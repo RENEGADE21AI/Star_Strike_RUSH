@@ -1144,6 +1144,7 @@ function startWraithShift(boss, reason = "damage") {
   boss.shiftReason = reason;
   boss.nextRealm = 1 - boss.realm;
   kickShake(4);
+  state.fx.flash = Math.max(state.fx.flash, 4);
 }
 function finishWraithShift(boss) {
   boss.realm = boss.nextRealm;
@@ -2065,12 +2066,14 @@ function initTitleFormations() {
     state.titleLaneCooldowns[lane] = 90 + lane * 12;
   }
 }
-function formationSpawnWouldOverlap(f) {
-  const sx = f.x, sy = f.y;
+function formationSpawnWouldOverlap(newF) {
   for (const other of state.titleFormations) {
     if (!other || other.removed) continue;
-    const d = Math.hypot(other.x - sx, other.y - sy);
-    if (d < 160) return true;
+    const yOverlap = Math.abs(other.y - newF.baseY) < 80;
+    const sameDir = other.dir === newF.dir;
+    const closeX = Math.abs(other.x - newF.x) < 200;
+    if (yOverlap && sameDir && closeX) return true;
+    if (Math.hypot(other.x - newF.x, other.y - newF.baseY) < 140) return true;
   }
   return false;
 }
@@ -2277,16 +2280,24 @@ function drawGearIcon(rect, active = false) {
   const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.strokeStyle = active ? "rgba(120,255,180,0.8)" : "rgba(255,255,255,0.9)";
-  ctx.fillStyle = active ? "rgba(120,255,180,0.20)" : "rgba(255,255,255,0.10)";
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(0, 0, 10, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = active ? "rgba(120,255,180,0.85)" : "rgba(255,255,255,0.90)";
+  ctx.fillStyle = active ? "rgba(120,255,180,0.18)" : "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, 8.8, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
   for (let i = 0; i < 8; i++) {
     const a = i * (TAU / 8);
-    const x1 = Math.cos(a) * 12, y1 = Math.sin(a) * 12;
-    const x2 = Math.cos(a) * 15, y2 = Math.sin(a) * 15;
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.save();
+    ctx.rotate(a);
+    ctx.fillRect(10.5, -2.0, 4.5, 4.0);
+    ctx.restore();
   }
+  ctx.fillStyle = active ? "rgba(0,20,10,0.85)" : "rgba(0,0,0,0.80)";
+  ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, TAU); ctx.fill();
+  ctx.strokeStyle = active ? "rgba(120,255,180,0.85)" : "rgba(255,255,255,0.90)";
+  ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, TAU); ctx.stroke();
   ctx.restore();
 }
 function drawBookIcon(rect, active = false) {
@@ -2424,11 +2435,16 @@ function drawPhantomShip(hitMix = 0, silhouette = false, ghostAlpha = 1, telegra
   ctx.fillStyle = silhouette ? "rgba(50,50,50,0.95)" : (stateMode === "ghost" ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.30)");
   ctx.fillRect(-2, 10, 4, 3);
   if (!silhouette) drawEnemyFlame(12, 7, 7, phase, stateMode === "ghost" ? 0.34 : 0.42);
+
   if (!silhouette) {
     if (telegraph > 0) {
       ctx.strokeStyle = "rgba(255,255,255,0.8)";
       ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 22, 0, TAU); ctx.stroke();
+    } else {
+      ctx.strokeStyle = stateMode === "ghost" ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.20)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 20, 0, TAU); ctx.stroke();
     }
     ctx.globalAlpha = 1;
   }
@@ -2480,11 +2496,11 @@ function drawBossStandardShip(silhouette = false, alpha = 1) {
   ctx.beginPath(); ctx.moveTo(48, 16); ctx.lineTo(62, 28); ctx.lineTo(40, 22); ctx.closePath(); ctx.fill();
   ctx.globalAlpha = 1;
 }
-function drawBossWraithShip(silhouette = false, alpha = 1, realm = 0) {
+function drawBossWraithShip(silhouette = false, alpha = 1, realm = 0, chargeTelegraph = 0) {
   if (!silhouette) {
     ctx.globalAlpha = alpha;
     ctx.shadowColor = realm === 0 ? "rgba(170,220,255,0.42)" : "rgba(180,120,255,0.48)";
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = chargeTelegraph > 0 ? 24 : 16;
   }
   const hull = silhouette ? "rgba(50,50,50,0.95)" : (realm === 0 ? "rgba(230,245,255,0.92)" : "rgba(225,200,255,0.88)");
   const inner = silhouette ? "rgba(50,50,50,0.95)" : (realm === 0 ? "rgba(200,225,245,0.85)" : "rgba(210,185,245,0.82)");
@@ -2517,6 +2533,7 @@ function drawEnemyGeometry(kind, opts = {}) {
   const telegraph = opts.telegraph || 0;
   const realm = opts.realm == null ? 0 : opts.realm;
   const phase = opts.phase || 0;
+  const chargeTelegraph = opts.chargeTelegraph || 0;
   if (!silhouette) ctx.globalAlpha = alpha;
 
   if (kind === "red") drawRedShip(hitMix, silhouette, phase);
@@ -2524,7 +2541,7 @@ function drawEnemyGeometry(kind, opts = {}) {
   else if (kind === "purple") drawPurpleShip(hitMix, silhouette, phase);
   else if (kind === "phantom") drawPhantomShip(hitMix, silhouette, alpha, telegraph, stateMode, phase);
   else if (kind === "boss_standard") drawBossStandardShip(silhouette, alpha);
-  else if (kind === "boss_wraith") drawBossWraithShip(silhouette, alpha, realm);
+  else if (kind === "boss_wraith") drawBossWraithShip(silhouette, alpha, realm, chargeTelegraph);
 
   ctx.globalAlpha = 1;
 }
@@ -2955,7 +2972,7 @@ function drawTitleAndButtons() {
   ctx.font = FONT_HUD;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  let txt = callSign ? `CALL SIGN: ${callSign}` : "ENTER PILOT NAME";
+  let txt = callSign ? `CALL SIGN: ${callSign}` : "ENTER CALL SIGN";
   if (callSignEditing) txt += (Math.floor(callSignCursorBlink / 28) % 2 === 0 ? " |" : " ");
   ctx.fillStyle = callSign ? "#fff" : "rgba(255,255,255,0.30)";
   ctx.fillText(txt, callRect.x + callRect.w / 2, callRect.y + callRect.h / 2 + 1);
@@ -3178,61 +3195,44 @@ function drawPlayer() {
   }
 
   if (p.ghostTimer > 0) {
-    const canFilter = typeof ctx.filter === "string";
-    ctx.save();
-    ctx.translate(p.x, p.y + bob);
-    ctx.rotate(tilt);
-    ctx.globalCompositeOperation = "lighter";
-    ctx.shadowColor = "rgba(80,255,255,1.0)";
-    ctx.shadowBlur = 28;
-
     const vx = p.vx, vy = p.vy;
     const mag = Math.hypot(vx, vy) || 1;
     const ox = -vx / mag, oy = -vy / mag;
 
-    const afterimages = [
-      { dist: 4, alpha: 0.22 },
-      { dist: 8, alpha: 0.13 },
-      { dist: 13, alpha: 0.07 }
+    const trailDefs = [
+      { dist: 12, alpha: 0.07 },
+      { dist: 6,  alpha: 0.11 }
     ];
-    for (const ai of afterimages) {
+    for (const td of trailDefs) {
       ctx.save();
-      ctx.translate(ox * ai.dist, oy * ai.dist);
-      ctx.globalAlpha = ai.alpha;
-      if (canFilter) ctx.filter = "blur(5px)";
-      drawExhaust(
-        ai.alpha * 0.85,
-        "rgba(140,255,255,0.70)",
-        "rgba(245,255,255,0.40)"
-      );
-      drawPlayerHull(
-        "rgba(220,252,255,0.66)",
-        "rgba(82,126,136,0.52)",
-        0.20
-      );
+      ctx.translate(p.x + ox * td.dist, p.y + bob + oy * td.dist);
+      ctx.rotate(tilt);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = td.alpha;
+      ctx.shadowColor = "rgba(120,255,255,0.6)";
+      ctx.shadowBlur = 10;
+      drawExhaust(0.5, "rgba(140,255,255,0.55)", "rgba(245,255,255,0.30)");
+      drawPlayerHull("rgba(200,248,255,0.6)", "rgba(82,126,136,0.40)", 0.12);
       drawCockpit("ghost", 0.82, 0.80);
-      if (canFilter) ctx.filter = "none";
       ctx.restore();
     }
 
+    ctx.save();
+    ctx.translate(p.x, p.y + bob);
+    ctx.rotate(tilt);
+    ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = 0.40;
-    if (canFilter) ctx.filter = "blur(3px)";
-    drawExhaust(
-      0.65,
-      "rgba(140,255,255,0.70)",
-      "rgba(245,255,255,0.40)"
-    );
-    drawPlayerHull(
-      "rgba(220,252,255,0.66)",
-      "rgba(82,126,136,0.52)",
-      0.20
-    );
+    ctx.shadowColor = "rgba(120,255,255,0.95)";
+    ctx.shadowBlur = 22;
+    drawExhaust(0.65, "rgba(140,255,255,0.70)", "rgba(245,255,255,0.40)");
+    drawPlayerHull("rgba(220,252,255,0.66)", "rgba(82,126,136,0.52)", 0.20);
     drawCockpit("ghost", 0.82, 0.80);
-    if (canFilter) ctx.filter = "none";
-
+    ctx.globalAlpha = 0.16;
+    ctx.translate(-1.2, 1.1);
+    drawPlayerHull("rgba(210,250,255,0.34)", "rgba(90,180,190,0.20)", 0.10);
     ctx.restore();
+
     ctx.globalAlpha = 1;
-    ctx.filter = "none";
     ctx.globalCompositeOperation = "source-over";
     ctx.shadowBlur = 0;
     return;
@@ -3360,6 +3360,12 @@ function drawEnemies() {
     const scale = 1 + Math.min(0.12, (e.hitPulse || 0) * 0.08);
     const hitMix = clamp((e.hitFlash || 0) / 12, 0, 1);
     const typeScale = e.type === "red" ? 1.05 : 1;
+    let entityAlpha = 1;
+    if (e.type === "phantom") {
+      entityAlpha = e.telegraphTimer > 0
+        ? clamp(0.42 + Math.sin((state.frame + (e.flickerSeed || 0)) * 0.8) * 0.22, 0.2, 0.64)
+        : (e.stateMode === "ghost" ? 0.42 : 1);
+    }
     ctx.save();
     ctx.translate(e.x, e.y);
     ctx.scale(scale * typeScale, scale * typeScale);
@@ -3371,13 +3377,23 @@ function drawEnemies() {
     if (!e.escape) ctx.scale(1, -1);
     drawEnemyGeometry(e.type, {
       hitMix,
-      alpha: 1,
+      alpha: entityAlpha,
       silhouette: false,
       stateMode: e.stateMode || "physical",
       telegraph: e.telegraphTimer || 0,
       realm: e.realm || 0,
-      phase: e.loopPhase
+      phase: e.loopPhase,
+      chargeTelegraph: e.chargeTelegraph || 0
     });
+    if (e.type === "purple" && e.warn > 0) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, (e.r || 17) + 4, 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.restore();
   }
 }
@@ -3387,7 +3403,6 @@ function drawBoss() {
   if (b.mode === "wraith") {
     const hpPct = b.hp / b.maxHp;
     const alphaBase = 0.50 + (1 - hpPct) * 0.18;
-    const realmGlow = b.realm === 0 ? "rgba(170,220,255,0.42)" : "rgba(180,120,255,0.48)";
     const flicker = b.shiftTelegraph > 0 ? (0.35 + Math.sin(state.frame * 0.8) * 0.25) : 1;
     const visibleAlpha = alphaBase * flicker;
     const wobble = Math.sin(state.frame * 0.045 + b.movePhase) * 2.2;
@@ -3395,7 +3410,7 @@ function drawBoss() {
     ctx.save();
     ctx.translate(b.x, b.y + wobble);
     ctx.rotate(tilt);
-    drawBossWraithShip(false, visibleAlpha, b.realm);
+    drawBossWraithShip(false, visibleAlpha, b.realm, b.chargeTelegraph);
     ctx.restore();
     for (let i = 0; i < 4; i++) {
       const ang = state.frame * 0.05 + i * 1.5;
@@ -4010,6 +4025,20 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   const k = e.key;
+  if (state.gameState === "start") {
+    if (k === "Enter" || k === " ") {
+      e.preventDefault();
+      beginGame();
+    }
+    return;
+  }
+  if (state.gameState === "gameover") {
+    if (k === "Enter" || k === " ") {
+      e.preventDefault();
+      beginGame();
+    }
+    return;
+  }
   if (state.gameState === "playing") {
     if (isMoveKey(k)) {
       e.preventDefault();
