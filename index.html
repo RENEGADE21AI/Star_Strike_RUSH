@@ -19,10 +19,14 @@
 </head>
 <body>
 <canvas id="game"></canvas>
+<input type="text" id="callSignInput"
+  style="position:fixed;left:-9999px;top:0;opacity:0;width:1px;height:1px;"
+  maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const callSignInputEl = document.getElementById("callSignInput");
 
 let W = 0, H = 0;
 let devSkipCooldown = 0;
@@ -54,10 +58,12 @@ let respawnHold = 0;
 let respawnPointerDown = false;
 let respawnPointerInside = false;
 let codexDiscovered = {};
+let codexHasNew = false;
 let encounterQueue = [];
 let encounterCard = null;
 const ENCOUNTER_CARD_DURATION = 210;
 let codexDetailType = null;
+let resetProgressConfirm = false;
 
 const FONT_TITLE = "900 52px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
 const FONT_HUGE = "900 58px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
@@ -284,6 +290,16 @@ const state = {
   lastWaveTemplateName: null,
   gameState: "start"
 };
+
+callSignInputEl.addEventListener("input", () => {
+  if (!callSignEditing) return;
+  callSign = sanitizeCallSign(callSignInputEl.value);
+  callSignInputEl.value = callSign;
+  saveCallSign();
+});
+callSignInputEl.addEventListener("blur", () => {
+  callSignEditing = false;
+});
 
 function makePlayer() {
   return {
@@ -820,6 +836,7 @@ function discoverCodex(type) {
     codexDiscovered[type] = true;
     saveCodexDiscovered();
     encounterQueue.push(type);
+    codexHasNew = true;
   }
 }
 function spawnWave() {
@@ -2170,7 +2187,10 @@ function updateTitleFormations() {
 }
 function updateTitleScreen() {
   updateTitleFormations();
-  titlePanelTarget = titleSubState === "main" ? 0 : 1;
+  if (titlePanelTarget === 0 && titlePanelAnim < 0.02) {
+    titleSubState = "main";
+    codexDetailType = null;
+  }
   titlePanelAnim += (titlePanelTarget - titlePanelAnim) * 0.22;
   callSignCursorBlink = (callSignCursorBlink + 1) % 56;
 
@@ -2203,12 +2223,14 @@ function updateRespawnHold() {
 function setCallSignFromInputKey(e) {
   if (e.key === "Enter" || e.key === "Escape") {
     callSignEditing = false;
+    callSignInputEl.blur();
   } else if (e.key === "Backspace") {
     callSign = callSign.slice(0, -1);
+    callSignInputEl.value = callSign;
     saveCallSign();
   } else if (e.key.length === 1 && callSign.length < 12) {
     const ch = e.key.toUpperCase();
-    if (/^[A-Z0-9_]$/.test(ch)) { callSign += ch; saveCallSign(); }
+    if (/^[A-Z0-9_]$/.test(ch)) { callSign += ch; callSignInputEl.value = callSign; saveCallSign(); }
   }
   e.preventDefault();
 }
@@ -2233,9 +2255,12 @@ function getTitleIconRects() {
 function getTitlePanelRect() {
   const panelW = Math.min(W * 0.84, W - 24);
   const panelH = Math.min(H * 0.72, H - 32);
-  const panelX = (W - panelW) / 2;
-  const panelY = (H - panelH) / 2;
-  return { x: panelX, y: panelY, w: panelW, h: panelH };
+  const openX = (W - panelW) / 2;
+  const closedX = W + 24;
+  const anim = clamp(titlePanelAnim, 0, 1);
+  const x = openX + (closedX - openX) * (1 - anim);
+  const y = (H - panelH) / 2;
+  return { x, y, w: panelW, h: panelH };
 }
 function getGameOverButtons() {
   const btnW = 220, btnH = 42, x = Math.round((W - btnW) / 2), y1 = Math.round(H * 0.60), gap = 12;
@@ -2243,6 +2268,35 @@ function getGameOverButtons() {
 }
 function hitRect(rect, x, y) { return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h; }
 
+function getSettingsRects() {
+  const panel = getTitlePanelRect();
+  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const innerX = panel.x + 20;
+  const innerY = panel.y + 56;
+  const btnY = innerY + 18;
+  const btnW = 64, btnH = 28, gap = 10;
+  const low = { x: innerX, y: btnY, w: btnW, h: btnH };
+  const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
+  const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
+  const shake = { x: innerX, y: btnY + 52, w: 130, h: 30 };
+  const reset = { x: innerX, y: btnY + 96, w: 160, h: 30 };
+  return { panel, closeRect, low, med, high, shake, reset };
+}
+function getCodexRects() {
+  const panel = getTitlePanelRect();
+  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const rects = codexCardRects(panel);
+  return { panel, closeRect, rects };
+}
+function getResetConfirmRects() {
+  const boxW = Math.min(460, W - 28);
+  const boxH = 166;
+  const boxX = Math.round((W - boxW) / 2);
+  const boxY = Math.round((H - boxH) / 2);
+  const no = { x: boxX + 28, y: boxY + boxH - 48, w: 116, h: 32 };
+  const yes = { x: boxX + boxW - 144, y: boxY + boxH - 48, w: 116, h: 32 };
+  return { box: { x: boxX, y: boxY, w: boxW, h: boxH }, yes, no };
+}
 function drawHoldButton(rect, label, hold, threshold, baseFill, strokeMin, strokeMax) {
   const progress = clamp(hold / threshold, 0, 1);
   ctx.save();
@@ -2280,58 +2334,64 @@ function drawGearIcon(rect, active = false) {
   const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.strokeStyle = active ? "rgba(120,255,180,0.85)" : "rgba(255,255,255,0.90)";
-  ctx.fillStyle = active ? "rgba(120,255,180,0.18)" : "rgba(255,255,255,0.08)";
+  ctx.strokeStyle = active ? "rgba(120,255,180,0.90)" : "rgba(255,255,255,0.92)";
+  ctx.fillStyle = active ? "rgba(120,255,180,0.20)" : "rgba(255,255,255,0.16)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(0, 0, 8.8, 0, TAU);
+  ctx.arc(0, 0, 13.2, 0, TAU);
   ctx.fill();
   ctx.stroke();
+
+  ctx.fillStyle = active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.92)";
   for (let i = 0; i < 8; i++) {
     const a = i * (TAU / 8);
     ctx.save();
     ctx.rotate(a);
-    ctx.fillRect(10.5, -2.0, 4.5, 4.0);
+    ctx.fillRect(11.9, -1.8, 4.8, 3.6);
     ctx.restore();
   }
-  ctx.fillStyle = active ? "rgba(0,20,10,0.85)" : "rgba(0,0,0,0.80)";
-  ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, TAU); ctx.fill();
-  ctx.strokeStyle = active ? "rgba(120,255,180,0.85)" : "rgba(255,255,255,0.90)";
-  ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, TAU); ctx.stroke();
+
+  ctx.fillStyle = active ? "rgba(250,255,255,0.92)" : "rgba(235,240,245,0.88)";
+  ctx.beginPath(); ctx.arc(0, 0, 8.4, 0, TAU); ctx.fill();
+  ctx.fillStyle = active ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.18)";
+  ctx.beginPath(); ctx.arc(0, 0, 5.0, 0, TAU); ctx.fill();
+  ctx.fillStyle = active ? "rgba(0,20,10,0.85)" : "rgba(0,0,0,0.78)";
+  ctx.beginPath(); ctx.arc(0, 0, 4.3, 0, TAU); ctx.fill();
   ctx.restore();
 }
 function drawBookIcon(rect, active = false) {
   const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.fillStyle = active ? "rgba(120,255,180,0.20)" : "rgba(255,255,255,0.10)";
-  ctx.strokeStyle = active ? "rgba(120,255,180,0.8)" : "rgba(255,255,255,0.9)";
+  ctx.strokeStyle = active ? "rgba(120,255,180,0.85)" : "rgba(255,255,255,0.90)";
+  ctx.fillStyle = active ? "rgba(120,255,180,0.16)" : "rgba(255,255,255,0.10)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(-12, -10); ctx.lineTo(-2, -8); ctx.lineTo(-2, 10); ctx.lineTo(-12, 8); ctx.closePath();
+  ctx.moveTo(-12, -11); ctx.lineTo(-2, -9); ctx.lineTo(-2, 11); ctx.lineTo(-12, 8); ctx.closePath();
   ctx.fill(); ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(2, -8); ctx.lineTo(12, -10); ctx.lineTo(12, 8); ctx.lineTo(2, 10); ctx.closePath();
+  ctx.moveTo(2, -9); ctx.lineTo(12, -11); ctx.lineTo(12, 8); ctx.lineTo(2, 11); ctx.closePath();
   ctx.fill(); ctx.stroke();
+  ctx.fillStyle = active ? "rgba(120,255,180,0.22)" : "rgba(255,255,255,0.14)";
+  ctx.fillRect(-2, -11, 4, 22);
+  ctx.strokeStyle = active ? "rgba(120,255,180,0.55)" : "rgba(255,255,255,0.35)";
+  ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(-3, -5); ctx.moveTo(-8, -1); ctx.lineTo(-3, 0); ctx.moveTo(-8, 4); ctx.lineTo(-3, 5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(3, -5); ctx.lineTo(8, -6); ctx.moveTo(3, 0); ctx.lineTo(8, -1); ctx.moveTo(3, 5); ctx.lineTo(8, 4); ctx.stroke();
+  if (codexHasNew) {
+    ctx.fillStyle = "#f33";
+    ctx.shadowColor = "rgba(255,50,50,0.9)";
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(10, -9, 4.5, 0, TAU);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
   ctx.restore();
 }
-
 function drawEnemyFlame(yOffset, width, height, phase, alpha = 0.42) {
   const flicker = 1 + Math.sin(state.frame * 0.35 + phase) * 0.22;
   const reach = height * flicker;
   ctx.save();
-  const nozzleW = width * 0.42;
-  const nozzleH = Math.max(3.2, height * 0.34);
-  ctx.globalAlpha = alpha * 0.28;
-  ctx.fillStyle = "rgba(0,0,0,0.34)";
-  ctx.beginPath();
-  ctx.roundRect(-nozzleW * 0.5, yOffset - nozzleH, nozzleW, nozzleH, nozzleH * 0.5);
-  ctx.fill();
-  ctx.globalAlpha = alpha * 0.10;
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.beginPath();
-  ctx.roundRect(-nozzleW * 0.22, yOffset - nozzleH + 0.8, nozzleW * 0.44, 1.2, 1);
-  ctx.fill();
   ctx.globalAlpha = alpha * 0.85;
   ctx.fillStyle = "rgba(255,150,50,0.70)";
   ctx.beginPath();
@@ -2685,7 +2745,8 @@ function drawEncounterCard() {
   ctx.font = FONT_TINY;
   ctx.textAlign = "left"; ctx.textBaseline = "top";
   const blink = Math.floor(state.frame / 18) % 2 === 0 ? "●" : "○";
-  ctx.fillText(blink + " FIRST CONTACT", cardX + 80, cardY + 8);
+  const cardLabel = encounterCard.type.startsWith("boss") ? "NEW BOSS" : "NEW ENEMY";
+  ctx.fillText(blink + " " + cardLabel, cardX + 80, cardY + 8);
   ctx.save();
   ctx.translate(cardX + 40, cardY + cardH / 2 + 2);
   drawEncounterShipGraphic(encounterCard.type, {
@@ -2724,23 +2785,22 @@ function drawTitlePanelFrame(panel, title) {
   ctx.restore();
 }
 function drawSettingsPanel() {
-  const panel = getTitlePanelRect();
-  drawTitlePanelFrame(panel, "PERFORMANCE");
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const r = getSettingsRects();
+  drawTitlePanelFrame(r.panel, "PERFORMANCE");
   ctx.save();
   ctx.fillStyle = "rgba(255,255,255,0.10)";
-  ctx.fillRect(closeRect.x, closeRect.y, closeRect.w, closeRect.h);
+  ctx.fillRect(r.closeRect.x, r.closeRect.y, r.closeRect.w, r.closeRect.h);
   ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.strokeRect(closeRect.x, closeRect.y, closeRect.w, closeRect.h);
+  ctx.strokeRect(r.closeRect.x, r.closeRect.y, r.closeRect.w, r.closeRect.h);
   ctx.fillStyle = "#fff";
   ctx.font = FONT_HUD;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("×", closeRect.x + closeRect.w / 2, closeRect.y + closeRect.h / 2);
+  ctx.fillText("×", r.closeRect.x + r.closeRect.w / 2, r.closeRect.y + r.closeRect.h / 2);
   ctx.restore();
 
-  const innerX = panel.x + 20;
-  const innerY = panel.y + 56;
+  const innerX = r.panel.x + 20;
+  const innerY = r.panel.y + 56;
   ctx.save();
   ctx.fillStyle = "rgba(255,255,255,0.8)";
   ctx.font = FONT_SMALL;
@@ -2765,7 +2825,7 @@ function drawSettingsPanel() {
     ctx.fillText(labels[i] === 300 ? "LOW" : labels[i] === 600 ? "MED" : "HIGH", rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
   }
 
-  const shakeRect = { x: innerX, y: btnY + 52, w: 130, h: 30 };
+  const shakeRect = r.shake;
   ctx.fillStyle = settingScreenShake ? "rgba(120,255,180,0.14)" : "rgba(255,255,255,0.08)";
   ctx.fillRect(shakeRect.x, shakeRect.y, shakeRect.w, shakeRect.h);
   ctx.strokeStyle = settingScreenShake ? "rgba(120,255,180,0.7)" : "rgba(255,255,255,0.22)";
@@ -2775,6 +2835,17 @@ function drawSettingsPanel() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(`SHAKE: ${settingScreenShake ? "ON" : "OFF"}`, shakeRect.x + shakeRect.w / 2, shakeRect.y + shakeRect.h / 2 + 1);
+
+  const resetRect = r.reset;
+  ctx.fillStyle = "rgba(255,80,80,0.12)";
+  ctx.fillRect(resetRect.x, resetRect.y, resetRect.w, resetRect.h);
+  ctx.strokeStyle = "rgba(255,120,120,0.6)";
+  ctx.strokeRect(resetRect.x, resetRect.y, resetRect.w, resetRect.h);
+  ctx.fillStyle = "#fff";
+  ctx.font = FONT_TINY;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("RESET PROGRESS", resetRect.x + resetRect.w / 2, resetRect.y + resetRect.h / 2 + 1);
   ctx.restore();
 }
 function drawCodexSilhouetteLockIcon(x, y) {
@@ -2808,6 +2879,7 @@ function drawCodexGrid(panel) {
   const rects = codexCardRects(panel);
   const types = ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"];
   const typeColors = { red:"#e44", orange:"#f93", purple:"#b4f", phantom:"#0ff", boss_standard:"#6ff", boss_wraith:"#d9b6ff" };
+  const shortNames = { red:"RED", orange:"ORANGE", purple:"PURPLE", phantom:"PHANTOM", boss_standard:"CMD SHIP", boss_wraith:"WRAITH" };
   for (const type of types) {
     const r = rects[type];
     const discovered = !!codexDiscovered[type];
@@ -2829,7 +2901,7 @@ function drawCodexGrid(panel) {
     ctx.textBaseline = "middle";
     ctx.font = FONT_TINY;
     ctx.fillStyle = discovered ? "#fff" : "rgba(255,255,255,0.35)";
-    ctx.fillText(discovered ? type.replace("_", " ").toUpperCase() : "???", r.x + r.w / 2, r.y + 86);
+    ctx.fillText(discovered ? (shortNames[type] || type.toUpperCase()) : "???", r.x + r.w / 2, r.y + 86);
     if (discovered) {
       ctx.fillStyle = typeColors[type];
       ctx.beginPath(); ctx.arc(r.x + r.w - 10, r.y + 10, 3, 0, TAU); ctx.fill();
@@ -2926,10 +2998,47 @@ function drawCodexPanel() {
   else drawCodexGrid(panel);
 }
 
+function drawResetProgressConfirm() {
+  if (!resetProgressConfirm) return;
+  const r = getResetConfirmRects();
+  const labelName = callSign || "User";
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.58)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(10,10,18,0.96)";
+  ctx.beginPath(); ctx.roundRect(r.box.x, r.box.y, r.box.w, r.box.h, 12); ctx.fill();
+  ctx.strokeStyle = "rgba(255,100,100,0.7)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(r.box.x, r.box.y, r.box.w, r.box.h, 12); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.82)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = FONT_SMALL;
+  ctx.fillText("Are you sure you want to reset your progress?", r.box.x + r.box.w / 2, r.box.y + 44);
+  ctx.fillStyle = "#fff";
+  ctx.font = FONT_HUD;
+  ctx.fillText(labelName || "PILOT", r.box.x + r.box.w / 2, r.box.y + 72);
+  ctx.font = FONT_BUTTON;
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  ctx.fillRect(r.no.x, r.no.y, r.no.w, r.no.h);
+  ctx.strokeStyle = "rgba(255,255,255,0.28)";
+  ctx.strokeRect(r.no.x, r.no.y, r.no.w, r.no.h);
+  ctx.fillStyle = "#000";
+  ctx.fillText("NO", r.no.x + r.no.w / 2, r.no.y + r.no.h / 2 + 1);
+  ctx.fillStyle = "rgba(255,90,90,0.94)";
+  ctx.fillRect(r.yes.x, r.yes.y, r.yes.w, r.yes.h);
+  ctx.strokeStyle = "rgba(255,160,160,0.55)";
+  ctx.strokeRect(r.yes.x, r.yes.y, r.yes.w, r.yes.h);
+  ctx.fillStyle = "#fff";
+  ctx.fillText("YES", r.yes.x + r.yes.w / 2, r.yes.y + r.yes.h / 2 + 1);
+  ctx.restore();
+}
 function drawSettingsAndCodexPanels() {
   if (titlePanelAnim <= 0.02 && titlePanelTarget <= 0) return;
   ctx.save();
   ctx.globalAlpha = clamp(titlePanelAnim, 0, 1);
+  ctx.fillStyle = "rgba(0,0,0,0.30)";
+  ctx.fillRect(0, 0, W, H);
   if (titleSubState === "settings") drawSettingsPanel();
   else if (titleSubState === "codex") drawCodexPanel();
   ctx.restore();
@@ -2968,14 +3077,25 @@ function drawTitleAndButtons() {
   ctx.strokeStyle = callSignEditing ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.35)";
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.roundRect(callRect.x, callRect.y, callRect.w, callRect.h, 8); ctx.stroke();
-  ctx.fillStyle = "#fff";
   ctx.font = FONT_HUD;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  let txt = callSign ? `CALL SIGN: ${callSign}` : "ENTER CALL SIGN";
-  if (callSignEditing) txt += (Math.floor(callSignCursorBlink / 28) % 2 === 0 ? " |" : " ");
+  let txt;
+  if (callSignEditing) {
+    txt = callSign + (Math.floor(callSignCursorBlink / 28) % 2 === 0 ? "|" : " ");
+  } else {
+    txt = callSign || "ENTER CALL SIGN";
+  }
   ctx.fillStyle = callSign ? "#fff" : "rgba(255,255,255,0.30)";
   ctx.fillText(txt, callRect.x + callRect.w / 2, callRect.y + callRect.h / 2 + 1);
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.font = FONT_TINY;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("CALL SIGN", W / 2, H * 0.355 - 20 - 4);
   ctx.restore();
 
   const playRect = getPlayButtonRect();
@@ -3008,6 +3128,7 @@ function drawStartScreen() {
   drawMenuFlights();
   drawTitleAndButtons();
   drawSettingsAndCodexPanels();
+  drawResetProgressConfirm();
 }
 function drawGameOverScreen() {
   const buttons = getGameOverButtons();
@@ -3196,12 +3317,13 @@ function drawPlayer() {
 
   if (p.ghostTimer > 0) {
     const vx = p.vx, vy = p.vy;
-    const mag = Math.hypot(vx, vy) || 1;
-    const ox = -vx / mag, oy = -vy / mag;
+    const vmag = Math.hypot(vx, vy) || 1;
+    const ox = -vx / vmag, oy = -vy / vmag;
 
     const trailDefs = [
-      { dist: 12, alpha: 0.07 },
-      { dist: 6,  alpha: 0.11 }
+      { dist: 18, alpha: 0.05 },
+      { dist: 10, alpha: 0.09 },
+      { dist: 4,  alpha: 0.13 }
     ];
     for (const td of trailDefs) {
       ctx.save();
@@ -3209,11 +3331,11 @@ function drawPlayer() {
       ctx.rotate(tilt);
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = td.alpha;
-      ctx.shadowColor = "rgba(120,255,255,0.6)";
-      ctx.shadowBlur = 10;
-      drawExhaust(0.5, "rgba(140,255,255,0.55)", "rgba(245,255,255,0.30)");
-      drawPlayerHull("rgba(200,248,255,0.6)", "rgba(82,126,136,0.40)", 0.12);
-      drawCockpit("ghost", 0.82, 0.80);
+      ctx.shadowColor = "rgba(80,220,255,0.7)";
+      ctx.shadowBlur = 12;
+      drawExhaust(td.alpha * 2.1, "rgba(120,255,255,0.55)", "rgba(200,255,255,0.28)");
+      drawPlayerHull("rgba(160,240,255,0.8)", "rgba(80,160,190,0.5)", 0.10);
+      drawCockpit("ghost", 0.75, 0.73);
       ctx.restore();
     }
 
@@ -3221,15 +3343,46 @@ function drawPlayer() {
     ctx.translate(p.x, p.y + bob);
     ctx.rotate(tilt);
     ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = 0.40;
-    ctx.shadowColor = "rgba(120,255,255,0.95)";
-    ctx.shadowBlur = 22;
-    drawExhaust(0.65, "rgba(140,255,255,0.70)", "rgba(245,255,255,0.40)");
-    drawPlayerHull("rgba(220,252,255,0.66)", "rgba(82,126,136,0.52)", 0.20);
+    ctx.globalAlpha = 0.38;
+    ctx.shadowColor = "rgba(80,255,255,1.0)";
+    ctx.shadowBlur = 26;
+    drawExhaust(0.80, "rgba(120,255,255,0.85)", "rgba(200,255,255,0.50)");
+    drawPlayerHull("rgba(190,255,255,0.82)", "rgba(90,190,210,0.65)", 0.28);
     drawCockpit("ghost", 0.82, 0.80);
-    ctx.globalAlpha = 0.16;
+    ctx.globalAlpha = 0.14;
     ctx.translate(-1.2, 1.1);
-    drawPlayerHull("rgba(210,250,255,0.34)", "rgba(90,180,190,0.20)", 0.10);
+    drawPlayerHull("rgba(180,240,255,0.5)", "rgba(80,160,185,0.25)", 0.10);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(p.x, p.y + bob);
+    ctx.rotate(tilt);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = "rgba(120,255,255,0.12)";
+    ctx.lineWidth = 1;
+    for (let scanY = -22; scanY <= 22; scanY += 3) {
+      ctx.beginPath();
+      ctx.moveTo(-22, scanY);
+      ctx.lineTo(22, scanY);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.shadowColor = "rgba(80,255,255,1.0)";
+    ctx.shadowBlur = 8;
+    for (let i = 0; i < 6; i++) {
+      const ang = state.frame * 0.09 + i * (TAU / 6);
+      const r = 13 + Math.sin(state.frame * 0.13 + i * 1.7) * 4;
+      const mx = p.x + Math.cos(ang) * r;
+      const my = p.y + bob + Math.sin(ang) * r * 0.45;
+      ctx.globalAlpha = clamp(0.35 + Math.sin(state.frame * 0.18 + i * 2.1) * 0.25, 0.1, 0.65);
+      ctx.fillStyle = "rgba(160,255,255,1.0)";
+      ctx.beginPath();
+      ctx.arc(mx, my, 1.6, 0, TAU);
+      ctx.fill();
+    }
     ctx.restore();
 
     ctx.globalAlpha = 1;
@@ -3795,6 +3948,7 @@ function setupSession(mode = "start") {
   titlePanelAnim = 0;
   titlePanelTarget = 0;
   codexDetailType = null;
+  resetProgressConfirm = false;
   highScoreDirty = false;
   state.stars = [];
   for (let i = 0; i < 110; i++) {
@@ -3830,38 +3984,95 @@ function resize() {
   if (state.gameState === "start") initTitleFormations();
 }
 
+function resetProgressData() {
+  highScore = 0;
+  previousHighScore = 0;
+  highScoreDirty = true;
+  saveHighScore();
+  codexDiscovered = {};
+  codexHasNew = false;
+  saveCodexDiscovered();
+  encounterQueue = [];
+  encounterCard = null;
+}
 function titlePanelHit(x, y) {
   const panel = getTitlePanelRect();
   return titlePanelAnim > 0.02 && x >= panel.x && x <= panel.x + panel.w && y >= panel.y && y <= panel.y + panel.h;
 }
-function titleSettingsRects() {
-  const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
-  const innerX = panel.x + 20;
-  const innerY = panel.y + 56;
-  const btnY = innerY + 18;
-  const btnW = 64, btnH = 28, gap = 10;
-  const low = { x: innerX, y: btnY, w: btnW, h: btnH };
-  const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
-  const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
-  const shake = { x: innerX, y: btnY + 52, w: 130, h: 30 };
-  return { panel, closeRect, low, med, high, shake };
-}
-function titleCodexRects() {
-  const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
-  const rects = codexCardRects(panel);
-  const backRect = { x: panel.x + 28, y: panel.y + 58, w: 28, h: 22 };
-  return { panel, closeRect, rects, backRect };
+function handleResetProgressConfirmDown(x, y) {
+  if (!resetProgressConfirm) return false;
+  const r = getResetConfirmRects();
+  if (hitRect(r.yes, x, y)) {
+    resetProgressConfirm = false;
+    resetProgressData();
+    titleSubState = "main";
+    titlePanelTarget = 0;
+    codexDetailType = null;
+    return true;
+  }
+  if (hitRect(r.no, x, y)) {
+    resetProgressConfirm = false;
+    return true;
+  }
+  return true;
 }
 function handleTitlePointerDown(x, y) {
+  if (resetProgressConfirm) return handleResetProgressConfirmDown(x, y);
+
+  if (titlePanelAnim > 0.02) {
+    if (titlePanelHit(x, y)) {
+      if (titleSubState === "settings") {
+        const r = getSettingsRects();
+        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        if (hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
+        if (hitRect(r.med, x, y)) { settingMaxParticles = 600; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
+        if (hitRect(r.high, x, y)) { settingMaxParticles = 900; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
+        if (hitRect(r.shake, x, y)) { settingScreenShake = !settingScreenShake; saveSettings(); return true; }
+        if (hitRect(r.reset, x, y)) { resetProgressConfirm = true; return true; }
+        return true;
+      }
+      if (titleSubState === "codex") {
+        const r = getCodexRects();
+        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        if (codexDetailType) {
+          const detailCard = { x: r.panel.x + 18, y: r.panel.y + 46, w: r.panel.w - 36, h: r.panel.h - 62 };
+          const backRect = { x: detailCard.x + 10, y: detailCard.y + 10, w: 28, h: 22 };
+          if (hitRect(backRect, x, y)) { codexDetailType = null; return true; }
+          if (!(x >= detailCard.x && x <= detailCard.x + detailCard.w && y >= detailCard.y && y <= detailCard.y + detailCard.h)) {
+            codexDetailType = null;
+            return true;
+          }
+          return true;
+        }
+        for (const type of ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"]) {
+          const card = r.rects[type];
+          if (!hitRect(card, x, y)) continue;
+          if (codexDiscovered[type]) {
+            codexDetailType = type;
+          }
+          return true;
+        }
+        return true;
+      }
+    }
+    return true;
+  }
+
   const callRect = getCallSignRect();
   const playRect = getPlayButtonRect();
   const iconRects = getTitleIconRects();
+
   if (hitRect(callRect, x, y)) {
     callSignEditing = true;
+    callSignInputEl.value = callSign;
+    callSignInputEl.focus();
     return true;
   }
+  if (callSignEditing) {
+    callSignEditing = false;
+    callSignInputEl.blur();
+  }
+
   if (hitRect(playRect, x, y)) {
     playBtnPointerDown = true;
     playBtnPointerInside = true;
@@ -3869,56 +4080,17 @@ function handleTitlePointerDown(x, y) {
     return true;
   }
   if (hitRect(iconRects.settings, x, y)) {
-    if (titleSubState === "settings" && titlePanelTarget === 1) { titleSubState = "main"; titlePanelTarget = 0; codexDetailType = null; }
+    if (titleSubState === "settings" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
     else { titleSubState = "settings"; titlePanelTarget = 1; codexDetailType = null; }
     return true;
   }
   if (hitRect(iconRects.codex, x, y)) {
-    if (titleSubState === "codex" && titlePanelTarget === 1) { titleSubState = "main"; titlePanelTarget = 0; codexDetailType = null; }
+    codexHasNew = false;
+    if (titleSubState === "codex" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
     else { titleSubState = "codex"; titlePanelTarget = 1; }
     return true;
   }
 
-  if (titlePanelHit(x, y)) {
-    if (titleSubState === "settings") {
-      const r = titleSettingsRects();
-      if (hitRect(r.closeRect, x, y)) { titleSubState = "main"; titlePanelTarget = 0; codexDetailType = null; return true; }
-      if (hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-      if (hitRect(r.med, x, y)) { settingMaxParticles = 600; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-      if (hitRect(r.high, x, y)) { settingMaxParticles = 900; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-      if (hitRect(r.shake, x, y)) { settingScreenShake = !settingScreenShake; saveSettings(); return true; }
-      return true;
-    }
-    if (titleSubState === "codex") {
-      const r = titleCodexRects();
-      if (hitRect(r.closeRect, x, y)) { titleSubState = "main"; titlePanelTarget = 0; codexDetailType = null; return true; }
-      if (codexDetailType) {
-        const detailCard = { x: r.panel.x + 18, y: r.panel.y + 46, w: r.panel.w - 36, h: r.panel.h - 62 };
-        const backRect = { x: detailCard.x + 10, y: detailCard.y + 10, w: 28, h: 22 };
-        if (hitRect(backRect, x, y)) { codexDetailType = null; return true; }
-        if (!(x >= detailCard.x && x <= detailCard.x + detailCard.w && y >= detailCard.y && y <= detailCard.y + detailCard.h)) {
-          codexDetailType = null;
-          return true;
-        }
-        return true;
-      }
-      for (const type of ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"]) {
-        const card = r.rects[type];
-        if (!hitRect(card, x, y)) continue;
-        if (codexDiscovered[type]) {
-          codexDetailType = type;
-        }
-        return true;
-      }
-      return true;
-    }
-  }
-  if (titleSubState !== "main") {
-    titleSubState = "main";
-    titlePanelTarget = 0;
-    codexDetailType = null;
-    return true;
-  }
   return false;
 }
 function handleGameOverPointerDown(x, y) {
@@ -4001,13 +4173,31 @@ function endPointer(e) {
     state.joystick.ax = 0;
     state.joystick.ay = 0;
   }
+  if (state.gameState === "gameover" && respawnPointerDown && respawnPointerInside) {
+    respawnPointerDown = false;
+    respawnPointerInside = false;
+    respawnHold = 0;
+    beginGame();
+    return;
+  }
+  if (state.gameState === "start" && playBtnPointerDown && playBtnPointerInside) {
+    playBtnPointerDown = false;
+    playBtnPointerInside = false;
+    playBtnHold = 0;
+    beginGame();
+    return;
+  }
+  if (state.gameState === "gameover") {
+    respawnPointerDown = false;
+    respawnPointerInside = false;
+    respawnHold = 0;
+    return;
+  }
   if (state.gameState !== "playing") {
     playBtnPointerDown = false;
     playBtnPointerInside = false;
     playBtnHold = 0;
-    respawnPointerDown = false;
-    respawnPointerInside = false;
-    respawnHold = 0;
+    return;
   }
 }
 canvas.addEventListener("pointerup", endPointer);
