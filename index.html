@@ -28,7 +28,13 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const callSignInputEl = document.getElementById("callSignInput");
 
-let W = 0, H = 0;
+const GAME_W = 375;
+const GAME_H = 667;
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+
+let W = GAME_W, H = GAME_H;
 let devSkipCooldown = 0;
 const DEV_SKIP_COOLDOWN_FRAMES = 48;
 let MAX_PARTICLES = 900;
@@ -533,7 +539,7 @@ function phaseDuration(phase) {
 }
 function rhythmProfile() {
   if (state.boss || state.bossDeath) return { pressure: 0, interval: 0 };
-  const beat = state.phaseTimer % 240;
+  const beat = state.waveTimer % 240;
   if (beat < 45) return { pressure: -7, interval: 18 };
   if (beat < 135) return { pressure: 10, interval: -12 };
   if (beat < 170) return { pressure: -4, interval: 10 };
@@ -2342,7 +2348,7 @@ function drawGearIcon(rect, active = false) {
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.92)";
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
   for (let i = 0; i < 8; i++) {
     const a = i * (TAU / 8);
     ctx.save();
@@ -2621,6 +2627,7 @@ function drawEncounterShipGraphic(type, opts = {}) {
   const stateMode = opts.stateMode || "physical";
   const realm = opts.realm == null ? 0 : opts.realm;
   ctx.save();
+  ctx.translate(0, 0);
   ctx.scale(scale, scale);
   ctx.scale(1, -1);
   drawEnemyGeometry(type, { hitMix: 0, alpha: 1, silhouette, stateMode, telegraph: 0, realm, phase: state.frame * 0.04 });
@@ -3271,7 +3278,7 @@ function drawPlayer() {
     const outlineAlpha = normal ? 0.11 : 0.09;
     ctx.globalAlpha = bodyAlpha;
     ctx.shadowColor = normal ? "rgba(190,230,255,0.32)" : "rgba(210,170,255,0.28)";
-    ctx.shadowBlur = normal ? 8 : 10;
+    ctx.shadowBlur = 8;
 
     ctx.save();
     ctx.globalAlpha = bodyAlpha * 0.42;
@@ -3316,42 +3323,29 @@ function drawPlayer() {
   }
 
   if (p.ghostTimer > 0) {
-    const vx = p.vx, vy = p.vy;
-    const vmag = Math.hypot(vx, vy) || 1;
-    const ox = -vx / vmag, oy = -vy / vmag;
-
-    const trailDefs = [
-      { dist: 18, alpha: 0.05 },
-      { dist: 10, alpha: 0.09 },
-      { dist: 4,  alpha: 0.13 }
-    ];
-    for (const td of trailDefs) {
-      ctx.save();
-      ctx.translate(p.x + ox * td.dist, p.y + bob + oy * td.dist);
-      ctx.rotate(tilt);
-      ctx.globalCompositeOperation = "source-over";
-      ctx.globalAlpha = td.alpha;
-      ctx.shadowColor = "rgba(80,220,255,0.7)";
-      ctx.shadowBlur = 12;
-      drawExhaust(td.alpha * 2.1, "rgba(120,255,255,0.55)", "rgba(200,255,255,0.28)");
-      drawPlayerHull("rgba(160,240,255,0.8)", "rgba(80,160,190,0.5)", 0.10);
-      drawCockpit("ghost", 0.75, 0.73);
-      ctx.restore();
-    }
-
     ctx.save();
     ctx.translate(p.x, p.y + bob);
     ctx.rotate(tilt);
     ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = 0.38;
-    ctx.shadowColor = "rgba(80,255,255,1.0)";
-    ctx.shadowBlur = 26;
-    drawExhaust(0.80, "rgba(120,255,255,0.85)", "rgba(200,255,255,0.50)");
-    drawPlayerHull("rgba(190,255,255,0.82)", "rgba(90,190,210,0.65)", 0.28);
-    drawCockpit("ghost", 0.82, 0.80);
-    ctx.globalAlpha = 0.14;
-    ctx.translate(-1.2, 1.1);
-    drawPlayerHull("rgba(180,240,255,0.5)", "rgba(80,160,185,0.25)", 0.10);
+    ctx.globalAlpha = 0.20;
+    ctx.shadowColor = "rgba(80,255,255,0.9)";
+    ctx.shadowBlur = 32;
+    ctx.fillStyle = "rgba(100,240,255,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(0, -2, 17, 20, 0, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(p.x, p.y + bob);
+    ctx.rotate(tilt);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.46;
+    ctx.shadowColor = "rgba(80,255,255,0.75)";
+    ctx.shadowBlur = 14;
+    drawExhaust(0.72, "rgba(120,255,255,0.85)", "rgba(200,255,255,0.50)");
+    drawPlayerHull("rgba(180,255,255,0.90)", "rgba(80,180,200,0.62)", 0.22);
+    drawCockpit("ghost", 0.80, 0.78);
     ctx.restore();
 
     ctx.save();
@@ -3361,10 +3355,7 @@ function drawPlayer() {
     ctx.strokeStyle = "rgba(120,255,255,0.12)";
     ctx.lineWidth = 1;
     for (let scanY = -22; scanY <= 22; scanY += 3) {
-      ctx.beginPath();
-      ctx.moveTo(-22, scanY);
-      ctx.lineTo(22, scanY);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-22, scanY); ctx.lineTo(22, scanY); ctx.stroke();
     }
     ctx.restore();
 
@@ -3835,16 +3826,159 @@ function drawDamageFlash() {
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
 }
+function drawOuterFog() {
+  const screenW = canvas.width;
+  const screenH = canvas.height;
+  const gx = offsetX;
+  const gy = offsetY;
+  const gw = GAME_W * scale;
+  const gh = GAME_H * scale;
+  const t = state.frame;
+
+  function drawCloudBank(cx, cy, rx, ry, alpha, phase, tone = 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = alpha;
+    const lobes = [
+      [-0.42, -0.10, 0.92, 0.78],
+      [-0.22, -0.18, 1.08, 0.86],
+      [0.02, -0.12, 1.18, 0.90],
+      [0.26, -0.08, 1.02, 0.78],
+      [0.48, -0.02, 0.88, 0.68],
+      [-0.04, 0.10, 1.30, 0.56]
+    ];
+    for (let i = 0; i < lobes.length; i++) {
+      const l = lobes[i];
+      const driftX = Math.sin(t * 0.0012 + phase + i * 1.17) * rx * 0.14;
+      const driftY = Math.cos(t * 0.0009 + phase + i * 1.42) * ry * 0.10;
+      const px = cx + driftX + l[0] * rx * 0.18;
+      const py = cy + driftY + l[1] * ry * 0.16;
+      const rw = rx * l[2];
+      const rh = ry * l[3];
+      const grad = ctx.createRadialGradient(px, py, Math.min(rw, rh) * 0.10, px, py, Math.max(rw, rh) * 0.92);
+      grad.addColorStop(0, tone === 0 ? `rgba(26,28,32,${alpha * 0.98})` : `rgba(34,37,42,${alpha * 0.96})`);
+      grad.addColorStop(0.42, tone === 0 ? `rgba(14,16,19,${alpha * 0.82})` : `rgba(18,20,24,${alpha * 0.78})`);
+      grad.addColorStop(0.75, tone === 0 ? `rgba(6,7,9,${alpha * 0.42})` : `rgba(10,11,13,${alpha * 0.38})`);
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(px, py, rw, rh, 0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = alpha * 0.25;
+    ctx.fillStyle = tone === 0 ? "rgba(0,0,0,0.34)" : "rgba(0,0,0,0.28)";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + ry * 0.10, rx * 0.92, ry * 0.72, 0, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, screenW, screenH);
+
+  const wide = [
+    { x: -70, y: screenH * 0.08, rx: screenW * 0.52, ry: screenH * 0.11, a: 0.16, p: 0.5, t: 0 },
+    { x: screenW * 0.28, y: screenH * 0.04, rx: screenW * 0.44, ry: screenH * 0.10, a: 0.14, p: 1.1, t: 1 },
+    { x: screenW * 0.84, y: screenH * 0.11, rx: screenW * 0.50, ry: screenH * 0.12, a: 0.16, p: 1.8, t: 0 },
+    { x: screenW * 0.08, y: screenH * 0.22, rx: screenW * 0.58, ry: screenH * 0.12, a: 0.18, p: 2.4, t: 0 },
+    { x: screenW * 0.92, y: screenH * 0.30, rx: screenW * 0.52, ry: screenH * 0.11, a: 0.17, p: 3.0, t: 1 },
+    { x: screenW * 0.18, y: screenH * 0.42, rx: screenW * 0.56, ry: screenH * 0.12, a: 0.19, p: 3.6, t: 0 },
+    { x: screenW * 0.86, y: screenH * 0.52, rx: screenW * 0.50, ry: screenH * 0.11, a: 0.17, p: 4.1, t: 1 },
+    { x: screenW * 0.10, y: screenH * 0.65, rx: screenW * 0.60, ry: screenH * 0.13, a: 0.18, p: 4.6, t: 0 },
+    { x: screenW * 0.88, y: screenH * 0.74, rx: screenW * 0.54, ry: screenH * 0.12, a: 0.18, p: 5.1, t: 1 },
+    { x: screenW * 0.16, y: screenH * 0.86, rx: screenW * 0.50, ry: screenH * 0.11, a: 0.16, p: 5.7, t: 0 },
+    { x: screenW * 0.82, y: screenH * 0.94, rx: screenW * 0.46, ry: screenH * 0.10, a: 0.15, p: 6.2, t: 1 }
+  ];
+
+  const sideBands = [
+    { x: screenW * 0.03, y: screenH * 0.18, rx: screenW * 0.16, ry: screenH * 0.30, a: 0.18, p: 0.9, t: 0 },
+    { x: screenW * 0.97, y: screenH * 0.22, rx: screenW * 0.16, ry: screenH * 0.30, a: 0.18, p: 2.1, t: 1 },
+    { x: screenW * 0.05, y: screenH * 0.58, rx: screenW * 0.18, ry: screenH * 0.28, a: 0.16, p: 3.3, t: 0 },
+    { x: screenW * 0.95, y: screenH * 0.66, rx: screenW * 0.18, ry: screenH * 0.28, a: 0.16, p: 4.5, t: 1 }
+  ];
+
+  const driftBanks = [
+    { x: screenW * 0.22, y: screenH * 0.13, rx: screenW * 0.38, ry: screenH * 0.07, a: 0.10, p: 0.4, t: 0 },
+    { x: screenW * 0.78, y: screenH * 0.27, rx: screenW * 0.40, ry: screenH * 0.08, a: 0.10, p: 1.6, t: 1 },
+    { x: screenW * 0.20, y: screenH * 0.48, rx: screenW * 0.42, ry: screenH * 0.08, a: 0.11, p: 2.8, t: 0 },
+    { x: screenW * 0.80, y: screenH * 0.63, rx: screenW * 0.42, ry: screenH * 0.08, a: 0.11, p: 4.0, t: 1 },
+    { x: screenW * 0.24, y: screenH * 0.82, rx: screenW * 0.38, ry: screenH * 0.07, a: 0.10, p: 5.2, t: 0 }
+  ];
+
+  for (const c of wide) {
+    const cx = ((c.x + Math.sin(t * 0.0012 + c.p) * 16) % (screenW + 280) + (screenW + 280)) % (screenW + 280) - 140;
+    const cy = ((c.y + Math.cos(t * 0.0009 + c.p) * 10) % (screenH + 220) + (screenH + 220)) % (screenH + 220) - 110;
+    drawCloudBank(cx, cy, c.rx, c.ry, c.a, c.p, c.t);
+  }
+  for (const c of sideBands) {
+    const cx = c.x + Math.sin(t * 0.0008 + c.p) * 10;
+    const cy = c.y + Math.cos(t * 0.0011 + c.p) * 14;
+    drawCloudBank(cx, cy, c.rx, c.ry, c.a, c.p, c.t);
+  }
+  for (const c of driftBanks) {
+    const cx = c.x + Math.sin(t * 0.0007 + c.p) * 22;
+    const cy = c.y + Math.cos(t * 0.0008 + c.p) * 18;
+    drawCloudBank(cx, cy, c.rx, c.ry, c.a, c.p, c.t);
+  }
+
+  for (let i = 0; i < 8; i++) {
+    const y = screenH * (0.06 + i * 0.125) + Math.sin(t * 0.0006 + i * 1.35) * 8;
+    const x = screenW * 0.5 + Math.cos(t * 0.0005 + i * 0.7) * screenW * 0.08;
+    drawCloudBank(x, y, screenW * 0.82, screenH * 0.045, 0.06, i * 0.6, 1);
+  }
+
+  ctx.fillStyle = "#000";
+  ctx.fillRect(gx, gy, gw, gh);
+
+  const edge = 38;
+  if (gy > 0) {
+    const g = ctx.createLinearGradient(0, gy - edge, 0, gy + edge);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(7,8,10,0.95)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, gy - edge, screenW, edge);
+  }
+  if (gy + gh < screenH) {
+    const g = ctx.createLinearGradient(0, gy + gh, 0, gy + gh + edge);
+    g.addColorStop(0, "rgba(7,8,10,0.95)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, gy + gh, screenW, edge);
+  }
+  if (gx > 0) {
+    const g = ctx.createLinearGradient(gx - edge, 0, gx + edge, 0);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(7,8,10,0.95)");
+    ctx.fillStyle = g;
+    ctx.fillRect(gx - edge, gy, edge, gh);
+  }
+  if (gx + gw < screenW) {
+    const g = ctx.createLinearGradient(gx + gw, 0, gx + gw + edge, 0);
+    g.addColorStop(0, "rgba(7,8,10,0.95)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(gx + gw, gy, edge, gh);
+  }
+
+  ctx.restore();
+}
 
 function draw() {
+  drawOuterFog();
+
   const shakeOn = settingScreenShake ? 1 : 0;
   const baseShake = (state.fx.shake + (state.gameState === "gameover" ? state.gameOverShake : 0)) * shakeOn;
   const gameOverT = state.gameState === "gameover" ? clamp(state.gameOverShakeTimer / 180, 0, 1) : 0;
   const freqScale = state.gameState === "gameover" ? (0.55 + 0.45 * gameOverT) : 1;
   const sx = baseShake ? Math.sin(state.frame * 17.13 * freqScale) * baseShake * 0.6 : 0;
   const sy = baseShake ? Math.cos(state.frame * 11.7 * freqScale) * baseShake * 0.6 : 0;
+
   ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
   ctx.translate(sx, sy);
+
   drawBackground();
   if (state.gameState === "playing") {
     drawPowerups();
@@ -3864,9 +3998,14 @@ function draw() {
     drawGameOverScreen();
   }
   ctx.restore();
+
   if (state.gameState === "playing" || state.gameState === "gameover") {
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
     drawLowHpWarning();
     drawDamageFlash();
+    ctx.restore();
   }
 }
 function beginGame() { setupSession("playing"); showMessage("PHASE 1", 90); }
@@ -3972,8 +4111,15 @@ function enterGameOver() {
   state.gameOverShake = 6;
 }
 function resize() {
-  W = canvas.width = window.innerWidth;
-  H = canvas.height = window.innerHeight;
+  const screenW = window.innerWidth;
+  const screenH = window.innerHeight;
+  canvas.width = screenW;
+  canvas.height = screenH;
+  scale = Math.min(screenW / GAME_W, screenH / GAME_H);
+  offsetX = Math.round((screenW - GAME_W * scale) / 2);
+  offsetY = Math.round((screenH - GAME_H * scale) / 2);
+  W = GAME_W;
+  H = GAME_H;
   if (!state.player) return;
   state.player.x = clamp(state.player.x, 20, W - 20);
   state.player.y = clamp(state.player.y, H * 0.60, H - 28);
@@ -4109,7 +4255,8 @@ function handleGameOverPointerDown(x, y) {
 }
 canvas.addEventListener("pointerdown", (e) => {
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const x = (e.clientX - rect.left - offsetX) / scale;
+  const y = (e.clientY - rect.top - offsetY) / scale;
   if (state.gameState === "gameover") {
     if (handleGameOverPointerDown(x, y)) return;
     return;
@@ -4134,7 +4281,8 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointermove", (e) => {
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const x = (e.clientX - rect.left - offsetX) / scale;
+  const y = (e.clientY - rect.top - offsetY) / scale;
   if (state.gameState !== "playing") {
     if (playBtnPointerDown) {
       const playRect = getPlayButtonRect();
@@ -4158,7 +4306,8 @@ canvas.addEventListener("pointermove", (e) => {
 });
 function updateJoystickFromPointer(e) {
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const x = (e.clientX - rect.left - offsetX) / scale;
+  const y = (e.clientY - rect.top - offsetY) / scale;
   const dx = x - state.joystick.cx, dy = y - state.joystick.cy;
   const d = Math.hypot(dx, dy);
   const r = state.joystick.radius;
