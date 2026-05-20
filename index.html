@@ -3833,137 +3833,106 @@ function drawOuterFog() {
   const gy = offsetY;
   const gw = GAME_W * scale;
   const gh = GAME_H * scale;
+
+  // No letterbox on this device — skip entirely
+  if (gx < 1 && gy < 1) {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, screenW, screenH);
+    return;
+  }
+
   const t = state.frame;
 
-  function drawCloudBank(cx, cy, rx, ry, alpha, phase, tone = 0) {
-    ctx.save();
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = alpha;
-    const lobes = [
-      [-0.42, -0.10, 0.92, 0.78],
-      [-0.22, -0.18, 1.08, 0.86],
-      [0.02, -0.12, 1.18, 0.90],
-      [0.26, -0.08, 1.02, 0.78],
-      [0.48, -0.02, 0.88, 0.68],
-      [-0.04, 0.10, 1.30, 0.56]
-    ];
-    for (let i = 0; i < lobes.length; i++) {
-      const l = lobes[i];
-      const driftX = Math.sin(t * 0.0012 + phase + i * 1.17) * rx * 0.14;
-      const driftY = Math.cos(t * 0.0009 + phase + i * 1.42) * ry * 0.10;
-      const px = cx + driftX + l[0] * rx * 0.18;
-      const py = cy + driftY + l[1] * ry * 0.16;
-      const rw = rx * l[2];
-      const rh = ry * l[3];
-      const grad = ctx.createRadialGradient(px, py, Math.min(rw, rh) * 0.10, px, py, Math.max(rw, rh) * 0.92);
-      grad.addColorStop(0, tone === 0 ? `rgba(26,28,32,${alpha * 0.98})` : `rgba(34,37,42,${alpha * 0.96})`);
-      grad.addColorStop(0.42, tone === 0 ? `rgba(14,16,19,${alpha * 0.82})` : `rgba(18,20,24,${alpha * 0.78})`);
-      grad.addColorStop(0.75, tone === 0 ? `rgba(6,7,9,${alpha * 0.42})` : `rgba(10,11,13,${alpha * 0.38})`);
-      grad.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.ellipse(px, py, rw, rh, 0, 0, TAU);
-      ctx.fill();
-    }
-    ctx.globalAlpha = alpha * 0.25;
-    ctx.fillStyle = tone === 0 ? "rgba(0,0,0,0.34)" : "rgba(0,0,0,0.28)";
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + ry * 0.10, rx * 0.92, ry * 0.72, 0, 0, TAU);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  ctx.save();
-  ctx.fillStyle = "#000";
+  // Deep space base
+  ctx.fillStyle = "#030209";
   ctx.fillRect(0, 0, screenW, screenH);
 
-  const wide = [
-    { x: -70, y: screenH * 0.08, rx: screenW * 0.52, ry: screenH * 0.11, a: 0.16, p: 0.5, t: 0 },
-    { x: screenW * 0.28, y: screenH * 0.04, rx: screenW * 0.44, ry: screenH * 0.10, a: 0.14, p: 1.1, t: 1 },
-    { x: screenW * 0.84, y: screenH * 0.11, rx: screenW * 0.50, ry: screenH * 0.12, a: 0.16, p: 1.8, t: 0 },
-    { x: screenW * 0.08, y: screenH * 0.22, rx: screenW * 0.58, ry: screenH * 0.12, a: 0.18, p: 2.4, t: 0 },
-    { x: screenW * 0.92, y: screenH * 0.30, rx: screenW * 0.52, ry: screenH * 0.11, a: 0.17, p: 3.0, t: 1 },
-    { x: screenW * 0.18, y: screenH * 0.42, rx: screenW * 0.56, ry: screenH * 0.12, a: 0.19, p: 3.6, t: 0 },
-    { x: screenW * 0.86, y: screenH * 0.52, rx: screenW * 0.50, ry: screenH * 0.11, a: 0.17, p: 4.1, t: 1 },
-    { x: screenW * 0.10, y: screenH * 0.65, rx: screenW * 0.60, ry: screenH * 0.13, a: 0.18, p: 4.6, t: 0 },
-    { x: screenW * 0.88, y: screenH * 0.74, rx: screenW * 0.54, ry: screenH * 0.12, a: 0.18, p: 5.1, t: 1 },
-    { x: screenW * 0.16, y: screenH * 0.86, rx: screenW * 0.50, ry: screenH * 0.11, a: 0.16, p: 5.7, t: 0 },
-    { x: screenW * 0.82, y: screenH * 0.94, rx: screenW * 0.46, ry: screenH * 0.10, a: 0.15, p: 6.2, t: 1 }
+  // 8 large cloud masses anchored to screen edges and corners
+  const blobs = [
+    { x: 0,        y: 0,        r: screenW * 0.60, a: 0.78, p: 0.0 },
+    { x: screenW,  y: 0,        r: screenW * 0.58, a: 0.72, p: 1.6 },
+    { x: 0,        y: screenH,  r: screenW * 0.58, a: 0.74, p: 3.1 },
+    { x: screenW,  y: screenH,  r: screenW * 0.60, a: 0.76, p: 4.7 },
+    { x: screenW * 0.5, y: 0,        r: screenW * 0.48, a: 0.62, p: 0.9 },
+    { x: screenW * 0.5, y: screenH,  r: screenW * 0.48, a: 0.62, p: 2.4 },
+    { x: 0,        y: screenH * 0.5, r: screenH * 0.42, a: 0.66, p: 1.3 },
+    { x: screenW,  y: screenH * 0.5, r: screenH * 0.42, a: 0.66, p: 3.8 },
   ];
 
-  const sideBands = [
-    { x: screenW * 0.03, y: screenH * 0.18, rx: screenW * 0.16, ry: screenH * 0.30, a: 0.18, p: 0.9, t: 0 },
-    { x: screenW * 0.97, y: screenH * 0.22, rx: screenW * 0.16, ry: screenH * 0.30, a: 0.18, p: 2.1, t: 1 },
-    { x: screenW * 0.05, y: screenH * 0.58, rx: screenW * 0.18, ry: screenH * 0.28, a: 0.16, p: 3.3, t: 0 },
-    { x: screenW * 0.95, y: screenH * 0.66, rx: screenW * 0.18, ry: screenH * 0.28, a: 0.16, p: 4.5, t: 1 }
+  for (const b of blobs) {
+    const dx = Math.sin(t * 0.00042 + b.p) * 22;
+    const dy = Math.cos(t * 0.00036 + b.p) * 16;
+    const cx = b.x + dx;
+    const cy = b.y + dy;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, b.r);
+    grad.addColorStop(0,    `rgba(30,20,54,${b.a})`);
+    grad.addColorStop(0.28, `rgba(22,14,40,${b.a * 0.72})`);
+    grad.addColorStop(0.58, `rgba(14,9,26,${b.a * 0.38})`);
+    grad.addColorStop(1,    "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, b.r, 0, TAU);
+    ctx.fill();
+  }
+
+  // 4 secondary drifting wisps
+  const wisps = [
+    { x: screenW * 0.25, y: screenH * 0.18, r: screenW * 0.30, a: 0.42, p: 2.2 },
+    { x: screenW * 0.75, y: screenH * 0.28, r: screenW * 0.28, a: 0.38, p: 0.5 },
+    { x: screenW * 0.20, y: screenH * 0.75, r: screenW * 0.30, a: 0.40, p: 3.4 },
+    { x: screenW * 0.78, y: screenH * 0.72, r: screenW * 0.28, a: 0.38, p: 1.8 },
   ];
 
-  const driftBanks = [
-    { x: screenW * 0.22, y: screenH * 0.13, rx: screenW * 0.38, ry: screenH * 0.07, a: 0.10, p: 0.4, t: 0 },
-    { x: screenW * 0.78, y: screenH * 0.27, rx: screenW * 0.40, ry: screenH * 0.08, a: 0.10, p: 1.6, t: 1 },
-    { x: screenW * 0.20, y: screenH * 0.48, rx: screenW * 0.42, ry: screenH * 0.08, a: 0.11, p: 2.8, t: 0 },
-    { x: screenW * 0.80, y: screenH * 0.63, rx: screenW * 0.42, ry: screenH * 0.08, a: 0.11, p: 4.0, t: 1 },
-    { x: screenW * 0.24, y: screenH * 0.82, rx: screenW * 0.38, ry: screenH * 0.07, a: 0.10, p: 5.2, t: 0 }
-  ];
-
-  for (const c of wide) {
-    const cx = ((c.x + Math.sin(t * 0.0012 + c.p) * 16) % (screenW + 280) + (screenW + 280)) % (screenW + 280) - 140;
-    const cy = ((c.y + Math.cos(t * 0.0009 + c.p) * 10) % (screenH + 220) + (screenH + 220)) % (screenH + 220) - 110;
-    drawCloudBank(cx, cy, c.rx, c.ry, c.a, c.p, c.t);
-  }
-  for (const c of sideBands) {
-    const cx = c.x + Math.sin(t * 0.0008 + c.p) * 10;
-    const cy = c.y + Math.cos(t * 0.0011 + c.p) * 14;
-    drawCloudBank(cx, cy, c.rx, c.ry, c.a, c.p, c.t);
-  }
-  for (const c of driftBanks) {
-    const cx = c.x + Math.sin(t * 0.0007 + c.p) * 22;
-    const cy = c.y + Math.cos(t * 0.0008 + c.p) * 18;
-    drawCloudBank(cx, cy, c.rx, c.ry, c.a, c.p, c.t);
+  for (const w of wisps) {
+    const dx = Math.sin(t * 0.00055 + w.p) * 28;
+    const dy = Math.cos(t * 0.00048 + w.p) * 20;
+    const cx = w.x + dx;
+    const cy = w.y + dy;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, w.r);
+    grad.addColorStop(0,    `rgba(38,24,62,${w.a})`);
+    grad.addColorStop(0.45, `rgba(24,15,42,${w.a * 0.50})`);
+    grad.addColorStop(1,    "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, w.r, 0, TAU);
+    ctx.fill();
   }
 
-  for (let i = 0; i < 8; i++) {
-    const y = screenH * (0.06 + i * 0.125) + Math.sin(t * 0.0006 + i * 1.35) * 8;
-    const x = screenW * 0.5 + Math.cos(t * 0.0005 + i * 0.7) * screenW * 0.08;
-    drawCloudBank(x, y, screenW * 0.82, screenH * 0.045, 0.06, i * 0.6, 1);
-  }
-
+  // Black out the game area
   ctx.fillStyle = "#000";
   ctx.fillRect(gx, gy, gw, gh);
 
-  const edge = 38;
+  // Feather game edges back into fog (only where there's actual letterbox gap)
+  const fade = 40;
   if (gy > 0) {
-    const g = ctx.createLinearGradient(0, gy - edge, 0, gy + edge);
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, "rgba(7,8,10,0.95)");
+    const g = ctx.createLinearGradient(0, gy, 0, gy + fade);
+    g.addColorStop(0, "rgba(0,0,0,1)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
-    ctx.fillRect(0, gy - edge, screenW, edge);
+    ctx.fillRect(gx, gy, gw, Math.min(fade, gh));
   }
   if (gy + gh < screenH) {
-    const g = ctx.createLinearGradient(0, gy + gh, 0, gy + gh + edge);
-    g.addColorStop(0, "rgba(7,8,10,0.95)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
+    const g = ctx.createLinearGradient(0, gy + gh - fade, 0, gy + gh);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(0,0,0,1)");
     ctx.fillStyle = g;
-    ctx.fillRect(0, gy + gh, screenW, edge);
+    ctx.fillRect(gx, Math.max(gy, gy + gh - fade), gw, Math.min(fade, gh));
   }
   if (gx > 0) {
-    const g = ctx.createLinearGradient(gx - edge, 0, gx + edge, 0);
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, "rgba(7,8,10,0.95)");
-    ctx.fillStyle = g;
-    ctx.fillRect(gx - edge, gy, edge, gh);
-  }
-  if (gx + gw < screenW) {
-    const g = ctx.createLinearGradient(gx + gw, 0, gx + gw + edge, 0);
-    g.addColorStop(0, "rgba(7,8,10,0.95)");
+    const g = ctx.createLinearGradient(gx, 0, gx + fade, 0);
+    g.addColorStop(0, "rgba(0,0,0,1)");
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
-    ctx.fillRect(gx + gw, gy, edge, gh);
+    ctx.fillRect(gx, gy, Math.min(fade, gw), gh);
   }
-
-  ctx.restore();
+  if (gx + gw < screenW) {
+    const g = ctx.createLinearGradient(gx + gw - fade, 0, gx + gw, 0);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, "rgba(0,0,0,1)");
+    ctx.fillStyle = g;
+    ctx.fillRect(Math.max(gx, gx + gw - fade), gy, Math.min(fade, gw), gh);
+  }
 }
-
 function draw() {
   drawOuterFog();
 
