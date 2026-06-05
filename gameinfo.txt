@@ -1,632 +1,426 @@
-Star Strike RUSH — Comprehensive Game Design Document
-Overview
+# Star Strike RUSH — Game Design Document
 
-Star Strike RUSH is a fast-paced arcade space shooter that blends classic fixed-screen alien assault gameplay with modern action systems, aggressive enemy behavior, boss encounters, realm-shifting mechanics, procedural encounters, and atmospheric presentation.
+### Living Design Reference
 
-The game is designed around one core objective:
+-----
 
-Survive increasingly dangerous waves of hostile starfighters while mastering movement, positioning, timing, target priority, and dimensional adaptation.
+## 1. Vision & Concept
 
-Unlike traditional arcade shooters that rely primarily on predictable enemy formations, Star Strike RUSH creates a battlefield that constantly evolves. Enemy fleets transition between formations, break into attack runs, perform specialized movement behaviors, trigger realm-based transformations, and culminate in large-scale boss encounters.
+Star Strike RUSH is a single-screen vertical shoot-’em-up (shmup) designed for portrait mobile play, playable in a browser with no install. It targets the feel of classic arcade shmups — tight, readable action, escalating pressure, short-but-intense sessions — while layering in a small number of original mechanics (the realm system, fractional damage, boss alternation) that give it a distinct identity without overwhelming complexity.
 
-The result is a game that feels simultaneously familiar and unpredictable.
+The tone is dark and cinematic but not grimdark. The palette skews deep space: near-black backgrounds, purple-black fog, vivid enemy colors that pop against the darkness. The game should feel tense and fast, with a slight weight to the player ship that rewards aggressive positioning rather than timid corner-camping.
 
-Core Pillars
-1. Constant Motion
+The intended play session is 5–15 minutes. Death should feel fair. Every loss should feel survivable-in-retrospect, motivating a retry.
 
-The game rarely allows static play.
+-----
 
-Enemies:
+## 2. Platform & Presentation
 
-Drift
-Dive
-Flank
-Snap-turn
-Warp
-Reposition
+**Logical resolution:** 375 × 667 px (9:16 portrait)  
+**Rendering:** HTML5 Canvas, single self-contained HTML file  
+**Scaling:** Letterboxed — scales uniformly to fill any device screen. Fog bands fill the letterbox bars so there are never raw black bars. The game area is always centered.  
+**Input:** Touch (primary) and mouse. All pointer coordinates are transformed through the offset/scale matrix so game logic is resolution-independent.  
+**Target device:** Mobile browser (portrait). Also playable on desktop.
 
-The player is encouraged to:
+There is no install, no account, no server. All persistence is localStorage.
 
-Dodge continuously
-Reposition proactively
-React quickly
-Maintain offensive pressure
+-----
 
-Every second should feel active.
+## 3. Core Gameplay Loop
 
-2. Readable Chaos
+The player pilots a single ship from the bottom of the screen, shooting upward at descending enemy waves. Enemies shoot back. The player can move freely across the full game area and has a ghost-dash ability for evasion.
 
-Despite large numbers of enemies and visual effects, gameplay remains readable.
+Waves of enemies arrive in formation. Between waves, the game briefly pauses before the next set spawns. Bosses appear at fixed phase milestones. The loop is:
 
-Key readability systems include:
+**Wave → clear → brief pause → next wave → … → Boss phase → repeat at higher difficulty**
 
-Clear projectile colors
-Distinct enemy silhouettes
-Visible movement patterns
-Controlled particle density
-Darkened background treatment
-Fog confined outside gameplay space
+There are no lives in the traditional sense — the player has a hit-point total, and the game ends when it reaches zero. Powerups dropped by enemies restore HP, upgrade firepower, or add a wingman escort.
 
-The player should always understand:
+Scoring is cumulative. There is a single global high score (localStorage). No online leaderboard. The player sets a call sign that appears on the game over and high score screen.
 
-What can kill them
-What they can shoot
-Where they can move
-3. Escalation
+-----
 
-Difficulty rises through multiple layers simultaneously.
+## 4. Player Ship
 
-Enemy Count
+### Movement
 
-More enemies appear.
+Free movement across the full game area. Touch/drag to reposition. The ship follows the input point with slight physics smoothing — responsive but not teleporting. There is intentional inertia so the ship feels like it has mass.
 
-Enemy Variety
+### Firing
 
-New archetypes are introduced.
+The ship fires automatically at all times while alive. Shot type depends on current powerup state and whether the Wraith fight is active.
 
-Behavior Complexity
+**Shot types:**
 
-Movement becomes less predictable.
+- **Standard single:** One center bullet, full damage (1.0)
+- **Spread:** Three bullets (left, center, right). Side bullets deal fractional damage (0.75). Center deals full (1.0).
+- **Wingman:** Escort ship fires independently. Wingman side shots also deal 0.75 fractional damage.
 
-Realm Effects
+The fractional damage system prevents spread fire from being a strict upgrade — it deals more total damage against a wide group but less per-hit against a single armored target like a boss.
 
-The battlefield itself changes.
+### Ghost Dash
 
-Boss Mechanics
+The player can activate a brief ghost state (the “dash”). While ghosted:
 
-Major encounters introduce unique threats.
+- The ship becomes semi-transparent with a soft outer glow
+- Scan lines are drawn over the ship geometry
+- Six small motes orbit the ship in a loose ring
+- The ship is immune to physical-realm enemy bullets
+- The ship can pass through physical enemies without collision
 
-The game continually raises pressure without relying solely on increased health values.
+The ghost dash has a cooldown. It is not a movement teleport — the ship does not reposition. It is purely a brief invulnerability/phase-through window.
 
-4. Atmosphere
+**Visual style of ghost:** Transparent hull (~46% alpha) + outer aura rendered with a lighter composite mode + scan line overlay + 6 orbiting motes. No afterimage trails. The ghost animation design may be revised in a future pass.
 
-Star Strike RUSH is not intended to feel bright or cartoonish.
+### Health
 
-Its visual identity centers on:
+The player has a hit point total displayed as a bar in the HUD. At low HP, a pulsing red border warning activates around the game area. There is also a screen flash on taking damage.
 
-Deep-space darkness
-Purple-black nebula fog
-Wraith dimensional corruption
-Shadowed environments
-Cold cosmic emptiness
+No shield. No extra lives. One ship, one HP pool.
 
-The mood aims for:
+-----
 
-Calm tension rather than visual spectacle.
+## 5. Wingman
 
-Story Premise
+A powerup can grant the player a wingman escort ship. The wingman:
 
-Humanity's frontier fleets have entered a region of space corrupted by an unknown dimensional phenomenon known as the Wraith Realm.
+- Orbits or flanks the player ship
+- Fires independently, matching the player’s shot rhythm
+- Has its own HP or is destroyed on a single boss-level hit (TBD)
+- Visually distinct from the player ship but in the same design language
 
-This anomaly bends reality, distorts matter, and transforms both ships and pilots exposed to it.
+The wingman adds firepower and serves as a soft “extra hit” since certain enemy bullets may target the player position and be intercepted.
 
-As an elite strike pilot, the player must push deeper into hostile territory while surviving endless waves of enemy forces that have adapted to these dimensional conditions.
+-----
 
-The further the player progresses, the more unstable reality becomes.
+## 6. Progression — Phases, Waves, Difficulty
 
-Gameplay Structure
-Session Flow
+### Phases
 
-A typical run follows:
+The game is divided into phases. Phases gate boss encounters and difficulty scaling. Phase number is the primary progression counter.
 
-Start Screen
-Initial Enemy Waves
-Increasing Enemy Variety
-Encounter Events
-Realm Shifts
-Mini Escalations
-Boss Fight
-Higher-Difficulty Cycles
-Death
-Score Evaluation
+- Phases 1–7: Standard bosses appear at every phase divisible by 4 (phase 4 only in this range)
+- Phase 8+: Boss encounters alternate between Standard and Wraith bosses
 
-The loop is designed for replayability and score chasing.
+This means the Wraith is introduced as a late-game escalation, not a recurring threat from the start.
 
-Player Ship
-Role
+### Waves
 
-The player ship serves as:
+Each phase contains multiple enemy waves. Waves are drawn from a library of wave templates that define enemy count, type, formation pattern, and entry choreography. Wave templates are never modified by difficulty scaling code — the templates are fixed design assets.
 
-Primary damage source
-Dodge platform
-Positioning tool
+**Wave mood** is a meta-parameter that influences which templates are selected and how aggressively enemies fire. Mood shifts over the course of a phase.
 
-The ship remains responsive and agile.
+### Difficulty Scaling
 
-Controls
-Movement
-Up
-Down
-Left
-Right
+A difficulty value increases over time and phase count. It affects:
 
-Movement is precise and immediate.
+- Enemy movement speed
+- Enemy bullet speed and fire rate
+- Frequency of elite (purple/phantom) enemies in formations
 
-Fire
+Scaling uses the `updateDifficulty()` and `updatePressure()` systems. Pressure is a shorter-term spike that temporarily increases aggression during boss approach or after the player has been doing very well.
 
-Primary weapon fires continuously or rapidly.
+-----
 
-The player is expected to maintain offensive pressure whenever possible.
+## 7. Enemy Roster
 
-Health System
+All enemies are rendered geometrically — no sprites. Each has a distinct silhouette, color, and behavior pattern.
 
-The player possesses finite health.
+### Red — Scout
 
-Damage sources include:
+- HP: 2
+- Threat contribution: 1.05
+- The standard footsoldier. Fast, low HP. Often appears in large formations. Dies in two hits from a center shot or a couple of spread hits. Fires occasionally.
 
-Enemy bullets
-Collision impacts
-Boss attacks
-Realm hazards
+### Orange — Light
 
-Low health triggers warning effects.
+- HP: 1
+- Threat contribution: 0.80
+- Frailer than red, often used as filler or chaff in mixed formations. One hit to kill. May appear in larger numbers to compensate.
 
-These include:
+### Purple — Heavy
 
-Visual flashes
-Alert indicators
+- HP: 5
+- Threat contribution: 3.55
+- The armored threat. Takes sustained fire to kill. Moves slower. Fires more dangerous bullet patterns. Appears in smaller numbers but dramatically raises the difficulty of a wave.
 
-The purpose is to increase urgency without obscuring gameplay.
+### Phantom
 
-Realms
+- HP: 3
+- Threat contribution: 2.35
+- The special enemy. Alternates between physical and ghost phases on a fixed cycle (~132 frames physical, ~78 frames ghost). During its ghost phase, it is immune to physical-realm player bullets. During the physical phase, it is fully vulnerable.
+- Has a 20-frame telegraph (flicker) before each phase transition so the player can anticipate it.
+- The Phantom fires “phantom shots” — cross-realm bullets (realm: null) that can hit the player regardless of ghost dash state. This makes the Phantom uniquely dangerous and not safely ignored during a dash.
 
-One of Star Strike RUSH's defining systems.
+**Enemy visual language:** All enemies have triangular engine flame indicators (not round or rectangular nozzles). Color-coding is consistent — enemy type is always identifiable at a glance by hue.
 
-Normal Realm
+-----
 
-The standard battlefield.
+## 8. Boss Encounters
 
-Characteristics:
+### Standard Boss
 
-Stable visuals
-Standard enemy behavior
-Blue-toned atmosphere
-Wraith Realm
+A large, heavily armored ship that drops in from the top of the screen. Fires complex bullet patterns in phases. The spawn attack has no telegraph — the pause before it fires is the only warning. This is intentional; the timing is sufficient and a visual telegraph was judged as redundant and visually noisy.
 
-A corrupted dimensional state.
+The Standard Boss cycles through attack patterns as its HP depletes. It is always targetable with physical-realm bullets.
 
-Characteristics:
+### Wraith Boss
 
-Purple corruption
-Altered visual tinting
-Different atmospheric mood
-Enhanced enemy threat
+The Wraith is the late-game signature encounter. It operates across two realms:
 
-The Wraith Realm serves as both:
+- In its physical phase, it is vulnerable to physical bullets
+- In its ghost phase, it is only vulnerable to ghost-realm bullets (fired while the player is in ghost state)
 
-A gameplay modifier
-A visual identity system
-Enemy System
+The Wraith fires bullets gated by realm — its physical bullets can only hit a physical-realm player, its ghost bullets can only hit a ghost-realm player. This creates a dynamic where the player must actively manage realm state both to deal damage and to survive.
 
-Enemies are organized into archetypes.
+The Wraith has a distinct visual treatment from the Standard Boss — ghostly, translucent, with aura effects matching the phantom enemy aesthetic.
 
-Each archetype has:
+### Boss Phase Rotation
 
-Unique geometry
-Unique movement
-Unique attack behavior
-Different threat levels
-Enemy Types
-Blue Fighters
+- Phases 1–7: Standard boss appears only at phase milestones (phase % 4 == 0)
+- Phase 8+: Bosses alternate — Standard, Wraith, Standard, Wraith…
 
-Role:
+This ensures the player encounters the Wraith only after they’ve had time to understand the realm mechanic through Phantom enemies.
 
-Basic frontline units.
+-----
 
-Behavior:
+## 9. The Realm System
 
-Formation movement
-Predictable attacks
-Entry-level threat
+The realm system is the game’s central original mechanic, fully realized during the Wraith fight.
 
-Purpose:
+**Player realm:** 0 = physical, 1 = ghost (activated by ghost dash)  
+**Bullet realm:** Each bullet carries the realm of the player at the moment of firing  
+**Collision gating:** A bullet only damages a target if the bullet’s realm matches the target’s current realm (or the bullet is cross-realm, realm: null)
 
-Teach player fundamentals.
+**Phantom shot** (fired by Phantom enemies): realm: null — hits regardless of player state. This is intentional and permanent design. It is the Phantom’s defining threat.
 
-Orange Fighters
+**Player ghost dash:** Fires physical bullets at all times unless explicitly in ghost state. Managing the timing of ghost dash to fire ghost bullets at the Wraith’s ghost phase while also surviving Wraith ghost bullets is the core skill challenge of the Wraith fight.
 
-Role:
+The realm system does not affect normal (non-boss) gameplay in a gameplay-blocking way — it is mostly background during regular waves. Phantoms introduce it visually and mechanically before the Wraith makes it load-bearing.
 
-Aggressive flankers.
+-----
 
-Behavior:
+## 10. Bullet System
 
-Sudden snap turns
-Rapid direction changes
-Unpredictable movement
+### Bullet Budget
 
-Purpose:
+To prevent bullet spam from overwhelming the screen, a bullet budget system caps total active bullets:
 
-Force constant attention.
+- Regular combat: max 36 active enemy bullets
+- Wraith fight: max 54 active enemy bullets
 
-Advanced Variants
+Before any enemy fires, `canSpendBulletBudget()` is checked. If the budget is spent, the fire is skipped. This prevents frame rate degradation and visual noise on weaker devices.
 
-Higher-tier units introduce:
+### Fractional Damage
 
-Faster attack patterns
-More aggressive trajectories
-Greater survivability
+Not all bullets deal the same damage. Spread fire side bullets and wingman side shots deal 0.75 damage. Center shots deal 1.0. Boss bullets deal higher values. This is stored as `b.damage ?? 1` in collision — the fallback ensures legacy bullets always deal 1.
 
-These enemies challenge player adaptation rather than memorization.
+This system means players can’t mindlessly spray and expect full DPS against armored targets. Precise aiming matters against high-HP enemies.
 
-Enemy Formations
+-----
 
-Enemies rarely act as isolated units.
+## 11. Powerups
 
-Instead they:
+Powerups drop from destroyed enemies (chance-based). Types include:
 
-Spawn in formations
-Maintain spacing
-Break formation dynamically
+- **HP restore** — partial heal
+- **Spread upgrade** — grants spread shot
+- **Wingman** — grants escort ship
+- (Possibly others — additional types may be added in future passes)
 
-Examples include:
+### Drought Prevention
 
-V Formation
+If the player goes 12 kills or 900 frames without a powerup drop, a drop is guaranteed. This prevents frustrating dry streaks where the player is weakening through sustained combat with no recovery.
 
-Classic attack wedge.
+-----
 
-Line Formation
+## 12. Scoring & Persistence
 
-Broad front pressure.
+**Score:** Accumulated by killing enemies. Enemy type and threat value influence score contribution. Boss kills give large score bonuses.
 
-Sweep Formation
+**High score:** Stored in localStorage (`star_strike_rush_high_score_v1`). Compared against on game over. The previous high score is captured before the new score is committed, so the game over screen can show both the old record and the new result.
 
-Horizontal battlefield control.
+**Call sign:** Player-entered name/tag stored in localStorage (`star_strike_rush_callsign_v1`). Displayed on game over and high score screens.
 
-Cluster Formation
+**Settings persistence:** Max particle count and screen shake preference stored in localStorage (`star_strike_rush_settings_v1`).
 
-Dense engagement zones.
+**Codex:** A discovered-enemy log stored in localStorage (`star_strike_rush_codex_v1`). Tracks which enemy types the player has encountered. Intended as a light meta-progression reward for curious players — no gameplay gating.
 
-Attack Patterns
+-----
 
-Enemy attacks include:
+## 13. Visual Design
 
-Direct Fire
+### Overall Aesthetic
 
-Shoots toward player position.
+Dark space. Deep blacks and near-blacks for the background. Enemy ships use vivid saturated colors (red, orange, purple) that read instantly against the background. The player ship is lighter, distinct. The UI uses minimal chrome — HP bar, score text, phase indicator. Nothing decorative that competes with the action.
 
-Predictive Fire
+The feel should be slightly brutal and intense — not cute, not retro-pixel, but geometric and precise. Think vector arcade updated for mobile.
 
-Attempts to lead movement.
+### Color Palette (Fog / Letterbox)
 
-Burst Fire
+The fog bands that fill the letterbox areas (outside the 375×667 game area) use a dark purple-black palette. RGB values roughly in the ranges: R 12–32, G 5–14, B 26–58. This connects the game area to the device frame rather than having raw black bars.
 
-Multiple projectiles.
+The game area itself is punched to near-black (#040208) after fog is drawn — not pure black, slightly purple-tinted to keep the palette coherent.
 
-Strafing Runs
+### Fog System (Confirmed, Locked Design)
 
-Firing while crossing the battlefield.
+Three-tier cloud system rendered in the letterbox bands:
 
-Movement System
+1. **Large masses** — 4 overlapping lobes plus a dense core
+1. **Mid rolling structures** — 2 lobes, denser than wisps
+1. **Faint wisps** — the lightest layer, adding depth
 
-Movement patterns are a major source of variety.
+Each fog element has multi-oscillator drift: 3 independent sine/cosine terms at different frequencies per axis, producing organic non-repeating movement.
 
-Examples:
+The fog is clipped to the letterbox bands (outside game area). Seam feathering bleeds slightly inward across the boundary for a soft transition. The game area is punched black after fog draw. The fog fill always renders before any early-exit check, preventing the black-screen bug where skipping early could leave the canvas unfilled.
 
-Drift
+### Title Screen
 
-Slow directional movement.
+- Animated fog bands as described above
+- Two suns visible in the game area background (intentional, not a bug)
+- Enemy ships drift across the title in formation, sinking into the fog at the edges (controlled by a smoothstep falloff over ~96px rather than a hard clip)
+- Game title and start prompt overlaid
 
-Snap
+### Enemy Visuals
 
-Rapid direction changes.
+- All engines/exhausts rendered as triangles
+- Player exhaust has no dark nozzle block
+- Each enemy type has a distinct silhouette readable at small sizes
 
-Arc
+### Ghost / Phantom Visual
 
-Curved trajectories.
+Currently: semi-transparent hull (~46% alpha), outer aura via lighter composite, scan line overlay, 6 orbiting motes.
+**Status: Under review. The ghost animation may be redesigned in a future pass.**
 
-Dive
+### Particle System
 
-Aggressive attacks toward player space.
+Explosions, bullet impacts, and damage events use a particle system. Max particle count is a user-configurable setting (for lower-end devices). Screen shake on impacts is also configurable.
 
-Sweep
+-----
 
-Broad lateral movement.
+## 14. Screen States & UI
 
-Encounter System
+### Title Screen
 
-Periodic encounters interrupt standard wave flow.
+- Animated background with fog, drifting formation ships, double sun
+- Tap/click to start
+- Call sign entry (if not set)
+- Access to settings and codex
 
-These act as pacing events.
+### HUD (In-Game)
 
-Goals:
+- HP bar (prominent, bottom or top area)
+- Current score
+- Phase / wave indicator
+- Ghost dash cooldown indicator
+- Wingman indicator (if active)
+- Low HP pulsing red border warning (activates below threshold)
+- Damage flash overlay on hit
 
-Break repetition
-Introduce variety
-Increase tension
+### Game Over Screen
 
-Encounter cards announce these events.
+- Displays call sign
+- Final score
+- Previous high score and new high score (if beaten)
+- Retry prompt
 
-This creates anticipation before major gameplay shifts.
+### Settings
 
-Boss System
+- Max particles toggle/slider (performance)
+- Screen shake on/off
+- (Potentially: volume if audio is added)
 
-Boss encounters serve as major milestones.
+### Codex
 
-Bosses are designed to:
+- Log of encountered enemy types with brief flavor descriptions
+- Unlocked by first encounter with each enemy type
+- No gameplay gating — purely informational/collectible
 
-Occupy significant screen space
-Control player movement
-Introduce unique attack mechanics
-Boss Design Goals
+-----
 
-Bosses should feel:
+## 15. Audio
 
-Dangerous
-Memorable
-Distinct from normal enemies
+Not yet implemented in the current build. Placeholder in design:
 
-Not merely:
+- Distinct fire sounds per shot type
+- Hit feedback sounds
+- Enemy death sounds
+- Boss music or stinger
+- Game over sting
+- Title ambient loop
 
-Larger enemies
-Higher health pools
-Boss Death Sequence
+Audio is a future pass item.
 
-Boss defeats trigger:
+-----
 
-Visual destruction effects
-Particle cascades
-Large-scale feedback
+## 16. Screen Shake & Juice
 
-This serves as a reward moment following sustained pressure.
+Screen shake is applied to the game area transform (not the fog layer, which is fixed). Shake intensity scales with event severity:
 
-Projectile System
-Player Bullets
+- Minor: bullet hit on player
+- Major: boss death, player death
 
-Characteristics:
+The fog and letterbox remain stable during shake to avoid disorienting the player about the screen boundary.
 
-Fast
-Readable
-Reliable
+-----
 
-Designed for precision shooting.
+## 17. Locked Design Decisions
 
-Enemy Bullets
+These are confirmed and must not be revisited without explicit intent:
 
-Characteristics:
+|Decision                                                     |Rationale                              |
+|-------------------------------------------------------------|---------------------------------------|
+|Double sun on title screen                                   |Intentional aesthetic, not a bug       |
+|Standard boss spawn attack has no telegraph                  |Timing pause is sufficient warning     |
+|Ghost dash: transparent + glowy, NO afterimage trails        |Afterimage looked cluttered            |
+|Enemy engines are triangles                                  |Consistent visual language             |
+|Player exhaust has no dark nozzle block                      |Cleaner silhouette                     |
+|Phantom shot is cross-realm (realm: null)                    |Core threat identity of the Phantom    |
+|Powerup drought: 12 kills or 900 frames guaranteed           |Player experience, prevents frustration|
+|Previous high score captured before update in enterGameOver()|Allows accurate before/after display   |
+|Bullet budget: 36 normal / 54 wraith                         |Frame rate and visual clarity          |
 
-Highly visible
-Threat-focused
-Color-coded
+-----
 
-Projectile readability remains a major design priority.
+## 18. Architecture Notes (For Context Continuity)
 
-Power-Ups
+These are implementation anchors — not game design, but important for preserving design intent across chat sessions:
 
-Power-ups introduce temporary advantages.
+- `STORAGE_KEY = "star_strike_rush_high_score_v1"` — never change
+- `updateCollisions()` — entire function is do-not-touch
+- `fireEnemyBullet()`, `fireWraithBullet()` — entire functions preserved
+- All realm logic: `playerRealm`, `isWraithActive()`, `getPlayerShotKind()`
+- `updateBossStandard()`, `updateBossWraith()` — do not rewrite
+- All wave templates and `waveTemplates` object — design assets, not code
+- `b.damage ?? 1` in collision — the fallback is load-bearing
+- `phantomShot` fires with `realm: null` — cross-realm by design
 
-Potential categories include:
+**draw() render order (critical):**
 
-Damage
+1. `drawOuterFog()` — first, clears canvas, fills fog bands, punches game area black
+1. `ctx.save()` → translate → scale → translate(shake)
+1. `drawBackground()`
+1. Game content by state
+1. `ctx.restore()`
+1. If playing/game over: save → translate → scale → `drawLowHpWarning` → `drawDamageFlash` → restore
 
-Increase offensive output.
+-----
 
-Fire Rate
+## 19. Open & Future Items
 
-Increase bullet volume.
+|Item                                         |Status                       |
+|---------------------------------------------|-----------------------------|
+|Ghost animation redesign                     |Under consideration          |
+|Audio pass                                   |Future                       |
+|Additional powerup types                     |Future                       |
+|Additional wave templates                    |Future                       |
+|Additional enemy types                       |Future                       |
+|Boss Wraith second phase or pattern expansion|Future                       |
+|Codex flavor text content                    |Future                       |
+|High score leaderboard (online)              |Not planned                  |
+|Additional game modes                        |Not planned                  |
+|v7 fog fix (3-fix ChatGPT prompt)            |Pending — next immediate step|
 
-Survival
+-----
 
-Defensive benefits.
-
-Utility
-
-Situational tactical advantages.
-
-Power-ups provide moments of empowerment amid escalating difficulty.
-
-Visual Design
-Art Direction
-
-Star Strike RUSH uses:
-
-Geometric spacecraft
-Stylized effects
-Minimalist silhouettes
-
-The goal is clarity over realism.
-
-Space Background
-
-The playable area exists inside a dark void.
-
-Elements include:
-
-Starfields
-Scan-line atmosphere
-Realm tinting
-
-The background remains intentionally subdued.
-
-Gameplay always takes priority.
-
-Atmospheric Fog System
-
-One of the game's most distinctive visual features.
-
-Design Goal
-
-The fog is not decoration.
-
-It is environmental storytelling.
-
-The playfield exists inside a corridor carved through a larger cosmic atmosphere.
-
-Visual Characteristics
-
-The fog:
-
-Exists outside the game area
-Feels volumetric
-Appears dense and heavy
-Uses dark purple-black coloration
-
-It should evoke:
-
-Smog
-Nebula mass
-Deep-space cloud banks
-Structure
-
-The fog operates across three density scales:
-
-Large Masses
-
-Create overall atmospheric shape.
-
-Rolling Structures
-
-Introduce motion and depth.
-
-Internal Wisps
-
-Prevent visual stagnation.
-
-Boundary Behavior
-
-The fog does not abruptly stop.
-
-Instead:
-
-It feathers toward the playfield
-Slightly bleeds inward
-Creates a seamless transition
-
-The result feels like:
-
-A corridor cut through a larger cloud system.
-
-Title Screen
-
-The title screen functions as a living scene rather than a static menu.
-
-Formation Flybys
-
-Enemy squadrons perform continuous flights.
-
-Characteristics:
-
-Formation movement
-Dynamic paths
-Persistent motion
-Fog Interaction
-
-Formation ships gradually disappear into surrounding fog.
-
-This creates the illusion that:
-
-The atmosphere surrounds the world
-Ships enter and leave cloud banks naturally
-
-The effect reinforces environmental depth before gameplay begins.
-
-Screen Effects
-Screen Shake
-
-Used sparingly.
-
-Triggered by:
-
-Heavy impacts
-Boss attacks
-Destruction events
-
-Purpose:
-
-Increase perceived force.
-
-Damage Flash
-
-Communicates:
-
-Player hits
-Significant impacts
-
-Maintains clarity while enhancing feedback.
-
-Particle System
-
-Particles support:
-
-Explosions
-Hits
-Destruction
-Realm effects
-
-Particle density is tuned to avoid visual clutter.
-
-Difficulty Philosophy
-
-Star Strike RUSH is designed around:
-
-Fairness
-
-Deaths should feel earned.
-
-Pressure
-
-The player should feel challenged.
-
-Adaptation
-
-Victory comes from:
-
-Recognition
-Positioning
-Reaction
-
-Not memorization alone.
-
-Replayability
-
-No single run should feel identical.
-
-Variation comes from:
-
-Encounters
-Enemy mixes
-Formation compositions
-Realm interactions
-Boss timing
-Target Player Experience
-
-The intended emotional progression is:
-
-Early Game
-
-Confidence
-
-Mid Game
-
-Tension
-
-Late Game
-
-Controlled panic
-
-Boss Encounters
-
-Intensity
-
-High-Level Play
-
-Flow state
-
-The player should feel like an elite pilot threading through overwhelming odds while pushing deeper into a hostile, corrupted region of space.
-
-Summary
-
-Star Strike RUSH is a modern arcade space shooter built around fast movement, readable combat, escalating enemy behaviors, dimensional atmosphere, and strong visual identity.
-
-Its defining features include:
-
-Dynamic enemy formations
-Snap-turn combat behaviors
-Realm-shifting gameplay
-Procedural encounter pacing
-Large-scale boss battles
-Atmospheric fog-driven presentation
-High replay value
-Score-chasing arcade structure
-
-The overall vision is a game that feels like fighting through an endless hostile fleet inside a dark, living region of space—where the battlefield remains readable, but the universe around it feels vast, oppressive, and alive.
+*End of document. Update this file after major design decisions are confirmed or changed.*
