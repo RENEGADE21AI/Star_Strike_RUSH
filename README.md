@@ -5,28 +5,23 @@ A mobile-first HTML5 canvas space fighter game.
 ## Project structure
 
 ```text
-index.html                       Page shell only, or generated ordered script loader after split
-css/style.css                    Page, canvas, hidden input, and load-error styles
-js/game.js                       Main JavaScript entry point for the module-loader stage
-js/config.js                     Shared loader configuration
-js/legacyLoader.js               Coordinates loading the stable legacy game build
-js/legacyGame.js                 Checked-in extracted legacy game script
-js/legacyParser.js               Extracts the inline game script from legacy HTML
-js/legacyCache.js                Caches the extracted script for the browser session
-js/errorView.js                  Displays a readable load error if boot fails
+index.html                       Page shell that loads generated ordered script parts
+css/style.css                    Page, canvas, and hidden input styles
+js/legacyGame.js                 Checked-in extracted legacy game script source
+js/game-parts/                   Generated ordered browser script parts loaded by index.html
 scripts/extract-legacy-game.mjs  Local helper for extracting a legacy inline script
-scripts/use-local-legacy-game.mjs  Switches the loader to checked-in legacyGame.js
 scripts/split-legacy-game.mjs    Splits legacyGame.js into ordered browser script parts
+scripts/validate-split.mjs       Verifies index.html and js/game-parts stay in sync
 .github/workflows/extract-legacy-game.yml  Manual workflow for full legacy extraction
 .github/workflows/split-legacy-game.yml    Manual workflow for generating ordered game parts
-.github/workflows/smoke-test.yml            Basic file and syntax checks
+.github/workflows/smoke-test.yml            Basic file, syntax, and split validation checks
 ```
 
 ## Current refactor status
 
 The old single-file shell has been split into separate HTML, CSS, JavaScript, scripts, and workflows.
 
-The legacy game script has been extracted into a checked-in local file by GitHub Actions. The current loader can run the local script without depending on `raw.githubusercontent.com`.
+The legacy game script has been extracted into `js/legacyGame.js`, then generated into ordered browser script files under `js/game-parts/`. The page now loads those ordered parts directly, so it no longer depends on `raw.githubusercontent.com` or the temporary module-loader stage.
 
 ## GitHub Actions helpers
 
@@ -58,9 +53,15 @@ You can split the checked-in legacy script locally with:
 node scripts/split-legacy-game.mjs
 ```
 
+You can validate the generated split with:
+
+```bash
+node scripts/validate-split.mjs
+```
+
 ## Next deeper cleanup step
 
-After the generated `js/game-parts/` files exist, the next refactor should replace those generated chunks with meaningful gameplay modules, for example:
+The next refactor should replace the generated chunks with meaningful gameplay modules, for example:
 
 ```text
 js/core/state.js
