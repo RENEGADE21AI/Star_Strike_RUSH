@@ -19,14 +19,12 @@ jobs:
           test -f js/legacyGame.js
           test -d js/game-parts
           test -f scripts/extract-legacy-game.mjs
-          test -f scripts/use-local-legacy-game.mjs
           test -f scripts/split-legacy-game.mjs
           test -f scripts/validate-split.mjs
 
       - name: Parse JavaScript helpers
         run: |
           node --check scripts/extract-legacy-game.mjs
-          node --check scripts/use-local-legacy-game.mjs
           node --check scripts/split-legacy-game.mjs
           node --check scripts/validate-split.mjs
 
