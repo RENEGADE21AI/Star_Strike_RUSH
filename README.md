@@ -5,39 +5,43 @@ A mobile-first HTML5 canvas space fighter game.
 ## Project structure
 
 ```text
-index.html                       Page shell that loads generated ordered script parts
+index.html                       Page shell that loads the exact extracted game script
 css/style.css                    Page, canvas, and hidden input styles
 js/legacyGame.js                 Checked-in extracted legacy game script source
-js/game-parts/                   Generated ordered browser script parts loaded by index.html
 scripts/extract-legacy-game.mjs  Local helper for extracting a legacy inline script
-scripts/split-legacy-game.mjs    Splits legacyGame.js into ordered browser script parts
-scripts/validate-split.mjs       Verifies index.html and js/game-parts stay in sync
+scripts/validate-legacy-integrity.mjs  Verifies legacyGame.js matches the known-good original script
 .github/workflows/extract-legacy-game.yml  Manual workflow for full legacy extraction
-.github/workflows/split-legacy-game.yml    Manual workflow for generating ordered game parts
-.github/workflows/smoke-test.yml            Basic file, syntax, and split validation checks
+.github/workflows/smoke-test.yml            Basic file, syntax, and integrity checks
 ```
 
 ## Current refactor status
 
-The old single-file shell has been split into separate HTML, CSS, JavaScript, scripts, and workflows.
+The old single-file shell has been split into separate HTML, CSS, and JavaScript files.
 
-The legacy game script has been extracted into `js/legacyGame.js`, then generated into ordered browser script files under `js/game-parts/`. The page now loads those ordered parts directly, so it no longer depends on `raw.githubusercontent.com` or the temporary module-loader stage.
+The runtime path is intentionally simple so the game behaves exactly like the pre-refactor version:
+
+```text
+index.html -> css/style.css
+index.html -> js/legacyGame.js
+```
+
+`js/legacyGame.js` is the original inline game script extracted from the known-good `index.html` commit. The smoke test restores that known-good file and verifies that `js/legacyGame.js` matches the original inline script exactly.
 
 ## GitHub Actions helpers
 
-To extract the full old inline game script into `js/legacyGame.js`, run:
+To re-extract the full old inline game script into `js/legacyGame.js`, run:
 
 ```text
 Actions -> Extract legacy game script -> Run workflow
 ```
 
-To split `js/legacyGame.js` into generated ordered files under `js/game-parts/`, run:
+The smoke test runs on pushes and pull requests and checks:
 
 ```text
-Actions -> Split legacy game -> Run workflow
+- required runtime files exist
+- helper scripts parse
+- js/legacyGame.js exactly matches the known-good original inline script
 ```
-
-The split workflow rewrites `index.html` to load the generated parts in order.
 
 ## Local helper commands
 
@@ -47,21 +51,15 @@ After cloning the repository locally, you can extract an inline legacy script wi
 node scripts/extract-legacy-game.mjs path/to/legacy-index.html js/legacyGame.js
 ```
 
-You can split the checked-in legacy script locally with:
+You can validate the extracted script with:
 
 ```bash
-node scripts/split-legacy-game.mjs
-```
-
-You can validate the generated split with:
-
-```bash
-node scripts/validate-split.mjs
+node scripts/validate-legacy-integrity.mjs path/to/legacy-index.html
 ```
 
 ## Next deeper cleanup step
 
-The next refactor should replace the generated chunks with meaningful gameplay modules, for example:
+The next refactor should be a gradual semantic split of `js/legacyGame.js` into meaningful gameplay modules, for example:
 
 ```text
 js/core/state.js
@@ -80,4 +78,4 @@ js/input/pointer.js
 js/input/keyboard.js
 ```
 
-That deeper step should be done gradually so each commit is easy to test and gameplay regressions are easier to spot.
+Do that one system at a time with tests/playtesting between commits so behavior changes are easy to catch.
