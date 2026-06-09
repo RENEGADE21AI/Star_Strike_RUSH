@@ -1,0 +1,35 @@
+name: Smoke test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Check required files
+        run: |
+          test -f index.html
+          test -f css/style.css
+          test -f js/game.js
+          test -f js/config.js
+          test -f js/legacyLoader.js
+          test -f js/legacyParser.js
+          test -f js/legacyCache.js
+          test -f js/errorView.js
+
+      - name: Parse JavaScript modules
+        run: |
+          node --check js/game.js
+          node --check js/config.js
+          node --check js/legacyLoader.js
+          node --check js/legacyParser.js
+          node --check js/legacyCache.js
+          node --check js/errorView.js
+          node --check scripts/extract-legacy-game.mjs
+          node --check scripts/use-local-legacy-game.mjs
