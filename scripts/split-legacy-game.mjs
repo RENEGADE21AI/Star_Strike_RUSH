@@ -20,7 +20,7 @@ for (let start = 0, part = 0; start < lines.length; start += partSize, part++) {
   const chunk = lines.slice(start, start + partSize).join('\n').trimEnd() + '\n';
   const filename = `${String(part).padStart(2, '0')}-legacy-game-part.js`;
   const relativePath = `js/game-parts/${filename}`;
-  const banner = `// Star Strike RUSH legacy game part ${part + 1}\n// Generated from js/legacyGame.js by scripts/split-legacy-game.mjs.\n\n`;
+  const banner = `// Star Strike RUSH legacy game part ${part + 1}\n// Generated from js/legacyGame.js by scripts/split-legacy-game.mjs.\n// Do not edit generated part files directly.\n\n`;
   await writeFile(resolve(outputDir, filename), banner + chunk, 'utf8');
   partPaths.push(relativePath);
 }
