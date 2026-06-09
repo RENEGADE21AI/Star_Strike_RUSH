@@ -11,23 +11,26 @@ jobs:
     steps:
       - name: Check out repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Check required files
+      - name: Check required runtime files
         run: |
           test -f index.html
           test -f css/style.css
           test -f js/legacyGame.js
-          test -d js/game-parts
           test -f scripts/extract-legacy-game.mjs
-          test -f scripts/split-legacy-game.mjs
-          test -f scripts/validate-split.mjs
+          test -f scripts/validate-legacy-integrity.mjs
 
       - name: Parse JavaScript helpers
         run: |
           node --check scripts/extract-legacy-game.mjs
-          node --check scripts/split-legacy-game.mjs
-          node --check scripts/validate-split.mjs
+          node --check scripts/validate-legacy-integrity.mjs
 
-      - name: Validate generated split
+      - name: Restore known-good legacy HTML
         run: |
-          node scripts/validate-split.mjs
+          git show a5cf58cf7acb72db2dc147261d3dc28f094794b7:index.html > /tmp/legacy-index.html
+
+      - name: Validate extracted script integrity
+        run: |
+          node scripts/validate-legacy-integrity.mjs /tmp/legacy-index.html
