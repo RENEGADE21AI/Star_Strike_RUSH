@@ -23,10 +23,6 @@ jobs:
         run: |
           node scripts/extract-legacy-game.mjs /tmp/legacy-index.html js/legacyGame.js
 
-      - name: Switch loader to local legacy script
-        run: |
-          node scripts/use-local-legacy-game.mjs
-
       - name: Commit extracted script
         run: |
           if git diff --quiet; then
@@ -35,6 +31,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add js/legacyGame.js js/legacyLoader.js
+          git add js/legacyGame.js
           git commit -m "Extract legacy game script locally"
           git push
