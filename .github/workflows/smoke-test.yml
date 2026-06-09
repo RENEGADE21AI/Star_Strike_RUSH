@@ -16,20 +16,20 @@ jobs:
         run: |
           test -f index.html
           test -f css/style.css
-          test -f js/game.js
-          test -f js/config.js
-          test -f js/legacyLoader.js
-          test -f js/legacyParser.js
-          test -f js/legacyCache.js
-          test -f js/errorView.js
+          test -f js/legacyGame.js
+          test -d js/game-parts
+          test -f scripts/extract-legacy-game.mjs
+          test -f scripts/use-local-legacy-game.mjs
+          test -f scripts/split-legacy-game.mjs
+          test -f scripts/validate-split.mjs
 
-      - name: Parse JavaScript modules
+      - name: Parse JavaScript helpers
         run: |
-          node --check js/game.js
-          node --check js/config.js
-          node --check js/legacyLoader.js
-          node --check js/legacyParser.js
-          node --check js/legacyCache.js
-          node --check js/errorView.js
           node --check scripts/extract-legacy-game.mjs
           node --check scripts/use-local-legacy-game.mjs
+          node --check scripts/split-legacy-game.mjs
+          node --check scripts/validate-split.mjs
+
+      - name: Validate generated split
+        run: |
+          node scripts/validate-split.mjs
