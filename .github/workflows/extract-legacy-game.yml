@@ -1,0 +1,40 @@
+name: Extract legacy game script
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out current repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore last known-good single-file build
+        run: |
+          git show a5cf58cf7acb72db2dc147261d3dc28f094794b7:index.html > /tmp/legacy-index.html
+
+      - name: Extract inline game script
+        run: |
+          node scripts/extract-legacy-game.mjs /tmp/legacy-index.html js/legacyGame.js
+
+      - name: Switch loader to local legacy script
+        run: |
+          node scripts/use-local-legacy-game.mjs
+
+      - name: Commit extracted script
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/legacyGame.js js/legacyLoader.js
+          git commit -m "Extract legacy game script locally"
+          git push
