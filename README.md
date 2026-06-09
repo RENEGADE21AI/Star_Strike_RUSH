@@ -5,26 +5,46 @@ A mobile-first HTML5 canvas space fighter game.
 ## Project structure
 
 ```text
-index.html                  Page shell only
-css/style.css               Page, canvas, hidden input, and load-error styles
-js/game.js                  Main JavaScript entry point
-js/config.js                Shared loader configuration
-js/legacyLoader.js          Coordinates loading the stable legacy game build
-js/legacyParser.js          Extracts the inline game script from legacy HTML
-js/legacyCache.js           Caches the extracted script for the browser session
-js/errorView.js             Displays a readable load error if boot fails
+index.html                       Page shell only, or generated ordered script loader after split
+css/style.css                    Page, canvas, hidden input, and load-error styles
+js/game.js                       Main JavaScript entry point for the module-loader stage
+js/config.js                     Shared loader configuration
+js/legacyLoader.js               Coordinates loading the stable legacy game build
+js/legacyGame.js                 Checked-in extracted legacy game script
+js/legacyParser.js               Extracts the inline game script from legacy HTML
+js/legacyCache.js                Caches the extracted script for the browser session
+js/errorView.js                  Displays a readable load error if boot fails
 scripts/extract-legacy-game.mjs  Local helper for extracting a legacy inline script
+scripts/use-local-legacy-game.mjs  Switches the loader to checked-in legacyGame.js
+scripts/split-legacy-game.mjs    Splits legacyGame.js into ordered browser script parts
+.github/workflows/extract-legacy-game.yml  Manual workflow for full legacy extraction
+.github/workflows/split-legacy-game.yml    Manual workflow for generating ordered game parts
+.github/workflows/smoke-test.yml            Basic file and syntax checks
 ```
 
 ## Current refactor status
 
-The old single-file shell has been split into separate HTML, CSS, and JavaScript files.
+The old single-file shell has been split into separate HTML, CSS, JavaScript, scripts, and workflows.
 
-The current loader keeps gameplay behavior stable by loading the last known-good legacy build, extracting its game script, caching it for the current browser session, and running it on the new page shell.
+The legacy game script has been extracted into a checked-in local file by GitHub Actions. The current loader can run the local script without depending on `raw.githubusercontent.com`.
 
-This gives the project a cleaner multi-file structure without risking gameplay regressions from manually rewriting thousands of lines at once.
+## GitHub Actions helpers
 
-## Local extraction helper
+To extract the full old inline game script into `js/legacyGame.js`, run:
+
+```text
+Actions -> Extract legacy game script -> Run workflow
+```
+
+To split `js/legacyGame.js` into generated ordered files under `js/game-parts/`, run:
+
+```text
+Actions -> Split legacy game -> Run workflow
+```
+
+The split workflow rewrites `index.html` to load the generated parts in order.
+
+## Local helper commands
 
 After cloning the repository locally, you can extract an inline legacy script with:
 
@@ -32,9 +52,15 @@ After cloning the repository locally, you can extract an inline legacy script wi
 node scripts/extract-legacy-game.mjs path/to/legacy-index.html js/legacyGame.js
 ```
 
+You can split the checked-in legacy script locally with:
+
+```bash
+node scripts/split-legacy-game.mjs
+```
+
 ## Next deeper cleanup step
 
-The next refactor should replace the remote legacy loader with a checked-in local `js/legacyGame.js`, then gradually split that file into dedicated gameplay modules, for example:
+After the generated `js/game-parts/` files exist, the next refactor should replace those generated chunks with meaningful gameplay modules, for example:
 
 ```text
 js/core/state.js
@@ -53,4 +79,4 @@ js/input/pointer.js
 js/input/keyboard.js
 ```
 
-That deeper step should be done with a local clone or another full-source extraction path so the full legacy source can be split without accidentally dropping lines.
+That deeper step should be done gradually so each commit is easy to test and gameplay regressions are easier to spot.
