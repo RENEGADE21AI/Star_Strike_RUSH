@@ -1,5 +1,6 @@
 // Star Strike RUSH legacy game part 5
 // Generated from js/legacyGame.js by scripts/split-legacy-game.mjs.
+// Do not edit generated part files directly.
 
       damagePlayer(1);
     }

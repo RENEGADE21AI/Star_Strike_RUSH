@@ -1,5 +1,6 @@
 // Star Strike RUSH legacy game part 2
 // Generated from js/legacyGame.js by scripts/split-legacy-game.mjs.
+// Do not edit generated part files directly.
 
   else if (!getWingman(1)) addWingmanSide(1, timer);
   else refreshWingmen(timer);

@@ -1,5 +1,6 @@
 // Star Strike RUSH legacy game part 1
 // Generated from js/legacyGame.js by scripts/split-legacy-game.mjs.
+// Do not edit generated part files directly.
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");

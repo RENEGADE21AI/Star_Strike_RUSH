@@ -1,5 +1,6 @@
 // Star Strike RUSH legacy game part 3
 // Generated from js/legacyGame.js by scripts/split-legacy-game.mjs.
+// Do not edit generated part files directly.
 
     base.cycleTimer = (extra.cycleTimer != null) ? extra.cycleTimer : rand(0, phantomCycleDuration(base.stateMode));
     base.telegraphTimer = extra.telegraphTimer || 0;

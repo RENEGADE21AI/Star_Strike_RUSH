@@ -1,5 +1,6 @@
 // Star Strike RUSH legacy game part 10
 // Generated from js/legacyGame.js by scripts/split-legacy-game.mjs.
+// Do not edit generated part files directly.
 
   state.fx.shake = 0;
   state.fx.flash = 0;

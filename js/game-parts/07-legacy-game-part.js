@@ -1,5 +1,6 @@
 // Star Strike RUSH legacy game part 8
 // Generated from js/legacyGame.js by scripts/split-legacy-game.mjs.
+// Do not edit generated part files directly.
 
 }
 function drawPlayer() {
