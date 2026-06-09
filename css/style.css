@@ -22,3 +22,11 @@ canvas {
   width: 1px;
   height: 1px;
 }
+
+.load-error {
+  position: fixed;
+  inset: 16px;
+  color: white;
+  font: 16px Arial, sans-serif;
+  white-space: pre-wrap;
+}
