@@ -2,6 +2,14 @@
 
 A mobile-first HTML5 canvas space fighter game.
 
+## License and usage
+
+Copyright (c) 2026 Michael Del Bianco. All rights reserved.
+
+This project is proprietary. Use requires prior written permission from the copyright owner.
+
+See `LICENSE` for the copyright notice.
+
 ## Project structure
 
 ```text
