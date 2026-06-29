@@ -1,0 +1,234 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function hasRequired(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    function hasOnly(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function validText(value, maxLength) {
+      return value is string
+        && value.size() <= maxLength
+        && value.matches("^[A-Za-z0-9 _.'-]*$");
+    }
+
+    function validEmail(value) {
+      return value is string
+        && value.size() <= 120
+        && value.matches("^[A-Za-z0-9@._+-]*$");
+    }
+
+    function validCallSign(value) {
+      return value is string
+        && value.size() <= 12
+        && value.matches("^[A-Z0-9_]*$");
+    }
+
+    function validUrl(value) {
+      return value is string
+        && value.size() <= 300
+        && (value == "" || value.matches("^https?://.{1,292}$"));
+    }
+
+    function validScore(value) {
+      return value is int && value >= 0 && value <= 999999999;
+    }
+
+    function validCounter(value) {
+      return value is int && value >= 0 && value <= 1000000;
+    }
+
+    function validPhase(value) {
+      return value is int && value >= 1 && value <= 9999;
+    }
+
+    function validPrivateAccount(data, userId) {
+      return hasRequired(data, [
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'createdAt',
+          'lastSeenAt',
+          'updatedAt'
+        ])
+        && hasOnly(data, [
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'createdAt',
+          'lastSeenAt',
+          'updatedAt'
+        ])
+        && data.uid == userId
+        && validEmail(data.email)
+        && validText(data.displayName, 60)
+        && validUrl(data.photoURL)
+        && data.lastSeenAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function validPublicProfile(data, userId) {
+      return hasRequired(data, [
+          'uid',
+          'displayName',
+          'callSign',
+          'photoURL',
+          'bestScore',
+          'phase',
+          'achievementsCount',
+          'createdAt',
+          'updatedAt'
+        ])
+        && hasOnly(data, [
+          'uid',
+          'displayName',
+          'callSign',
+          'photoURL',
+          'bestScore',
+          'phase',
+          'achievementsCount',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid == userId
+        && validText(data.displayName, 60)
+        && validCallSign(data.callSign)
+        && validUrl(data.photoURL)
+        && validScore(data.bestScore)
+        && validPhase(data.phase)
+        && validCounter(data.achievementsCount)
+        && data.updatedAt == request.time;
+    }
+
+    function validLeaderboardRecord(data, userId) {
+      return hasRequired(data, [
+          'uid',
+          'displayName',
+          'callSign',
+          'photoURL',
+          'bestScore',
+          'phase',
+          'achievementsCount',
+          'updatedAt'
+        ])
+        && hasOnly(data, [
+          'uid',
+          'displayName',
+          'callSign',
+          'photoURL',
+          'bestScore',
+          'phase',
+          'achievementsCount',
+          'updatedAt'
+        ])
+        && data.uid == userId
+        && validText(data.displayName, 60)
+        && validCallSign(data.callSign)
+        && validUrl(data.photoURL)
+        && validScore(data.bestScore)
+        && validPhase(data.phase)
+        && validCounter(data.achievementsCount)
+        && data.updatedAt == request.time;
+    }
+
+    function validAchievementId(achievementId) {
+      return achievementId in [
+        'first_sortie',
+        'rookie_score',
+        'ace_score',
+        'legend_score',
+        'phase_two',
+        'phase_three',
+        'boss_breaker',
+        'ghost_runner',
+        'collector',
+        'swarm_clearer'
+      ];
+    }
+
+    function validAchievement(data, userId, achievementId) {
+      return hasRequired(data, [
+          'uid',
+          'achievementId',
+          'title',
+          'unlockedAt'
+        ])
+        && hasOnly(data, [
+          'uid',
+          'achievementId',
+          'title',
+          'unlockedAt'
+        ])
+        && validAchievementId(achievementId)
+        && data.uid == userId
+        && data.achievementId == achievementId
+        && validText(data.title, 40)
+        && data.unlockedAt == request.time;
+    }
+
+    match /players_private/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && validPrivateAccount(request.resource.data, userId)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isOwner(userId)
+        && validPrivateAccount(request.resource.data, userId)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+    }
+
+    match /players_public/{userId} {
+      allow get: if signedIn();
+      allow list: if signedIn() && request.query.limit <= 25;
+      allow create: if isOwner(userId)
+        && validPublicProfile(request.resource.data, userId)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isOwner(userId)
+        && validPublicProfile(request.resource.data, userId)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.bestScore >= resource.data.bestScore
+        && request.resource.data.phase >= resource.data.phase
+        && request.resource.data.achievementsCount >= resource.data.achievementsCount;
+      allow delete: if false;
+    }
+
+    match /leaderboard_scores/{userId} {
+      allow get: if signedIn();
+      allow list: if signedIn() && request.query.limit <= 25;
+      allow create: if isOwner(userId)
+        && validLeaderboardRecord(request.resource.data, userId);
+      allow update: if isOwner(userId)
+        && validLeaderboardRecord(request.resource.data, userId)
+        && request.resource.data.bestScore >= resource.data.bestScore
+        && request.resource.data.phase >= resource.data.phase
+        && request.resource.data.achievementsCount >= resource.data.achievementsCount;
+      allow delete: if false;
+    }
+
+    match /player_achievements/{userId}/items/{achievementId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && validAchievement(request.resource.data, userId, achievementId);
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,426 +1,393 @@
-# Star Strike RUSH — Game Design Document
+# Star Strike RUSH - Game Design Document
 
-### Living Design Reference
+## Living Design Reference
 
------
+This document is the source of truth for Star Strike RUSH. Keep it updated whenever gameplay, progression, enemies, bosses, powerups, online systems, or major technical structure changes.
 
-## 1. Vision & Concept
+## 1. Vision
 
-Star Strike RUSH is a single-screen vertical shoot-’em-up (shmup) designed for portrait mobile play, playable in a browser with no install. It targets the feel of classic arcade shmups — tight, readable action, escalating pressure, short-but-intense sessions — while layering in a small number of original mechanics (the realm system, fractional damage, boss alternation) that give it a distinct identity without overwhelming complexity.
+Star Strike RUSH is a single-screen vertical shmup built for portrait mobile play. It should feel like a fast arcade run: short sessions, readable threats, escalating pressure, fair deaths, and immediate restarts.
 
-The tone is dark and cinematic but not grimdark. The palette skews deep space: near-black backgrounds, purple-black fog, vivid enemy colors that pop against the darkness. The game should feel tense and fast, with a slight weight to the player ship that rewards aggressive positioning rather than timid corner-camping.
+The game identity is:
 
-The intended play session is 5–15 minutes. Death should feel fair. Every loss should feel survivable-in-retrospect, motivating a retry.
+- Tight single-screen vertical action.
+- Geometric enemy silhouettes with strong color identity.
+- Fair telegraphs instead of surprise deaths.
+- Ghost dash and energy management as the signature player resource.
+- Short waves that create pressure without flooding the screen.
+- Bosses that test one clear skill at a time.
 
------
+Do not add more enemies, bosses, or powerups beyond the roster in this document until the current package has been tuned, balanced, and polished.
 
-## 2. Platform & Presentation
+## 2. Platform And Structure
 
-**Logical resolution:** 375 × 667 px (9:16 portrait)  
-**Rendering:** HTML5 Canvas, single self-contained HTML file  
-**Scaling:** Letterboxed — scales uniformly to fill any device screen. Fog bands fill the letterbox bars so there are never raw black bars. The game area is always centered.  
-**Input:** Touch (primary) and mouse. All pointer coordinates are transformed through the offset/scale matrix so game logic is resolution-independent.  
-**Target device:** Mobile browser (portrait). Also playable on desktop.
+Logical resolution: 375 x 667 portrait.
 
-There is no install, no account, no server. All persistence is localStorage.
+Rendering: HTML5 Canvas.
 
------
+Input: mobile touch controls first, keyboard/mouse also supported.
 
-## 3. Core Gameplay Loop
+Persistence:
 
-The player pilots a single ship from the bottom of the screen, shooting upward at descending enemy waves. Enemies shoot back. The player can move freely across the full game area and has a ghost-dash ability for evasion.
+- Local high score, call sign, settings, and codex discoveries use localStorage.
+- Firebase Auth supports Google sign-in.
+- Cloud Firestore stores online profiles, world record leaderboard entries, run summaries, and earned achievements.
+- The game remains playable signed out; online sync is additive.
 
-Waves of enemies arrive in formation. Between waves, the game briefly pauses before the next set spawns. Bosses appear at fixed phase milestones. The loop is:
+Source layout:
 
-**Wave → clear → brief pause → next wave → … → Boss phase → repeat at higher difficulty**
+- `index.html` loads ordered browser scripts.
+- `styles.css` owns page/canvas styling.
+- `src/01-core.js` through `src/18-session-input-loop.js` own the core game.
+- `src/18-expansion-data.js`, `src/18-expansion-enemies-powerups.js`,
+  `src/18-expansion-hazards-bosses.js`, and
+  `src/18-expansion-rendering-waves.js` own the final expansion package.
+- `src/19-game-achievements.js` defines achievement payloads.
+- `src/20-firebase-online.js` owns Firebase Auth and Firestore sync.
 
-There are no lives in the traditional sense — the player has a hit-point total, and the game ends when it reaches zero. Powerups dropped by enemies restore HP, upgrade firepower, or add a wingman escort.
+## 3. Core Loop
 
-Scoring is cumulative. There is a single global high score (localStorage). No online leaderboard. The player sets a call sign that appears on the game over and high score screen.
+The player pilots a ship near the bottom of the screen and fires automatically upward.
 
------
+The loop is:
+
+Wave -> brief pressure shift -> next wave -> phase clear -> boss milestone -> higher phase.
+
+The player has HP and energy. HP loss ends the run at zero. Energy fuels ghost dash and becomes more important once Siphons, Leeches, Siphon Core, Stabilizer, and Overcharge enter the game.
+
+Scoring is cumulative. Combo kills increase the multiplier. Score Surge temporarily boosts score gain.
 
 ## 4. Player Ship
 
 ### Movement
 
-Free movement across the full game area. Touch/drag to reposition. The ship follows the input point with slight physics smoothing — responsive but not teleporting. There is intentional inertia so the ship feels like it has mass.
+The player moves freely inside the play area with smoothed acceleration. The ship should feel responsive but not weightless. Mobile controls must remain readable and forgiving.
 
 ### Firing
 
-The ship fires automatically at all times while alive. Shot type depends on current powerup state and whether the Wraith fight is active.
+The ship fires automatically.
 
-**Shot types:**
+Shot types:
 
-- **Standard single:** One center bullet, full damage (1.0)
-- **Spread:** Three bullets (left, center, right). Side bullets deal fractional damage (0.75). Center deals full (1.0).
-- **Wingman:** Escort ship fires independently. Wingman side shots also deal 0.75 fractional damage.
+- Standard single: one center shot, 1.0 damage.
+- Spread Shot: three shots, center at 1.0 damage and side shots at 0.75 damage.
+- Wingman: escort ships fire independently.
+- Piercing Shot: center shot pierces through one enemy for a short duration.
 
-The fractional damage system prevents spread fire from being a strict upgrade — it deals more total damage against a wide group but less per-hit against a single armored target like a boss.
+### Ghost Dash And Energy
 
-### Ghost Dash
+Ghost dash grants a brief phase window and costs energy. During Wraith fights, ghost action switches the player between physical and ghost realms.
 
-The player can activate a brief ghost state (the “dash”). While ghosted:
+Energy regenerates over time. Overcharge increases regeneration temporarily. Energy Cell restores a chunk immediately. Siphon and Leech threats attack this resource without turning empty energy into heavy HP damage.
 
-- The ship becomes semi-transparent with a soft outer glow
-- Scan lines are drawn over the ship geometry
-- Six small motes orbit the ship in a loose ring
-- The ship is immune to physical-realm enemy bullets
-- The ship can pass through physical enemies without collision
+### Health And Defense
 
-The ghost dash has a cooldown. It is not a movement teleport — the ship does not reposition. It is purely a brief invulnerability/phase-through window.
+The player has one HP pool. Repair +1 restores HP up to max.
 
-**Visual style of ghost:** Transparent hull (~46% alpha) + outer aura rendered with a lighter composite mode + scan line overlay + 6 orbiting motes. No afterimage trails. The ghost animation design may be revised in a future pass.
+Phase Shield blocks one HP damage instance, flashes, and breaks. It does not block energy drain.
 
-### Health
+## 5. Online Records And Achievements
 
-The player has a hit point total displayed as a bar in the HUD. At low HP, a pulsing red border warning activates around the game area. There is also a screen flash on taking damage.
+Signed-in players can sync:
 
-No shield. No extra lives. One ship, one HP pool.
+- Profile call sign.
+- Best score.
+- Run summaries.
+- Earned achievements.
+- Global leaderboard records.
 
------
+The online panel shows account state, world records, achievement status, and refresh controls.
 
-## 5. Wingman
+The game must remain functional if Firebase is unavailable or the player is signed out. In that case, local play and local high score continue normally.
 
-A powerup can grant the player a wingman escort ship. The wingman:
+## 6. Progression And Boss Rotation
 
-- Orbits or flanks the player ship
-- Fires independently, matching the player’s shot rhythm
-- Has its own HP or is destroyed on a single boss-level hit (TBD)
-- Visually distinct from the player ship but in the same design language
+Phases gate enemy introductions, debris events, and bosses.
 
-The wingman adds firepower and serves as a soft “extra hit” since certain enemy bullets may target the player position and be intercepted.
+Boss milestones occur on phases divisible by 4.
 
------
+Current boss order:
 
-## 6. Progression — Phases, Waves, Difficulty
+- Phase 4: Standard Boss.
+- Phase 8: Wraith Boss.
+- Phase 12: Debris Warden.
+- Phase 16: Mothership.
+- Phase 20: Siphon Core.
+- Phase 24: Hive Breaker.
+- Phase 28: Rail Tyrant.
+- Phase 32: Gravity Well.
+- Later phase milestones cycle through the six expansion bosses.
 
-### Phases
+The Wraith remains the first full realm-system boss. Expansion bosses come after the player has already seen the basic and realm mechanics.
 
-The game is divided into phases. Phases gate boss encounters and difficulty scaling. Phase number is the primary progression counter.
+## 7. Wave And Difficulty Rules
 
-- Phases 1–7: Standard bosses appear at every phase divisible by 4 (phase 4 only in this range)
-- Phase 8+: Boss encounters alternate between Standard and Wraith bosses
+Waves are selected from templates and filtered by mood, phase, pressure, and active threat load.
 
-This means the Wraith is introduced as a late-game escalation, not a recurring threat from the start.
+Wave moods:
 
-### Waves
+- Open: baseline readable patterns.
+- Spike: sharper pressure and priority targets.
+- Recovery: reduced pressure, safer drops, and less density.
+- Rule: mechanic-focused waves such as Phantoms, Siphons, Leeches, support enemies, or Railgunners.
 
-Each phase contains multiple enemy waves. Waves are drawn from a library of wave templates that define enemy count, type, formation pattern, and entry choreography. Wave templates are never modified by difficulty scaling code — the templates are fixed design assets.
+Difficulty scaling affects movement, firing cadence, enemy mix, pressure budget, and cooldowns. It must not override fairness rules:
 
-**Wave mood** is a meta-parameter that influences which templates are selected and how aggressively enemies fire. Mood shifts over the course of a phase.
+- No unavoidable laser hits.
+- No heavy bullet spam during asteroid walls.
+- No Minecaster overload during debris fields.
+- No debris event when the player is at 1 HP.
+- No boss-shielding.
+- No shield stacking.
 
-### Difficulty Scaling
+## 8. Enemy Roster
 
-A difficulty value increases over time and phase count. It affects:
+All enemies are geometric, color-coded, and readable at a glance.
 
-- Enemy movement speed
-- Enemy bullet speed and fire rate
-- Frequency of elite (purple/phantom) enemies in formations
+### Red Scout
 
-Scaling uses the `updateDifficulty()` and `updatePressure()` systems. Pressure is a shorter-term spike that temporarily increases aggression during boss approach or after the player has been doing very well.
+Color: red.
+HP: 2.
+Role: basic chaff and formation filler.
 
------
+Drifts downward and establishes the baseline dodge/shoot rhythm.
 
-## 7. Enemy Roster
+### Orange Light Interceptor
 
-All enemies are rendered geometrically — no sprites. Each has a distinct silhouette, color, and behavior pattern.
+Color: orange.
+HP: 1.
+Role: fast movement threat.
 
-### Red — Scout
+Uses erratic movement patterns and creates lane pressure without much durability.
 
-- HP: 2
-- Threat contribution: 1.05
-- The standard footsoldier. Fast, low HP. Often appears in large formations. Dies in two hits from a center shot or a couple of spread hits. Fires occasionally.
+### Purple Heavy
 
-### Orange — Light
+Color: purple.
+HP: 5.
+Role: armored shooter.
 
-- HP: 1
-- Threat contribution: 0.80
-- Frailer than red, often used as filler or chaff in mixed formations. One hit to kill. May appear in larger numbers to compensate.
+Slow, durable, and fires aimed shots after a visible warning ring.
 
-### Purple — Heavy
+### Cyan Phantom
 
-- HP: 5
-- Threat contribution: 3.55
-- The armored threat. Takes sustained fire to kill. Moves slower. Fires more dangerous bullet patterns. Appears in smaller numbers but dramatically raises the difficulty of a wave.
+Color: cyan.
+HP: 3.
+Role: realm enemy.
 
-### Phantom
+Alternates between physical and ghost states with a telegraph. During ghost state, it requires ghost-realm interaction in Wraith contexts.
 
-- HP: 3
-- Threat contribution: 2.35
-- The special enemy. Alternates between physical and ghost phases on a fixed cycle (~132 frames physical, ~78 frames ghost). During its ghost phase, it is immune to physical-realm player bullets. During the physical phase, it is fully vulnerable.
-- Has a 20-frame telegraph (flicker) before each phase transition so the player can anticipate it.
-- The Phantom fires “phantom shots” — cross-realm bullets (realm: null) that can hit the player regardless of ghost dash state. This makes the Phantom uniquely dangerous and not safely ignored during a dash.
+### Splitter
 
-**Enemy visual language:** All enemies have triangular engine flame indicators (not round or rectangular nozzles). Color-coding is consistent — enemy type is always identifiable at a glance by hue.
+Color: yellow-green shell with red/orange cracks.
+Phase: 3+.
+HP: 3.
+Role: break-apart movement threat.
 
------
+Does not shoot. When destroyed, it splits into two fragile shards that fly diagonally downward. Shards are worth little score and do not drop powerups.
 
-## 8. Boss Encounters
+### Carrier
+
+Color: bronze/gold.
+Phase: 6+.
+HP: 6.
+Role: priority spawner.
+
+Slowly descends and opens launch bays. If ignored, it releases red/orange enemies, and later Splitters or Siphons. Killing it before a launch awards a small bonus. Usually only one is active.
+
+### Siphon
+
+Color: acid green.
+Phase: 5+.
+HP: 3.
+Role: energy-drain shooter.
+
+Fires green drain shots that remove energy rather than HP. If the player has no energy, drain shots do not become heavy HP damage.
+
+### Leech
+
+Color: dark green with green tether.
+Phase: 6+.
+HP: 4.
+Role: proximity energy drain.
+
+Locks on, then tethers to the player if close enough. The tether drains energy over time and breaks when the player gets far enough away or uses ghost movement well. It does not deal direct HP collision damage.
+
+### Minecaster
+
+Color: black hull with red/orange hazard lights.
+Phase: 4+.
+HP: 3.
+Role: area denial.
+
+Drops arming mines. Mines blink before activation, can be shot, and explode in a small radius if touched.
+
+### Shieldbearer
+
+Color: steel gray with yellow shield glow.
+Phase: 5+.
+HP: 4.
+Role: support.
+
+Applies a non-stacking shield to nearby enemies. The shield absorbs a hit on a cooldown. Shieldbearer itself is always vulnerable and never shields bosses.
+
+### Railgunner
+
+Color: dark red/black with red laser accents.
+Phase: 7+.
+HP: 3.
+Role: telegraphed precision threat.
+
+Slows before firing, paints a warning line for roughly 35-45 frames, locks direction, then fires a narrow beam. The beam does not track after lock.
+
+### Repair Drone
+
+Color: dull silver with green sparks.
+Phase: 6+.
+HP: 2.
+Role: healer support.
+
+Does not shoot. Repairs one damaged enemy slowly. Cannot repair bosses or asteroids. Rare and usually paired with Purple, Carrier, or Shieldbearer pressure.
+
+## 9. Rare Environmental Hazard
+
+### Debris Field
+
+Event message: `DEBRIS FIELD`.
+Phase: 3+.
+Role: rare movement hazard.
+
+Asteroids are not normal enemies. They are rare environmental events and boss tools.
+
+Rules:
+
+- Show warning text before the field appears.
+- Do not trigger during normal boss fights.
+- Do not trigger when the player is at 1 HP.
+- Do not trigger when pressure is already high.
+- Asteroids damage player and enemies.
+- Asteroids block player shots.
+- Asteroids should not become a normal powerup source.
+
+Asteroid types:
+
+- Small Debris: fast, low HP.
+- Rock Asteroid: medium speed, medium HP.
+- Iron Asteroid: slow, tanky, rare.
+- Comet Shard: fast late-game asteroid with a trail.
+
+## 10. Boss Roster
 
 ### Standard Boss
 
-A large, heavily armored ship that drops in from the top of the screen. Fires complex bullet patterns in phases. The spawn attack has no telegraph — the pause before it fires is the only warning. This is intentional; the timing is sufficient and a visual telegraph was judged as redundant and visually noisy.
+Color: cyan/white.
+Role: baseline bullet and add-control boss.
 
-The Standard Boss cycles through attack patterns as its HP depletes. It is always targetable with physical-realm bullets.
+Uses spread, aimed, fan, and spawn attacks.
 
 ### Wraith Boss
 
-The Wraith is the late-game signature encounter. It operates across two realms:
+Color: pale ghost/realm tones.
+Role: realm-system boss.
 
-- In its physical phase, it is vulnerable to physical bullets
-- In its ghost phase, it is only vulnerable to ghost-realm bullets (fired while the player is in ghost state)
+Requires physical/ghost realm awareness. The player must use ghost action to survive and to damage the Wraith in the correct state.
 
-The Wraith fires bullets gated by realm — its physical bullets can only hit a physical-realm player, its ghost bullets can only hit a ghost-realm player. This creates a dynamic where the player must actively manage realm state both to deal damage and to survive.
+### Debris Warden
 
-The Wraith has a distinct visual treatment from the Standard Boss — ghostly, translucent, with aura effects matching the phantom enemy aesthetic.
+Color: dark metal, bronze, asteroid gray.
+Role: asteroid-wall boss.
+Core skill: move to the safe gap.
 
-### Boss Phase Rotation
+Summons asteroid walls with visible gaps. Patterns include single wall, double gate, crush wall, meteor warnings, and diagonal rotating fields. Heavy bullet spam must not overlap wall reads.
 
-- Phases 1–7: Standard boss appears only at phase milestones (phase % 4 == 0)
-- Phase 8+: Bosses alternate — Standard, Wraith, Standard, Wraith…
+### Mothership
 
-This ensures the player encounters the Wraith only after they’ve had time to understand the realm mechanic through Phantom enemies.
+Color: bronze/gold.
+Role: carrier boss.
+Core skill: target priority and add control.
 
------
+Launch bays release escorts, heavy deployments, and repair drones. Shooting the boss remains useful, but ignoring adds should make the fight harder.
 
-## 9. The Realm System
+### Siphon Core
 
-The realm system is the game’s central original mechanic, fully realized during the Wraith fight.
+Color: black-green and acid green.
+Role: energy-drain boss.
+Core skill: energy management.
 
-**Player realm:** 0 = physical, 1 = ghost (activated by ghost dash)  
-**Bullet realm:** Each bullet carries the realm of the player at the moment of firing  
-**Collision gating:** A bullet only damages a target if the bullet’s realm matches the target’s current realm (or the bullet is cross-realm, realm: null)
+Uses drain beams, energy mines, pulse rings, short-range tethers, and stronger drain patterns when the player has high energy. Empty energy should reduce drain pressure rather than become instant death.
 
-**Phantom shot** (fired by Phantom enemies): realm: null — hits regardless of player state. This is intentional and permanent design. It is the Phantom’s defining threat.
+### Hive Breaker
 
-**Player ghost dash:** Fires physical bullets at all times unless explicitly in ghost state. Managing the timing of ghost dash to fire ghost bullets at the Wraith’s ghost phase while also surviving Wraith ghost bullets is the core skill challenge of the Wraith fight.
+Color: yellow-green and amber fracture lines.
+Role: splitter boss.
+Core skill: handle break-apart chaos.
 
-The realm system does not affect normal (non-boss) gameplay in a gameplay-blocking way — it is mostly background during regular waves. Phantoms introduce it visually and mechanically before the Wraith makes it load-bearing.
+Releases shards, Splitter guards, and panic fragments as HP falls. It should reduce bullet pressure while fragments are active.
 
------
+### Rail Tyrant
 
-## 10. Bullet System
+Color: black/dark red with laser core.
+Role: laser boss.
+Core skill: read telegraphs.
 
-### Bullet Budget
+Uses center lance, crosshair lock, triple lanes, side sweep, and faster final warnings. No instant lasers. Beam direction locks before firing.
 
-To prevent bullet spam from overwhelming the screen, a bullet budget system caps total active bullets:
+### Gravity Well
 
-- Regular combat: max 36 active enemy bullets
-- Wraith fight: max 54 active enemy bullets
+Color: dark violet/black with purple-red rings.
+Role: movement-control boss.
+Core skill: fight gentle movement pressure.
 
-Before any enemy fires, `canSpendBulletBudget()` is checked. If the budget is spent, the fire is skipped. This prevents frame rate degradation and visual noise on weaker devices.
-
-### Fractional Damage
-
-Not all bullets deal the same damage. Spread fire side bullets and wingman side shots deal 0.75 damage. Center shots deal 1.0. Boss bullets deal higher values. This is stored as `b.damage ?? 1` in collision — the fallback ensures legacy bullets always deal 1.
-
-This system means players can’t mindlessly spray and expect full DPS against armored targets. Precise aiming matters against high-HP enemies.
-
------
+Creates warning circles, pull zones, compression rings, orbit shots, asteroid orbit releases, and pull-gap dodges. Pull must be noticeable but never fully steal control.
 
 ## 11. Powerups
 
-Powerups drop from destroyed enemies (chance-based). Types include:
+Existing powerups:
 
-- **HP restore** — partial heal
-- **Spread upgrade** — grants spread shot
-- **Wingman** — grants escort ship
-- (Possibly others — additional types may be added in future passes)
+- Spread Shot: temporary three-shot firing.
+- Rapid Fire: temporary faster firing.
+- Repair +1: restores 1 HP.
+- Wingman: adds one escort.
+- Dual Wing: adds two escorts.
 
-### Drought Prevention
+Final added powerups:
 
-If the player goes 12 kills or 900 frames without a powerup drop, a drop is guaranteed. This prevents frustrating dry streaks where the player is weakening through sustained combat with no recovery.
+- Energy Cell: restores 40-50 energy without exceeding max.
+- Overcharge: increases energy regeneration for 10-15 seconds.
+- Phase Shield: blocks one HP hit, does not block energy drain.
+- Magnet Field: pulls powerups toward the player for about 12 seconds.
+- Piercing Shot: center shots pierce one enemy for a short duration.
+- Ion Burst: clears nearby enemy bullets and damages small enemies; little/no boss value.
+- Stabilizer: reduces energy drain and weakens Leech/Gravity effects.
+- Score Surge: temporary score multiplier boost, best during normal waves.
 
------
+Powerups should support survival, energy play, offense, collection, and scoring without removing the need to dodge.
 
-## 12. Scoring & Persistence
+## 12. Fairness And Readability Rules
 
-**Score:** Accumulated by killing enemies. Enemy type and threat value influence score contribution. Boss kills give large score bonuses.
+Readable action is more important than raw density.
 
-**High score:** Stored in localStorage (`star_strike_rush_high_score_v1`). Compared against on game over. The previous high score is captured before the new score is committed, so the game over screen can show both the old record and the new result.
+Hard rules:
 
-**Call sign:** Player-entered name/tag stored in localStorage (`star_strike_rush_callsign_v1`). Displayed on game over and high score screens.
+- Rail beams and boss lasers always telegraph.
+- Beam direction locks before firing.
+- Asteroid walls always show a visible safe gap.
+- Leech and Siphon pressure energy, not HP.
+- Gravity pull is gentle and never takes full control away.
+- Bosses should not combine their identity mechanic with heavy unrelated spam.
+- Support enemies create target priority but not permanent invulnerability.
+- Shards are fragile and capped.
+- Carriers are rare and priority focused.
+- Debris fields are rare and pressure-aware.
 
-**Settings persistence:** Max particle count and screen shake preference stored in localStorage (`star_strike_rush_settings_v1`).
+Death should feel fair in retrospect.
 
-**Codex:** A discovered-enemy log stored in localStorage (`star_strike_rush_codex_v1`). Tracks which enemy types the player has encountered. Intended as a light meta-progression reward for curious players — no gameplay gating.
+## 13. Current Scope Guard
 
------
+The final expansion package is now:
 
-## 13. Visual Design
+- 8 enemies: Splitter, Carrier, Siphon, Leech, Minecaster, Shieldbearer, Railgunner, Repair Drone.
+- 1 environmental system: rare Debris Field / Asteroids.
+- 6 bosses: Debris Warden, Mothership, Siphon Core, Hive Breaker, Rail Tyrant, Gravity Well.
+- 8 powerups: Energy Cell, Overcharge, Phase Shield, Magnet Field, Piercing Shot, Ion Burst, Stabilizer, Score Surge.
 
-### Overall Aesthetic
-
-Dark space. Deep blacks and near-blacks for the background. Enemy ships use vivid saturated colors (red, orange, purple) that read instantly against the background. The player ship is lighter, distinct. The UI uses minimal chrome — HP bar, score text, phase indicator. Nothing decorative that competes with the action.
-
-The feel should be slightly brutal and intense — not cute, not retro-pixel, but geometric and precise. Think vector arcade updated for mobile.
-
-### Color Palette (Fog / Letterbox)
-
-The fog bands that fill the letterbox areas (outside the 375×667 game area) use a dark purple-black palette. RGB values roughly in the ranges: R 12–32, G 5–14, B 26–58. This connects the game area to the device frame rather than having raw black bars.
-
-The game area itself is punched to near-black (#040208) after fog is drawn — not pure black, slightly purple-tinted to keep the palette coherent.
-
-### Fog System (Confirmed, Locked Design)
-
-Three-tier cloud system rendered in the letterbox bands:
-
-1. **Large masses** — 4 overlapping lobes plus a dense core
-1. **Mid rolling structures** — 2 lobes, denser than wisps
-1. **Faint wisps** — the lightest layer, adding depth
-
-Each fog element has multi-oscillator drift: 3 independent sine/cosine terms at different frequencies per axis, producing organic non-repeating movement.
-
-The fog is clipped to the letterbox bands (outside game area). Seam feathering bleeds slightly inward across the boundary for a soft transition. The game area is punched black after fog draw. The fog fill always renders before any early-exit check, preventing the black-screen bug where skipping early could leave the canvas unfilled.
-
-### Title Screen
-
-- Animated fog bands as described above
-- Two suns visible in the game area background (intentional, not a bug)
-- Enemy ships drift across the title in formation, sinking into the fog at the edges (controlled by a smoothstep falloff over ~96px rather than a hard clip)
-- Game title and start prompt overlaid
-
-### Enemy Visuals
-
-- All engines/exhausts rendered as triangles
-- Player exhaust has no dark nozzle block
-- Each enemy type has a distinct silhouette readable at small sizes
-
-### Ghost / Phantom Visual
-
-Currently: semi-transparent hull (~46% alpha), outer aura via lighter composite, scan line overlay, 6 orbiting motes.
-**Status: Under review. The ghost animation may be redesigned in a future pass.**
-
-### Particle System
-
-Explosions, bullet impacts, and damage events use a particle system. Max particle count is a user-configurable setting (for lower-end devices). Screen shake on impacts is also configurable.
-
------
-
-## 14. Screen States & UI
-
-### Title Screen
-
-- Animated background with fog, drifting formation ships, double sun
-- Tap/click to start
-- Call sign entry (if not set)
-- Access to settings and codex
-
-### HUD (In-Game)
-
-- HP bar (prominent, bottom or top area)
-- Current score
-- Phase / wave indicator
-- Ghost dash cooldown indicator
-- Wingman indicator (if active)
-- Low HP pulsing red border warning (activates below threshold)
-- Damage flash overlay on hit
-
-### Game Over Screen
-
-- Displays call sign
-- Final score
-- Previous high score and new high score (if beaten)
-- Retry prompt
-
-### Settings
-
-- Max particles toggle/slider (performance)
-- Screen shake on/off
-- (Potentially: volume if audio is added)
-
-### Codex
-
-- Log of encountered enemy types with brief flavor descriptions
-- Unlocked by first encounter with each enemy type
-- No gameplay gating — purely informational/collectible
-
------
-
-## 15. Audio
-
-Not yet implemented in the current build. Placeholder in design:
-
-- Distinct fire sounds per shot type
-- Hit feedback sounds
-- Enemy death sounds
-- Boss music or stinger
-- Game over sting
-- Title ambient loop
-
-Audio is a future pass item.
-
------
-
-## 16. Screen Shake & Juice
-
-Screen shake is applied to the game area transform (not the fog layer, which is fixed). Shake intensity scales with event severity:
-
-- Minor: bullet hit on player
-- Major: boss death, player death
-
-The fog and letterbox remain stable during shake to avoid disorienting the player about the screen boundary.
-
------
-
-## 17. Locked Design Decisions
-
-These are confirmed and must not be revisited without explicit intent:
-
-|Decision                                                     |Rationale                              |
-|-------------------------------------------------------------|---------------------------------------|
-|Double sun on title screen                                   |Intentional aesthetic, not a bug       |
-|Standard boss spawn attack has no telegraph                  |Timing pause is sufficient warning     |
-|Ghost dash: transparent + glowy, NO afterimage trails        |Afterimage looked cluttered            |
-|Enemy engines are triangles                                  |Consistent visual language             |
-|Player exhaust has no dark nozzle block                      |Cleaner silhouette                     |
-|Phantom shot is cross-realm (realm: null)                    |Core threat identity of the Phantom    |
-|Powerup drought: 12 kills or 900 frames guaranteed           |Player experience, prevents frustration|
-|Previous high score captured before update in enterGameOver()|Allows accurate before/after display   |
-|Bullet budget: 36 normal / 54 wraith                         |Frame rate and visual clarity          |
-
------
-
-## 18. Architecture Notes (For Context Continuity)
-
-These are implementation anchors — not game design, but important for preserving design intent across chat sessions:
-
-- `STORAGE_KEY = "star_strike_rush_high_score_v1"` — never change
-- `updateCollisions()` — entire function is do-not-touch
-- `fireEnemyBullet()`, `fireWraithBullet()` — entire functions preserved
-- All realm logic: `playerRealm`, `isWraithActive()`, `getPlayerShotKind()`
-- `updateBossStandard()`, `updateBossWraith()` — do not rewrite
-- All wave templates and `waveTemplates` object — design assets, not code
-- `b.damage ?? 1` in collision — the fallback is load-bearing
-- `phantomShot` fires with `realm: null` — cross-realm by design
-
-**draw() render order (critical):**
-
-1. `drawOuterFog()` — first, clears canvas, fills fog bands, punches game area black
-1. `ctx.save()` → translate → scale → translate(shake)
-1. `drawBackground()`
-1. Game content by state
-1. `ctx.restore()`
-1. If playing/game over: save → translate → scale → `drawLowHpWarning` → `drawDamageFlash` → restore
-
------
-
-## 19. Open & Future Items
-
-|Item                                         |Status                       |
-|---------------------------------------------|-----------------------------|
-|Ghost animation redesign                     |Under consideration          |
-|Audio pass                                   |Future                       |
-|Additional powerup types                     |Future                       |
-|Additional wave templates                    |Future                       |
-|Additional enemy types                       |Future                       |
-|Boss Wraith second phase or pattern expansion|Future                       |
-|Codex flavor text content                    |Future                       |
-|High score leaderboard (online)              |Not planned                  |
-|Additional game modes                        |Not planned                  |
-|v7 fog fix (3-fix ChatGPT prompt)            |Pending — next immediate step|
-
------
-
-*End of document. Update this file after major design decisions are confirmed or changed.*
+Do not expand the roster further right now. Next work should focus on balance, polish, effects, achievement tuning, mobile feel, boss art readability, and performance.

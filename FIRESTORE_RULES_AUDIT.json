@@ -1,0 +1,36 @@
+{
+  "score": 4,
+  "summary": "The rules are default-deny, owner-scoped, type-checked, size-limited, and prevent users from updating another user's account, leaderboard, or achievement records. The remaining prototype risk is that the browser client is still trusted to report scores and achievements.",
+  "findings": [
+    {
+      "check": "The Update Bypass",
+      "severity": "minor",
+      "issue": "Create and update paths use the same field allowlists and type checks. Public profile and leaderboard updates also keep bestScore, phase, and achievementsCount monotonic. No update bypass was found for document shape or ownership.",
+      "recommendation": "Keep all future mutable fields in the same shared validators, and add explicit non-decreasing or immutable checks where needed."
+    },
+    {
+      "check": "Authority Source",
+      "severity": "minor",
+      "issue": "Ownership comes from request.auth.uid and the path user id, not from user-supplied data. Score and achievement truth still comes from the client, which is acceptable only for the current prototype.",
+      "recommendation": "For a competitive production leaderboard, accept submissions through a trusted backend and let only that backend write leaderboard records."
+    },
+    {
+      "check": "Storage Abuse",
+      "severity": "minor",
+      "issue": "Strings, URLs, scores, counters, phases, and leaderboard list queries are bounded. Achievement ids are whitelisted.",
+      "recommendation": "Keep query limits on any new public collection and cap any arrays or strings added later."
+    },
+    {
+      "check": "Type Safety",
+      "severity": "minor",
+      "issue": "Rules validate strings, ints, URLs, timestamps, and field allowlists for each writable collection.",
+      "recommendation": "Add matching validators before adding new client-writable fields."
+    },
+    {
+      "check": "Field-Level vs. Identity-Level Security",
+      "severity": "minor",
+      "issue": "Every write rule combines field validation with an isOwner(userId) check. Authenticated users can read public leaderboard/profile documents, but cannot write other users' records.",
+      "recommendation": "Keep private data in owner-only collections and avoid adding emails or sensitive fields to public leaderboard documents."
+    }
+  ]
+}
