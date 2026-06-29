@@ -17,6 +17,14 @@ copied from `src/firebase-config.example.json`; deployed Firebase Hosting can us
 the reserved `/__/firebase/init.json` endpoint. Rotated browser keys should be
 restricted in Google Cloud by HTTP referrer and API.
 
+Current live browser API key posture:
+
+- The key string is not stored in this repository.
+- The Firebase Hosting app reads config from `/__/firebase/init.json`.
+- The key is API-restricted to Firebase-related services.
+- The key is browser-restricted to the Firebase Hosting domains and local
+  development origins.
+
 ## Collections
 
 ### `players_private/{uid}`
