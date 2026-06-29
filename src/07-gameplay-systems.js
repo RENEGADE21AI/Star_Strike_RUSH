@@ -268,6 +268,7 @@ function damagePlayer(amount = 1) {
   if (state.frame - d.lastHitFrame <= 180) d.heatStreak = true;
   d.lastHitFrame = state.frame;
   p.hp -= amount;
+  state.runStats.damageTaken += Math.max(1, Math.floor(amount || 1));
   p.inv = amount >= 2 ? 70 : 60;
   p.energy = clamp(p.energy + 12, 0, p.maxEnergy);
   state.difficulty.grace = 120;

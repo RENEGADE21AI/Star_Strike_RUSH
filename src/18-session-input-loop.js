@@ -66,6 +66,11 @@ function setupSession(mode = "start") {
   state.runStats.powerups = 0;
   state.runStats.ghostUses = 0;
   state.runStats.bosses = 0;
+  state.runStats.damageTaken = 0;
+  state.runStats.highestCombo = 0;
+  state.runStats.startedAtMs = Date.now();
+  state.runStats.metaApplied = false;
+  lastRunMeta = null;
   state.gameState = mode;
   state.keyboard.up = false;
   state.keyboard.down = false;
@@ -101,6 +106,7 @@ function enterGameOver() {
   previousHighScore = highScore;
   if (state.score > highScore) { highScore = state.score; highScoreDirty = true; }
   if (highScoreDirty) saveHighScore();
+  applyRunMetaProgress();
   state.message = "";
   state.messageTimer = 0;
   state.messageMax = 0;
@@ -139,6 +145,9 @@ function resetProgressData() {
   codexDiscovered = {};
   codexHasNew = false;
   saveCodexDiscovered();
+  metaProgress = makeDefaultMetaProgress();
+  lastRunMeta = null;
+  saveMetaProgress();
   encounterQueue = [];
   encounterCard = null;
 }
@@ -417,6 +426,7 @@ window.addEventListener("beforeunload", () => {
   saveCallSign();
   saveSettings();
   saveCodexDiscovered();
+  saveMetaProgress();
 });
 
 function update() {
@@ -542,6 +552,7 @@ loadHighScore();
 loadCallSign();
 loadSettings();
 loadCodexDiscovered();
+loadMetaProgress();
 resize();
 setupSession("start");
 window.addEventListener("resize", resize);

@@ -19,9 +19,27 @@ const rand = (min, max) => min + Math.random() * (max - min);
 const TAU = Math.PI * 2;
 
 const STORAGE_KEY = "star_strike_rush_high_score_v1";
+const META_STORAGE_KEY = "star_strike_rush_meta_v1";
+const CURRENT_SEASON_ID = "season_01";
+const CURRENT_SEASON_NAME = "Launch Flight";
+const SEASON_TIER_XP = 1000;
+const GLORY_RANKS = [
+  { threshold: 0, name: "Rookie Pilot" },
+  { threshold: 1000, name: "Star Cadet" },
+  { threshold: 3000, name: "Strike Pilot" },
+  { threshold: 7500, name: "Void Runner" },
+  { threshold: 15000, name: "Ace" },
+  { threshold: 30000, name: "Elite Ace" },
+  { threshold: 60000, name: "Phantom Hunter" },
+  { threshold: 100000, name: "Wraithbreaker" },
+  { threshold: 175000, name: "Solar Legend" },
+  { threshold: 300000, name: "Star Eternal" }
+];
 let highScore = 0;
 let previousHighScore = 0;
 let highScoreDirty = false;
+let metaProgress = null;
+let lastRunMeta = null;
 
 let callSign = "";
 let callSignEditing = false;
@@ -110,6 +128,9 @@ function loadHighScore() {
 function saveHighScore() {
   try { localStorage.setItem(STORAGE_KEY, String(highScore)); highScoreDirty = false; } catch {}
 }
+function getLocalHighScore() {
+  return Math.max(0, Math.floor(highScore || 0));
+}
 function saveCallSign() {
   try { localStorage.setItem("star_strike_rush_callsign_v1", callSign); } catch {}
 }
@@ -154,6 +175,222 @@ function loadCodexDiscovered() {
   } catch {
     codexDiscovered = {};
   }
+}
+function rankForGlory(glory) {
+  const total = Math.max(0, Math.floor(glory || 0));
+  let current = GLORY_RANKS[0];
+  let index = 0;
+  for (let i = 1; i < GLORY_RANKS.length; i++) {
+    if (total < GLORY_RANKS[i].threshold) break;
+    current = GLORY_RANKS[i];
+    index = i;
+  }
+  const next = GLORY_RANKS[index + 1] || null;
+  return {
+    index,
+    name: current.name,
+    threshold: current.threshold,
+    nextName: next ? next.name : "",
+    nextThreshold: next ? next.threshold : 0,
+    progress: next ? clamp((total - current.threshold) / Math.max(1, next.threshold - current.threshold), 0, 1) : 1
+  };
+}
+function currentSeasonTierForXP(xp) {
+  return clamp(1 + Math.floor(Math.max(0, Math.floor(xp || 0)) / SEASON_TIER_XP), 1, 50);
+}
+function gloryForScore(score) {
+  return Math.floor(Math.max(0, Math.floor(score || 0)) / 10);
+}
+function seasonXpForRun(score, phase, stats) {
+  const s = Math.max(0, Math.floor(score || 0));
+  const p = Math.max(1, Math.floor(phase || 1));
+  const bossBonus = Math.max(0, Math.floor((stats && stats.bosses) || 0)) * 60;
+  const powerupBonus = Math.max(0, Math.floor((stats && stats.powerups) || 0)) * 5;
+  return clamp(Math.floor(s / 45) + p * 8 + bossBonus + powerupBonus, 0, 2500);
+}
+function creditsForRun(score, phase, stats) {
+  const s = Math.max(0, Math.floor(score || 0));
+  const p = Math.max(1, Math.floor(phase || 1));
+  const bossBonus = Math.max(0, Math.floor((stats && stats.bosses) || 0)) * 25;
+  return clamp(Math.floor(s / 120) + p * 2 + bossBonus, 0, 1500);
+}
+function makeDefaultMetaProgress() {
+  return {
+    version: 1,
+    totalGlory: 0,
+    currentSeason: {
+      id: CURRENT_SEASON_ID,
+      name: CURRENT_SEASON_NAME,
+      xp: 0,
+      tier: 1
+    },
+    credits: 0,
+    lifetime: {
+      runs: 0,
+      score: 0,
+      kills: 0,
+      powerups: 0,
+      ghostUses: 0,
+      bosses: 0,
+      damageTaken: 0,
+      highestCombo: 0,
+      bestScore: 0,
+      bestPhase: 1
+    },
+    recentReceipts: [],
+    lastUpdatedAtMs: 0
+  };
+}
+function sanitizeStoredMetaProgress(raw) {
+  const base = makeDefaultMetaProgress();
+  const data = raw && typeof raw === "object" ? raw : {};
+  const season = data.currentSeason && typeof data.currentSeason === "object" ? data.currentSeason : {};
+  const lifetime = data.lifetime && typeof data.lifetime === "object" ? data.lifetime : {};
+  base.totalGlory = Math.max(0, Math.floor(data.totalGlory || 0));
+  base.credits = Math.max(0, Math.floor(data.credits || 0));
+  base.currentSeason.id = String(season.id || CURRENT_SEASON_ID).slice(0, 40);
+  base.currentSeason.name = String(season.name || CURRENT_SEASON_NAME).slice(0, 60);
+  base.currentSeason.xp = Math.max(0, Math.floor(season.xp || 0));
+  base.currentSeason.tier = currentSeasonTierForXP(base.currentSeason.xp);
+  if (base.currentSeason.id !== CURRENT_SEASON_ID) {
+    base.currentSeason = { id: CURRENT_SEASON_ID, name: CURRENT_SEASON_NAME, xp: 0, tier: 1 };
+  }
+  base.lifetime.runs = Math.max(0, Math.floor(lifetime.runs || 0));
+  base.lifetime.score = Math.max(0, Math.floor(lifetime.score || 0));
+  base.lifetime.kills = Math.max(0, Math.floor(lifetime.kills || 0));
+  base.lifetime.powerups = Math.max(0, Math.floor(lifetime.powerups || 0));
+  base.lifetime.ghostUses = Math.max(0, Math.floor(lifetime.ghostUses || 0));
+  base.lifetime.bosses = Math.max(0, Math.floor(lifetime.bosses || 0));
+  base.lifetime.damageTaken = Math.max(0, Math.floor(lifetime.damageTaken || 0));
+  base.lifetime.highestCombo = Math.max(0, Math.floor(lifetime.highestCombo || 0));
+  base.lifetime.bestScore = Math.max(0, Math.floor(lifetime.bestScore || 0));
+  base.lifetime.bestPhase = Math.max(1, Math.floor(lifetime.bestPhase || 1));
+  base.recentReceipts = Array.isArray(data.recentReceipts) ? data.recentReceipts.slice(-20) : [];
+  base.lastUpdatedAtMs = Math.max(0, Math.floor(data.lastUpdatedAtMs || 0));
+  return base;
+}
+function loadMetaProgress() {
+  try {
+    const raw = localStorage.getItem(META_STORAGE_KEY);
+    metaProgress = sanitizeStoredMetaProgress(raw ? JSON.parse(raw) : {});
+  } catch {
+    metaProgress = makeDefaultMetaProgress();
+  }
+}
+function getMetaProgress() {
+  if (!metaProgress) loadMetaProgress();
+  return metaProgress;
+}
+function saveMetaProgress() {
+  try { localStorage.setItem(META_STORAGE_KEY, JSON.stringify(getMetaProgress())); } catch {}
+}
+function currentMetaSnapshot() {
+  const progress = getMetaProgress();
+  const rank = rankForGlory(progress.totalGlory);
+  return {
+    totalGlory: progress.totalGlory,
+    gloryRank: rank.name,
+    gloryRankIndex: rank.index,
+    nextGloryRank: rank.nextName,
+    nextGloryThreshold: rank.nextThreshold,
+    rankProgress: rank.progress,
+    seasonId: progress.currentSeason.id,
+    seasonName: progress.currentSeason.name,
+    seasonXP: progress.currentSeason.xp,
+    seasonTier: progress.currentSeason.tier,
+    credits: progress.credits,
+    lifetime: { ...progress.lifetime }
+  };
+}
+function currentRunReceiptSnapshot() {
+  const stats = state.runStats || {};
+  const score = Math.max(0, Math.floor(state.score || 0));
+  const phase = Math.max(1, Math.floor(state.phase || 1));
+  const now = Date.now();
+  const startedAtMs = Math.max(0, Math.floor(stats.startedAtMs || now));
+  const runDurationMs = Math.max(0, now - startedAtMs);
+  return {
+    receiptId: `local_${now}_${score}_${Math.max(0, Math.floor(stats.kills || 0))}`,
+    score,
+    phaseReached: phase,
+    runDurationMs,
+    enemiesKilled: Math.max(0, Math.floor(stats.kills || 0)),
+    bossesKilled: Math.max(0, Math.floor(stats.bosses || 0)),
+    powerupsCollected: Math.max(0, Math.floor(stats.powerups || 0)),
+    ghostUses: Math.max(0, Math.floor(stats.ghostUses || 0)),
+    damageTaken: Math.max(0, Math.floor(stats.damageTaken || 0)),
+    highestCombo: Math.max(0, Math.floor(stats.highestCombo || 0)),
+    clientVersion: "web-v1",
+    endedAtMs: now
+  };
+}
+function applyRunMetaProgress() {
+  const stats = state.runStats || {};
+  if (stats.metaApplied) return lastRunMeta || { snapshot: currentMetaSnapshot(), receipt: currentRunReceiptSnapshot() };
+  const progress = getMetaProgress();
+  const receipt = currentRunReceiptSnapshot();
+  const beforeGlory = progress.totalGlory;
+  const beforeRank = rankForGlory(beforeGlory);
+  const beforeSeasonXP = progress.currentSeason.xp;
+  const beforeCredits = progress.credits;
+  const gloryGained = gloryForScore(receipt.score);
+  const seasonXPGained = seasonXpForRun(receipt.score, receipt.phaseReached, {
+    bosses: receipt.bossesKilled,
+    powerups: receipt.powerupsCollected
+  });
+  const creditsEarned = creditsForRun(receipt.score, receipt.phaseReached, { bosses: receipt.bossesKilled });
+
+  progress.totalGlory += gloryGained;
+  progress.currentSeason.xp += seasonXPGained;
+  progress.currentSeason.tier = currentSeasonTierForXP(progress.currentSeason.xp);
+  progress.credits += creditsEarned;
+  progress.lifetime.runs++;
+  progress.lifetime.score += receipt.score;
+  progress.lifetime.kills += receipt.enemiesKilled;
+  progress.lifetime.powerups += receipt.powerupsCollected;
+  progress.lifetime.ghostUses += receipt.ghostUses;
+  progress.lifetime.bosses += receipt.bossesKilled;
+  progress.lifetime.damageTaken += receipt.damageTaken;
+  progress.lifetime.highestCombo = Math.max(progress.lifetime.highestCombo, receipt.highestCombo);
+  progress.lifetime.bestScore = Math.max(progress.lifetime.bestScore, receipt.score, highScore);
+  progress.lifetime.bestPhase = Math.max(progress.lifetime.bestPhase, receipt.phaseReached);
+  progress.lastUpdatedAtMs = receipt.endedAtMs;
+  progress.recentReceipts.push({
+    receiptId: receipt.receiptId,
+    score: receipt.score,
+    phaseReached: receipt.phaseReached,
+    gloryGained,
+    seasonXPGained,
+    creditsEarned,
+    endedAtMs: receipt.endedAtMs
+  });
+  if (progress.recentReceipts.length > 20) progress.recentReceipts.splice(0, progress.recentReceipts.length - 20);
+  stats.metaApplied = true;
+  const afterRank = rankForGlory(progress.totalGlory);
+  lastRunMeta = {
+    receipt,
+    gloryBefore: beforeGlory,
+    gloryAfter: progress.totalGlory,
+    gloryGained,
+    seasonXPBefore: beforeSeasonXP,
+    seasonXPAfter: progress.currentSeason.xp,
+    seasonXPGained,
+    creditsBefore: beforeCredits,
+    creditsAfter: progress.credits,
+    creditsEarned,
+    rankBefore: beforeRank.name,
+    rankAfter: afterRank.name,
+    rankIndexBefore: beforeRank.index,
+    rankIndexAfter: afterRank.index,
+    rankUp: afterRank.index > beforeRank.index,
+    seasonTier: progress.currentSeason.tier,
+    snapshot: currentMetaSnapshot()
+  };
+  saveMetaProgress();
+  return lastRunMeta;
+}
+function getLastRunMeta() {
+  return lastRunMeta ? JSON.parse(JSON.stringify(lastRunMeta)) : null;
 }
 function saveMilestone() { if (highScoreDirty) saveHighScore(); }
 function kickShake(amount) {
@@ -281,7 +518,7 @@ const state = {
   joystick: { active: false, id: null, cx: 0, cy: 0, ax: 0, ay: 0, radius: 56 },
   playerRealm: 0,
   devStatsVisible: false,
-  runStats: { kills: 0, powerups: 0, ghostUses: 0, bosses: 0 },
+  runStats: { kills: 0, powerups: 0, ghostUses: 0, bosses: 0, damageTaken: 0, highestCombo: 0, startedAtMs: 0, metaApplied: false },
   killsSinceLastDrop: 0,
   framesSinceLastDrop: 0,
   powerupDropCooldown: 0,
@@ -348,5 +585,12 @@ function addFlatScore(points) {
   state.score += points;
   if (state.score > highScore) { highScore = state.score; highScoreDirty = true; }
 }
-function noteKill(basePoints) { state.comboKills++; state.difficulty.killStreak++; state.runStats.kills++; refreshMultiplier(); addScore(basePoints); }
+function noteKill(basePoints) {
+  state.comboKills++;
+  state.difficulty.killStreak++;
+  state.runStats.kills++;
+  state.runStats.highestCombo = Math.max(state.runStats.highestCombo || 0, state.comboKills);
+  refreshMultiplier();
+  addScore(basePoints);
+}
 function resetCombo() { state.comboKills = 0; refreshMultiplier(); state.difficulty.killStreak = 0; }

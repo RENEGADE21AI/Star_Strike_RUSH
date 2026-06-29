@@ -41,18 +41,30 @@ function currentRunStatsSnapshot() {
     kills: Math.max(0, Math.floor(stats.kills || 0)),
     powerups: Math.max(0, Math.floor(stats.powerups || 0)),
     ghostUses: Math.max(0, Math.floor(stats.ghostUses || 0)),
-    bosses: Math.max(0, Math.floor(stats.bosses || 0))
+    bosses: Math.max(0, Math.floor(stats.bosses || 0)),
+    damageTaken: Math.max(0, Math.floor(stats.damageTaken || 0)),
+    highestCombo: Math.max(0, Math.floor(stats.highestCombo || 0)),
+    runDurationMs: Math.max(0, Date.now() - Math.max(0, Math.floor(stats.startedAtMs || Date.now())))
   };
 }
 
 function buildOnlineRunPayload() {
   const score = Math.max(0, Math.floor(state.score || 0));
+  const metaRun = typeof getLastRunMeta === "function" ? getLastRunMeta() : null;
+  const metaSnapshot = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
+  const receipt = metaRun && metaRun.receipt
+    ? metaRun.receipt
+    : (typeof currentRunReceiptSnapshot === "function" ? currentRunReceiptSnapshot() : null);
   const run = {
     score,
     highScore: Math.max(score, Math.max(0, Math.floor(highScore || 0))),
     phase: Math.max(1, Math.floor(state.phase || 1)),
+    phaseReached: Math.max(1, Math.floor(state.phase || 1)),
     callSign: sanitizeCallSign(callSign || ""),
     stats: currentRunStatsSnapshot(),
+    meta: metaSnapshot,
+    runMeta: metaRun,
+    receipt,
     completedAtMs: Date.now(),
     clientVersion: "web-v1"
   };

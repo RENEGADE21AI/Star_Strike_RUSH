@@ -11,6 +11,8 @@ function drawTitleAndButtons() {
   const sw = ctx.measureText(suffix).width;
   const total = pw + sw;
   const startX = -total / 2;
+  const fit = Math.min(0.55, (W - 170) / Math.max(1, total));
+  ctx.scale(fit, fit);
   ctx.shadowColor = "rgba(100,220,255,0.55)";
   ctx.shadowBlur = 14;
   ctx.lineWidth = 5;
@@ -79,6 +81,14 @@ function drawTitleAndButtons() {
   const line3 = "HIGH SCORE: " + highScore;
   const w3 = ctx.measureText(line3).width;
   ctx.fillText(line3, (W - w3) / 2, H * 0.72);
+  if (typeof currentMetaSnapshot === "function") {
+    const meta = currentMetaSnapshot();
+    const rankLine = `${meta.gloryRank.toUpperCase()}  |  GLORY ${Number(meta.totalGlory || 0).toLocaleString()}`;
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = "rgba(255,230,128,0.88)";
+    ctx.textAlign = "center";
+    ctx.fillText(rankLine, W / 2, H * 0.747);
+  }
   ctx.restore();
 }
 function drawStartScreen() {
@@ -107,6 +117,21 @@ function drawGameOverScreen() {
     const record = "New High Score!";
     const rw = ctx.measureText(record).width;
     ctx.fillText(record, (W - rw) / 2, H * 0.47);
+  }
+  const meta = typeof getLastRunMeta === "function" ? getLastRunMeta() : null;
+  if (meta) {
+    let y = H * 0.505;
+    ctx.font = FONT_SMALL;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffe680";
+    ctx.fillText(`Glory +${Number(meta.gloryGained || 0).toLocaleString()}  Total ${Number(meta.gloryAfter || 0).toLocaleString()}`, W / 2, y);
+    y += 22;
+    ctx.fillStyle = meta.rankUp ? "#78ffb4" : "rgba(255,255,255,0.84)";
+    ctx.fillText(`${meta.rankUp ? "NEW RANK: " : "Rank: "}${meta.rankAfter || "Rookie Pilot"}`, W / 2, y);
+    y += 20;
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillText(`Season XP +${Number(meta.seasonXPGained || 0).toLocaleString()}  |  Credits +${Number(meta.creditsEarned || 0).toLocaleString()}  |  Tier ${meta.seasonTier || 1}`, W / 2, y);
   }
   ctx.restore();
   drawHoldButton(buttons.respawn, "RESPAWN", respawnHold, 30, "rgba(255,255,255,0.08)", 0.28, 0.75);

@@ -50,8 +50,42 @@ service cloud.firestore {
       return value is int && value >= 0 && value <= 1000000;
     }
 
+    function validBoundedCounter(value, max) {
+      return value is int && value >= 0 && value <= max;
+    }
+
     function validPhase(value) {
       return value is int && value >= 1 && value <= 9999;
+    }
+
+    function validGloryRank(value) {
+      return value in [
+        'Rookie Pilot',
+        'Star Cadet',
+        'Strike Pilot',
+        'Void Runner',
+        'Ace',
+        'Elite Ace',
+        'Phantom Hunter',
+        'Wraithbreaker',
+        'Solar Legend',
+        'Star Eternal'
+      ];
+    }
+
+    function validGloryRankIndex(value) {
+      return value is int && value >= 0 && value <= 9;
+    }
+
+    function validSeasonId(value) {
+      return value is string
+        && value.size() >= 1
+        && value.size() <= 40
+        && value.matches("^[A-Za-z0-9_-]+$");
+    }
+
+    function validSeasonTier(value) {
+      return value is int && value >= 1 && value <= 50;
     }
 
     function validPrivateAccount(data, userId) {
@@ -60,6 +94,21 @@ service cloud.firestore {
           'email',
           'displayName',
           'photoURL',
+          'glory',
+          'gloryRank',
+          'gloryRankIndex',
+          'currentSeasonId',
+          'currentSeasonXP',
+          'currentSeasonTier',
+          'credits',
+          'lifetimeRuns',
+          'lifetimeScore',
+          'lifetimeKills',
+          'lifetimePowerups',
+          'lifetimeGhostUses',
+          'lifetimeBosses',
+          'lifetimeDamageTaken',
+          'highestCombo',
           'createdAt',
           'lastSeenAt',
           'updatedAt'
@@ -69,6 +118,21 @@ service cloud.firestore {
           'email',
           'displayName',
           'photoURL',
+          'glory',
+          'gloryRank',
+          'gloryRankIndex',
+          'currentSeasonId',
+          'currentSeasonXP',
+          'currentSeasonTier',
+          'credits',
+          'lifetimeRuns',
+          'lifetimeScore',
+          'lifetimeKills',
+          'lifetimePowerups',
+          'lifetimeGhostUses',
+          'lifetimeBosses',
+          'lifetimeDamageTaken',
+          'highestCombo',
           'createdAt',
           'lastSeenAt',
           'updatedAt'
@@ -77,6 +141,21 @@ service cloud.firestore {
         && validEmail(data.email)
         && validText(data.displayName, 60)
         && validUrl(data.photoURL)
+        && validScore(data.glory)
+        && validGloryRank(data.gloryRank)
+        && validGloryRankIndex(data.gloryRankIndex)
+        && validSeasonId(data.currentSeasonId)
+        && validScore(data.currentSeasonXP)
+        && validSeasonTier(data.currentSeasonTier)
+        && validScore(data.credits)
+        && validCounter(data.lifetimeRuns)
+        && validScore(data.lifetimeScore)
+        && validCounter(data.lifetimeKills)
+        && validCounter(data.lifetimePowerups)
+        && validCounter(data.lifetimeGhostUses)
+        && validCounter(data.lifetimeBosses)
+        && validCounter(data.lifetimeDamageTaken)
+        && validCounter(data.highestCombo)
         && data.lastSeenAt == request.time
         && data.updatedAt == request.time;
     }
@@ -90,6 +169,10 @@ service cloud.firestore {
           'bestScore',
           'phase',
           'achievementsCount',
+          'glory',
+          'gloryRank',
+          'gloryRankIndex',
+          'seasonTier',
           'createdAt',
           'updatedAt'
         ])
@@ -101,6 +184,10 @@ service cloud.firestore {
           'bestScore',
           'phase',
           'achievementsCount',
+          'glory',
+          'gloryRank',
+          'gloryRankIndex',
+          'seasonTier',
           'createdAt',
           'updatedAt'
         ])
@@ -111,6 +198,10 @@ service cloud.firestore {
         && validScore(data.bestScore)
         && validPhase(data.phase)
         && validCounter(data.achievementsCount)
+        && validScore(data.glory)
+        && validGloryRank(data.gloryRank)
+        && validGloryRankIndex(data.gloryRankIndex)
+        && validSeasonTier(data.seasonTier)
         && data.updatedAt == request.time;
     }
 
@@ -123,6 +214,10 @@ service cloud.firestore {
           'bestScore',
           'phase',
           'achievementsCount',
+          'glory',
+          'gloryRank',
+          'gloryRankIndex',
+          'seasonTier',
           'updatedAt'
         ])
         && hasOnly(data, [
@@ -133,6 +228,10 @@ service cloud.firestore {
           'bestScore',
           'phase',
           'achievementsCount',
+          'glory',
+          'gloryRank',
+          'gloryRankIndex',
+          'seasonTier',
           'updatedAt'
         ])
         && data.uid == userId
@@ -142,6 +241,10 @@ service cloud.firestore {
         && validScore(data.bestScore)
         && validPhase(data.phase)
         && validCounter(data.achievementsCount)
+        && validScore(data.glory)
+        && validGloryRank(data.gloryRank)
+        && validGloryRankIndex(data.gloryRankIndex)
+        && validSeasonTier(data.seasonTier)
         && data.updatedAt == request.time;
     }
 
@@ -151,11 +254,17 @@ service cloud.firestore {
         'rookie_score',
         'ace_score',
         'legend_score',
+        'surge_score',
+        'mythic_score',
         'phase_two',
         'phase_three',
+        'phase_eight',
+        'phase_twelve',
         'boss_breaker',
+        'boss_hunter',
         'ghost_runner',
         'collector',
+        'power_hungry',
         'swarm_clearer'
       ];
     }
@@ -180,6 +289,67 @@ service cloud.firestore {
         && data.unlockedAt == request.time;
     }
 
+    function validRunReceipt(data, userId, receiptId) {
+      return hasRequired(data, [
+          'uid',
+          'receiptId',
+          'clientReceiptId',
+          'score',
+          'phaseReached',
+          'runDurationMs',
+          'enemiesKilled',
+          'bossesKilled',
+          'powerupsCollected',
+          'ghostUses',
+          'damageTaken',
+          'highestCombo',
+          'gloryGained',
+          'seasonXPGained',
+          'creditsEarned',
+          'clientVersion',
+          'endedAtMs',
+          'submittedAt'
+        ])
+        && hasOnly(data, [
+          'uid',
+          'receiptId',
+          'clientReceiptId',
+          'score',
+          'phaseReached',
+          'runDurationMs',
+          'enemiesKilled',
+          'bossesKilled',
+          'powerupsCollected',
+          'ghostUses',
+          'damageTaken',
+          'highestCombo',
+          'gloryGained',
+          'seasonXPGained',
+          'creditsEarned',
+          'clientVersion',
+          'endedAtMs',
+          'submittedAt'
+        ])
+        && data.uid == userId
+        && data.receiptId == receiptId
+        && validSeasonId(data.clientReceiptId)
+        && validScore(data.score)
+        && validPhase(data.phaseReached)
+        && validBoundedCounter(data.runDurationMs, 86400000)
+        && validCounter(data.enemiesKilled)
+        && validCounter(data.bossesKilled)
+        && validCounter(data.powerupsCollected)
+        && validCounter(data.ghostUses)
+        && validCounter(data.damageTaken)
+        && validCounter(data.highestCombo)
+        && validScore(data.gloryGained)
+        && validBoundedCounter(data.seasonXPGained, 2500)
+        && validBoundedCounter(data.creditsEarned, 1500)
+        && validText(data.clientVersion, 20)
+        && validBoundedCounter(data.endedAtMs, 9999999999999)
+        && data.submittedAt == request.time;
+    }
+
     match /players_private/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
@@ -188,7 +358,20 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time;
       allow update: if isOwner(userId)
         && validPrivateAccount(request.resource.data, userId)
-        && request.resource.data.createdAt == resource.data.createdAt;
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.glory >= resource.data.get('glory', 0)
+        && request.resource.data.gloryRankIndex >= resource.data.get('gloryRankIndex', 0)
+        && request.resource.data.currentSeasonXP >= resource.data.get('currentSeasonXP', 0)
+        && request.resource.data.currentSeasonTier >= resource.data.get('currentSeasonTier', 1)
+        && request.resource.data.credits >= resource.data.get('credits', 0)
+        && request.resource.data.lifetimeRuns >= resource.data.get('lifetimeRuns', 0)
+        && request.resource.data.lifetimeScore >= resource.data.get('lifetimeScore', 0)
+        && request.resource.data.lifetimeKills >= resource.data.get('lifetimeKills', 0)
+        && request.resource.data.lifetimePowerups >= resource.data.get('lifetimePowerups', 0)
+        && request.resource.data.lifetimeGhostUses >= resource.data.get('lifetimeGhostUses', 0)
+        && request.resource.data.lifetimeBosses >= resource.data.get('lifetimeBosses', 0)
+        && request.resource.data.lifetimeDamageTaken >= resource.data.get('lifetimeDamageTaken', 0)
+        && request.resource.data.highestCombo >= resource.data.get('highestCombo', 0);
       allow delete: if false;
     }
 
@@ -203,7 +386,10 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.bestScore >= resource.data.bestScore
         && request.resource.data.phase >= resource.data.phase
-        && request.resource.data.achievementsCount >= resource.data.achievementsCount;
+        && request.resource.data.achievementsCount >= resource.data.achievementsCount
+        && request.resource.data.glory >= resource.data.get('glory', 0)
+        && request.resource.data.gloryRankIndex >= resource.data.get('gloryRankIndex', 0)
+        && request.resource.data.seasonTier >= resource.data.get('seasonTier', 1);
       allow delete: if false;
     }
 
@@ -216,7 +402,10 @@ service cloud.firestore {
         && validLeaderboardRecord(request.resource.data, userId)
         && request.resource.data.bestScore >= resource.data.bestScore
         && request.resource.data.phase >= resource.data.phase
-        && request.resource.data.achievementsCount >= resource.data.achievementsCount;
+        && request.resource.data.achievementsCount >= resource.data.achievementsCount
+        && request.resource.data.glory >= resource.data.get('glory', 0)
+        && request.resource.data.gloryRankIndex >= resource.data.get('gloryRankIndex', 0)
+        && request.resource.data.seasonTier >= resource.data.get('seasonTier', 1);
       allow delete: if false;
     }
 
@@ -224,6 +413,14 @@ service cloud.firestore {
       allow get, list: if isOwner(userId);
       allow create: if isOwner(userId)
         && validAchievement(request.resource.data, userId, achievementId);
+      allow update, delete: if false;
+    }
+
+    match /run_receipts/{userId}/items/{receiptId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId) && request.query.limit <= 50;
+      allow create: if isOwner(userId)
+        && validRunReceipt(request.resource.data, userId, receiptId);
       allow update, delete: if false;
     }
 

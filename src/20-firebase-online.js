@@ -9,10 +9,24 @@ let auth = null;
 let db = null;
 let leaderboardUnsubscribe = null;
 
+const GLORY_RANK_NAMES = [
+  "Rookie Pilot",
+  "Star Cadet",
+  "Strike Pilot",
+  "Void Runner",
+  "Ace",
+  "Elite Ace",
+  "Phantom Hunter",
+  "Wraithbreaker",
+  "Solar Legend",
+  "Star Eternal"
+];
+
 const online = {
   ready: false,
   user: null,
   profileCallSign: "",
+  profileMeta: null,
   leaderboard: [],
   achievements: [],
   lastStatus: "Connecting Firebase...",
@@ -33,6 +47,7 @@ function getState() {
     ready: online.ready,
     user: clonePublicUser(online.user),
     profileCallSign: online.profileCallSign,
+    profileMeta: online.profileMeta ? { ...online.profileMeta } : null,
     leaderboard: online.leaderboard.map((row) => ({ ...row })),
     achievements: online.achievements.slice(),
     lastStatus: online.lastStatus,
@@ -104,6 +119,77 @@ function numberOrZero(value) {
   return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
 }
 
+function boundedNumber(value, max) {
+  return Math.min(numberOrZero(value), max);
+}
+
+function safeId(value, fallback = "item") {
+  const text = String(value || fallback)
+    .replace(/[^A-Za-z0-9_-]/g, "_")
+    .slice(0, 40);
+  return text || fallback;
+}
+
+function safeGloryRank(value) {
+  const text = String(value || "");
+  return GLORY_RANK_NAMES.includes(text) ? text : GLORY_RANK_NAMES[0];
+}
+
+function safeGloryRankIndex(value, rankName = "") {
+  const n = numberOrZero(value);
+  if (n >= 0 && n < GLORY_RANK_NAMES.length) return n;
+  const idx = GLORY_RANK_NAMES.indexOf(rankName);
+  return idx >= 0 ? idx : 0;
+}
+
+function gloryRankNameForIndex(index) {
+  return GLORY_RANK_NAMES[Math.max(0, Math.min(GLORY_RANK_NAMES.length - 1, numberOrZero(index)))] || GLORY_RANK_NAMES[0];
+}
+
+function localMetaSnapshot() {
+  if (typeof window.currentMetaSnapshot === "function") return window.currentMetaSnapshot();
+  return null;
+}
+
+function normalizeMetaSnapshot(meta) {
+  const rankName = safeGloryRank(meta && meta.gloryRank);
+  return {
+    totalGlory: boundedNumber(meta && meta.totalGlory, 999999999),
+    gloryRank: rankName,
+    gloryRankIndex: safeGloryRankIndex(meta && meta.gloryRankIndex, rankName),
+    seasonId: safeId(meta && meta.seasonId, "season_01"),
+    seasonName: safeText(meta && meta.seasonName, "Launch Flight", 60),
+    seasonXP: boundedNumber(meta && meta.seasonXP, 999999999),
+    seasonTier: Math.max(1, Math.min(50, numberOrZero(meta && meta.seasonTier) || 1)),
+    credits: boundedNumber(meta && meta.credits, 999999999),
+    lifetime: {
+      runs: boundedNumber(meta && meta.lifetime && meta.lifetime.runs, 1000000),
+      score: boundedNumber(meta && meta.lifetime && meta.lifetime.score, 999999999),
+      kills: boundedNumber(meta && meta.lifetime && meta.lifetime.kills, 1000000),
+      powerups: boundedNumber(meta && meta.lifetime && meta.lifetime.powerups, 1000000),
+      ghostUses: boundedNumber(meta && meta.lifetime && meta.lifetime.ghostUses, 1000000),
+      bosses: boundedNumber(meta && meta.lifetime && meta.lifetime.bosses, 1000000),
+      damageTaken: boundedNumber(meta && meta.lifetime && meta.lifetime.damageTaken, 1000000),
+      highestCombo: boundedNumber(meta && meta.lifetime && meta.lifetime.highestCombo, 1000000),
+      bestScore: boundedNumber(meta && meta.lifetime && meta.lifetime.bestScore, 999999999),
+      bestPhase: Math.max(1, boundedNumber(meta && meta.lifetime && meta.lifetime.bestPhase, 9999) || 1)
+    }
+  };
+}
+
+function normalizeRunMeta(meta) {
+  const rankName = safeGloryRank(meta && meta.rankAfter);
+  return {
+    gloryGained: boundedNumber(meta && meta.gloryGained, 999999999),
+    gloryAfter: boundedNumber(meta && meta.gloryAfter, 999999999),
+    seasonXPGained: boundedNumber(meta && meta.seasonXPGained, 2500),
+    creditsEarned: boundedNumber(meta && meta.creditsEarned, 1500),
+    rankAfter: rankName,
+    rankIndexAfter: safeGloryRankIndex(meta && meta.rankIndexAfter, rankName),
+    seasonTier: Math.max(1, Math.min(50, numberOrZero(meta && meta.seasonTier) || 1))
+  };
+}
+
 function achievementDefinitions() {
   if (typeof window.getAchievementDefinitions === "function") return window.getAchievementDefinitions();
   return [];
@@ -121,17 +207,45 @@ function knownAchievementIds() {
 function normalizeRun(run) {
   const validAchievements = knownAchievementIds();
   const rawAchievements = Array.isArray(run && run.achievements) ? run.achievements : [];
+  const meta = normalizeMetaSnapshot(run && run.meta);
+  const runMeta = normalizeRunMeta(run && run.runMeta);
+  const rawReceipt = run && run.receipt ? run.receipt : {};
+  const score = numberOrZero(run && run.score);
+  const phase = Math.max(1, numberOrZero(run && (run.phaseReached || run.phase)) || 1);
+  const receipt = {
+    clientReceiptId: safeId(rawReceipt.receiptId, "local_receipt"),
+    score: boundedNumber(rawReceipt.score || score, 999999999),
+    phaseReached: Math.max(1, boundedNumber(rawReceipt.phaseReached || phase, 9999) || 1),
+    runDurationMs: boundedNumber(rawReceipt.runDurationMs, 86400000),
+    enemiesKilled: boundedNumber(rawReceipt.enemiesKilled, 1000000),
+    bossesKilled: boundedNumber(rawReceipt.bossesKilled, 1000000),
+    powerupsCollected: boundedNumber(rawReceipt.powerupsCollected, 1000000),
+    ghostUses: boundedNumber(rawReceipt.ghostUses, 1000000),
+    damageTaken: boundedNumber(rawReceipt.damageTaken, 1000000),
+    highestCombo: boundedNumber(rawReceipt.highestCombo, 1000000),
+    gloryGained: runMeta.gloryGained || Math.floor(score / 10),
+    seasonXPGained: runMeta.seasonXPGained,
+    creditsEarned: runMeta.creditsEarned,
+    clientVersion: safeText(rawReceipt.clientVersion || (run && run.clientVersion), "web-v1", 20),
+    endedAtMs: boundedNumber(rawReceipt.endedAtMs || (run && run.completedAtMs), 9999999999999)
+  };
   return {
-    score: numberOrZero(run && run.score),
+    score,
     highScore: numberOrZero(run && run.highScore),
-    phase: Math.max(1, numberOrZero(run && run.phase) || 1),
+    phase,
     callSign: safeCallSign(run && run.callSign),
     stats: {
       kills: numberOrZero(run && run.stats && run.stats.kills),
       powerups: numberOrZero(run && run.stats && run.stats.powerups),
       ghostUses: numberOrZero(run && run.stats && run.stats.ghostUses),
-      bosses: numberOrZero(run && run.stats && run.stats.bosses)
+      bosses: numberOrZero(run && run.stats && run.stats.bosses),
+      damageTaken: numberOrZero(run && run.stats && run.stats.damageTaken),
+      highestCombo: numberOrZero(run && run.stats && run.stats.highestCombo),
+      runDurationMs: boundedNumber(run && run.stats && run.stats.runDurationMs, 86400000)
     },
+    meta,
+    runMeta,
+    receipt,
     achievements: rawAchievements.filter((id) => validAchievements.has(id))
   };
 }
@@ -143,11 +257,23 @@ async function syncProfile(callSignOverride = "") {
   const uid = user.uid;
   const publicRef = doc(db, "players_public", uid);
   const privateRef = doc(db, "players_private", uid);
-  const publicSnap = await getDoc(publicRef);
+  const [publicSnap, privateSnap] = await Promise.all([
+    getDoc(publicRef),
+    getDoc(privateRef)
+  ]);
   const publicData = publicSnap.exists() ? publicSnap.data() : {};
+  const privateData = privateSnap.exists() ? privateSnap.data() : {};
+  const localMeta = normalizeMetaSnapshot(localMetaSnapshot());
   const requestedCallSign = safeCallSign(callSignOverride || online.profileCallSign || publicData.callSign || "");
   const displayName = safeText(user.displayName || requestedCallSign, "Pilot", 60);
   const photoURL = safeUrl(user.photoURL);
+  const totalGlory = Math.max(localMeta.totalGlory, numberOrZero(publicData.glory), numberOrZero(privateData.glory));
+  const gloryRankIndex = Math.max(localMeta.gloryRankIndex, numberOrZero(publicData.gloryRankIndex), numberOrZero(privateData.gloryRankIndex));
+  const remoteRank = safeGloryRank(privateData.gloryRank || publicData.gloryRank || gloryRankNameForIndex(gloryRankIndex));
+  const gloryRank = localMeta.totalGlory >= totalGlory ? localMeta.gloryRank : (remoteRank === GLORY_RANK_NAMES[0] && gloryRankIndex > 0 ? gloryRankNameForIndex(gloryRankIndex) : remoteRank);
+  const currentSeasonXP = Math.max(localMeta.seasonXP, numberOrZero(privateData.currentSeasonXP));
+  const currentSeasonTier = Math.max(localMeta.seasonTier, numberOrZero(publicData.seasonTier), numberOrZero(privateData.currentSeasonTier), 1);
+  const credits = Math.max(localMeta.credits, numberOrZero(privateData.credits));
   const timestamp = serverTimestamp();
 
   const privatePayload = {
@@ -155,6 +281,21 @@ async function syncProfile(callSignOverride = "") {
     email: safeEmail(user.email),
     displayName,
     photoURL,
+    glory: totalGlory,
+    gloryRank,
+    gloryRankIndex,
+    currentSeasonId: localMeta.seasonId,
+    currentSeasonXP,
+    currentSeasonTier,
+    credits,
+    lifetimeRuns: Math.max(localMeta.lifetime.runs, numberOrZero(privateData.lifetimeRuns)),
+    lifetimeScore: Math.max(localMeta.lifetime.score, numberOrZero(privateData.lifetimeScore)),
+    lifetimeKills: Math.max(localMeta.lifetime.kills, numberOrZero(privateData.lifetimeKills)),
+    lifetimePowerups: Math.max(localMeta.lifetime.powerups, numberOrZero(privateData.lifetimePowerups)),
+    lifetimeGhostUses: Math.max(localMeta.lifetime.ghostUses, numberOrZero(privateData.lifetimeGhostUses)),
+    lifetimeBosses: Math.max(localMeta.lifetime.bosses, numberOrZero(privateData.lifetimeBosses)),
+    lifetimeDamageTaken: Math.max(localMeta.lifetime.damageTaken, numberOrZero(privateData.lifetimeDamageTaken)),
+    highestCombo: Math.max(localMeta.lifetime.highestCombo, numberOrZero(privateData.highestCombo)),
     lastSeenAt: timestamp,
     updatedAt: timestamp
   };
@@ -163,14 +304,21 @@ async function syncProfile(callSignOverride = "") {
     displayName,
     callSign: requestedCallSign,
     photoURL,
-    bestScore: numberOrZero(publicData.bestScore),
-    phase: Math.max(1, numberOrZero(publicData.phase) || 1),
+    bestScore: Math.max(
+      numberOrZero(publicData.bestScore),
+      localMeta.lifetime.bestScore,
+      typeof window.getLocalHighScore === "function" ? window.getLocalHighScore() : 0
+    ),
+    phase: Math.max(1, numberOrZero(publicData.phase), localMeta.lifetime.bestPhase || 1),
     achievementsCount: numberOrZero(publicData.achievementsCount),
+    glory: totalGlory,
+    gloryRank,
+    gloryRankIndex,
+    seasonTier: currentSeasonTier,
     updatedAt: timestamp
   };
 
   if (!publicSnap.exists()) publicPayload.createdAt = timestamp;
-  const privateSnap = await getDoc(privateRef);
   if (!privateSnap.exists()) privatePayload.createdAt = timestamp;
 
   await Promise.all([
@@ -179,6 +327,14 @@ async function syncProfile(callSignOverride = "") {
   ]);
 
   online.profileCallSign = requestedCallSign;
+  online.profileMeta = {
+    totalGlory,
+    gloryRank,
+    gloryRankIndex,
+    currentSeasonXP,
+    currentSeasonTier,
+    credits
+  };
   setStatus("Profile synced.");
 }
 
@@ -192,7 +348,11 @@ function applyLeaderboardSnapshot(snapshot) {
       photoURL: safeUrl(data.photoURL),
       bestScore: numberOrZero(data.bestScore),
       phase: Math.max(1, numberOrZero(data.phase) || 1),
-      achievementsCount: numberOrZero(data.achievementsCount)
+      achievementsCount: numberOrZero(data.achievementsCount),
+      glory: numberOrZero(data.glory),
+      gloryRank: safeGloryRank(data.gloryRank),
+      gloryRankIndex: safeGloryRankIndex(data.gloryRankIndex, data.gloryRank),
+      seasonTier: Math.max(1, numberOrZero(data.seasonTier) || 1)
     };
   });
 }
@@ -282,6 +442,7 @@ async function signOutOnline() {
     const { signOut } = window.starStrikeFirebaseApi;
     await signOut(auth);
     online.user = null;
+    online.profileMeta = null;
     online.achievements = [];
     online.leaderboard = [];
     setStatus("Signed out.");
@@ -302,6 +463,7 @@ async function submitRun(rawRun) {
     return;
   }
   const {
+    collection,
     doc,
     getDoc,
     serverTimestamp,
@@ -328,6 +490,22 @@ async function submitRun(rawRun) {
     const newAchievementIds = run.achievements.filter((id) => !unlocked.has(id));
     const bestScore = Math.max(currentBest, runBest);
     const phase = Math.max(currentPhase, run.phase);
+    const glory = Math.max(numberOrZero(publicData.glory), numberOrZero(leaderboardData.glory), run.meta.totalGlory, run.runMeta.gloryAfter);
+    const gloryRankIndex = Math.max(
+      numberOrZero(publicData.gloryRankIndex),
+      numberOrZero(leaderboardData.gloryRankIndex),
+      run.meta.gloryRankIndex,
+      run.runMeta.rankIndexAfter
+    );
+    const remoteRank = safeGloryRank(publicData.gloryRank || leaderboardData.gloryRank || run.runMeta.rankAfter || gloryRankNameForIndex(gloryRankIndex));
+    const gloryRank = run.meta.totalGlory >= glory ? run.meta.gloryRank : (remoteRank === GLORY_RANK_NAMES[0] && gloryRankIndex > 0 ? gloryRankNameForIndex(gloryRankIndex) : remoteRank);
+    const seasonTier = Math.max(
+      numberOrZero(publicData.seasonTier),
+      numberOrZero(leaderboardData.seasonTier),
+      run.meta.seasonTier,
+      run.runMeta.seasonTier,
+      1
+    );
     const achievementsCount = Math.max(
       numberOrZero(publicData.achievementsCount),
       numberOrZero(leaderboardData.achievementsCount),
@@ -343,7 +521,32 @@ async function submitRun(rawRun) {
       bestScore,
       phase,
       achievementsCount,
+      glory,
+      gloryRank,
+      gloryRankIndex,
+      seasonTier,
       updatedAt: timestamp
+    };
+    const receiptRef = doc(collection(db, "run_receipts", uid, "items"));
+    const receiptPayload = {
+      uid,
+      receiptId: receiptRef.id,
+      clientReceiptId: run.receipt.clientReceiptId,
+      score: run.receipt.score,
+      phaseReached: run.receipt.phaseReached,
+      runDurationMs: run.receipt.runDurationMs,
+      enemiesKilled: run.receipt.enemiesKilled,
+      bossesKilled: run.receipt.bossesKilled,
+      powerupsCollected: run.receipt.powerupsCollected,
+      ghostUses: run.receipt.ghostUses,
+      damageTaken: run.receipt.damageTaken,
+      highestCombo: run.receipt.highestCombo,
+      gloryGained: run.receipt.gloryGained,
+      seasonXPGained: run.receipt.seasonXPGained,
+      creditsEarned: run.receipt.creditsEarned,
+      clientVersion: run.receipt.clientVersion,
+      endedAtMs: run.receipt.endedAtMs,
+      submittedAt: timestamp
     };
     const achievementWrites = newAchievementIds.map((achievementId) => {
       const achievementRef = doc(db, "player_achievements", uid, "items", achievementId);
@@ -358,11 +561,12 @@ async function submitRun(rawRun) {
     await Promise.all([
       setDoc(publicRef, recordPayload, { merge: true }),
       setDoc(leaderboardRef, recordPayload, { merge: true }),
+      setDoc(receiptRef, receiptPayload),
       ...achievementWrites
     ]);
     await loadAchievements();
     subscribeLeaderboard();
-    setStatus(newAchievementIds.length ? "Run and achievements synced." : "Run synced.");
+    setStatus(newAchievementIds.length ? "Run, Glory, and achievements synced." : "Run and Glory synced.");
     notify(newAchievementIds.length ? "ACHIEVEMENTS SYNCED" : "RUN SYNCED");
   } catch (error) {
     setError(error, "Run sync failed.");
@@ -418,6 +622,7 @@ async function bootFirebase() {
       if (!user) {
         online.achievements = [];
         online.leaderboard = [];
+        online.profileMeta = null;
         setStatus("Sign in to sync records.");
         return;
       }

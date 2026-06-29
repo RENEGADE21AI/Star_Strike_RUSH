@@ -30,8 +30,11 @@ Input: mobile touch controls first, keyboard/mouse also supported.
 Persistence:
 
 - Local high score, call sign, settings, and codex discoveries use localStorage.
+- Local Glory, current-season XP preview, Credits preview, lifetime stats, and
+  recent run receipts use localStorage.
 - Firebase Auth supports Google sign-in.
-- Cloud Firestore stores online profiles, world record leaderboard entries, run summaries, and earned achievements.
+- Cloud Firestore stores online profiles, player-card progression fields, world
+  record leaderboard entries, immutable run receipts, and earned achievements.
 - The game remains playable signed out; online sync is additive.
 
 Source layout:
@@ -42,7 +45,7 @@ Source layout:
 - `src/18-expansion-data.js`, `src/18-expansion-enemies-powerups.js`,
   `src/18-expansion-hazards-bosses.js`, and
   `src/18-expansion-rendering-waves.js` own the final expansion package.
-- `src/19-game-achievements.js` defines achievement payloads.
+- `src/19-game-achievements.js` defines achievement, run receipt, and online payloads.
 - `src/20-firebase-online.js` owns Firebase Auth and Firestore sync.
 
 ## 3. Core Loop
@@ -56,6 +59,14 @@ Wave -> brief pressure shift -> next wave -> phase clear -> boss milestone -> hi
 The player has HP and energy. HP loss ends the run at zero. Energy fuels ghost dash and becomes more important once Siphons, Leeches, Siphon Core, Stabilizer, and Overcharge enter the game.
 
 Scoring is cumulative. Combo kills increase the multiplier. Score Surge temporarily boosts score gain.
+
+At the end of a run, Score converts to Glory at 10:1:
+
+Glory gained = floor(score / 10).
+
+Glory is permanent lifetime identity progression. It never decreases and must
+never unlock HP, damage, better ghost dash, better powerup odds, boss advantages,
+or gameplay score multipliers.
 
 ## 4. Player Ship
 
@@ -86,19 +97,96 @@ The player has one HP pool. Repair +1 restores HP up to max.
 
 Phase Shield blocks one HP damage instance, flashes, and breaks. It does not block energy drain.
 
-## 5. Online Records And Achievements
+## 5. Meta Layer, Online Records, And Achievements
+
+The meta layer supports the arcade loop without taking it over. The title screen
+still prioritizes Play. Progression is mostly presented after the run.
+
+Current implemented meta layer:
+
+- Score converts to Glory at 10:1.
+- Glory ranks appear on the title screen, game-over screen, online player card,
+  and leaderboard rows.
+- End-of-run progression shows Glory gained, total Glory, rank, Season XP gained,
+  Credits earned, and current season tier.
+- Run receipts record score, phase reached, duration, enemies killed, bosses
+  killed, powerups collected, ghost uses, damage taken, highest combo, and client
+  version.
+- Local guest progression works signed out. Signed-in accounts sync public
+  profile fields, leaderboard records, achievements, and owner-only receipt
+  archives.
+
+Glory ranks:
+
+- 0: Rookie Pilot.
+- 1,000: Star Cadet.
+- 3,000: Strike Pilot.
+- 7,500: Void Runner.
+- 15,000: Ace.
+- 30,000: Elite Ace.
+- 60,000: Phantom Hunter.
+- 100,000: Wraithbreaker.
+- 175,000: Solar Legend.
+- 300,000: Star Eternal.
+
+Season structure target:
+
+- 8-week seasons.
+- 50 Flight Pass tiers.
+- Free reward track first.
+- Premium reward track later.
+- Daily and weekly missions later.
+- Cosmetic Lab voting later.
+- No season gameplay events.
+
+Meta systems that are planned but not implemented yet:
+
+- Daily missions.
+- Weekly missions.
+- Flight Pass reward claiming.
+- Cosmetic inventory.
+- Customize screen.
+- Shop.
+- Gems.
+- Stripe web purchases.
+- Premium Flight Pass.
+- AdMob rewarded ads.
+- Community Cosmetic Lab.
+- UGC moderation and voting.
+
+Hard monetization and community constraints:
+
+- No fan-fund or fuel system.
+- No paying to force a cosmetic into the game.
+- No buying votes with Gems.
+- No Gem mission rerolls.
+- No loot boxes.
+- No paid gameplay advantage.
+- No permanent gameplay upgrades.
+- No gameplay power from cosmetics, purchases, Glory, Credits, Gems, or seasons.
+
+Stripe is not added yet. When web payments are added, Stripe must be handled by
+server-side checkout and webhooks, and clients must not grant Gems, purchases,
+premium pass ownership, or inventory directly. Android/iOS builds should use a
+purchase-provider abstraction for platform billing.
 
 Signed-in players can sync:
 
 - Profile call sign.
 - Best score.
-- Run summaries.
+- Player-card progression fields.
+- Run receipts.
 - Earned achievements.
 - Global leaderboard records.
 
 The online panel shows account state, world records, achievement status, and refresh controls.
 
 The game must remain functional if Firebase is unavailable or the player is signed out. In that case, local play and local high score continue normally.
+
+Competitive production rule: Firestore rules can protect owner scope and data
+shape, but they cannot prove a browser-reported run is real. A future
+`submitRunReceipt()` Cloud Function should validate run plausibility, grant
+authoritative Glory/Season XP/Credits, and write competitive leaderboard records.
 
 ## 6. Progression And Boss Rotation
 

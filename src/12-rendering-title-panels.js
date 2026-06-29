@@ -331,9 +331,21 @@ function drawOnlinePanel() {
   ctx.save();
   const leaderboard = Array.isArray(online.leaderboard) ? online.leaderboard : [];
   const achievements = Array.isArray(online.achievements) ? online.achievements : [];
+  const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
   const definitions = typeof getAchievementDefinitions === "function" ? getAchievementDefinitions() : [];
   const achievementNames = new Map(definitions.map((item) => [item.id, item.name]));
-  let listY = panel.y + 156;
+  let listY = panel.y + 154;
+  if (meta) {
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = "rgba(255,230,128,0.88)";
+    ctx.fillText(`GLORY ${Number(meta.totalGlory || 0).toLocaleString()} - ${meta.gloryRank}`, panel.x + 20, listY);
+    listY += 18;
+    ctx.fillStyle = "rgba(255,255,255,0.66)";
+    ctx.fillText(`SEASON TIER ${meta.seasonTier || 1} - CREDITS ${Number(meta.credits || 0).toLocaleString()}`, panel.x + 20, listY);
+    listY += 24;
+  }
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.font = FONT_HUD;
@@ -342,11 +354,12 @@ function drawOnlinePanel() {
   listY += 22;
   ctx.font = FONT_TINY;
   if (leaderboard.length) {
-    leaderboard.slice(0, 5).forEach((row, index) => {
+    leaderboard.slice(0, 4).forEach((row, index) => {
       const who = String(row.callSign || row.displayName || "PILOT").slice(0, 12);
       const score = Number(row.bestScore || 0).toLocaleString();
+      const rank = row.gloryRank ? ` ${String(row.gloryRank).slice(0, 14)}` : "";
       ctx.fillStyle = index === 0 ? "#ffe680" : "rgba(255,255,255,0.82)";
-      ctx.fillText(`${index + 1}. ${who}`, panel.x + 22, listY);
+      ctx.fillText(`${index + 1}. ${who}${rank}`, panel.x + 22, listY);
       ctx.textAlign = "right";
       ctx.fillText(score, panel.x + panel.w - 22, listY);
       ctx.textAlign = "left";
@@ -358,7 +371,7 @@ function drawOnlinePanel() {
     listY += 17;
   }
 
-  listY = panel.y + 292;
+  listY = Math.max(panel.y + 318, listY + 18);
   ctx.font = FONT_HUD;
   ctx.fillStyle = "#fff";
   ctx.fillText("ACHIEVEMENTS", panel.x + 20, listY);
