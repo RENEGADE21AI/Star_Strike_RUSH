@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "star-strike-rush"
+  },
+  "targets": {
+    "star-strike-rush": {
+      "hosting": {
+        "app": [
+          "star-strike-rush"
+        ]
+      }
+    }
+  }
+}

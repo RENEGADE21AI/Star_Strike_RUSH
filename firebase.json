@@ -1,4 +1,45 @@
 {
+  "hosting": {
+    "target": "app",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      ".git",
+      ".git/**",
+      ".gitignore",
+      "**/node_modules/**",
+      "**/firebase-config*.json",
+      "**/firebase-config*.js",
+      "firestore.rules",
+      "firestore.indexes.json",
+      "FIRESTORE_*.md",
+      "FIRESTORE_*.json",
+      "gameinfo.txt",
+      "LICENSE",
+      "*-debug.log",
+      "firebase-debug.log",
+      "firestore-debug.log",
+      "ui-debug.log"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|html)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"

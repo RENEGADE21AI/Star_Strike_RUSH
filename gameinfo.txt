@@ -27,6 +27,8 @@ Rendering: HTML5 Canvas.
 
 Input: mobile touch controls first, keyboard/mouse also supported.
 
+Live Firebase Hosting URL: `https://star-strike-rush.web.app`.
+
 Persistence:
 
 - Local high score, call sign, settings, and codex discoveries use localStorage.

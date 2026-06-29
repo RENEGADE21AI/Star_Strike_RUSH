@@ -2,6 +2,7 @@
 
 Firebase project: `star-strike-rush`
 Firestore database: `(default)`, Standard edition, `nam5 (United States)`
+Firebase Hosting live URL: `https://star-strike-rush.web.app`
 
 The game uses Firebase Auth for Google accounts and Cloud Firestore for public
 records plus private player data. The current setup is a prototype-safe,
