@@ -52,7 +52,11 @@ let titleProgressScroll = 0;
 let titleProgressDragActive = false;
 let titleProgressDragPointerId = null;
 let titleProgressDragY = 0;
+let titleProgressDragX = 0;
 let titleProgressDragStartScroll = 0;
+let titleProgressDragMoved = false;
+let titleProgressPointerDownNode = null;
+let titleProgressSelectedNode = null;
 let playBtnHold = 0;
 let playBtnPointerDown = false;
 let playBtnPointerInside = false;
@@ -228,7 +232,8 @@ function makeDefaultMetaProgress() {
       id: CURRENT_SEASON_ID,
       name: CURRENT_SEASON_NAME,
       xp: 0,
-      tier: 1
+      tier: 1,
+      claimedRewardIds: []
     },
     credits: 0,
     lifetime: {
@@ -258,8 +263,11 @@ function sanitizeStoredMetaProgress(raw) {
   base.currentSeason.name = String(season.name || CURRENT_SEASON_NAME).slice(0, 60);
   base.currentSeason.xp = Math.max(0, Math.floor(season.xp || 0));
   base.currentSeason.tier = currentSeasonTierForXP(base.currentSeason.xp);
+  base.currentSeason.claimedRewardIds = Array.isArray(season.claimedRewardIds)
+    ? season.claimedRewardIds.map((id) => String(id).slice(0, 80)).slice(0, 200)
+    : [];
   if (base.currentSeason.id !== CURRENT_SEASON_ID) {
-    base.currentSeason = { id: CURRENT_SEASON_ID, name: CURRENT_SEASON_NAME, xp: 0, tier: 1 };
+    base.currentSeason = { id: CURRENT_SEASON_ID, name: CURRENT_SEASON_NAME, xp: 0, tier: 1, claimedRewardIds: [] };
   }
   base.lifetime.runs = Math.max(0, Math.floor(lifetime.runs || 0));
   base.lifetime.score = Math.max(0, Math.floor(lifetime.score || 0));
@@ -304,6 +312,7 @@ function currentMetaSnapshot() {
     seasonName: progress.currentSeason.name,
     seasonXP: progress.currentSeason.xp,
     seasonTier: progress.currentSeason.tier,
+    seasonClaimedRewardIds: progress.currentSeason.claimedRewardIds.slice(),
     credits: progress.credits,
     lifetime: { ...progress.lifetime }
   };
@@ -338,6 +347,7 @@ function applyRunMetaProgress() {
   const beforeGlory = progress.totalGlory;
   const beforeRank = rankForGlory(beforeGlory);
   const beforeSeasonXP = progress.currentSeason.xp;
+  const beforeSeasonTier = progress.currentSeason.tier;
   const beforeCredits = progress.credits;
   const gloryGained = gloryForScore(receipt.score);
   const seasonXPGained = seasonXpForRun(receipt.score, receipt.phaseReached, {
@@ -389,7 +399,9 @@ function applyRunMetaProgress() {
     rankIndexBefore: beforeRank.index,
     rankIndexAfter: afterRank.index,
     rankUp: afterRank.index > beforeRank.index,
+    seasonTierBefore: beforeSeasonTier,
     seasonTier: progress.currentSeason.tier,
+    seasonTierUp: progress.currentSeason.tier > beforeSeasonTier,
     snapshot: currentMetaSnapshot()
   };
   saveMetaProgress();

@@ -63,6 +63,24 @@ function drawTitleAndButtons() {
   const playRect = getPlayButtonRect();
   drawHoldButton(playRect, "PLAY", playBtnHold, 45, "rgba(0,180,100,0.18)", 0.45, 0.90);
 
+  const dockX = iconRects.achievements.x - 8;
+  const dockY = iconRects.achievements.y - 18;
+  const dockW = iconRects.settings.x + iconRects.settings.w - iconRects.achievements.x + 16;
+  const dockH = 82;
+  ctx.save();
+  ctx.fillStyle = "rgba(5,8,18,0.44)";
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.beginPath();
+  ctx.roundRect(dockX, dockY, dockW, dockH, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "rgba(120,210,255,0.66)";
+  ctx.fillText("PILOT META", dockX + dockW / 2, dockY + 5);
+  ctx.restore();
+
   drawSimpleButton(iconRects.achievements, "");
   drawSimpleButton(iconRects.progress, "");
   drawSimpleButton(iconRects.records, "");
@@ -83,6 +101,14 @@ function drawTitleAndButtons() {
   ctx.fillText("RECORDS", iconRects.records.x + iconRects.records.w / 2, iconRects.records.y + iconRects.records.h + 4);
   ctx.fillText("CODEX", iconRects.codex.x + iconRects.codex.w / 2, iconRects.codex.y + iconRects.codex.h + 4);
   ctx.fillText("GEAR", iconRects.settings.x + iconRects.settings.w / 2, iconRects.settings.y + iconRects.settings.h + 4);
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = accountOnline ? "rgba(120,255,180,0.72)" : "rgba(255,255,255,0.42)";
+  ctx.font = "900 8px 'Arial Narrow', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText("ACCOUNT", iconRects.account.x + iconRects.account.w / 2, iconRects.account.y + iconRects.account.h + 4);
   ctx.restore();
 
   ctx.save();
@@ -145,6 +171,7 @@ function drawGameOverScreen() {
   }
   ctx.restore();
   drawHoldButton(buttons.respawn, "RESPAWN", respawnHold, 30, "rgba(255,255,255,0.08)", 0.28, 0.75);
+  drawSimpleButton(buttons.road, "VIEW ROAD", "rgba(120,255,180,0.58)");
   drawSimpleButton(buttons.title, "TITLE SCREEN");
 }
 

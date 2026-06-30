@@ -1102,6 +1102,8 @@
           <li>Call sign is the pilot-card anchor; account chip is attached to the right.</li>
           <li>Play is the dominant action and wider than every other control.</li>
           <li>Icon order: Badges, Road, Records, Codex, Gear.</li>
+          <li>The icon row should read as a small Pilot Meta dock so players understand these are secondary progression/profile surfaces.</li>
+          <li>The account chip should be labelled as Account so sync/profile is not confused with the call sign field.</li>
           <li>High score and Glory rank stay below the icon row as a compact status strip.</li>
         </ul>
         <div class="notes">Anti-pattern: do not add a large dashboard, news carousel, or monetization callout to this screen.</div>
@@ -1209,6 +1211,9 @@
           <li>Current rank is the headline, with next rank and progress bar pinned near the top.</li>
           <li>The road itself is long, with alternating rank cards on a central rail.</li>
           <li>Major ranks get larger glowing nodes; minor checkpoints preview the climb between ranks.</li>
+          <li>Opening the Road should auto-position near the player's current rank, with a little space above it.</li>
+          <li>The current node should have extra energy: pulse, glow, and a small ship marker on the rail.</li>
+          <li>Tapping a node opens an inspect panel with requirement, status, and identity reward.</li>
           <li>Use gold for lifetime identity, green for reached status.</li>
         </ul>
       </div>
@@ -1260,9 +1265,11 @@
         <ul>
           <li>Use green/cyan instead of gold so it does not compete with lifetime Glory.</li>
           <li>Tier rows become a long scroll track, not a compact list.</li>
-          <li>Free rewards sit on the left lane; future premium rewards sit on the right lane.</li>
+          <li>Free rewards sit on the left lane; cosmetic rewards sit on the right lane. Do not imply Stripe or a paid pass here.</li>
+          <li>Reward cards use real reward data: tier, reward type, amount/name, detail text, and claimed/unclaimed/locked state.</li>
+          <li>Opening the Season Road should auto-position near the player's current tier.</li>
           <li>Every fifth tier should feel like a larger milestone node.</li>
-          <li>When rewards exist, claiming happens here, not on the title screen.</li>
+          <li>When reward claiming is added, it happens here, not on the title screen.</li>
         </ul>
       </div>
       <div class="screen-frame">
@@ -1572,7 +1579,7 @@
           <li>Game Over title sits top third.</li>
           <li>Score and high score appear before meta gains.</li>
           <li>Glory/Season/Credits preview sits above buttons.</li>
-          <li>Respawn is primary; Title Screen is secondary.</li>
+          <li>Respawn is primary; View Road is the meta bridge; Title Screen is secondary.</li>
           <li>Future: new achievements should appear as compact reward chips here.</li>
         </ul>
       </div>
@@ -1585,7 +1592,8 @@
           <div class="stat-line green-text" style="top:364px;">New Rank: Star Cadet</div>
           <div class="stat-line muted" style="top:390px;">Season XP +240 | Credits +68 | Tier 2</div>
           <div class="button" style="left:78px;right:78px;top:430px;height:44px;">Respawn</div>
-          <div class="button secondary" style="left:78px;right:78px;top:486px;height:44px;">Title Screen</div>
+          <div class="button secondary" style="left:78px;right:78px;top:486px;height:44px;">View Road</div>
+          <div class="button secondary" style="left:78px;right:78px;top:542px;height:44px;">Title Screen</div>
         </div>
       </div>
     </section>

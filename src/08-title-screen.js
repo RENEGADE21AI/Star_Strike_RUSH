@@ -306,8 +306,12 @@ function getTitlePanelRect() {
   return { x, y, w: panelW, h: panelH };
 }
 function getGameOverButtons() {
-  const btnW = 220, btnH = 42, x = Math.round((W - btnW) / 2), y1 = Math.round(H * 0.60), gap = 12;
-  return { respawn: { x, y: y1, w: btnW, h: btnH }, title: { x, y: y1 + btnH + gap, w: btnW, h: btnH } };
+  const btnW = 220, btnH = 40, x = Math.round((W - btnW) / 2), y1 = Math.round(H * 0.59), gap = 10;
+  return {
+    respawn: { x, y: y1, w: btnW, h: btnH },
+    road: { x, y: y1 + btnH + gap, w: btnW, h: btnH },
+    title: { x, y: y1 + 2 * (btnH + gap), w: btnW, h: btnH }
+  };
 }
 function hitRect(rect, x, y) { return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h; }
 
@@ -360,6 +364,7 @@ function getProgressRects() {
   return { panel, closeRect, gloryTab, seasonTab, contentRect };
 }
 function getProgressContentHeight() {
+  if (typeof getProgressRoadContentHeight === "function") return getProgressRoadContentHeight();
   if (titleProgressTab === "season") return 86 + 50 * 62;
   const gloryStepCount = Math.max(1, GLORY_RANKS.length * 2 - 1);
   return 72 + gloryStepCount * 80;
@@ -370,6 +375,12 @@ function getProgressMaxScroll() {
 }
 function clampTitleProgressScroll() {
   titleProgressScroll = clamp(titleProgressScroll, 0, getProgressMaxScroll());
+}
+function getProgressDetailRect() {
+  const r = getProgressRects();
+  const w = r.contentRect.w - 24;
+  const h = 86;
+  return { x: r.contentRect.x + 12, y: r.contentRect.y + r.contentRect.h - h - 10, w, h };
 }
 function getResetConfirmRects() {
   const boxW = Math.min(460, W - 28);

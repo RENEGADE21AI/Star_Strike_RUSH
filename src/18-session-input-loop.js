@@ -96,7 +96,11 @@ function setupSession(mode = "start") {
   titleProgressDragActive = false;
   titleProgressDragPointerId = null;
   titleProgressDragY = 0;
+  titleProgressDragX = 0;
   titleProgressDragStartScroll = 0;
+  titleProgressDragMoved = false;
+  titleProgressPointerDownNode = null;
+  titleProgressSelectedNode = null;
   codexDetailType = null;
   resetProgressConfirm = false;
   highScoreDirty = false;
@@ -181,24 +185,33 @@ function handleResetProgressConfirmDown(x, y) {
 function setTitleProgressTab(tab) {
   if (titleProgressTab !== tab) {
     titleProgressTab = tab;
-    titleProgressScroll = 0;
     titleProgressDragActive = false;
     titleProgressDragPointerId = null;
+    titleProgressPointerDownNode = null;
+    titleProgressSelectedNode = null;
+    if (typeof focusTitleProgressOnCurrent === "function") focusTitleProgressOnCurrent();
   }
   clampTitleProgressScroll();
 }
-function beginTitleProgressDrag(pointerId, y) {
+function beginTitleProgressDrag(pointerId, x, y) {
   titleProgressDragActive = true;
   titleProgressDragPointerId = pointerId;
   titleProgressDragY = y;
+  titleProgressDragX = x;
   titleProgressDragStartScroll = titleProgressScroll;
+  titleProgressDragMoved = false;
+  titleProgressPointerDownNode = typeof getProgressNodeAt === "function" ? getProgressNodeAt(x, y) : null;
   if (pointerId !== null && pointerId !== undefined) {
     try { canvas.setPointerCapture(pointerId); } catch {}
   }
 }
-function updateTitleProgressDrag(pointerId, y) {
+function updateTitleProgressDrag(pointerId, x, y) {
   if (!titleProgressDragActive) return false;
   if (titleProgressDragPointerId !== null && titleProgressDragPointerId !== pointerId) return false;
+  if (Math.hypot(x - titleProgressDragX, y - titleProgressDragY) > 7) {
+    titleProgressDragMoved = true;
+    titleProgressSelectedNode = null;
+  }
   titleProgressScroll = titleProgressDragStartScroll + (titleProgressDragY - y) * 1.12;
   clampTitleProgressScroll();
   return true;
@@ -206,9 +219,23 @@ function updateTitleProgressDrag(pointerId, y) {
 function endTitleProgressDrag(pointerId) {
   if (!titleProgressDragActive) return false;
   if (titleProgressDragPointerId !== null && titleProgressDragPointerId !== pointerId) return false;
+  if (!titleProgressDragMoved) titleProgressSelectedNode = titleProgressPointerDownNode;
   titleProgressDragActive = false;
   titleProgressDragPointerId = null;
+  titleProgressPointerDownNode = null;
   return true;
+}
+function openTitleProgressRoad(tab = null) {
+  titleSubState = "progress";
+  titlePanelTarget = 1;
+  codexDetailType = null;
+  titleProgressDragActive = false;
+  titleProgressDragPointerId = null;
+  titleProgressPointerDownNode = null;
+  titleProgressSelectedNode = null;
+  if (tab) titleProgressTab = tab;
+  if (typeof focusTitleProgressOnCurrent === "function") focusTitleProgressOnCurrent();
+  else clampTitleProgressScroll();
 }
 function handleTitlePointerDown(x, y, pointerId = null) {
   if (resetProgressConfirm) return handleResetProgressConfirmDown(x, y);
@@ -273,7 +300,8 @@ function handleTitlePointerDown(x, y, pointerId = null) {
         if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
         if (hitRect(r.gloryTab, x, y)) { setTitleProgressTab("glory"); return true; }
         if (hitRect(r.seasonTab, x, y)) { setTitleProgressTab("season"); return true; }
-        if (hitRect(r.contentRect, x, y)) { beginTitleProgressDrag(pointerId, y); return true; }
+        if (typeof getProgressDetailRect === "function" && titleProgressSelectedNode && hitRect(getProgressDetailRect(), x, y)) return true;
+        if (hitRect(r.contentRect, x, y)) { beginTitleProgressDrag(pointerId, x, y); return true; }
         return true;
       }
     }
@@ -313,7 +341,7 @@ function handleTitlePointerDown(x, y, pointerId = null) {
   }
   if (hitRect(iconRects.progress, x, y)) {
     if (titleSubState === "progress" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "progress"; titlePanelTarget = 1; codexDetailType = null; clampTitleProgressScroll(); }
+    else openTitleProgressRoad();
     return true;
   }
   if (hitRect(iconRects.records, x, y)) {
@@ -345,6 +373,13 @@ function handleGameOverPointerDown(x, y) {
   }
   if (hitRect(buttons.title, x, y)) {
     setupSession("start");
+    return true;
+  }
+  if (buttons.road && hitRect(buttons.road, x, y)) {
+    state.gameState = "start";
+    titlePanelAnim = 1;
+    const meta = typeof getLastRunMeta === "function" ? getLastRunMeta() : null;
+    openTitleProgressRoad(meta && meta.rankUp ? "glory" : "season");
     return true;
   }
   return false;
@@ -380,7 +415,7 @@ canvas.addEventListener("pointermove", (e) => {
   const x = (e.clientX - rect.left - offsetX) / scale;
   const y = (e.clientY - rect.top - offsetY) / scale;
   if (state.gameState !== "playing") {
-    if (updateTitleProgressDrag(e.pointerId, y)) {
+    if (updateTitleProgressDrag(e.pointerId, x, y)) {
       e.preventDefault();
       return;
     }
@@ -460,6 +495,7 @@ canvas.addEventListener("wheel", (e) => {
   const r = getProgressRects();
   if (!hitRect(r.panel, x, y)) return;
   e.preventDefault();
+  titleProgressSelectedNode = null;
   titleProgressScroll += e.deltaY / Math.max(0.5, scale);
   clampTitleProgressScroll();
 }, { passive: false });
@@ -622,6 +658,12 @@ function getDebugSnapshot() {
       titleProgressScroll,
       titleProgressMaxScroll: typeof getProgressMaxScroll === "function" ? getProgressMaxScroll() : 0,
       titleProgressDragActive,
+      titleProgressSelectedNode: titleProgressSelectedNode ? {
+        id: titleProgressSelectedNode.id,
+        tab: titleProgressSelectedNode.tab,
+        title: titleProgressSelectedNode.title,
+        status: titleProgressSelectedNode.status
+      } : null,
       resetProgressConfirm
     }
   };

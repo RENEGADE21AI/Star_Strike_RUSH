@@ -47,6 +47,9 @@ Source layout:
   shows current screens, long stretched layouts for scrollable panels, and
   future meta-screen guardrails. Update it before making major UI changes.
 - `src/01-core.js` through `src/18-session-input-loop.js` own the core game.
+- `src/12-rendering-progress-road.js` owns the title-screen Glory Road and
+  Season Road renderer, season reward definitions, Road hit testing, and
+  current-progress focus behavior.
 - `src/18-expansion-data.js`, `src/18-expansion-enemies-powerups.js`,
   `src/18-expansion-hazards-bosses.js`, and
   `src/18-expansion-rendering-waves.js` own the final expansion package.
@@ -202,6 +205,10 @@ Title screen meta placement:
   The current canvas implementation uses a draggable/wheel-scroll road viewport:
   Glory alternates rank milestones and checkpoints, while Season displays all
   50 supported tiers on a central rail with free and cosmetic reward markers.
+  Road opens around current progress instead of always starting at tier/rank 1.
+  The current node has a pulsing marker ship, and tapping nodes or reward cards
+  opens an inspect panel with requirement, reward, and reached/locked/claimed
+  state.
 - Records opens the world-record leaderboard and refresh controls.
 - Codex opens enemy and boss discovery.
 - Gear opens performance/settings/reset controls.
@@ -209,6 +216,10 @@ Title screen meta placement:
 The old combined Online drawer should not be the default information model.
 Account, achievements, records, and progression should remain distinct so each
 screen has one obvious purpose.
+
+Game over should bridge into meta progression. After a run, the player sees
+Glory, Season XP, Credits, rank/tier movement, and a `VIEW ROAD` action that
+opens the Road panel near the newly relevant progress.
 
 The game must remain functional if Firebase is unavailable or the player is signed out. In that case, local play and local high score continue normally.
 
