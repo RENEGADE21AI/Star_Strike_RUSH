@@ -280,6 +280,8 @@
 
     .phone.tall { height: 960px; }
     .phone.extra-tall { height: 1180px; }
+    .phone.road-long { height: 1680px; }
+    .phone.season-long { height: 2100px; }
 
     .phone::after {
       content: "";
@@ -569,6 +571,238 @@
     .green-text { color: var(--green); }
     .cyan-text { color: var(--cyan); }
     .red-text { color: var(--red); }
+
+    .road-header {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      padding: 0 0 14px;
+      margin-bottom: 8px;
+      background: linear-gradient(180deg, rgba(10,10,20,0.98) 0%, rgba(10,10,20,0.92) 72%, rgba(10,10,20,0) 100%);
+    }
+
+    .road-summary {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin: 12px 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .road-summary strong {
+      display: block;
+      color: var(--ink);
+      font-size: 15px;
+      text-transform: uppercase;
+    }
+
+    .road-summary span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .road-badge {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 2px solid rgba(255,230,128,0.58);
+      background: radial-gradient(circle, rgba(255,230,128,0.28), rgba(255,230,128,0.06));
+      color: var(--gold);
+      font-family: var(--font-display);
+      font-size: 22px;
+    }
+
+    .road-map {
+      position: relative;
+      min-height: 1180px;
+      padding: 16px 0 36px;
+    }
+
+    .road-map::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 4px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--green) 0 10%, rgba(255,230,128,0.72) 10% 46%, rgba(255,255,255,0.18) 46% 100%);
+      box-shadow: 0 0 18px rgba(255,230,128,0.18);
+    }
+
+    .road-node {
+      position: relative;
+      width: 124px;
+      min-height: 78px;
+      margin: 24px 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.055);
+      color: rgba(255,255,255,0.74);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .road-node.left { margin-right: auto; }
+    .road-node.right { margin-left: auto; }
+    .road-node.major {
+      min-height: 92px;
+      border-color: rgba(255,230,128,0.55);
+      background: rgba(255,230,128,0.12);
+      color: var(--ink);
+    }
+
+    .road-node.reached {
+      border-color: rgba(120,255,180,0.52);
+      background: rgba(120,255,180,0.12);
+    }
+
+    .road-node::before {
+      content: "";
+      position: absolute;
+      top: 24px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.35);
+      background: #111522;
+      box-shadow: 0 0 0 5px rgba(10,10,20,0.95);
+    }
+
+    .road-node.left::before { right: -45px; }
+    .road-node.right::before { left: -45px; }
+    .road-node.reached::before {
+      border-color: var(--green);
+      background: var(--green);
+      box-shadow: 0 0 0 5px rgba(10,10,20,0.95), 0 0 18px rgba(120,255,180,0.55);
+    }
+
+    .road-node.major::before {
+      width: 30px;
+      height: 30px;
+      border-color: var(--gold);
+      background: var(--gold);
+      box-shadow: 0 0 0 5px rgba(10,10,20,0.95), 0 0 22px rgba(255,230,128,0.55);
+    }
+
+    .node-title {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .node-sub {
+      display: block;
+      color: var(--muted);
+      line-height: 1.25;
+    }
+
+    .season-map {
+      position: relative;
+      min-height: 1560px;
+      padding: 14px 0 40px;
+    }
+
+    .season-map::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 4px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--green) 0 4%, rgba(120,210,255,0.72) 4% 46%, rgba(255,255,255,0.16) 46% 100%);
+      box-shadow: 0 0 18px rgba(120,210,255,0.22);
+    }
+
+    .tier-step {
+      position: relative;
+      display: grid;
+      grid-template-columns: 105px 34px 105px;
+      gap: 10px;
+      align-items: center;
+      min-height: 64px;
+      margin: 10px 0;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .tier-step .reward {
+      min-height: 44px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.68);
+    }
+
+    .tier-step .reward.free {
+      border-color: rgba(120,255,180,0.34);
+    }
+
+    .tier-step .reward.premium {
+      border-color: rgba(255,230,128,0.28);
+      opacity: 0.70;
+    }
+
+    .tier-step .tier-dot {
+      position: relative;
+      z-index: 2;
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.28);
+      background: #111522;
+      color: rgba(255,255,255,0.72);
+      box-shadow: 0 0 0 5px rgba(10,10,20,0.95);
+    }
+
+    .tier-step.reached .tier-dot {
+      background: var(--green);
+      border-color: var(--green);
+      color: #04100a;
+      box-shadow: 0 0 0 5px rgba(10,10,20,0.95), 0 0 18px rgba(120,255,180,0.55);
+    }
+
+    .tier-step.milestone .tier-dot {
+      width: 42px;
+      height: 42px;
+      margin-left: -4px;
+      border-color: var(--gold);
+      background: var(--gold);
+      color: #15100a;
+      box-shadow: 0 0 0 5px rgba(10,10,20,0.95), 0 0 22px rgba(255,230,128,0.55);
+    }
+
+    .track-labels {
+      display: grid;
+      grid-template-columns: 105px 34px 105px;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      text-align: center;
+      text-transform: uppercase;
+      margin: 12px 0 8px;
+    }
 
     .hud-left {
       position: absolute;
@@ -969,34 +1203,50 @@
       <div class="screen-copy">
         <span class="status current expandable">Current, expandable</span>
         <h2>Glory Road</h2>
-        <p>Glory Road is lifetime identity. It must feel permanent and prestigious, but never imply gameplay power.</p>
+        <p>Glory Road is lifetime identity. It should feel like a classic scrollable progression road: a long rail, big rank milestones, smaller checkpoints, and visible distance to the next prestige moment.</p>
         <ul>
           <li>Top tabs switch Glory Road and Season Road.</li>
-          <li>Current rank is the headline, with next rank and progress bar below.</li>
-          <li>Rank ladder is a long vertical road, centered around current progress.</li>
+          <li>Current rank is the headline, with next rank and progress bar pinned near the top.</li>
+          <li>The road itself is long, with alternating rank cards on a central rail.</li>
+          <li>Major ranks get larger glowing nodes; minor checkpoints preview the climb between ranks.</li>
           <li>Use gold for lifetime identity, green for reached status.</li>
         </ul>
       </div>
       <div class="screen-frame">
-        <div class="phone tall">
+        <div class="phone road-long">
           <div class="panel long">
             <div class="close">X</div>
-            <div class="panel-title">Progress Road</div>
-            <div class="tabs"><div class="tab active">Glory Road</div><div class="tab">Season Road</div></div>
-            <h3 class="gold-text" style="font-size:16px;">Rookie Pilot</h3>
-            <div class="muted" style="margin-top:10px;font-size:11px;text-transform:uppercase;">Glory 0 | Next: Star Cadet at 1,000</div>
-            <div class="meter gold"><span style="width:0%;"></span></div>
-            <div class="row gold"><span>0</span><span>Rookie Pilot</span></div>
-            <div class="row"><span>1,000</span><span>Star Cadet</span></div>
-            <div class="row"><span>3,000</span><span>Strike Pilot</span></div>
-            <div class="row"><span>7,500</span><span>Void Runner</span></div>
-            <div class="row"><span>15,000</span><span>Ace</span></div>
-            <div class="row"><span>30,000</span><span>Elite Ace</span></div>
-            <div class="row"><span>60,000</span><span>Phantom Hunter</span></div>
-            <div class="row"><span>100,000</span><span>Wraithbreaker</span></div>
-            <div class="row"><span>175,000</span><span>Solar Legend</span></div>
-            <div class="row"><span>300,000</span><span>Star Eternal</span></div>
-            <div class="future-note">Design rule: ranks unlock identity only, not player power.</div>
+            <div class="road-header">
+              <div class="panel-title">Progress Road</div>
+              <div class="tabs"><div class="tab active">Glory Road</div><div class="tab">Season Road</div></div>
+              <div class="road-summary">
+                <div>
+                  <strong>Rookie Pilot</strong>
+                  <span>Glory 0 | Next: Star Cadet at 1,000</span>
+                </div>
+                <div class="road-badge">I</div>
+              </div>
+              <div class="meter gold"><span style="width:0%;"></span></div>
+            </div>
+            <div class="road-map">
+              <div class="road-node left reached major"><span class="node-title">Rookie Pilot</span><span class="node-sub">0 Glory. First launch identity.</span></div>
+              <div class="road-node right reached"><span class="node-title">250 Glory</span><span class="node-sub">First streak marker.</span></div>
+              <div class="road-node left"><span class="node-title">500 Glory</span><span class="node-sub">Halfway to first rank-up.</span></div>
+              <div class="road-node right"><span class="node-title">750 Glory</span><span class="node-sub">Rank-up warning glow.</span></div>
+              <div class="road-node left major"><span class="node-title">Star Cadet</span><span class="node-sub">1,000 Glory. New rank badge.</span></div>
+              <div class="road-node right"><span class="node-title">2,000 Glory</span><span class="node-sub">Cadet road checkpoint.</span></div>
+              <div class="road-node left major"><span class="node-title">Strike Pilot</span><span class="node-sub">3,000 Glory. Sharper title frame.</span></div>
+              <div class="road-node right"><span class="node-title">5,000 Glory</span><span class="node-sub">Mid-road identity marker.</span></div>
+              <div class="road-node left major"><span class="node-title">Void Runner</span><span class="node-sub">7,500 Glory. Deep-space badge.</span></div>
+              <div class="road-node right"><span class="node-title">11,000 Glory</span><span class="node-sub">Ace approach marker.</span></div>
+              <div class="road-node left major"><span class="node-title">Ace</span><span class="node-sub">15,000 Glory. Prestige glow.</span></div>
+              <div class="road-node right major"><span class="node-title">Elite Ace</span><span class="node-sub">30,000 Glory. Profile crest.</span></div>
+              <div class="road-node left major"><span class="node-title">Phantom Hunter</span><span class="node-sub">60,000 Glory. Ghost-realm identity.</span></div>
+              <div class="road-node right major"><span class="node-title">Wraithbreaker</span><span class="node-sub">100,000 Glory. Boss-slayer badge.</span></div>
+              <div class="road-node left major"><span class="node-title">Solar Legend</span><span class="node-sub">175,000 Glory. Gold title lockup.</span></div>
+              <div class="road-node right major"><span class="node-title">Star Eternal</span><span class="node-sub">300,000 Glory. Lifetime capstone.</span></div>
+            </div>
+            <div class="future-note">Design rule: the scroll distance is part of the fantasy. Ranks unlock identity only, never player power.</div>
           </div>
         </div>
       </div>
@@ -1006,34 +1256,60 @@
       <div class="screen-copy">
         <span class="status current expandable">Current, expandable</span>
         <h2>Season Road</h2>
-        <p>Season Road is the temporary 8-week progress surface. It can become longer than a viewport and should eventually support reward claiming.</p>
+        <p>Season Road is the temporary 8-week progress surface. It should feel like a classic pass: lots of tiers, a central spine, frequent small rewards, and bigger milestone rewards every few steps.</p>
         <ul>
           <li>Use green/cyan instead of gold so it does not compete with lifetime Glory.</li>
-          <li>Tier rows should preview rewards without implying power.</li>
-          <li>Premium track can be added later, visually separate and never stronger.</li>
+          <li>Tier rows become a long scroll track, not a compact list.</li>
+          <li>Free rewards sit on the left lane; future premium rewards sit on the right lane.</li>
+          <li>Every fifth tier should feel like a larger milestone node.</li>
           <li>When rewards exist, claiming happens here, not on the title screen.</li>
         </ul>
       </div>
       <div class="screen-frame">
-        <div class="phone extra-tall">
+        <div class="phone season-long">
           <div class="panel long">
             <div class="close">X</div>
-            <div class="panel-title">Progress Road</div>
-            <div class="tabs"><div class="tab">Glory Road</div><div class="tab active">Season Road</div></div>
-            <h3 class="green-text" style="font-size:16px;">Launch Flight - Tier 1</h3>
-            <div class="muted" style="margin-top:10px;font-size:11px;text-transform:uppercase;">Season XP 0 | Next tier in 1,000 XP</div>
-            <div class="meter"><span style="width:0%;"></span></div>
-            <div class="row active"><span>Tier 1</span><span>Reached | starter badge</span></div>
-            <div class="row"><span>Tier 2</span><span>Locked | trail tint</span></div>
-            <div class="row"><span>Tier 3</span><span>Locked | credits</span></div>
-            <div class="row"><span>Tier 4</span><span>Locked | banner</span></div>
-            <div class="row"><span>Tier 5</span><span>Locked | ship skin</span></div>
-            <div class="row"><span>Tier 6</span><span>Locked | credits</span></div>
-            <div class="row"><span>Tier 7</span><span>Locked | title</span></div>
-            <div class="row"><span>Tier 8</span><span>Locked | badge</span></div>
-            <div class="row"><span>Tier 9</span><span>Locked | trail tint</span></div>
-            <div class="row"><span>Tier 10</span><span>Locked | ship skin</span></div>
-            <div class="future-note">Future: 50 tiers, free track first, premium track later. No gameplay advantage.</div>
+            <div class="road-header">
+              <div class="panel-title">Progress Road</div>
+              <div class="tabs"><div class="tab">Glory Road</div><div class="tab active">Season Road</div></div>
+              <div class="road-summary">
+                <div>
+                  <strong>Launch Flight - Tier 1</strong>
+                  <span>Season XP 0 | Next tier in 1,000 XP</span>
+                </div>
+                <div class="road-badge" style="border-color:rgba(120,255,180,0.58);color:var(--green);background:radial-gradient(circle, rgba(120,255,180,0.25), rgba(120,255,180,0.05));">01</div>
+              </div>
+              <div class="meter"><span style="width:0%;"></span></div>
+            </div>
+            <div class="track-labels"><span>Free Track</span><span>Tier</span><span>Premium Later</span></div>
+            <div class="season-map">
+              <div class="tier-step reached"><div class="reward free">Starter Badge</div><div class="tier-dot">1</div><div class="reward premium">Locked Track</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">2</div><div class="reward premium">Trail Tint</div></div>
+              <div class="tier-step"><div class="reward free">Title: Launch</div><div class="tier-dot">3</div><div class="reward premium">Banner</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">4</div><div class="reward premium">Badge Trim</div></div>
+              <div class="tier-step milestone"><div class="reward free">Ship Skin Preview</div><div class="tier-dot">5</div><div class="reward premium">Premium Skin</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">6</div><div class="reward premium">Trail Tint</div></div>
+              <div class="tier-step"><div class="reward free">Banner</div><div class="tier-dot">7</div><div class="reward premium">Title Frame</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">8</div><div class="reward premium">Ship Decal</div></div>
+              <div class="tier-step"><div class="reward free">Badge</div><div class="tier-dot">9</div><div class="reward premium">Glow Color</div></div>
+              <div class="tier-step milestone"><div class="reward free">Comet Trail</div><div class="tier-dot">10</div><div class="reward premium">Gold Variant</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">11</div><div class="reward premium">Banner</div></div>
+              <div class="tier-step"><div class="reward free">Title</div><div class="tier-dot">12</div><div class="reward premium">Trail Tint</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">13</div><div class="reward premium">Badge Trim</div></div>
+              <div class="tier-step"><div class="reward free">Player Card</div><div class="tier-dot">14</div><div class="reward premium">Profile Frame</div></div>
+              <div class="tier-step milestone"><div class="reward free">Ship Skin</div><div class="tier-dot">15</div><div class="reward premium">Animated Trail</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">16</div><div class="reward premium">Banner</div></div>
+              <div class="tier-step"><div class="reward free">Badge</div><div class="tier-dot">17</div><div class="reward premium">Title Frame</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">18</div><div class="reward premium">Decal</div></div>
+              <div class="tier-step"><div class="reward free">Trail Tint</div><div class="tier-dot">19</div><div class="reward premium">Glow Color</div></div>
+              <div class="tier-step milestone"><div class="reward free">Boss Banner</div><div class="tier-dot">20</div><div class="reward premium">Premium Ship</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">21</div><div class="reward premium">Badge Trim</div></div>
+              <div class="tier-step"><div class="reward free">Title</div><div class="tier-dot">22</div><div class="reward premium">Banner</div></div>
+              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">23</div><div class="reward premium">Trail Tint</div></div>
+              <div class="tier-step"><div class="reward free">Profile Badge</div><div class="tier-dot">24</div><div class="reward premium">Profile Frame</div></div>
+              <div class="tier-step milestone"><div class="reward free">Midseason Skin</div><div class="tier-dot">25</div><div class="reward premium">Animated Skin</div></div>
+              <div class="future-note">Blueprint shows the scroll rhythm. Full implementation target is 50 tiers across an 8-week season, with cosmetic-only rewards.</div>
+            </div>
           </div>
         </div>
       </div>

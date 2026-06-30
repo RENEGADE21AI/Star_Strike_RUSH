@@ -196,7 +196,9 @@ Title screen meta placement:
   sign-out, profile sync, and online refresh controls.
 - The main icon row under Play is: Badges, Road, Records, Codex, Gear.
 - Badges opens the achievements trophy panel.
-- Road opens Glory Road and Season Road tabs.
+- Road opens Glory Road and Season Road tabs. These tracks should feel like
+  classic long-scroll progression roads with a central spine, nodes, milestone
+  rewards, and visible travel distance. Do not compress them into short lists.
 - Records opens the world-record leaderboard and refresh controls.
 - Codex opens enemy and boss discovery.
 - Gear opens performance/settings/reset controls.
