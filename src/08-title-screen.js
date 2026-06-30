@@ -231,6 +231,7 @@ function updateTitleScreen() {
   }
   titlePanelAnim += (titlePanelTarget - titlePanelAnim) * 0.22;
   callSignCursorBlink = (callSignCursorBlink + 1) % 56;
+  if (titleSubState === "progress") clampTitleProgressScroll();
 
   if (playBtnPointerDown && playBtnPointerInside) {
     playBtnHold++;
@@ -355,7 +356,20 @@ function getProgressRects() {
   const tabW = Math.floor((panel.w - 48) / 2);
   const gloryTab = { x: panel.x + 20, y: panel.y + 52, w: tabW, h: 30 };
   const seasonTab = { x: gloryTab.x + tabW + 8, y: gloryTab.y, w: tabW, h: 30 };
-  return { panel, closeRect, gloryTab, seasonTab };
+  const contentRect = { x: panel.x + 18, y: panel.y + 142, w: panel.w - 36, h: panel.h - 176 };
+  return { panel, closeRect, gloryTab, seasonTab, contentRect };
+}
+function getProgressContentHeight() {
+  if (titleProgressTab === "season") return 86 + 50 * 62;
+  const gloryStepCount = Math.max(1, GLORY_RANKS.length * 2 - 1);
+  return 72 + gloryStepCount * 80;
+}
+function getProgressMaxScroll() {
+  const r = getProgressRects();
+  return Math.max(0, getProgressContentHeight() - r.contentRect.h);
+}
+function clampTitleProgressScroll() {
+  titleProgressScroll = clamp(titleProgressScroll, 0, getProgressMaxScroll());
 }
 function getResetConfirmRects() {
   const boxW = Math.min(460, W - 28);

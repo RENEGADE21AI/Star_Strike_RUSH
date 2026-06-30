@@ -92,6 +92,11 @@ function setupSession(mode = "start") {
   titlePanelAnim = 0;
   titlePanelTarget = 0;
   titleProgressTab = "glory";
+  titleProgressScroll = 0;
+  titleProgressDragActive = false;
+  titleProgressDragPointerId = null;
+  titleProgressDragY = 0;
+  titleProgressDragStartScroll = 0;
   codexDetailType = null;
   resetProgressConfirm = false;
   highScoreDirty = false;
@@ -173,7 +178,39 @@ function handleResetProgressConfirmDown(x, y) {
   }
   return true;
 }
-function handleTitlePointerDown(x, y) {
+function setTitleProgressTab(tab) {
+  if (titleProgressTab !== tab) {
+    titleProgressTab = tab;
+    titleProgressScroll = 0;
+    titleProgressDragActive = false;
+    titleProgressDragPointerId = null;
+  }
+  clampTitleProgressScroll();
+}
+function beginTitleProgressDrag(pointerId, y) {
+  titleProgressDragActive = true;
+  titleProgressDragPointerId = pointerId;
+  titleProgressDragY = y;
+  titleProgressDragStartScroll = titleProgressScroll;
+  if (pointerId !== null && pointerId !== undefined) {
+    try { canvas.setPointerCapture(pointerId); } catch {}
+  }
+}
+function updateTitleProgressDrag(pointerId, y) {
+  if (!titleProgressDragActive) return false;
+  if (titleProgressDragPointerId !== null && titleProgressDragPointerId !== pointerId) return false;
+  titleProgressScroll = titleProgressDragStartScroll + (titleProgressDragY - y) * 1.12;
+  clampTitleProgressScroll();
+  return true;
+}
+function endTitleProgressDrag(pointerId) {
+  if (!titleProgressDragActive) return false;
+  if (titleProgressDragPointerId !== null && titleProgressDragPointerId !== pointerId) return false;
+  titleProgressDragActive = false;
+  titleProgressDragPointerId = null;
+  return true;
+}
+function handleTitlePointerDown(x, y, pointerId = null) {
   if (resetProgressConfirm) return handleResetProgressConfirmDown(x, y);
 
   if (titlePanelAnim > 0.02) {
@@ -234,8 +271,9 @@ function handleTitlePointerDown(x, y) {
       if (titleSubState === "progress") {
         const r = getProgressRects();
         if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
-        if (hitRect(r.gloryTab, x, y)) { titleProgressTab = "glory"; return true; }
-        if (hitRect(r.seasonTab, x, y)) { titleProgressTab = "season"; return true; }
+        if (hitRect(r.gloryTab, x, y)) { setTitleProgressTab("glory"); return true; }
+        if (hitRect(r.seasonTab, x, y)) { setTitleProgressTab("season"); return true; }
+        if (hitRect(r.contentRect, x, y)) { beginTitleProgressDrag(pointerId, y); return true; }
         return true;
       }
     }
@@ -275,7 +313,7 @@ function handleTitlePointerDown(x, y) {
   }
   if (hitRect(iconRects.progress, x, y)) {
     if (titleSubState === "progress" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "progress"; titlePanelTarget = 1; codexDetailType = null; }
+    else { titleSubState = "progress"; titlePanelTarget = 1; codexDetailType = null; clampTitleProgressScroll(); }
     return true;
   }
   if (hitRect(iconRects.records, x, y)) {
@@ -324,7 +362,7 @@ canvas.addEventListener("pointerdown", (e) => {
     if (onDevToggleZone(x, y)) { state.devStatsVisible = !state.devStatsVisible; return; }
   }
   if (state.gameState !== "playing") {
-    if (handleTitlePointerDown(x, y)) return;
+    if (handleTitlePointerDown(x, y, e.pointerId)) return;
     return;
   }
   canvas.setPointerCapture(e.pointerId);
@@ -342,6 +380,10 @@ canvas.addEventListener("pointermove", (e) => {
   const x = (e.clientX - rect.left - offsetX) / scale;
   const y = (e.clientY - rect.top - offsetY) / scale;
   if (state.gameState !== "playing") {
+    if (updateTitleProgressDrag(e.pointerId, y)) {
+      e.preventDefault();
+      return;
+    }
     if (playBtnPointerDown) {
       const playRect = getPlayButtonRect();
       playBtnPointerInside = hitRect(playRect, x, y);
@@ -374,6 +416,7 @@ function updateJoystickFromPointer(e) {
   state.joystick.ay = (dy * s) / r;
 }
 function endPointer(e) {
+  endTitleProgressDrag(e.pointerId);
   if (state.joystick.active && state.joystick.id === e.pointerId) {
     state.joystick.active = false;
     state.joystick.id = null;
@@ -409,6 +452,17 @@ function endPointer(e) {
 }
 canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", endPointer);
+canvas.addEventListener("wheel", (e) => {
+  if (state.gameState === "playing" || titleSubState !== "progress" || titlePanelAnim <= 0.02) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left - offsetX) / scale;
+  const y = (e.clientY - rect.top - offsetY) / scale;
+  const r = getProgressRects();
+  if (!hitRect(r.panel, x, y)) return;
+  e.preventDefault();
+  titleProgressScroll += e.deltaY / Math.max(0.5, scale);
+  clampTitleProgressScroll();
+}, { passive: false });
 function onActionZone(x, y) { const cx = W - 76, cy = H - 76; return Math.hypot(x - cx, y - cy) <= 42; }
 function onJoystickZone(x, y) { const cx = 76, cy = H - 76; return Math.hypot(x - cx, y - cy) <= 62; }
 function isMoveKey(key) {
@@ -565,6 +619,9 @@ function getDebugSnapshot() {
       codexHasNew,
       codexDetailType,
       titleProgressTab,
+      titleProgressScroll,
+      titleProgressMaxScroll: typeof getProgressMaxScroll === "function" ? getProgressMaxScroll() : 0,
+      titleProgressDragActive,
       resetProgressConfirm
     }
   };

@@ -199,6 +199,9 @@ Title screen meta placement:
 - Road opens Glory Road and Season Road tabs. These tracks should feel like
   classic long-scroll progression roads with a central spine, nodes, milestone
   rewards, and visible travel distance. Do not compress them into short lists.
+  The current canvas implementation uses a draggable/wheel-scroll road viewport:
+  Glory alternates rank milestones and checkpoints, while Season displays all
+  50 supported tiers on a central rail with free and cosmetic reward markers.
 - Records opens the world-record leaderboard and refresh controls.
 - Codex opens enemy and boss discovery.
 - Gear opens performance/settings/reset controls.
