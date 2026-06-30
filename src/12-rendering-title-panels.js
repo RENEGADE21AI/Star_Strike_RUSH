@@ -293,6 +293,30 @@ function drawOnlineActionButton(rect, label, active = true) {
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
   ctx.restore();
 }
+function drawPanelCloseButton(rect) {
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.fillStyle = "#fff";
+  ctx.font = FONT_HUD;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("X", rect.x + rect.w / 2, rect.y + rect.h / 2);
+  ctx.restore();
+}
+function drawMetaBar(x, y, w, ratio, color) {
+  const fillW = Math.max(0, Math.min(w, w * clamp(ratio, 0, 1)));
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.09)";
+  ctx.fillRect(x, y, w, 8);
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, fillW, 8);
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.strokeRect(x, y, w, 8);
+  ctx.restore();
+}
 function drawOnlinePanel() {
   const r = getOnlineRects();
   const panel = r.panel;
@@ -300,19 +324,11 @@ function drawOnlinePanel() {
   const user = online.user || null;
   const name = user ? (online.profileCallSign || user.displayName || callSign || "PILOT") : "SIGNED OUT";
   const status = online.lastError || online.lastStatus || (user ? "Runs sync at game over." : "Sign in to sync records.");
-  drawTitlePanelFrame(panel, "ONLINE");
+  const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
+  drawTitlePanelFrame(panel, "ACCOUNT");
+  drawPanelCloseButton(r.closeRect);
 
   ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.10)";
-  ctx.fillRect(r.closeRect.x, r.closeRect.y, r.closeRect.w, r.closeRect.h);
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.strokeRect(r.closeRect.x, r.closeRect.y, r.closeRect.w, r.closeRect.h);
-  ctx.fillStyle = "#fff";
-  ctx.font = FONT_HUD;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("X", r.closeRect.x + r.closeRect.w / 2, r.closeRect.y + r.closeRect.h / 2);
-
   const innerX = panel.x + 20;
   let y = panel.y + 48;
   ctx.textAlign = "left";
@@ -323,38 +339,44 @@ function drawOnlinePanel() {
   y += 18;
   ctx.fillStyle = online.lastError ? "#ffb0b0" : "rgba(255,255,255,0.72)";
   ctx.fillText(String(status).slice(0, 42), innerX, y);
+  y = panel.y + 188;
+  if (meta) {
+    ctx.font = FONT_HUD;
+    ctx.fillStyle = "rgba(255,230,128,0.88)";
+    ctx.fillText(meta.gloryRank.toUpperCase(), innerX, y);
+    y += 22;
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = "rgba(255,255,255,0.66)";
+    ctx.fillText(`GLORY ${Number(meta.totalGlory || 0).toLocaleString()}  |  TIER ${meta.seasonTier || 1}`, innerX, y);
+    y += 18;
+    ctx.fillText(`CREDITS ${Number(meta.credits || 0).toLocaleString()}  |  BEST ${Number((meta.lifetime && meta.lifetime.bestScore) || highScore || 0).toLocaleString()}`, innerX, y);
+  }
   ctx.restore();
 
   drawOnlineActionButton(r.signIn, user ? "SYNC PROFILE" : "SIGN IN WITH GOOGLE", true);
   drawOnlineActionButton(r.signOut, "SIGN OUT", !!user);
+  drawOnlineActionButton(r.refresh, "REFRESH ONLINE DATA", true);
+}
+function drawRecordsPanel() {
+  const r = getRecordsRects();
+  const panel = r.panel;
+  const online = onlineState();
+  const user = online.user || null;
+  const leaderboard = Array.isArray(online.leaderboard) ? online.leaderboard : [];
+  drawTitlePanelFrame(panel, "WORLD RECORDS");
+  drawPanelCloseButton(r.closeRect);
 
   ctx.save();
-  const leaderboard = Array.isArray(online.leaderboard) ? online.leaderboard : [];
-  const achievements = Array.isArray(online.achievements) ? online.achievements : [];
-  const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
-  const definitions = typeof getAchievementDefinitions === "function" ? getAchievementDefinitions() : [];
-  const achievementNames = new Map(definitions.map((item) => [item.id, item.name]));
-  let listY = panel.y + 154;
-  if (meta) {
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.font = FONT_TINY;
-    ctx.fillStyle = "rgba(255,230,128,0.88)";
-    ctx.fillText(`GLORY ${Number(meta.totalGlory || 0).toLocaleString()} - ${meta.gloryRank}`, panel.x + 20, listY);
-    listY += 18;
-    ctx.fillStyle = "rgba(255,255,255,0.66)";
-    ctx.fillText(`SEASON TIER ${meta.seasonTier || 1} - CREDITS ${Number(meta.credits || 0).toLocaleString()}`, panel.x + 20, listY);
-    listY += 24;
-  }
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.font = FONT_HUD;
-  ctx.fillStyle = "#fff";
-  ctx.fillText("WORLD RECORDS", panel.x + 20, listY);
-  listY += 22;
+  let listY = panel.y + 54;
+  ctx.font = FONT_SMALL;
+  ctx.fillStyle = "rgba(255,255,255,0.70)";
+  ctx.fillText(user ? "GLOBAL BEST-SCORE LADDER" : "SIGN IN TO LOAD GLOBAL SCORES", panel.x + 20, listY);
+  listY += 30;
   ctx.font = FONT_TINY;
   if (leaderboard.length) {
-    leaderboard.slice(0, 4).forEach((row, index) => {
+    leaderboard.slice(0, 10).forEach((row, index) => {
       const who = String(row.callSign || row.displayName || "PILOT").slice(0, 12);
       const score = Number(row.bestScore || 0).toLocaleString();
       const rank = row.gloryRank ? ` ${String(row.gloryRank).slice(0, 14)}` : "";
@@ -367,30 +389,124 @@ function drawOnlinePanel() {
     });
   } else {
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText(user ? "No synced records yet." : "Sign in to load global scores.", panel.x + 22, listY);
-    listY += 17;
-  }
-
-  listY = Math.max(panel.y + 318, listY + 18);
-  ctx.font = FONT_HUD;
-  ctx.fillStyle = "#fff";
-  ctx.fillText("ACHIEVEMENTS", panel.x + 20, listY);
-  listY += 22;
-  ctx.font = FONT_TINY;
-  if (achievements.length) {
-    achievements.slice(0, 5).forEach((id) => {
-      const key = typeof id === "string" ? id : id.achievementId;
-      ctx.fillStyle = "#78ffb4";
-      ctx.fillText(`UNLOCKED: ${achievementNames.get(key) || String(key || "ACHIEVEMENT").toUpperCase()}`, panel.x + 22, listY);
-      listY += 17;
-    });
-  } else {
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText(user ? "Finish runs to unlock badges." : "Sign in to save badges.", panel.x + 22, listY);
+    ctx.fillText(user ? "No synced records yet." : "Use the account chip to sign in.", panel.x + 22, listY);
   }
   ctx.restore();
 
   drawOnlineActionButton(r.refresh, "REFRESH RECORDS", true);
+}
+function drawAchievementsPanel() {
+  const r = getAchievementsRects();
+  const panel = r.panel;
+  const online = onlineState();
+  const definitions = typeof getAchievementDefinitions === "function" ? getAchievementDefinitions() : [];
+  const earned = new Set((Array.isArray(online.achievements) ? online.achievements : []).map((item) => typeof item === "string" ? item : item.achievementId));
+  drawTitlePanelFrame(panel, "ACHIEVEMENTS");
+  drawPanelCloseButton(r.closeRect);
+
+  ctx.save();
+  const total = Math.max(1, definitions.length);
+  let y = panel.y + 50;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.font = FONT_SMALL;
+  ctx.fillStyle = "#78ffb4";
+  ctx.fillText(`${earned.size}/${definitions.length} UNLOCKED`, panel.x + 20, y);
+  drawMetaBar(panel.x + 20, y + 20, panel.w - 40, earned.size / total, "rgba(120,255,180,0.68)");
+  y += 42;
+  ctx.font = FONT_TINY;
+  for (const achievement of definitions.slice(0, 12)) {
+    const unlocked = earned.has(achievement.id);
+    ctx.fillStyle = unlocked ? "rgba(120,255,180,0.13)" : "rgba(255,255,255,0.05)";
+    ctx.fillRect(panel.x + 20, y - 3, panel.w - 40, 23);
+    ctx.strokeStyle = unlocked ? "rgba(120,255,180,0.36)" : "rgba(255,255,255,0.10)";
+    ctx.strokeRect(panel.x + 20, y - 3, panel.w - 40, 23);
+    ctx.fillStyle = unlocked ? "#78ffb4" : "rgba(255,255,255,0.34)";
+    ctx.fillText(unlocked ? "UNLOCKED" : "LOCKED", panel.x + 28, y + 3);
+    ctx.fillStyle = unlocked ? "#fff" : "rgba(255,255,255,0.62)";
+    ctx.fillText(String(achievement.name || achievement.id).toUpperCase().slice(0, 22), panel.x + 88, y + 3);
+    y += 26;
+  }
+  if (!online.user) {
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillText("SIGN IN FROM ACCOUNT TO SYNC BADGES.", panel.x + 20, panel.y + panel.h - 28);
+  }
+  ctx.restore();
+}
+function drawProgressPanel() {
+  const r = getProgressRects();
+  const panel = r.panel;
+  const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
+  drawTitlePanelFrame(panel, "PROGRESS ROAD");
+  drawPanelCloseButton(r.closeRect);
+  drawOnlineActionButton(r.gloryTab, "GLORY ROAD", titleProgressTab === "glory");
+  drawOnlineActionButton(r.seasonTab, "SEASON ROAD", titleProgressTab === "season");
+
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  let y = panel.y + 102;
+  if (!meta) {
+    ctx.fillStyle = "rgba(255,255,255,0.62)";
+    ctx.font = FONT_SMALL;
+    ctx.fillText("Progress is still loading.", panel.x + 20, y);
+    ctx.restore();
+    return;
+  }
+  if (titleProgressTab === "glory") {
+    ctx.font = FONT_HUD;
+    ctx.fillStyle = "#ffe680";
+    ctx.fillText(meta.gloryRank.toUpperCase(), panel.x + 20, y);
+    y += 24;
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    const next = meta.nextGloryRank ? `NEXT: ${meta.nextGloryRank.toUpperCase()} AT ${Number(meta.nextGloryThreshold || 0).toLocaleString()}` : "MAX RANK REACHED";
+    ctx.fillText(`GLORY ${Number(meta.totalGlory || 0).toLocaleString()}  |  ${next}`, panel.x + 20, y);
+    drawMetaBar(panel.x + 20, y + 20, panel.w - 40, meta.rankProgress || 0, "rgba(255,230,128,0.70)");
+    y += 48;
+    const currentIndex = Math.max(0, Math.floor(meta.gloryRankIndex || 0));
+    const start = Math.max(0, currentIndex - 2);
+    const ranks = GLORY_RANKS.slice(start, start + 6);
+    ranks.forEach((rank, idx) => {
+      const actualIndex = start + idx;
+      const active = actualIndex === currentIndex;
+      const reached = actualIndex <= currentIndex;
+      ctx.fillStyle = active ? "rgba(255,230,128,0.16)" : reached ? "rgba(120,255,180,0.09)" : "rgba(255,255,255,0.05)";
+      ctx.fillRect(panel.x + 20, y - 3, panel.w - 40, 24);
+      ctx.strokeStyle = active ? "rgba(255,230,128,0.52)" : "rgba(255,255,255,0.10)";
+      ctx.strokeRect(panel.x + 20, y - 3, panel.w - 40, 24);
+      ctx.fillStyle = reached ? "#fff" : "rgba(255,255,255,0.48)";
+      ctx.fillText(`${Number(rank.threshold).toLocaleString()}  ${rank.name.toUpperCase()}`, panel.x + 30, y + 4);
+      y += 28;
+    });
+  } else {
+    const tierXP = Math.max(0, Math.floor(meta.seasonXP || 0));
+    const tierBase = (Math.max(1, meta.seasonTier || 1) - 1) * SEASON_TIER_XP;
+    const tierProgress = (tierXP - tierBase) / SEASON_TIER_XP;
+    ctx.font = FONT_HUD;
+    ctx.fillStyle = "#78ffb4";
+    ctx.fillText(`${String(meta.seasonName || CURRENT_SEASON_NAME).toUpperCase()} - TIER ${meta.seasonTier || 1}`, panel.x + 20, y);
+    y += 24;
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillText(`SEASON XP ${Number(tierXP).toLocaleString()}  |  NEXT TIER IN ${Number(Math.max(0, SEASON_TIER_XP - (tierXP - tierBase))).toLocaleString()} XP`, panel.x + 20, y);
+    drawMetaBar(panel.x + 20, y + 20, panel.w - 40, tierProgress, "rgba(120,255,180,0.70)");
+    y += 48;
+    const startTier = clamp((meta.seasonTier || 1) - 2, 1, 44);
+    for (let i = 0; i < 7; i++) {
+      const tier = startTier + i;
+      const reached = tier <= (meta.seasonTier || 1);
+      const active = tier === (meta.seasonTier || 1);
+      ctx.fillStyle = active ? "rgba(120,255,180,0.16)" : reached ? "rgba(120,210,255,0.08)" : "rgba(255,255,255,0.05)";
+      ctx.fillRect(panel.x + 20, y - 3, panel.w - 40, 24);
+      ctx.strokeStyle = active ? "rgba(120,255,180,0.52)" : "rgba(255,255,255,0.10)";
+      ctx.strokeRect(panel.x + 20, y - 3, panel.w - 40, 24);
+      ctx.fillStyle = reached ? "#fff" : "rgba(255,255,255,0.48)";
+      ctx.fillText(`TIER ${tier}  ${reached ? "REACHED" : "LOCKED"}  |  REWARDS LATER`, panel.x + 30, y + 4);
+      y += 28;
+    }
+  }
+  ctx.restore();
 }
 function drawSettingsAndCodexPanels() {
   if (titlePanelAnim <= 0.02 && titlePanelTarget <= 0) return;
@@ -401,5 +517,8 @@ function drawSettingsAndCodexPanels() {
   if (titleSubState === "settings") drawSettingsPanel();
   else if (titleSubState === "codex") drawCodexPanel();
   else if (titleSubState === "online") drawOnlinePanel();
+  else if (titleSubState === "records") drawRecordsPanel();
+  else if (titleSubState === "achievements") drawAchievementsPanel();
+  else if (titleSubState === "progress") drawProgressPanel();
   ctx.restore();
 }

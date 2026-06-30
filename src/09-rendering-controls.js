@@ -105,3 +105,56 @@ function drawAccountIcon(rect, active = false) {
   ctx.beginPath(); ctx.arc(12, -12, 4, 0, TAU); ctx.fill();
   ctx.restore();
 }
+function drawTrophyIcon(rect, active = false) {
+  const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.strokeStyle = active ? "rgba(255,230,128,0.95)" : "rgba(255,255,255,0.90)";
+  ctx.fillStyle = active ? "rgba(255,210,80,0.22)" : "rgba(255,255,255,0.10)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-10, -13); ctx.lineTo(10, -13); ctx.lineTo(7, 4); ctx.quadraticCurveTo(0, 10, -7, 4); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-13, -8, 7, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(13, -8, 7, Math.PI / 2, -Math.PI / 2); ctx.stroke();
+  ctx.fillStyle = active ? "rgba(255,230,128,0.80)" : "rgba(255,255,255,0.72)";
+  ctx.fillRect(-3, 8, 6, 7);
+  ctx.beginPath(); ctx.roundRect(-12, 15, 24, 4, 2); ctx.fill();
+  ctx.restore();
+}
+function drawRoadIcon(rect, active = false) {
+  const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.strokeStyle = active ? "rgba(120,255,180,0.92)" : "rgba(255,255,255,0.88)";
+  ctx.fillStyle = active ? "rgba(120,255,180,0.16)" : "rgba(255,255,255,0.10)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-14, 16);
+  ctx.bezierCurveTo(-8, 6, -10, -4, -2, -10);
+  ctx.bezierCurveTo(6, -16, 9, -5, 14, -15);
+  ctx.stroke();
+  for (let i = 0; i < 4; i++) {
+    const x = -13 + i * 9;
+    const y = 13 - i * 8;
+    ctx.beginPath();
+    ctx.arc(x, y, i === 3 ? 4 : 3, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawRecordsIcon(rect, active = false) {
+  const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.strokeStyle = active ? "rgba(120,210,255,0.95)" : "rgba(255,255,255,0.88)";
+  ctx.fillStyle = active ? "rgba(120,210,255,0.17)" : "rgba(255,255,255,0.10)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, 0, 7, 16, 0, 0, TAU); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.moveTo(-11, -9); ctx.lineTo(11, -9); ctx.moveTo(-11, 9); ctx.lineTo(11, 9); ctx.stroke();
+  ctx.fillStyle = active ? "#78d2ff" : "rgba(255,255,255,0.78)";
+  ctx.beginPath(); ctx.arc(8, -8, 3, 0, TAU); ctx.fill();
+  ctx.restore();
+}

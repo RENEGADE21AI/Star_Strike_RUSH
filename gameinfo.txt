@@ -102,7 +102,10 @@ Phase Shield blocks one HP damage instance, flashes, and breaks. It does not blo
 ## 5. Meta Layer, Online Records, And Achievements
 
 The meta layer supports the arcade loop without taking it over. The title screen
-still prioritizes Play. Progression is mostly presented after the run.
+still prioritizes Play, with compact meta entry points placed around the main
+start flow instead of a dashboard-style menu. Progression is mostly presented
+after the run, but the title screen should always make long-term identity and
+goals visible.
 
 Current implemented meta layer:
 
@@ -181,7 +184,23 @@ Signed-in players can sync:
 - Earned achievements.
 - Global leaderboard records.
 
-The online panel shows account state, world records, achievement status, and refresh controls.
+Title screen meta placement:
+
+- Play remains the largest central action.
+- The call sign area doubles as the pilot card, showing current Glory rank and
+  total Glory.
+- A small account chip sits beside the call sign. It opens account sign-in,
+  sign-out, profile sync, and online refresh controls.
+- The main icon row under Play is: Badges, Road, Records, Codex, Gear.
+- Badges opens the achievements trophy panel.
+- Road opens Glory Road and Season Road tabs.
+- Records opens the world-record leaderboard and refresh controls.
+- Codex opens enemy and boss discovery.
+- Gear opens performance/settings/reset controls.
+
+The old combined Online drawer should not be the default information model.
+Account, achievements, records, and progression should remain distinct so each
+screen has one obvious purpose.
 
 The game must remain functional if Firebase is unavailable or the player is signed out. In that case, local play and local high score continue normally.
 

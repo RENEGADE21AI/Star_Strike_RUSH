@@ -91,6 +91,7 @@ function setupSession(mode = "start") {
   titleSubState = "main";
   titlePanelAnim = 0;
   titlePanelTarget = 0;
+  titleProgressTab = "glory";
   codexDetailType = null;
   resetProgressConfirm = false;
   highScoreDirty = false;
@@ -219,6 +220,24 @@ function handleTitlePointerDown(x, y) {
         if (hitRect(r.refresh, x, y)) { requestOnlineRefresh(); return true; }
         return true;
       }
+      if (titleSubState === "records") {
+        const r = getRecordsRects();
+        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        if (hitRect(r.refresh, x, y)) { requestOnlineRefresh(); return true; }
+        return true;
+      }
+      if (titleSubState === "achievements") {
+        const r = getAchievementsRects();
+        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        return true;
+      }
+      if (titleSubState === "progress") {
+        const r = getProgressRects();
+        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        if (hitRect(r.gloryTab, x, y)) { titleProgressTab = "glory"; return true; }
+        if (hitRect(r.seasonTab, x, y)) { titleProgressTab = "season"; return true; }
+        return true;
+      }
     }
     return true;
   }
@@ -244,6 +263,26 @@ function handleTitlePointerDown(x, y) {
     playBtnHold = 0;
     return true;
   }
+  if (hitRect(iconRects.account, x, y)) {
+    if (titleSubState === "online" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
+    else { titleSubState = "online"; titlePanelTarget = 1; codexDetailType = null; }
+    return true;
+  }
+  if (hitRect(iconRects.achievements, x, y)) {
+    if (titleSubState === "achievements" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
+    else { titleSubState = "achievements"; titlePanelTarget = 1; codexDetailType = null; }
+    return true;
+  }
+  if (hitRect(iconRects.progress, x, y)) {
+    if (titleSubState === "progress" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
+    else { titleSubState = "progress"; titlePanelTarget = 1; codexDetailType = null; }
+    return true;
+  }
+  if (hitRect(iconRects.records, x, y)) {
+    if (titleSubState === "records" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
+    else { titleSubState = "records"; titlePanelTarget = 1; codexDetailType = null; }
+    return true;
+  }
   if (hitRect(iconRects.settings, x, y)) {
     if (titleSubState === "settings" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
     else { titleSubState = "settings"; titlePanelTarget = 1; codexDetailType = null; }
@@ -253,11 +292,6 @@ function handleTitlePointerDown(x, y) {
     codexHasNew = false;
     if (titleSubState === "codex" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
     else { titleSubState = "codex"; titlePanelTarget = 1; }
-    return true;
-  }
-  if (hitRect(iconRects.online, x, y)) {
-    if (titleSubState === "online" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "online"; titlePanelTarget = 1; codexDetailType = null; }
     return true;
   }
 
@@ -530,6 +564,7 @@ function getDebugSnapshot() {
       settingScreenShake,
       codexHasNew,
       codexDetailType,
+      titleProgressTab,
       resetProgressConfirm
     }
   };

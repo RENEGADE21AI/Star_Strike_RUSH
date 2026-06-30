@@ -47,6 +47,7 @@ let callSignCursorBlink = 0;
 let titleSubState = "main";
 let titlePanelAnim = 0.0;
 let titlePanelTarget = 0.0;
+let titleProgressTab = "glory";
 let playBtnHold = 0;
 let playBtnPointerDown = false;
 let playBtnPointerInside = false;

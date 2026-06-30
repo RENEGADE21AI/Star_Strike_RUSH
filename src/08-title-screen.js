@@ -281,14 +281,17 @@ function getPlayButtonRect() {
 function getTitleIconRects() {
   const centerX = W / 2;
   const y = H * 0.58;
-  const size = 46;
-  const gap = 20;
-  const total = size * 3 + gap * 2;
+  const size = 42;
+  const gap = 10;
+  const total = size * 5 + gap * 4;
   const startX = centerX - total / 2;
   return {
-    settings: { x: startX, y, w: size, h: size },
-    codex: { x: startX + size + gap, y, w: size, h: size },
-    online: { x: startX + 2 * (size + gap), y, w: size, h: size }
+    achievements: { x: startX, y, w: size, h: size },
+    progress: { x: startX + size + gap, y, w: size, h: size },
+    records: { x: startX + 2 * (size + gap), y, w: size, h: size },
+    codex: { x: startX + 3 * (size + gap), y, w: size, h: size },
+    settings: { x: startX + 4 * (size + gap), y, w: size, h: size },
+    account: { x: W / 2 + 126, y: H * 0.355 - 20, w: 36, h: 40 }
   };
 }
 function getTitlePanelRect() {
@@ -330,10 +333,29 @@ function getCodexRects() {
 function getOnlineRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
-  const signIn = { x: panel.x + 20, y: panel.y + 72, w: panel.w - 40, h: 34 };
-  const signOut = { x: panel.x + 20, y: panel.y + 112, w: panel.w - 40, h: 30 };
+  const signIn = { x: panel.x + 20, y: panel.y + 96, w: panel.w - 40, h: 34 };
+  const signOut = { x: panel.x + 20, y: panel.y + 136, w: panel.w - 40, h: 30 };
   const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
   return { panel, closeRect, signIn, signOut, refresh };
+}
+function getRecordsRects() {
+  const panel = getTitlePanelRect();
+  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
+  return { panel, closeRect, refresh };
+}
+function getAchievementsRects() {
+  const panel = getTitlePanelRect();
+  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  return { panel, closeRect };
+}
+function getProgressRects() {
+  const panel = getTitlePanelRect();
+  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const tabW = Math.floor((panel.w - 48) / 2);
+  const gloryTab = { x: panel.x + 20, y: panel.y + 52, w: tabW, h: 30 };
+  const seasonTab = { x: gloryTab.x + tabW + 8, y: gloryTab.y, w: tabW, h: 30 };
+  return { panel, closeRect, gloryTab, seasonTab };
 }
 function getResetConfirmRects() {
   const boxW = Math.min(460, W - 28);

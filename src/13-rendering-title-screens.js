@@ -47,6 +47,11 @@ function drawTitleAndButtons() {
   ctx.fillText(txt, callRect.x + callRect.w / 2, callRect.y + callRect.h / 2 + 1);
   ctx.restore();
 
+  const iconRects = getTitleIconRects();
+  const accountOnline = !!(window.starStrikeOnline && window.starStrikeOnline.getState && window.starStrikeOnline.getState().user);
+  drawSimpleButton(iconRects.account, "", accountOnline ? "rgba(120,255,180,0.62)" : "rgba(255,255,255,0.24)");
+  drawAccountIcon(iconRects.account, titleSubState === "online" && titlePanelTarget === 1);
+
   ctx.save();
   ctx.fillStyle = "rgba(255,255,255,0.45)";
   ctx.font = FONT_TINY;
@@ -58,21 +63,26 @@ function drawTitleAndButtons() {
   const playRect = getPlayButtonRect();
   drawHoldButton(playRect, "PLAY", playBtnHold, 45, "rgba(0,180,100,0.18)", 0.45, 0.90);
 
-  const iconRects = getTitleIconRects();
-  drawSimpleButton(iconRects.settings, "");
+  drawSimpleButton(iconRects.achievements, "");
+  drawSimpleButton(iconRects.progress, "");
+  drawSimpleButton(iconRects.records, "");
   drawSimpleButton(iconRects.codex, "");
-  drawSimpleButton(iconRects.online, "");
-  drawGearIcon(iconRects.settings, titleSubState === "settings" && titlePanelTarget === 1);
+  drawSimpleButton(iconRects.settings, "");
+  drawTrophyIcon(iconRects.achievements, titleSubState === "achievements" && titlePanelTarget === 1);
+  drawRoadIcon(iconRects.progress, titleSubState === "progress" && titlePanelTarget === 1);
+  drawRecordsIcon(iconRects.records, titleSubState === "records" && titlePanelTarget === 1);
   drawBookIcon(iconRects.codex, titleSubState === "codex" && titlePanelTarget === 1);
-  drawAccountIcon(iconRects.online, titleSubState === "online" && titlePanelTarget === 1);
+  drawGearIcon(iconRects.settings, titleSubState === "settings" && titlePanelTarget === 1);
   ctx.save();
   ctx.fillStyle = "rgba(255,255,255,0.80)";
   ctx.font = FONT_TINY;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText("SETTINGS", iconRects.settings.x + iconRects.settings.w / 2, iconRects.settings.y + iconRects.settings.h + 4);
+  ctx.fillText("BADGES", iconRects.achievements.x + iconRects.achievements.w / 2, iconRects.achievements.y + iconRects.achievements.h + 4);
+  ctx.fillText("ROAD", iconRects.progress.x + iconRects.progress.w / 2, iconRects.progress.y + iconRects.progress.h + 4);
+  ctx.fillText("RECORDS", iconRects.records.x + iconRects.records.w / 2, iconRects.records.y + iconRects.records.h + 4);
   ctx.fillText("CODEX", iconRects.codex.x + iconRects.codex.w / 2, iconRects.codex.y + iconRects.codex.h + 4);
-  ctx.fillText("ONLINE", iconRects.online.x + iconRects.online.w / 2, iconRects.online.y + iconRects.online.h + 4);
+  ctx.fillText("GEAR", iconRects.settings.x + iconRects.settings.w / 2, iconRects.settings.y + iconRects.settings.h + 4);
   ctx.restore();
 
   ctx.save();
