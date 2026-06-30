@@ -43,6 +43,9 @@ Source layout:
 
 - `index.html` loads ordered browser scripts.
 - `styles.css` owns page/canvas styling.
+- `docs/design-blueprint.html` is the repo-native screen design blueprint. It
+  shows current screens, long stretched layouts for scrollable panels, and
+  future meta-screen guardrails. Update it before making major UI changes.
 - `src/01-core.js` through `src/18-session-input-loop.js` own the core game.
 - `src/18-expansion-data.js`, `src/18-expansion-enemies-powerups.js`,
   `src/18-expansion-hazards-bosses.js`, and

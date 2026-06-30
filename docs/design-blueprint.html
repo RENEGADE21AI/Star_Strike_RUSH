@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Star Strike RUSH Design Blueprint</title>
+  <style>
+    :root {
+      --bg: #070912;
+      --panel: #10131f;
+      --panel-2: #151a28;
+      --ink: #f5f8ff;
+      --muted: #9aa7b8;
+      --quiet: #5f6c7e;
+      --line: rgba(255,255,255,0.18);
+      --line-strong: rgba(255,255,255,0.36);
+      --cyan: #78d2ff;
+      --green: #78ffb4;
+      --gold: #ffe680;
+      --orange: #ffbd5b;
+      --red: #ff6666;
+      --danger: #ff7c7c;
+      --void: #05070e;
+      --phone-w: 375px;
+      --phone-h: 667px;
+      --radius: 8px;
+      --font-display: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+      --font-ui: "Arial Narrow", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 72% 8%, rgba(255,189,91,0.14), transparent 22rem),
+        radial-gradient(circle at 14% 18%, rgba(120,210,255,0.10), transparent 18rem),
+        linear-gradient(180deg, #060814 0%, #090b13 52%, #05060b 100%);
+      color: var(--ink);
+      font-family: var(--font-ui);
+      letter-spacing: 0;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.38;
+      background-image:
+        radial-gradient(circle, rgba(255,255,255,0.9) 0 1px, transparent 1.4px),
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 94px 88px, 100% 42px;
+      mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    }
+
+    a { color: var(--cyan); }
+    .page {
+      width: min(1440px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 80px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    .hero-card, .nav-card, .spec-card {
+      background: rgba(10,13,24,0.86);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 18px 55px rgba(0,0,0,0.32);
+    }
+
+    .hero-card {
+      padding: 28px;
+      min-height: 300px;
+    }
+
+    .eyebrow {
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      margin: 0 0 10px;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 780px;
+      font-family: var(--font-display);
+      font-size: clamp(40px, 6vw, 80px);
+      line-height: 0.92;
+      text-shadow: 0 0 18px rgba(120,210,255,0.28);
+    }
+
+    h1 span { color: var(--orange); }
+    .hero-card p {
+      max-width: 850px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.45;
+    }
+
+    .token-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .token {
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      border-radius: var(--radius);
+      min-height: 74px;
+    }
+
+    .token b {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .token span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .nav-card {
+      padding: 20px;
+      position: sticky;
+      top: 16px;
+      align-self: start;
+    }
+
+    .nav-card h2 {
+      font-size: 18px;
+      color: var(--gold);
+      margin-bottom: 10px;
+    }
+
+    .nav-card ol {
+      margin: 0;
+      padding-left: 22px;
+      color: var(--muted);
+      columns: 1;
+    }
+
+    .nav-card li { margin: 6px 0; }
+
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 22px 0 32px;
+    }
+
+    .principle {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .principle h3 {
+      color: var(--cyan);
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .principle p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.38;
+      font-size: 14px;
+    }
+
+    .screen-spec {
+      display: grid;
+      grid-template-columns: minmax(430px, 0.95fr) minmax(360px, 1.05fr);
+      gap: 22px;
+      align-items: start;
+      padding: 24px 0;
+      border-top: 1px solid rgba(255,255,255,0.11);
+    }
+
+    .screen-copy {
+      position: sticky;
+      top: 18px;
+      padding: 18px 18px 20px;
+      background: rgba(10,13,24,0.72);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .screen-copy h2 {
+      font-family: var(--font-display);
+      font-size: 34px;
+      line-height: 0.95;
+      margin-bottom: 10px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      margin: 0 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .status.current { color: var(--green); border-color: rgba(120,255,180,0.34); }
+    .status.future { color: var(--gold); border-color: rgba(255,230,128,0.34); }
+
+    .screen-copy p, .screen-copy li {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.38;
+    }
+
+    .screen-copy ul {
+      margin: 12px 0 0;
+      padding-left: 20px;
+    }
+
+    .notes {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      color: var(--quiet);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .screen-frame {
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      padding: 18px;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .phone {
+      position: relative;
+      width: var(--phone-w);
+      height: var(--phone-h);
+      flex: 0 0 auto;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 80% 18%, rgba(255,230,128,0.20), transparent 80px),
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        radial-gradient(circle, rgba(255,255,255,0.7) 0 1px, transparent 1.6px),
+        #03050c;
+      background-size: auto, 100% 42px, 74px 64px, auto;
+      border: 1px solid rgba(255,255,255,0.22);
+      box-shadow: 0 22px 60px rgba(0,0,0,0.45);
+    }
+
+    .phone.tall { height: 960px; }
+    .phone.extra-tall { height: 1180px; }
+
+    .phone::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10), inset 0 0 48px rgba(0,0,0,0.55);
+    }
+
+    .title-logo {
+      position: absolute;
+      left: 48px;
+      right: 48px;
+      top: 136px;
+      text-align: center;
+      font-family: var(--font-display);
+      font-size: 30px;
+      font-weight: 900;
+      transform: skew(-8deg);
+      text-shadow: 0 0 12px rgba(120,210,255,0.48);
+    }
+
+    .title-logo span { color: var(--orange); }
+    .label {
+      position: absolute;
+      color: rgba(255,255,255,0.48);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .call-box, .button, .icon-button, .panel, .hud-box, .row, .tab, .meter, .pill, .modal {
+      border: 1px solid var(--line-strong);
+      background: rgba(255,255,255,0.07);
+      border-radius: var(--radius);
+    }
+
+    .call-box {
+      position: absolute;
+      left: 68px;
+      right: 54px;
+      top: 234px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.46);
+      font-weight: 900;
+    }
+
+    .account-chip {
+      position: absolute;
+      top: 234px;
+      right: 14px;
+      width: 36px;
+      height: 44px;
+      border: 2px solid rgba(255,255,255,0.38);
+      border-radius: 3px;
+    }
+
+    .account-chip::before {
+      content: "";
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      left: 12px;
+      top: 8px;
+      border: 2px solid rgba(255,255,255,0.72);
+      border-radius: 50%;
+    }
+
+    .account-chip::after {
+      content: "";
+      position: absolute;
+      left: 7px;
+      bottom: 7px;
+      width: 20px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,0.72);
+      border-radius: 12px 12px 4px 4px;
+    }
+
+    .button {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink);
+      font-weight: 900;
+      text-transform: uppercase;
+      background: rgba(0,180,100,0.18);
+      border-color: rgba(120,255,180,0.62);
+    }
+
+    .button.secondary {
+      background: rgba(255,255,255,0.07);
+      border-color: rgba(255,255,255,0.26);
+    }
+
+    .button.danger {
+      background: rgba(255,80,80,0.14);
+      border-color: rgba(255,120,120,0.62);
+    }
+
+    .icon-row {
+      position: absolute;
+      left: 51px;
+      right: 51px;
+      top: 418px;
+      display: grid;
+      grid-template-columns: repeat(5, 42px);
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .icon-button {
+      height: 42px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .icon-button small {
+      position: absolute;
+      top: 47px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.82);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .stat-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: rgba(255,255,255,0.84);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .rank-line {
+      color: var(--gold);
+      font-size: 10px;
+    }
+
+    .panel {
+      position: absolute;
+      left: 32px;
+      right: 32px;
+      top: 100px;
+      min-height: 518px;
+      padding: 18px 20px;
+      background: rgba(10,10,20,0.94);
+      box-shadow: 0 0 0 999px rgba(0,0,0,0.30);
+    }
+
+    .panel.long {
+      position: static;
+      margin: 72px 20px 0;
+      min-height: 0;
+      box-shadow: none;
+    }
+
+    .panel-title {
+      margin-bottom: 18px;
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .close {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line-strong);
+      background: rgba(255,255,255,0.10);
+      color: var(--ink);
+      font-weight: 900;
+    }
+
+    .row {
+      min-height: 26px;
+      margin: 8px 0;
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: rgba(255,255,255,0.72);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .row.active {
+      background: rgba(120,255,180,0.14);
+      border-color: rgba(120,255,180,0.44);
+      color: var(--ink);
+    }
+
+    .row.gold {
+      background: rgba(255,230,128,0.13);
+      border-color: rgba(255,230,128,0.44);
+      color: var(--ink);
+    }
+
+    .grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+    .codex-card {
+      height: 78px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.05);
+      display: grid;
+      place-items: center;
+      color: rgba(255,255,255,0.68);
+      font-size: 10px;
+      font-weight: 900;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .ship-mark {
+      width: 32px;
+      height: 32px;
+      clip-path: polygon(50% 0, 85% 70%, 50% 54%, 15% 70%);
+      background: var(--cyan);
+      box-shadow: 0 0 12px currentColor;
+      margin-bottom: 4px;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .tab {
+      padding: 8px;
+      text-align: center;
+      color: rgba(255,255,255,0.62);
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .tab.active {
+      color: var(--ink);
+      border-color: rgba(120,255,180,0.58);
+      background: rgba(120,255,180,0.12);
+    }
+
+    .meter {
+      height: 9px;
+      overflow: hidden;
+      margin: 10px 0 22px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    .meter > span {
+      display: block;
+      height: 100%;
+      background: var(--green);
+    }
+
+    .meter.gold > span { background: var(--gold); }
+    .muted { color: var(--muted); }
+    .gold-text { color: var(--gold); }
+    .green-text { color: var(--green); }
+    .cyan-text { color: var(--cyan); }
+    .red-text { color: var(--red); }
+
+    .hud-left {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      width: 122px;
+    }
+
+    .hp-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .hp {
+      height: 10px;
+      background: #d33;
+    }
+
+    .energy {
+      height: 8px;
+      border: 1px solid rgba(255,255,255,0.45);
+      background: rgba(255,255,255,0.12);
+    }
+
+    .energy span {
+      display: block;
+      height: 100%;
+      background: #ff0;
+      width: 72%;
+    }
+
+    .hud-right {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      text-align: right;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1.18;
+    }
+
+    .combo { font-family: var(--font-display); font-size: 24px; color: var(--orange); }
+    .joystick, .ghost-button {
+      position: absolute;
+      bottom: 34px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.08);
+    }
+
+    .joystick {
+      left: 20px;
+      width: 112px;
+      height: 112px;
+    }
+
+    .joystick::after {
+      content: "";
+      position: absolute;
+      width: 36px;
+      height: 36px;
+      left: 36px;
+      top: 36px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.20);
+    }
+
+    .ghost-button {
+      right: 34px;
+      width: 84px;
+      height: 84px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 900;
+      background: rgba(100,255,180,0.18);
+      border-color: rgba(100,255,180,0.55);
+    }
+
+    .playfield-ship {
+      position: absolute;
+      left: 168px;
+      bottom: 116px;
+      width: 40px;
+      height: 46px;
+      clip-path: polygon(50% 0, 92% 100%, 50% 72%, 8% 100%);
+      background: linear-gradient(#f7fbff, #78d2ff);
+      box-shadow: 0 0 16px rgba(120,210,255,0.55);
+    }
+
+    .enemy-dot {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      clip-path: polygon(50% 0, 100% 72%, 50% 54%, 0 72%);
+      background: var(--red);
+      box-shadow: 0 0 10px rgba(255,80,80,0.55);
+    }
+
+    .bullet {
+      position: absolute;
+      width: 6px;
+      height: 18px;
+      border-radius: 999px;
+      background: var(--cyan);
+      box-shadow: 0 0 10px rgba(120,210,255,0.7);
+    }
+
+    .announcement {
+      position: absolute;
+      top: 44px;
+      left: 50%;
+      transform: translateX(-50%);
+      min-width: 150px;
+      padding: 7px 14px;
+      text-align: center;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,0.35);
+      font-size: 18px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .boss-bar {
+      position: absolute;
+      top: 14px;
+      left: 54px;
+      right: 54px;
+      height: 10px;
+      border: 1px solid rgba(255,255,255,0.36);
+      background: rgba(255,255,255,0.08);
+    }
+
+    .boss-bar span {
+      display: block;
+      height: 100%;
+      width: 68%;
+      background: var(--red);
+    }
+
+    .laser-line {
+      position: absolute;
+      top: 110px;
+      bottom: 118px;
+      left: 190px;
+      width: 4px;
+      background: rgba(255,80,80,0.55);
+      box-shadow: 0 0 16px rgba(255,80,80,0.85);
+    }
+
+    .modal {
+      position: absolute;
+      left: 20px;
+      right: 20px;
+      top: 250px;
+      padding: 18px;
+      background: rgba(10,10,18,0.96);
+      border-color: rgba(255,100,100,0.70);
+      text-align: center;
+      box-shadow: 0 0 0 999px rgba(0,0,0,0.58);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .action {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--line-strong);
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .action.yes { background: rgba(255,90,90,0.92); }
+    .action.no { background: rgba(255,255,255,0.88); color: #000; }
+
+    .future-note {
+      padding: 10px;
+      margin: 12px 0;
+      border: 1px dashed rgba(255,230,128,0.44);
+      color: var(--gold);
+      background: rgba(255,230,128,0.07);
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .screen-map {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .screen-map .mini {
+      height: 120px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.04);
+      padding: 8px;
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: 900;
+    }
+
+    @media (max-width: 980px) {
+      .hero, .screen-spec { grid-template-columns: 1fr; }
+      .screen-copy, .nav-card { position: static; }
+      .principles, .token-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 520px) {
+      .page { width: min(100% - 18px, 430px); padding-top: 18px; }
+      .hero-card { padding: 20px; }
+      .principles, .token-grid { grid-template-columns: 1fr; }
+      .screen-spec { padding: 18px 0; }
+      .screen-frame { padding: 10px; }
+      .phone { transform-origin: top left; width: 375px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-card">
+        <p class="eyebrow">Star Strike RUSH Design Blueprint</p>
+        <h1>Arcade clarity before <span>feature sprawl</span></h1>
+        <p>
+          This document is the visual contract for the game screens. It keeps the
+          product portrait-first, readable under motion, and arcade-shmup focused.
+          Long meta surfaces are drawn as stretched screens so layout decisions
+          are visible without needing to imagine scroll.
+        </p>
+        <div class="token-grid">
+          <div class="token"><b>Viewport</b><span>Base design is 375 x 667 portrait. Desktop centers the same playfield.</span></div>
+          <div class="token"><b>Material</b><span>Dark glass panels, thin light strokes, neon status colors, hard-edged arcade geometry.</span></div>
+          <div class="token"><b>Typography</b><span>Impact-style display for drama, Arial Narrow UI for dense labels and score readouts.</span></div>
+          <div class="token"><b>Motion</b><span>Reserved for combat, warnings, reward pulses, and panel transitions. No busy idle UI.</span></div>
+        </div>
+      </div>
+      <nav class="nav-card">
+        <h2>Screen Index</h2>
+        <ol>
+          <li><a href="#title">Title</a></li>
+          <li><a href="#account">Account</a></li>
+          <li><a href="#badges">Badges</a></li>
+          <li><a href="#glory-road">Glory Road</a></li>
+          <li><a href="#season-road">Season Road</a></li>
+          <li><a href="#records">World Records</a></li>
+          <li><a href="#codex">Codex Grid</a></li>
+          <li><a href="#codex-detail">Codex Detail</a></li>
+          <li><a href="#gear">Gear</a></li>
+          <li><a href="#reset">Reset Confirm</a></li>
+          <li><a href="#gameplay">Gameplay HUD</a></li>
+          <li><a href="#boss">Boss/Warning HUD</a></li>
+          <li><a href="#wraith">Wraith Realm</a></li>
+          <li><a href="#gameover">Game Over</a></li>
+          <li><a href="#future">Future Meta Screens</a></li>
+        </ol>
+      </nav>
+    </section>
+
+    <section class="principles">
+      <div class="principle">
+        <h3>Play First</h3>
+        <p>Every non-combat surface points back to Play. The title screen is not a dashboard.</p>
+      </div>
+      <div class="principle">
+        <h3>One Job Per Panel</h3>
+        <p>Account, records, achievements, progress, codex, and settings stay separate.</p>
+      </div>
+      <div class="principle">
+        <h3>Fair Readability</h3>
+        <p>Combat UI must leave center and lower-middle playfield open for dodging.</p>
+      </div>
+      <div class="principle">
+        <h3>No Paid Power</h3>
+        <p>Shop, pass, cosmetics, and rewards never imply HP, damage, score, or power advantage.</p>
+      </div>
+    </section>
+
+    <section id="title" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current</span>
+        <h2>Title Screen</h2>
+        <p>The first screen is a playable arcade cockpit, not a landing page. It should say: choose a pilot identity, press Play, or inspect one focused meta surface.</p>
+        <ul>
+          <li>Logo sits in the upper third, readable over menu-flight background.</li>
+          <li>Call sign is the pilot-card anchor; account chip is attached to the right.</li>
+          <li>Play is the dominant action and wider than every other control.</li>
+          <li>Icon order: Badges, Road, Records, Codex, Gear.</li>
+          <li>High score and Glory rank stay below the icon row as a compact status strip.</li>
+        </ul>
+        <div class="notes">Anti-pattern: do not add a large dashboard, news carousel, or monetization callout to this screen.</div>
+      </div>
+      <div class="screen-frame">
+        <div class="phone">
+          <div class="title-logo">STAR STRIKE <span>RUSH</span></div>
+          <div class="label" style="top:216px;left:0;right:0;">Call Sign</div>
+          <div class="call-box">ENTER CALL SIGN</div>
+          <div class="account-chip"></div>
+          <div class="button" style="left:82px;right:82px;top:307px;height:56px;">Play</div>
+          <div class="icon-row">
+            <div class="icon-button">T<small>BADGES</small></div>
+            <div class="icon-button">R<small>ROAD</small></div>
+            <div class="icon-button">G<small>RECORDS</small></div>
+            <div class="icon-button">B<small>CODEX</small></div>
+            <div class="icon-button">S<small>GEAR</small></div>
+          </div>
+          <div class="stat-line" style="top:512px;">High Score: 0</div>
+          <div class="stat-line rank-line" style="top:535px;">Rookie Pilot | Glory 0</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="account" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current</span>
+        <h2>Account Panel</h2>
+        <p>Account is utility, not progression. It tells the player whether online sync is available and gives safe controls for sign-in, sign-out, sync, and refresh.</p>
+        <ul>
+          <li>Opens from the small account chip, not the main icon row.</li>
+          <li>Status and errors live above buttons and never overlap actions.</li>
+          <li>Shows local rank/Glory/Tier even when signed out.</li>
+          <li>Refresh remains available but should not feel like a required pre-run step.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone">
+          <div class="panel">
+            <div class="close">X</div>
+            <div class="panel-title">Account</div>
+            <div class="muted" style="font-weight:900;text-transform:uppercase;">Account: signed out</div>
+            <div class="red-text" style="margin-top:8px;font-size:12px;">Firebase config is not configured.</div>
+            <div class="button" style="left:20px;right:20px;top:102px;height:38px;">Sign in with Google</div>
+            <div class="button secondary" style="left:20px;right:20px;top:148px;height:34px;">Sign out</div>
+            <div style="position:absolute;left:20px;top:206px;">
+              <div class="gold-text" style="font-weight:900;text-transform:uppercase;">Rookie Pilot</div>
+              <div class="muted" style="font-size:11px;margin-top:8px;">Glory 0 | Tier 1</div>
+              <div class="muted" style="font-size:11px;margin-top:8px;">Credits 0 | Best 0</div>
+            </div>
+            <div class="button" style="left:20px;right:20px;bottom:18px;height:36px;">Refresh online data</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="badges" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current, expandable</span>
+        <h2>Badges / Achievements</h2>
+        <p>This is a trophy case. It should be satisfying at a glance and useful when long: unlocked state, locked silhouette, requirement, and recent unlocks.</p>
+        <ul>
+          <li>Header summary: unlocked count plus progress bar.</li>
+          <li>Rows stretch vertically when achievements exceed the viewport.</li>
+          <li>Locked rows should still communicate goals, not hide everything behind mystery.</li>
+          <li>Online sync message stays at the bottom of the full long surface.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone tall">
+          <div class="panel long">
+            <div class="close">X</div>
+            <div class="panel-title">Achievements</div>
+            <div class="green-text" style="font-weight:900;text-transform:uppercase;">0/16 Unlocked</div>
+            <div class="meter"><span style="width:0%;"></span></div>
+            <div class="row"><span>Locked</span><span>First Sortie</span></div>
+            <div class="row"><span>Locked</span><span>Rookie Ace</span></div>
+            <div class="row"><span>Locked</span><span>Ace Pilot</span></div>
+            <div class="row"><span>Locked</span><span>Legend Run</span></div>
+            <div class="row"><span>Locked</span><span>Score Surge</span></div>
+            <div class="row"><span>Locked</span><span>Mythic Rush</span></div>
+            <div class="row"><span>Locked</span><span>Phase Runner</span></div>
+            <div class="row"><span>Locked</span><span>Deep Strike</span></div>
+            <div class="row"><span>Locked</span><span>Wraith Contact</span></div>
+            <div class="row"><span>Locked</span><span>Expansion Front</span></div>
+            <div class="row"><span>Locked</span><span>Boss Breaker</span></div>
+            <div class="row"><span>Locked</span><span>Boss Hunter</span></div>
+            <div class="row"><span>Locked</span><span>Ghost Runner</span></div>
+            <div class="row"><span>Locked</span><span>Collector</span></div>
+            <div class="row"><span>Locked</span><span>Power Hungry</span></div>
+            <div class="row"><span>Locked</span><span>Swarm Clearer</span></div>
+            <div class="muted" style="margin-top:28px;font-size:11px;text-transform:uppercase;font-weight:900;">Sign in from Account to sync badges.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="glory-road" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current expandable">Current, expandable</span>
+        <h2>Glory Road</h2>
+        <p>Glory Road is lifetime identity. It must feel permanent and prestigious, but never imply gameplay power.</p>
+        <ul>
+          <li>Top tabs switch Glory Road and Season Road.</li>
+          <li>Current rank is the headline, with next rank and progress bar below.</li>
+          <li>Rank ladder is a long vertical road, centered around current progress.</li>
+          <li>Use gold for lifetime identity, green for reached status.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone tall">
+          <div class="panel long">
+            <div class="close">X</div>
+            <div class="panel-title">Progress Road</div>
+            <div class="tabs"><div class="tab active">Glory Road</div><div class="tab">Season Road</div></div>
+            <h3 class="gold-text" style="font-size:16px;">Rookie Pilot</h3>
+            <div class="muted" style="margin-top:10px;font-size:11px;text-transform:uppercase;">Glory 0 | Next: Star Cadet at 1,000</div>
+            <div class="meter gold"><span style="width:0%;"></span></div>
+            <div class="row gold"><span>0</span><span>Rookie Pilot</span></div>
+            <div class="row"><span>1,000</span><span>Star Cadet</span></div>
+            <div class="row"><span>3,000</span><span>Strike Pilot</span></div>
+            <div class="row"><span>7,500</span><span>Void Runner</span></div>
+            <div class="row"><span>15,000</span><span>Ace</span></div>
+            <div class="row"><span>30,000</span><span>Elite Ace</span></div>
+            <div class="row"><span>60,000</span><span>Phantom Hunter</span></div>
+            <div class="row"><span>100,000</span><span>Wraithbreaker</span></div>
+            <div class="row"><span>175,000</span><span>Solar Legend</span></div>
+            <div class="row"><span>300,000</span><span>Star Eternal</span></div>
+            <div class="future-note">Design rule: ranks unlock identity only, not player power.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="season-road" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current expandable">Current, expandable</span>
+        <h2>Season Road</h2>
+        <p>Season Road is the temporary 8-week progress surface. It can become longer than a viewport and should eventually support reward claiming.</p>
+        <ul>
+          <li>Use green/cyan instead of gold so it does not compete with lifetime Glory.</li>
+          <li>Tier rows should preview rewards without implying power.</li>
+          <li>Premium track can be added later, visually separate and never stronger.</li>
+          <li>When rewards exist, claiming happens here, not on the title screen.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone extra-tall">
+          <div class="panel long">
+            <div class="close">X</div>
+            <div class="panel-title">Progress Road</div>
+            <div class="tabs"><div class="tab">Glory Road</div><div class="tab active">Season Road</div></div>
+            <h3 class="green-text" style="font-size:16px;">Launch Flight - Tier 1</h3>
+            <div class="muted" style="margin-top:10px;font-size:11px;text-transform:uppercase;">Season XP 0 | Next tier in 1,000 XP</div>
+            <div class="meter"><span style="width:0%;"></span></div>
+            <div class="row active"><span>Tier 1</span><span>Reached | starter badge</span></div>
+            <div class="row"><span>Tier 2</span><span>Locked | trail tint</span></div>
+            <div class="row"><span>Tier 3</span><span>Locked | credits</span></div>
+            <div class="row"><span>Tier 4</span><span>Locked | banner</span></div>
+            <div class="row"><span>Tier 5</span><span>Locked | ship skin</span></div>
+            <div class="row"><span>Tier 6</span><span>Locked | credits</span></div>
+            <div class="row"><span>Tier 7</span><span>Locked | title</span></div>
+            <div class="row"><span>Tier 8</span><span>Locked | badge</span></div>
+            <div class="row"><span>Tier 9</span><span>Locked | trail tint</span></div>
+            <div class="row"><span>Tier 10</span><span>Locked | ship skin</span></div>
+            <div class="future-note">Future: 50 tiers, free track first, premium track later. No gameplay advantage.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="records" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current expandable">Current, expandable</span>
+        <h2>World Records</h2>
+        <p>The records screen answers one question: how do I compare? It should be fast to scan and not mixed with account controls.</p>
+        <ul>
+          <li>Signed-out state tells player to use Account, not a duplicate login flow.</li>
+          <li>Leaderboard rows show place, call sign, rank label, and best score.</li>
+          <li>Player personal best can pin above or below the global list later.</li>
+          <li>Refresh button stays fixed at bottom of the panel.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone tall">
+          <div class="panel long">
+            <div class="close">X</div>
+            <div class="panel-title">World Records</div>
+            <div class="muted" style="font-weight:900;text-transform:uppercase;margin-bottom:20px;">Global best-score ladder</div>
+            <div class="row gold"><span>1. NOVA</span><span>182,450</span></div>
+            <div class="row"><span>2. RUSH21</span><span>140,200</span></div>
+            <div class="row"><span>3. VANTA</span><span>128,900</span></div>
+            <div class="row"><span>4. ALYSSA</span><span>111,750</span></div>
+            <div class="row"><span>5. ORBIT</span><span>98,300</span></div>
+            <div class="row"><span>6. PILOT</span><span>87,600</span></div>
+            <div class="row"><span>7. GHOST</span><span>72,100</span></div>
+            <div class="row"><span>8. SOLAR</span><span>69,950</span></div>
+            <div class="row"><span>9. VECTOR</span><span>60,300</span></div>
+            <div class="row"><span>10. ROOKIE</span><span>44,020</span></div>
+            <div class="button" style="left:20px;right:20px;bottom:18px;height:36px;">Refresh Records</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="codex" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current expandable">Current, expandable</span>
+        <h2>Codex Grid</h2>
+        <p>The codex is discovery and threat literacy. It should help players recognize silhouettes, colors, and mechanics.</p>
+        <ul>
+          <li>Cards are compact, color-coded, and use silhouettes before discovery.</li>
+          <li>Grid can stretch as enemies and bosses grow; do not squeeze below readability.</li>
+          <li>New discoveries badge the Codex icon on the title screen.</li>
+          <li>Tap a discovered card to open detail.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone tall">
+          <div class="panel long">
+            <div class="close">X</div>
+            <div class="panel-title">Codex</div>
+            <div class="grid cols-4">
+              <div class="codex-card"><div><div class="ship-mark" style="background:#ff5555;"></div>Scout</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#ff9b3d;"></div>Interceptor</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#b65cff;"></div>Heavy</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#66e9ff;"></div>Phantom</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#b8ff50;"></div>Splitter</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#c99342;"></div>Carrier</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#5fff78;"></div>Siphon</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#3a7f50;"></div>Leech</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#ff6b35;"></div>Minecaster</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#d3d7df;"></div>Shield</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#b81525;"></div>Rail</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#bfc9c6;"></div>Repair</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#78d2ff;"></div>Boss</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#d9dcff;"></div>Wraith</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#9a7350;"></div>Warden</div></div>
+              <div class="codex-card"><div><div class="ship-mark" style="background:#272b38;"></div>???</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="codex-detail" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current</span>
+        <h2>Codex Detail</h2>
+        <p>Detail pages should explain one threat without becoming a manual. The goal is recognition, not encyclopedic lore.</p>
+        <ul>
+          <li>Back control is top-left inside the card.</li>
+          <li>Enemy art is large enough to inspect silhouette and color.</li>
+          <li>Threat, HP, speed, aggression, and fire rate are the compact stat set.</li>
+          <li>Later: add mechanic tip, first-seen phase, and best counter.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone">
+          <div class="panel">
+            <div class="close">X</div>
+            <div class="panel-title">Codex</div>
+            <div class="row" style="height:330px;display:block;padding:14px;position:relative;">
+              <div class="button secondary" style="left:12px;top:12px;width:32px;height:24px;">&lt;</div>
+              <div class="ship-mark" style="position:absolute;left:42px;top:82px;width:64px;height:64px;background:#5fff78;"></div>
+              <div style="position:absolute;left:124px;top:24px;right:12px;">
+                <h3 style="font-size:18px;">Siphon</h3>
+                <p class="muted">Threat: 2.70</p>
+                <p class="muted">HP: 3</p>
+                <div class="meter"><span style="width:62%;"></span></div>
+                <div class="meter"><span style="width:70%;"></span></div>
+                <div class="meter"><span style="width:54%;"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gear" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current</span>
+        <h2>Gear / Settings</h2>
+        <p>Gear is operational, restrained, and not a place for game goals. It protects performance and safety controls.</p>
+        <ul>
+          <li>Particle count: Low, Med, High.</li>
+          <li>Screen shake toggle.</li>
+          <li>Reset progress is present but visually dangerous and separated.</li>
+          <li>Future audio and accessibility controls belong here.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone">
+          <div class="panel">
+            <div class="close">X</div>
+            <div class="panel-title">Performance</div>
+            <div class="muted" style="font-weight:900;margin-bottom:12px;">Particle Count</div>
+            <div style="display:flex;gap:10px;">
+              <div class="button secondary" style="position:static;width:64px;height:28px;">Low</div>
+              <div class="button secondary" style="position:static;width:64px;height:28px;">Med</div>
+              <div class="button" style="position:static;width:64px;height:28px;">High</div>
+            </div>
+            <div class="button" style="left:20px;top:124px;width:130px;height:32px;">Shake: On</div>
+            <div class="button danger" style="left:20px;top:174px;width:160px;height:32px;">Reset Progress</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="reset" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current</span>
+        <h2>Reset Confirm</h2>
+        <p>This modal must interrupt gently but clearly. It is destructive and should not be easy to tap by accident.</p>
+        <ul>
+          <li>Dim all background content.</li>
+          <li>Show player call sign in the confirmation body.</li>
+          <li>No and Yes sit apart; Yes is red.</li>
+          <li>Future: require hold-to-confirm if remote account data is affected.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone">
+          <div class="title-logo">STAR STRIKE <span>RUSH</span></div>
+          <div class="modal">
+            <div>Are you sure you want to reset your progress?</div>
+            <h3 style="margin-top:14px;">PILOT</h3>
+            <div class="modal-actions">
+              <div class="action no">No</div>
+              <div class="action yes">Yes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gameplay" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current</span>
+        <h2>Gameplay HUD</h2>
+        <p>The playfield is the product. HUD elements are edge-bound and low-chrome so the player can read bullets and movement threats.</p>
+        <ul>
+          <li>Top-left: HP segments and energy bar.</li>
+          <li>Top-right: score, high score, combo multiplier.</li>
+          <li>Bottom-left: virtual joystick.</li>
+          <li>Bottom-right: Ghost action button.</li>
+          <li>Center/lower-middle stays clear for ship, bullets, enemies, and powerups.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone">
+          <div class="hud-left"><div class="hp-row"><div class="hp"></div><div class="hp"></div><div class="hp"></div><div class="hp"></div><div class="hp"></div></div><div class="energy"><span></span></div></div>
+          <div class="hud-right">Score: 1200<br>High: 3200<br><span class="combo">Combo x2</span></div>
+          <div class="enemy-dot" style="left:70px;top:110px;"></div>
+          <div class="enemy-dot" style="left:170px;top:150px;background:#ff9b3d;"></div>
+          <div class="enemy-dot" style="left:270px;top:112px;background:#b65cff;"></div>
+          <div class="bullet" style="left:184px;top:330px;"></div>
+          <div class="bullet" style="left:162px;top:390px;"></div>
+          <div class="playfield-ship"></div>
+          <div class="joystick"></div>
+          <div class="ghost-button">Ghost</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="boss" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current</span>
+        <h2>Boss / Warning HUD</h2>
+        <p>Boss patterns need special priority. The boss bar shifts the HUD down and warnings must be visible before danger.</p>
+        <ul>
+          <li>Boss HP sits top center.</li>
+          <li>Player HUD offsets down during boss fights.</li>
+          <li>Warning text appears in a compact center chip.</li>
+          <li>Rail/laser warnings use red charge lines that lock before firing.</li>
+          <li>Debris fields use obvious text before hazards spawn.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone">
+          <div class="boss-bar"><span></span></div>
+          <div class="announcement">Debris Field</div>
+          <div class="hud-left" style="top:46px;"><div class="hp-row"><div class="hp"></div><div class="hp"></div><div class="hp"></div><div class="hp"></div><div class="hp" style="background:rgba(110,110,110,0.45);"></div></div><div class="energy"><span style="width:46%;"></span></div></div>
+          <div class="hud-right" style="top:46px;">Score: 8200<br>High: 8200<br><span class="combo">Combo x3</span></div>
+          <div class="laser-line"></div>
+          <div class="enemy-dot" style="left:166px;top:88px;width:66px;height:66px;background:#9a7350;"></div>
+          <div class="playfield-ship"></div>
+          <div class="joystick"></div>
+          <div class="ghost-button">Ghost</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="wraith" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current</span>
+        <h2>Wraith Realm</h2>
+        <p>Wraith mode changes the action button from Ghost Dash to realm hop. The screen tint can help, but it must never hide bullets or ship state.</p>
+        <ul>
+          <li>Action button label becomes Hop.</li>
+          <li>Realm state is reflected in button color and boss/player effects.</li>
+          <li>Physical and ghost threats stay readable by color, not just opacity.</li>
+          <li>Energy cost is lower during realm hopping.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone" style="background:radial-gradient(circle at 50% 22%, rgba(210,170,255,0.18), transparent 130px), #03050c;">
+          <div class="boss-bar"><span style="width:44%;background:#d9dcff;"></span></div>
+          <div class="announcement">Ghost Realm</div>
+          <div class="hud-left" style="top:46px;"><div class="hp-row"><div class="hp"></div><div class="hp"></div><div class="hp"></div><div class="hp"></div><div class="hp"></div></div><div class="energy"><span style="width:80%;"></span></div></div>
+          <div class="hud-right" style="top:46px;">Score: 15400<br>High: 15400<br><span class="combo">Combo x4</span></div>
+          <div class="enemy-dot" style="left:151px;top:100px;width:78px;height:78px;background:#d9dcff;opacity:0.82;"></div>
+          <div class="playfield-ship" style="background:linear-gradient(#fff,#cba8ff);"></div>
+          <div class="joystick"></div>
+          <div class="ghost-button" style="background:rgba(210,170,255,0.22);border-color:rgba(210,170,255,0.62);">Hop</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gameover" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current</span>
+        <h2>Game Over</h2>
+        <p>Game Over is the reward and retry surface. It should show the run result, new records, meta gains, and get the player back into another run quickly.</p>
+        <ul>
+          <li>Game Over title sits top third.</li>
+          <li>Score and high score appear before meta gains.</li>
+          <li>Glory/Season/Credits preview sits above buttons.</li>
+          <li>Respawn is primary; Title Screen is secondary.</li>
+          <li>Future: new achievements should appear as compact reward chips here.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone">
+          <div class="stat-line" style="top:164px;font-family:var(--font-display);font-size:56px;">Game Over</div>
+          <div class="stat-line" style="top:246px;font-size:18px;">Score: 8,200</div>
+          <div class="stat-line" style="top:286px;font-size:18px;">High Score: 8,200</div>
+          <div class="stat-line gold-text" style="top:338px;">Glory +820 | Total 1,420</div>
+          <div class="stat-line green-text" style="top:364px;">New Rank: Star Cadet</div>
+          <div class="stat-line muted" style="top:390px;">Season XP +240 | Credits +68 | Tier 2</div>
+          <div class="button" style="left:78px;right:78px;top:430px;height:44px;">Respawn</div>
+          <div class="button secondary" style="left:78px;right:78px;top:486px;height:44px;">Title Screen</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="future" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status future">Future screens</span>
+        <h2>Future Meta Map</h2>
+        <p>These are not implemented screens yet. They are included so future monetization and progression work has guardrails before code starts.</p>
+        <ul>
+          <li>Missions: daily and weekly objectives, no paid rerolls.</li>
+          <li>Flight Pass: free first, premium later, cosmetic rewards only.</li>
+          <li>Customize: ship skins, trails, banners, titles, badges.</li>
+          <li>Shop: Stripe/web checkout via server only, no client-granted goods.</li>
+          <li>Cosmetic Lab: community voting, no buying votes.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone extra-tall">
+          <div class="panel long">
+            <div class="panel-title">Future Screen Families</div>
+            <div class="future-note">Each future screen gets its own dedicated panel. Do not bury these in Account.</div>
+            <div class="row active"><span>Missions</span><span>Daily / Weekly</span></div>
+            <div class="row"><span>Purpose</span><span>Session goals and XP rewards</span></div>
+            <div class="row"><span>Rule</span><span>No Gem rerolls</span></div>
+            <div class="row gold"><span>Flight Pass</span><span>50 tiers</span></div>
+            <div class="row"><span>Free</span><span>Always visible first</span></div>
+            <div class="row"><span>Premium</span><span>Separate cosmetic track later</span></div>
+            <div class="row active"><span>Customize</span><span>Cosmetic loadout</span></div>
+            <div class="row"><span>Slots</span><span>Ship, trail, title, banner, badge</span></div>
+            <div class="row"><span>Rule</span><span>No gameplay stats</span></div>
+            <div class="row gold"><span>Shop</span><span>Stripe server checkout</span></div>
+            <div class="row"><span>Products</span><span>Gems, pass, cosmetics</span></div>
+            <div class="row"><span>Rule</span><span>Webhook grants only</span></div>
+            <div class="row active"><span>Cosmetic Lab</span><span>Community voting</span></div>
+            <div class="row"><span>Rule</span><span>No paid votes or forced inclusion</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
