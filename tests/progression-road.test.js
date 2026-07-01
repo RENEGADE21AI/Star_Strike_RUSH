@@ -63,6 +63,7 @@ function loadGameContext() {
   context.globalThis = context;
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/01-core.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/12-progress-road-data.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/12-rendering-progress-road.js"), "utf8"), context);
   context.__storage = storage;
   return context;
