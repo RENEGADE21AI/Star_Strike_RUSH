@@ -101,6 +101,8 @@ function setupSession(mode = "start") {
   titleProgressDragMoved = false;
   titleProgressPointerDownNode = null;
   titleProgressSelectedNode = null;
+  titleProgressClaimPulse = 0;
+  titleMetaScreenTransition = 1;
   codexDetailType = null;
   resetProgressConfirm = false;
   highScoreDirty = false;
@@ -165,15 +167,24 @@ function titlePanelHit(x, y) {
   const panel = getTitlePanelRect();
   return titlePanelAnim > 0.02 && x >= panel.x && x <= panel.x + panel.w && y >= panel.y && y <= panel.y + panel.h;
 }
+function openTitleMetaScreen(screen) {
+  if (titleSubState !== screen || titlePanelTarget < 1) titleMetaScreenTransition = 0;
+  titleSubState = screen;
+  titlePanelTarget = 1;
+  if (screen !== "codex") codexDetailType = null;
+}
+function closeTitleMetaScreen() {
+  titlePanelTarget = 0;
+  codexDetailType = null;
+  resetProgressConfirm = false;
+}
 function handleResetProgressConfirmDown(x, y) {
   if (!resetProgressConfirm) return false;
   const r = getResetConfirmRects();
   if (hitRect(r.yes, x, y)) {
     resetProgressConfirm = false;
     resetProgressData();
-    titleSubState = "main";
-    titlePanelTarget = 0;
-    codexDetailType = null;
+    closeTitleMetaScreen();
     return true;
   }
   if (hitRect(r.no, x, y)) {
@@ -226,9 +237,7 @@ function endTitleProgressDrag(pointerId) {
   return true;
 }
 function openTitleProgressRoad(tab = null) {
-  titleSubState = "progress";
-  titlePanelTarget = 1;
-  codexDetailType = null;
+  openTitleMetaScreen("progress");
   titleProgressDragActive = false;
   titleProgressDragPointerId = null;
   titleProgressPointerDownNode = null;
@@ -244,7 +253,7 @@ function handleTitlePointerDown(x, y, pointerId = null) {
     if (titlePanelHit(x, y)) {
       if (titleSubState === "codex") {
         const r = getCodexRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
         if (codexDetailType) {
           const detailCard = { x: r.panel.x + 18, y: r.panel.y + 78, w: r.panel.w - 36, h: r.panel.h - 94 };
           const backRect = { x: detailCard.x + 10, y: detailCard.y + 10, w: 28, h: 22 };
@@ -268,7 +277,7 @@ function handleTitlePointerDown(x, y, pointerId = null) {
       }
       if (titleSubState === "online") {
         const r = getOnlineRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
         if (hitRect(r.signIn, x, y)) { requestOnlineSignIn(); return true; }
         if (hitRect(r.signOut, x, y)) { requestOnlineSignOut(); return true; }
         if (hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
@@ -281,21 +290,41 @@ function handleTitlePointerDown(x, y, pointerId = null) {
       }
       if (titleSubState === "records") {
         const r = getRecordsRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
         if (hitRect(r.refresh, x, y)) { requestOnlineRefresh(); return true; }
         return true;
       }
       if (titleSubState === "achievements") {
         const r = getAchievementsRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
         return true;
       }
       if (titleSubState === "progress") {
         const r = getProgressRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
+        if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
         if (hitRect(r.gloryTab, x, y)) { setTitleProgressTab("glory"); return true; }
         if (hitRect(r.seasonTab, x, y)) { setTitleProgressTab("season"); return true; }
-        if (typeof getProgressDetailRect === "function" && titleProgressSelectedNode && hitRect(getProgressDetailRect(), x, y)) return true;
+        if (typeof getProgressDetailRect === "function" && titleProgressSelectedNode && hitRect(getProgressDetailRect(), x, y)) {
+          if (
+            typeof progressDetailCanClaim === "function" &&
+            typeof getProgressClaimRect === "function" &&
+            progressDetailCanClaim(titleProgressSelectedNode) &&
+            hitRect(getProgressClaimRect(), x, y)
+          ) {
+            const result = claimSeasonReward(titleProgressSelectedNode.id);
+            titleProgressClaimPulse = 32;
+            const refreshed = typeof getProgressDetailById === "function" ? getProgressDetailById(titleProgressSelectedNode.id) : null;
+            if (refreshed) titleProgressSelectedNode = refreshed;
+            if (result.ok) {
+              showMessage(`CLAIMED ${String((result.applied && result.applied.name) || "REWARD").toUpperCase()}`, 100);
+            } else if (result.reason === "already_claimed") {
+              showMessage("ALREADY CLAIMED", 80);
+            } else if (result.reason === "locked") {
+              showMessage("REWARD LOCKED", 80);
+            }
+          }
+          return true;
+        }
         if (hitRect(r.contentRect, x, y)) { beginTitleProgressDrag(pointerId, x, y); return true; }
         return true;
       }
@@ -325,29 +354,29 @@ function handleTitlePointerDown(x, y, pointerId = null) {
     return true;
   }
   if (hitRect(iconRects.account, x, y)) {
-    if (titleSubState === "online" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "online"; titlePanelTarget = 1; codexDetailType = null; }
+    if (titleSubState === "online" && titlePanelTarget === 1) closeTitleMetaScreen();
+    else openTitleMetaScreen("online");
     return true;
   }
   if (hitRect(iconRects.achievements, x, y)) {
-    if (titleSubState === "achievements" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "achievements"; titlePanelTarget = 1; codexDetailType = null; }
+    if (titleSubState === "achievements" && titlePanelTarget === 1) closeTitleMetaScreen();
+    else openTitleMetaScreen("achievements");
     return true;
   }
   if (hitRect(iconRects.progress, x, y)) {
-    if (titleSubState === "progress" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
+    if (titleSubState === "progress" && titlePanelTarget === 1) closeTitleMetaScreen();
     else openTitleProgressRoad();
     return true;
   }
   if (hitRect(iconRects.records, x, y)) {
-    if (titleSubState === "records" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "records"; titlePanelTarget = 1; codexDetailType = null; }
+    if (titleSubState === "records" && titlePanelTarget === 1) closeTitleMetaScreen();
+    else openTitleMetaScreen("records");
     return true;
   }
   if (hitRect(iconRects.codex, x, y)) {
     codexHasNew = false;
-    if (titleSubState === "codex" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "codex"; titlePanelTarget = 1; }
+    if (titleSubState === "codex" && titlePanelTarget === 1) closeTitleMetaScreen();
+    else openTitleMetaScreen("codex");
     return true;
   }
 

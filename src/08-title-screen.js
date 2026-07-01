@@ -230,6 +230,9 @@ function updateTitleScreen() {
     codexDetailType = null;
   }
   titlePanelAnim += (titlePanelTarget - titlePanelAnim) * 0.22;
+  titleMetaScreenTransition += (1 - titleMetaScreenTransition) * 0.24;
+  if (titleMetaScreenTransition > 0.995) titleMetaScreenTransition = 1;
+  titleProgressClaimPulse = Math.max(0, titleProgressClaimPulse - 1);
   callSignCursorBlink = (callSignCursorBlink + 1) % 56;
   if (titleSubState === "progress") clampTitleProgressScroll();
 
@@ -319,13 +322,13 @@ function hitRect(rect, x, y) { return x >= rect.x && x <= rect.x + rect.w && y >
 
 function getCodexRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
   const rects = codexCardRects(panel);
   return { panel, closeRect, rects };
 }
 function getOnlineRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
   const innerX = panel.x + 20;
   const signIn = { x: innerX, y: panel.y + 112, w: panel.w - 40, h: 34 };
   const signOut = { x: innerX, y: panel.y + 152, w: panel.w - 40, h: 30 };
@@ -340,18 +343,18 @@ function getOnlineRects() {
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
   const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
   return { panel, closeRect, refresh };
 }
 function getAchievementsRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
   return { panel, closeRect };
 }
 function getProgressRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
+  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
   const tabW = Math.floor((panel.w - 48) / 2);
   const gloryTab = { x: panel.x + 20, y: panel.y + 72, w: tabW, h: 30 };
   const seasonTab = { x: gloryTab.x + tabW + 8, y: gloryTab.y, w: tabW, h: 30 };
@@ -374,7 +377,7 @@ function clampTitleProgressScroll() {
 function getProgressDetailRect() {
   const r = getProgressRects();
   const w = r.contentRect.w - 24;
-  const h = 86;
+  const h = 112;
   return { x: r.contentRect.x + 12, y: r.contentRect.y + r.contentRect.h - h - 10, w, h };
 }
 function getResetConfirmRects() {

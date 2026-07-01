@@ -86,6 +86,15 @@ function getSeasonRewardForTier(tier) {
   return SEASON_REWARDS[Math.max(1, Math.min(ROAD_SEASON_TIERS, tier)) - 1];
 }
 
+function findSeasonRewardById(rewardId) {
+  const id = String(rewardId || "");
+  for (const row of SEASON_REWARDS) {
+    if (row.flight && row.flight.id === id) return { tier: row.tier, lane: "flight", reward: row.flight };
+    if (row.supply && row.supply.id === id) return { tier: row.tier, lane: "supply", reward: row.supply };
+  }
+  return null;
+}
+
 function rewardLabel(reward) {
   if (!reward) return "Reward";
   if (reward.type === "credits") return `${Number(reward.amount || 0).toLocaleString()} CREDITS`;
@@ -103,6 +112,55 @@ function seasonRewardStatus(reward, tier, meta) {
   const claimed = new Set(Array.isArray(meta.seasonClaimedRewardIds) ? meta.seasonClaimedRewardIds : []);
   if (reward && claimed.has(reward.id)) return "CLAIMED";
   return tier <= Math.max(1, Math.floor(meta.seasonTier || 1)) ? "UNCLAIMED" : "LOCKED";
+}
+
+function applySeasonReward(progress, reward) {
+  const amount = Math.max(0, Math.floor((reward && reward.amount) || 0));
+  const type = reward ? reward.type : "";
+  if (type === "credits") {
+    progress.credits += amount;
+  } else if (type === "glory_cache") {
+    progress.totalGlory += amount;
+  } else if (type === "season_xp_cache") {
+    progress.currentSeason.xp += amount;
+    progress.currentSeason.tier = currentSeasonTierForXP(progress.currentSeason.xp);
+  }
+  return { type, amount, name: reward ? reward.name : "Reward" };
+}
+
+function claimSeasonReward(rewardId) {
+  const found = findSeasonRewardById(rewardId);
+  if (!found) {
+    return { ok: false, reason: "unknown_reward", status: "UNKNOWN", rewardId: String(rewardId || "") };
+  }
+  const progress = getMetaProgress();
+  const claimed = Array.isArray(progress.currentSeason.claimedRewardIds)
+    ? progress.currentSeason.claimedRewardIds
+    : [];
+  if (claimed.includes(found.reward.id)) {
+    return { ok: false, reason: "already_claimed", status: "CLAIMED", rewardId: found.reward.id, tier: found.tier, lane: found.lane };
+  }
+  progress.currentSeason.tier = currentSeasonTierForXP(progress.currentSeason.xp);
+  if (found.tier > progress.currentSeason.tier) {
+    return { ok: false, reason: "locked", status: "LOCKED", rewardId: found.reward.id, tier: found.tier, lane: found.lane };
+  }
+  const before = currentMetaSnapshot();
+  const applied = applySeasonReward(progress, found.reward);
+  progress.currentSeason.claimedRewardIds = Array.from(new Set([...claimed, found.reward.id])).slice(-220);
+  progress.currentSeason.tier = currentSeasonTierForXP(progress.currentSeason.xp);
+  progress.lastUpdatedAtMs = Date.now();
+  saveMetaProgress();
+  return {
+    ok: true,
+    reason: "claimed",
+    status: "CLAIMED",
+    rewardId: found.reward.id,
+    tier: found.tier,
+    lane: found.lane,
+    applied,
+    before,
+    snapshot: currentMetaSnapshot()
+  };
 }
 
 function gloryNodeDetail(node, meta) {
@@ -136,6 +194,17 @@ function seasonRewardDetail(tier, lane, reward, meta) {
     detail: reward.detail || "Season reward.",
     progress: `Current Tier ${Math.max(1, Math.floor(meta.seasonTier || 1))}`
   };
+}
+
+function getProgressDetailById(id) {
+  const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
+  if (!meta) return null;
+  const foundReward = findSeasonRewardById(id);
+  if (foundReward) return seasonRewardDetail(foundReward.tier, foundReward.lane, foundReward.reward, meta);
+  const tierMatch = /^season_tier_(\d+)$/.exec(String(id || ""));
+  if (tierMatch) return seasonTierDetail(Number(tierMatch[1]), meta);
+  const glory = makeGloryRoadNodes().find((node) => node.id === id);
+  return glory ? gloryNodeDetail(glory, meta) : null;
 }
 
 function seasonTierDetail(tier, meta) {
@@ -193,7 +262,7 @@ function buildSeasonRoadLayout(rect, meta) {
   const rows = [];
   for (let i = 1; i <= ROAD_SEASON_TIERS; i++) {
     const reward = getSeasonRewardForTier(i);
-    const y = rect.y + ROAD_SEASON_START_Y + (i - 1) * ROAD_SEASON_GAP;
+    const y = rect.y + ROAD_SEASON_START_Y + (ROAD_SEASON_TIERS - i) * ROAD_SEASON_GAP;
     rows.push({
       tier: i,
       reward,
@@ -224,13 +293,16 @@ function focusTitleProgressOnCurrent() {
   let targetY;
   if (titleProgressTab === "season") {
     const tier = clamp(Math.max(1, Math.floor(meta.seasonTier || 1)), 1, ROAD_SEASON_TIERS);
-    targetY = r.contentRect.y + ROAD_SEASON_START_Y + (tier - 1) * ROAD_SEASON_GAP;
+    targetY = r.contentRect.y + ROAD_SEASON_START_Y + (ROAD_SEASON_TIERS - tier) * ROAD_SEASON_GAP;
   } else {
     const nodes = makeGloryRoadNodes();
     const index = currentRoadIndexForThresholds(nodes, Math.max(0, Math.floor(meta.totalGlory || 0)));
     targetY = r.contentRect.y + ROAD_GLORY_START_Y + index * ROAD_GLORY_GAP;
   }
-  titleProgressScroll = targetY - (r.contentRect.y + Math.min(118, r.contentRect.h * 0.38));
+  const focusAnchor = titleProgressTab === "season"
+    ? r.contentRect.y + r.contentRect.h * 0.64
+    : r.contentRect.y + Math.min(118, r.contentRect.h * 0.38);
+  titleProgressScroll = targetY - focusAnchor;
   clampTitleProgressScroll();
 }
 
@@ -451,8 +523,8 @@ function drawSeasonRewardCard(x, y, w, h, detail, active, lane) {
 function drawSeasonRoadContent(rect, meta) {
   const layout = buildSeasonRoadLayout(rect, meta);
   const roadX = Math.round(rect.x + rect.w / 2);
-  const startY = rect.y + ROAD_SEASON_START_Y;
-  const endY = layout.length ? layout[layout.length - 1].dotY : startY;
+  const topY = layout.length ? Math.min(...layout.map((item) => item.dotY)) : rect.y + ROAD_SEASON_START_Y;
+  const bottomY = layout.length ? Math.max(...layout.map((item) => item.dotY)) : topY;
   const leftX = rect.x + 8;
   const leftW = Math.min(106, Math.floor((rect.w - 64) / 2));
   const rightW = leftW;
@@ -480,18 +552,25 @@ function drawSeasonRoadContent(rect, meta) {
   ctx.strokeStyle = "rgba(255,255,255,0.10)";
   ctx.lineWidth = 6;
   ctx.beginPath();
-  ctx.moveTo(roadX, startY - 34);
-  ctx.lineTo(roadX, endY + 34);
+  ctx.moveTo(roadX, topY - 34);
+  ctx.lineTo(roadX, bottomY + 34);
   ctx.stroke();
   const active = layout.find((item) => item.active) || layout[0];
   ctx.strokeStyle = "rgba(120,255,180,0.24)";
   ctx.lineWidth = 2;
   ctx.setLineDash([8, 9]);
   ctx.beginPath();
-  ctx.moveTo(roadX, startY - 34);
-  ctx.lineTo(roadX, active ? active.dotY : startY);
+  ctx.moveTo(roadX, bottomY + 34);
+  ctx.lineTo(roadX, active ? active.dotY : bottomY);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(120,255,180,0.55)";
+  ctx.beginPath();
+  ctx.moveTo(roadX, topY - 46);
+  ctx.lineTo(roadX - 6, topY - 32);
+  ctx.lineTo(roadX + 6, topY - 32);
+  ctx.closePath();
+  ctx.fill();
   for (const item of layout) {
     ctx.strokeStyle = item.active ? "rgba(120,255,180,0.48)" : item.reached ? "rgba(120,210,255,0.22)" : "rgba(255,255,255,0.10)";
     ctx.lineWidth = 1;
@@ -541,6 +620,45 @@ function drawProgressViewportFade(rect) {
   ctx.restore();
 }
 
+function progressDetailCanClaim(detail) {
+  return !!(detail && detail.tab === "season" && detail.status === "UNCLAIMED" && findSeasonRewardById(detail.id));
+}
+
+function getProgressClaimRect() {
+  const rect = getProgressDetailRect();
+  return { x: rect.x + rect.w - 100, y: rect.y + rect.h - 34, w: 88, h: 24 };
+}
+
+function drawProgressClaimButton(detail) {
+  if (!detail || detail.tab !== "season" || !findSeasonRewardById(detail.id)) return;
+  const claimable = progressDetailCanClaim(detail);
+  const rect = getProgressClaimRect();
+  const pulse = claimable ? 0.5 + Math.sin(state.frame * 0.16) * 0.5 : 0;
+  ctx.save();
+  if (titleProgressClaimPulse > 0 && detail.status === "CLAIMED") {
+    ctx.shadowColor = "rgba(120,255,180,0.85)";
+    ctx.shadowBlur = 8 + titleProgressClaimPulse * 0.35;
+  }
+  ctx.fillStyle = claimable
+    ? `rgba(120,255,180,${0.18 + pulse * 0.08})`
+    : detail.status === "CLAIMED"
+      ? "rgba(120,255,180,0.10)"
+      : "rgba(255,255,255,0.06)";
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = claimable
+    ? "rgba(120,255,180,0.72)"
+    : detail.status === "CLAIMED"
+      ? "rgba(120,255,180,0.38)"
+      : "rgba(255,255,255,0.18)";
+  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.fillStyle = claimable ? "#fff" : detail.status === "CLAIMED" ? "#78ffb4" : "rgba(255,255,255,0.42)";
+  ctx.font = FONT_TINY;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(claimable ? "CLAIM" : detail.status, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
+  ctx.restore();
+}
+
 function drawProgressDetailPanel() {
   const detail = titleProgressSelectedNode;
   if (!detail || detail.tab !== titleProgressTab) return;
@@ -567,9 +685,11 @@ function drawProgressDetailPanel() {
   ctx.fillStyle = "rgba(255,255,255,0.72)";
   ctx.fillText(detail.requirement.slice(0, 38), rect.x + 10, rect.y + 45);
   ctx.fillText(detail.reward.slice(0, 44), rect.x + 10, rect.y + 59);
-  ctx.textAlign = "right";
-  ctx.fillStyle = "rgba(255,255,255,0.44)";
-  ctx.fillText("TAP EMPTY TO CLOSE", rect.x + rect.w - 10, rect.y + rect.h - 14);
+  ctx.fillStyle = "rgba(255,255,255,0.50)";
+  ctx.fillText(detail.progress.slice(0, 38), rect.x + 10, rect.y + 73);
+  ctx.fillStyle = "rgba(255,255,255,0.40)";
+  ctx.fillText(String(detail.detail || "").slice(0, 34), rect.x + 10, rect.y + 88);
+  drawProgressClaimButton(detail);
   ctx.restore();
 }
 
