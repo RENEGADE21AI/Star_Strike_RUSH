@@ -263,29 +263,99 @@ function drawBossDeath() {
     ctx.restore();
   }
 }
+function powerupVisualForType(type) {
+  const base = {
+    spread: { color: "#4fff78" },
+    rapid: { color: "#ffe45c" },
+    repair: { color: "#58b8ff" },
+    wingman: { color: "#ff66ff" },
+    dual: { color: "#d878ff" }
+  };
+  return base[type] || (typeof expansionPowerupVisual === "function" ? expansionPowerupVisual(type) : null) || { color: "#f6f" };
+}
+
+function drawPowerupGlyph(type, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.shadowColor = "rgba(0,0,0,0.80)";
+  ctx.shadowBlur = 3;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  if (type === "spread") {
+    ctx.beginPath(); ctx.moveTo(0, 5); ctx.lineTo(0, -7); ctx.moveTo(0, 5); ctx.lineTo(-7, -3); ctx.moveTo(0, 5); ctx.lineTo(7, -3); ctx.stroke();
+  } else if (type === "rapid" || type === "overcharge") {
+    ctx.beginPath(); ctx.moveTo(2, -9); ctx.lineTo(-5, 1); ctx.lineTo(0, 1); ctx.lineTo(-2, 9); ctx.lineTo(7, -3); ctx.lineTo(2, -3); ctx.closePath(); ctx.fill();
+  } else if (type === "repair") {
+    ctx.fillRect(-2.2, -8, 4.4, 16);
+    ctx.fillRect(-8, -2.2, 16, 4.4);
+  } else if (type === "wingman" || type === "dual") {
+    const ships = type === "dual" ? [-5, 5] : [0];
+    for (const x of ships) {
+      ctx.beginPath(); ctx.moveTo(x, -8); ctx.lineTo(x - 5, 6); ctx.lineTo(x, 3); ctx.lineTo(x + 5, 6); ctx.closePath(); ctx.fill();
+    }
+  } else if (type === "energy_cell") {
+    ctx.strokeRect(-6, -8, 12, 16);
+    ctx.fillRect(-3, -11, 6, 3);
+    ctx.beginPath(); ctx.moveTo(1, -5); ctx.lineTo(-3, 1); ctx.lineTo(1, 1); ctx.lineTo(-1, 7); ctx.stroke();
+  } else if (type === "phase_shield") {
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(8, -5); ctx.lineTo(6, 5); ctx.quadraticCurveTo(0, 10, -6, 5); ctx.lineTo(-8, -5); ctx.closePath(); ctx.stroke();
+  } else if (type === "magnet") {
+    ctx.beginPath(); ctx.moveTo(-7, -5); ctx.lineTo(-7, 2); ctx.quadraticCurveTo(0, 10, 7, 2); ctx.lineTo(7, -5); ctx.stroke();
+    ctx.fillRect(-9, -7, 4, 4); ctx.fillRect(5, -7, 4, 4);
+  } else if (type === "piercing") {
+    ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(7, -1); ctx.lineTo(2, -1); ctx.lineTo(2, 9); ctx.lineTo(-2, 9); ctx.lineTo(-2, -1); ctx.lineTo(-7, -1); ctx.closePath(); ctx.fill();
+  } else if (type === "ion_burst") {
+    ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.stroke();
+    for (let i = 0; i < 8; i++) {
+      const a = i * TAU / 8;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * 3, Math.sin(a) * 3); ctx.lineTo(Math.cos(a) * 10, Math.sin(a) * 10); ctx.stroke();
+    }
+  } else if (type === "stabilizer") {
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(8, 0); ctx.lineTo(0, 9); ctx.lineTo(-8, 0); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(5, 0); ctx.moveTo(0, -5); ctx.lineTo(0, 5); ctx.stroke();
+  } else if (type === "score_surge") {
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + i * TAU / 5;
+      const x = Math.cos(a) * 9, y = Math.sin(a) * 9;
+      const b = a + Math.PI / 5;
+      const ix = Math.cos(b) * 4, iy = Math.sin(b) * 4;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      ctx.lineTo(ix, iy);
+    }
+    ctx.closePath(); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.arc(0, 0, 5, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawPowerups() {
   for (const p of state.powerups) {
     const bob = Math.sin(state.frame * 0.12 + p.x * 0.03) * 1.4;
-    const spin = state.frame * 0.04;
+    const spin = state.frame * 0.035;
+    const visual = powerupVisualForType(p.type);
+    const size = p.size + 2;
     ctx.save();
     ctx.translate(p.x, p.y + bob);
+    ctx.shadowColor = visual.color;
+    ctx.shadowBlur = 10;
     ctx.rotate(spin);
-    if (p.type === "spread") ctx.fillStyle = "#4f4";
-    else if (p.type === "rapid") ctx.fillStyle = "#ff4";
-    else if (p.type === "repair") ctx.fillStyle = "#4af";
-    else if (p.type === "wingman") ctx.fillStyle = "#f6f";
-    else {
-      const visual = typeof expansionPowerupVisual === "function" ? expansionPowerupVisual(p.type) : null;
-      ctx.fillStyle = visual ? visual.color : "#f6f";
-    }
+    ctx.fillStyle = "rgba(0,0,0,0.44)";
+    ctx.strokeStyle = visual.color;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, -p.size); ctx.lineTo(p.size, 0); ctx.lineTo(0, p.size); ctx.lineTo(-p.size, 0); ctx.closePath();
+    ctx.moveTo(0, -size); ctx.lineTo(size, 0); ctx.lineTo(0, size); ctx.lineTo(-size, 0); ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "#000";
-    ctx.font = FONT_TINY;
-    ctx.textAlign = "left";
-    const visual = typeof expansionPowerupVisual === "function" ? expansionPowerupVisual(p.type) : null;
-    ctx.fillText(p.type === "spread" ? "S" : p.type === "rapid" ? "R" : p.type === "repair" ? "+" : p.type === "wingman" ? "W" : p.type === "dual" ? "2" : visual ? visual.label : "?", -3, 4);
+    ctx.stroke();
+    ctx.globalAlpha = 0.22 + Math.sin(state.frame * 0.12 + p.x) * 0.06;
+    ctx.fillStyle = visual.color;
+    ctx.beginPath(); ctx.arc(0, 0, size * 0.78, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.rotate(-spin);
+    drawPowerupGlyph(p.type, visual.color);
     ctx.restore();
   }
 }

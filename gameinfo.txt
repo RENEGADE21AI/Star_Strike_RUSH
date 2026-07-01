@@ -199,8 +199,8 @@ Title screen meta placement:
   total Glory.
 - A small account chip sits to the left of the call sign. It opens account
   sign-in, sign-out, profile sync, online refresh, settings, and reset controls.
-- The main icon row under Play is: Badges, Road, Records, Codex.
-- Badges opens the achievements trophy panel.
+- The main icon row under Play is: Achieve, Road, Records, Codex.
+- Achieve opens the achievements trophy panel.
 - Road opens Glory Road and Season Road tabs. These tracks should feel like
   classic long-scroll progression roads with a central spine, nodes, milestone
   rewards, and visible travel distance. Do not compress them into short lists.
@@ -520,7 +520,7 @@ Final added powerups:
 - Stabilizer: reduces energy drain and weakens Leech/Gravity effects.
 - Score Surge: temporary score multiplier boost, best during normal waves.
 
-Powerups should support survival, energy play, offense, collection, and scoring without removing the need to dodge.
+Powerups should support survival, energy play, offense, collection, and scoring without removing the need to dodge. Pickups should use readable arcade glyphs rather than plain letter labels: spread fan, rapid bolt, repair cross, wing ships, battery, shield, magnet, piercing arrow, burst, stabilizer, and score star.
 
 ## 12. Fairness And Readability Rules
 

@@ -459,6 +459,31 @@ function drawRecordsPanel() {
 
   drawOnlineActionButton(r.refresh, "REFRESH RECORDS", true);
 }
+function drawAchievementBadgeIcon(x, y, unlocked) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineWidth = 1.5;
+  if (unlocked) {
+    ctx.strokeStyle = "rgba(255,230,128,0.92)";
+    ctx.fillStyle = "rgba(255,210,80,0.20)";
+    ctx.beginPath();
+    ctx.moveTo(-6, -8); ctx.lineTo(6, -8); ctx.lineTo(4, 2); ctx.quadraticCurveTo(0, 6, -4, 2); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-8, -5, 4, Math.PI / 2, -Math.PI / 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(8, -5, 4, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+    ctx.fillStyle = "rgba(255,230,128,0.85)";
+    ctx.fillRect(-1.5, 5, 3, 5);
+    ctx.fillRect(-7, 10, 14, 3);
+  } else {
+    ctx.strokeStyle = "rgba(255,255,255,0.34)";
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.beginPath(); ctx.roundRect(-7, -1, 14, 11, 3); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -1, 5, Math.PI, 0); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.fillRect(-1, 3, 2, 3);
+  }
+  ctx.restore();
+}
 function drawAchievementsPanel() {
   const r = getAchievementsRects();
   const panel = r.panel;
@@ -475,25 +500,38 @@ function drawAchievementsPanel() {
   ctx.textBaseline = "top";
   ctx.font = FONT_SMALL;
   ctx.fillStyle = "#78ffb4";
-  ctx.fillText(`${earned.size}/${definitions.length} UNLOCKED`, panel.x + 20, y);
-  drawMetaBar(panel.x + 20, y + 20, panel.w - 40, earned.size / total, "rgba(120,255,180,0.68)");
-  y += 42;
+  ctx.fillText(`${earned.size}/${definitions.length} UNLOCKED`, panel.x + 54, y + 3);
+  ctx.save();
+  ctx.translate(panel.x + 35, y + 10);
+  drawAchievementBadgeIcon(0, 0, earned.size > 0);
+  ctx.restore();
+  drawMetaBar(panel.x + 20, y + 24, panel.w - 40, earned.size / total, "rgba(255,230,128,0.72)");
+  y += 46;
   ctx.font = FONT_TINY;
-  for (const achievement of definitions.slice(0, 12)) {
+  for (const achievement of definitions.slice(0, 16)) {
     const unlocked = earned.has(achievement.id);
-    ctx.fillStyle = unlocked ? "rgba(120,255,180,0.13)" : "rgba(255,255,255,0.05)";
-    ctx.fillRect(panel.x + 20, y - 3, panel.w - 40, 23);
+    const rowX = panel.x + 20;
+    const rowW = panel.w - 40;
+    const rowH = 22;
+    const fill = ctx.createLinearGradient(rowX, y - 2, rowX + rowW, y - 2);
+    fill.addColorStop(0, unlocked ? "rgba(255,230,128,0.14)" : "rgba(255,255,255,0.045)");
+    fill.addColorStop(1, unlocked ? "rgba(120,255,180,0.07)" : "rgba(255,255,255,0.025)");
+    ctx.fillStyle = fill;
+    ctx.fillRect(rowX, y - 2, rowW, rowH);
     ctx.strokeStyle = unlocked ? "rgba(120,255,180,0.36)" : "rgba(255,255,255,0.10)";
-    ctx.strokeRect(panel.x + 20, y - 3, panel.w - 40, 23);
+    ctx.strokeRect(rowX, y - 2, rowW, rowH);
+    ctx.fillStyle = unlocked ? "rgba(255,230,128,0.72)" : "rgba(255,255,255,0.18)";
+    ctx.fillRect(rowX, y - 2, 3, rowH);
+    drawAchievementBadgeIcon(rowX + 17, y + 8, unlocked);
     ctx.fillStyle = unlocked ? "#78ffb4" : "rgba(255,255,255,0.34)";
-    ctx.fillText(unlocked ? "UNLOCKED" : "LOCKED", panel.x + 28, y + 3);
+    ctx.fillText(unlocked ? "DONE" : "LOCK", rowX + 36, y + 4);
     ctx.fillStyle = unlocked ? "#fff" : "rgba(255,255,255,0.62)";
-    ctx.fillText(String(achievement.name || achievement.id).toUpperCase().slice(0, 22), panel.x + 88, y + 3);
-    y += 26;
+    ctx.fillText(String(achievement.name || achievement.id).toUpperCase().slice(0, 23), rowX + 78, y + 4);
+    y += 24;
   }
   if (!online.user) {
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText("SIGN IN FROM ACCOUNT TO SYNC BADGES.", panel.x + 20, panel.y + panel.h - 28);
+    ctx.fillText("SIGN IN FROM ACCOUNT TO SYNC ACHIEVEMENTS.", panel.x + 20, panel.y + panel.h - 28);
   }
   ctx.restore();
 }

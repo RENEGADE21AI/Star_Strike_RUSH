@@ -54,7 +54,7 @@ function drawTitleAndButtons() {
 
   const iconRects = getTitleIconRects();
   const accountOnline = !!(window.starStrikeOnline && window.starStrikeOnline.getState && window.starStrikeOnline.getState().user);
-  drawSimpleButton(iconRects.account, "", accountOnline ? "rgba(120,255,180,0.62)" : "rgba(255,255,255,0.24)");
+  drawSimpleButton(iconRects.account, "", accountOnline || (titleSubState === "online" && titlePanelTarget === 1) ? "rgba(120,255,180,0.62)" : "rgba(255,255,255,0.24)");
   drawAccountIcon(iconRects.account, titleSubState === "online" && titlePanelTarget === 1);
 
   ctx.save();
@@ -73,11 +73,20 @@ function drawTitleAndButtons() {
   const dockW = iconRects.codex.x + iconRects.codex.w - iconRects.achievements.x + 16;
   const dockH = 82;
   ctx.save();
-  ctx.fillStyle = "rgba(5,8,18,0.44)";
-  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  const dockFill = ctx.createLinearGradient(dockX, dockY, dockX, dockY + dockH);
+  dockFill.addColorStop(0, "rgba(14,20,36,0.78)");
+  dockFill.addColorStop(0.55, "rgba(5,8,18,0.50)");
+  dockFill.addColorStop(1, "rgba(0,0,0,0.34)");
+  ctx.fillStyle = dockFill;
+  ctx.strokeStyle = "rgba(120,210,255,0.16)";
   ctx.beginPath();
   ctx.roundRect(dockX, dockY, dockW, dockH, 8);
   ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.beginPath();
+  ctx.moveTo(dockX + 12, dockY + 20);
+  ctx.lineTo(dockX + dockW - 12, dockY + 20);
   ctx.stroke();
   ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
   ctx.textAlign = "center";
@@ -86,20 +95,24 @@ function drawTitleAndButtons() {
   ctx.fillText("PILOT META", dockX + dockW / 2, dockY + 5);
   ctx.restore();
 
-  drawSimpleButton(iconRects.achievements, "");
-  drawSimpleButton(iconRects.progress, "");
-  drawSimpleButton(iconRects.records, "");
-  drawSimpleButton(iconRects.codex, "");
-  drawTrophyIcon(iconRects.achievements, titleSubState === "achievements" && titlePanelTarget === 1);
-  drawRoadIcon(iconRects.progress, titleSubState === "progress" && titlePanelTarget === 1);
-  drawRecordsIcon(iconRects.records, titleSubState === "records" && titlePanelTarget === 1);
-  drawBookIcon(iconRects.codex, titleSubState === "codex" && titlePanelTarget === 1);
+  const achievementsActive = titleSubState === "achievements" && titlePanelTarget === 1;
+  const progressActive = titleSubState === "progress" && titlePanelTarget === 1;
+  const recordsActive = titleSubState === "records" && titlePanelTarget === 1;
+  const codexActive = titleSubState === "codex" && titlePanelTarget === 1;
+  drawSimpleButton(iconRects.achievements, "", achievementsActive ? "rgba(255,230,128,0.72)" : "rgba(255,255,255,0.28)");
+  drawSimpleButton(iconRects.progress, "", progressActive ? "rgba(120,255,180,0.72)" : "rgba(255,255,255,0.28)");
+  drawSimpleButton(iconRects.records, "", recordsActive ? "rgba(120,210,255,0.72)" : "rgba(255,255,255,0.28)");
+  drawSimpleButton(iconRects.codex, "", codexActive ? "rgba(120,255,180,0.72)" : "rgba(255,255,255,0.28)");
+  drawTrophyIcon(iconRects.achievements, achievementsActive);
+  drawRoadIcon(iconRects.progress, progressActive);
+  drawRecordsIcon(iconRects.records, recordsActive);
+  drawBookIcon(iconRects.codex, codexActive);
   ctx.save();
   ctx.fillStyle = "rgba(255,255,255,0.80)";
   ctx.font = FONT_TINY;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText("BADGES", iconRects.achievements.x + iconRects.achievements.w / 2, iconRects.achievements.y + iconRects.achievements.h + 4);
+  ctx.fillText("ACHIEVE", iconRects.achievements.x + iconRects.achievements.w / 2, iconRects.achievements.y + iconRects.achievements.h + 4);
   ctx.fillText("ROAD", iconRects.progress.x + iconRects.progress.w / 2, iconRects.progress.y + iconRects.progress.h + 4);
   ctx.fillText("RECORDS", iconRects.records.x + iconRects.records.w / 2, iconRects.records.y + iconRects.records.h + 4);
   ctx.fillText("CODEX", iconRects.codex.x + iconRects.codex.w / 2, iconRects.codex.y + iconRects.codex.h + 4);
