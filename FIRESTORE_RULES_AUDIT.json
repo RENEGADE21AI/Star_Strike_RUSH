@@ -6,7 +6,7 @@
       "check": "The Update Bypass",
       "severity": "minor",
       "issue": "Create and update paths use the same field allowlists and type checks. Public profile, private progression, and leaderboard updates keep best score, phase, achievement count, Glory, rank index, season tier, Credits preview, and lifetime counters non-decreasing.",
-      "recommendation": "Keep future mutable fields in shared validators. Move spendable balances and inventory ownership to Cloud Functions before adding real purchases or spending."
+      "recommendation": "Keep future mutable fields in shared validators. Move spendable balances and reward claiming to Cloud Functions before adding real spending."
     },
     {
       "check": "Authority Source",
@@ -24,19 +24,19 @@
       "check": "Type Safety",
       "severity": "minor",
       "issue": "Rules validate strings, ints, URLs, timestamps, allowed document shapes, rank names, rank indexes, season tiers, and receipt counters for each writable collection.",
-      "recommendation": "Add matching validators before introducing missions, cosmetics, voting, reports, inventory, or purchases."
+      "recommendation": "Add matching validators before introducing missions, reports, run history, reward claiming, or accessibility settings sync."
     },
     {
       "check": "Field-Level vs. Identity-Level Security",
       "severity": "minor",
       "issue": "Every write rule combines field validation with an isOwner(userId) check. Authenticated users can read public leaderboard/profile documents, but cannot write another user's records or read private account documents.",
-      "recommendation": "Keep emails, purchase data, moderation data, and private progression details out of public documents."
+      "recommendation": "Keep emails, moderation data, and private progression details out of public documents."
     },
     {
-      "check": "Payment Safety",
+      "check": "Reward Authority",
       "severity": "minor",
-      "issue": "No Stripe checkout, purchase state, Gems grants, premium pass ownership, or paid voting paths are present in the rules or client.",
-      "recommendation": "When monetization is added, use Stripe webhooks or platform purchase verification through Cloud Functions; never let clients grant Gems, purchases, or inventory directly."
+      "issue": "No client-authoritative reward-claiming path is present in the rules or client.",
+      "recommendation": "When Season Road claiming is added, use Cloud Functions for authoritative grants; never let clients directly grant spendable balances."
     }
   ]
 }

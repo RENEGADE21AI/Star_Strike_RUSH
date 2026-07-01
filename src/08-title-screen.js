@@ -284,25 +284,27 @@ function getTitleIconRects() {
   const y = H * 0.58;
   const size = 42;
   const gap = 10;
-  const total = size * 5 + gap * 4;
+  const total = size * 4 + gap * 3;
   const startX = centerX - total / 2;
+  const callRect = getCallSignRect();
   return {
     achievements: { x: startX, y, w: size, h: size },
     progress: { x: startX + size + gap, y, w: size, h: size },
     records: { x: startX + 2 * (size + gap), y, w: size, h: size },
     codex: { x: startX + 3 * (size + gap), y, w: size, h: size },
-    settings: { x: startX + 4 * (size + gap), y, w: size, h: size },
-    account: { x: W / 2 + 126, y: H * 0.355 - 20, w: 36, h: 40 }
+    account: { x: callRect.x - 46, y: callRect.y, w: 36, h: 40 }
   };
 }
 function getTitlePanelRect() {
-  const panelW = Math.min(W * 0.84, W - 24);
-  const panelH = Math.min(H * 0.72, H - 32);
-  const openX = (W - panelW) / 2;
+  const marginX = 10;
+  const marginY = 14;
+  const panelW = W - marginX * 2;
+  const panelH = H - marginY * 2;
+  const openX = marginX;
   const closedX = W + 24;
   const anim = clamp(titlePanelAnim, 0, 1);
   const x = openX + (closedX - openX) * (1 - anim);
-  const y = (H - panelH) / 2;
+  const y = marginY;
   return { x, y, w: panelW, h: panelH };
 }
 function getGameOverButtons() {
@@ -315,20 +317,6 @@ function getGameOverButtons() {
 }
 function hitRect(rect, x, y) { return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h; }
 
-function getSettingsRects() {
-  const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
-  const innerX = panel.x + 20;
-  const innerY = panel.y + 56;
-  const btnY = innerY + 18;
-  const btnW = 64, btnH = 28, gap = 10;
-  const low = { x: innerX, y: btnY, w: btnW, h: btnH };
-  const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
-  const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
-  const shake = { x: innerX, y: btnY + 52, w: 130, h: 30 };
-  const reset = { x: innerX, y: btnY + 96, w: 160, h: 30 };
-  return { panel, closeRect, low, med, high, shake, reset };
-}
 function getCodexRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
@@ -338,10 +326,17 @@ function getCodexRects() {
 function getOnlineRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
-  const signIn = { x: panel.x + 20, y: panel.y + 96, w: panel.w - 40, h: 34 };
-  const signOut = { x: panel.x + 20, y: panel.y + 136, w: panel.w - 40, h: 30 };
+  const innerX = panel.x + 20;
+  const signIn = { x: innerX, y: panel.y + 112, w: panel.w - 40, h: 34 };
+  const signOut = { x: innerX, y: panel.y + 152, w: panel.w - 40, h: 30 };
+  const btnW = 64, btnH = 28, gap = 10, btnY = panel.y + 286;
+  const low = { x: innerX, y: btnY, w: btnW, h: btnH };
+  const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
+  const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
+  const shake = { x: innerX, y: btnY + 50, w: 134, h: 30 };
+  const reset = { x: panel.x + panel.w - 180, y: btnY + 50, w: 160, h: 30 };
   const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
-  return { panel, closeRect, signIn, signOut, refresh };
+  return { panel, closeRect, signIn, signOut, low, med, high, shake, reset, refresh };
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();
@@ -358,9 +353,9 @@ function getProgressRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
   const tabW = Math.floor((panel.w - 48) / 2);
-  const gloryTab = { x: panel.x + 20, y: panel.y + 52, w: tabW, h: 30 };
+  const gloryTab = { x: panel.x + 20, y: panel.y + 72, w: tabW, h: 30 };
   const seasonTab = { x: gloryTab.x + tabW + 8, y: gloryTab.y, w: tabW, h: 30 };
-  const contentRect = { x: panel.x + 18, y: panel.y + 142, w: panel.w - 36, h: panel.h - 176 };
+  const contentRect = { x: panel.x + 18, y: panel.y + 162, w: panel.w - 36, h: panel.h - 198 };
   return { panel, closeRect, gloryTab, seasonTab, contentRect };
 }
 function getProgressContentHeight() {

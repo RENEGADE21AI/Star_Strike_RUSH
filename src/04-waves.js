@@ -29,10 +29,10 @@ function selectWaveTemplate() {
   const phaseTier = state.phase < 4 ? "early" : state.phase < 9 ? "mid" : "late";
   let pool;
   if (state.phase === 1) {
-    if (mood === "recovery") pool = [["breather", 8], ["redV", 4], ["redWall", 3]];
-    else if (mood === "spike") pool = [["redWall", 5], ["redV", 4], ["breather", 2]];
-    else if (mood === "rule") pool = [["redV", 5], ["redWall", 4], ["breather", 2]];
-    else pool = [["breather", 5], ["redV", 4], ["redWall", 4]];
+    const lateOpening = state.phaseTimer > phaseDuration(1) * 0.55;
+    if (mood === "recovery") pool = [["breather", 9], ["redV", 3]];
+    else if (lateOpening) pool = [["breather", 7], ["redV", 4], ["redWall", 1]];
+    else pool = [["breather", 8], ["redV", 2]];
   } else if (mood === "recovery") {
     pool = phaseTier === "early"
       ? [["breather", 6], ["redV", 3], ["orangePair", 4], ["staggerMix", 2]]
@@ -101,7 +101,7 @@ function spawnWave() {
   state.lastWaveTemplateName = sel.name;
   state.pendingSpawns.push(...events);
   const density = templateDensity(events);
-  if (state.waveMood === "spike" && density < 4.8) {
+  if (state.phase >= 3 && state.waveMood === "spike" && density < 4.8) {
     const followName = Math.random() < 0.6 ? "mixedChevron" : "redWall";
     const follow = waveTemplates[followName] ? waveTemplates[followName]() : [];
     for (const ev of follow) ev.delay += 28 + Math.floor(rand(0, 18));
@@ -113,7 +113,7 @@ function spawnWave() {
     for (const ev of follow) ev.delay += 36 + Math.floor(rand(0, 20));
     state.pendingSpawns.push(...follow);
   }
-  if (density >= 5.5) {
+  if (state.phase >= 3 && density >= 5.5) {
     const followName = Math.random() < 0.5 ? "breather" : "orangePair";
     const follow = waveTemplates[followName] ? waveTemplates[followName]() : [];
     for (const ev of follow) ev.delay += 34 + Math.floor(rand(0, 20));

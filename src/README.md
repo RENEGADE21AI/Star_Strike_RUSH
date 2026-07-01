@@ -14,7 +14,9 @@ after the files they depend on, because the current code intentionally shares gl
 - `09-rendering-controls.js`: shared button and icon drawing helpers.
 - `10-rendering-ships.js`: enemy, boss, formation, and menu ship art.
 - `11-rendering-title-effects.js`: title sun, menu flights, encounter cards.
-- `12-rendering-title-panels.js`: settings, codex, and reset-confirm panels.
+- `12-rendering-title-panels.js`: account/settings, records, achievements, codex,
+  and reset-confirm panels.
+- `12-rendering-progress-road.js`: Glory Road and Season Road rendering.
 - `13-rendering-title-screens.js`: title screen and game-over screen composition.
 - `14-rendering-player.js`: background and player ship rendering.
 - `15-rendering-entities.js`: wingmen, bullets, enemies, bosses, powerups, particles.

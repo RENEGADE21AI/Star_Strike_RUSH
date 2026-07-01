@@ -1,16 +1,23 @@
 function phaseDuration(phase) {
-  if (phase === 1) return 1100;
-  if (phase === 2) return 980;
-  if (phase === 3) return 880;
-  return Math.max(500, 840 - (phase - 4) * 22);
+  if (phase === 1) return 2500;
+  if (phase === 2) return 2200;
+  if (phase === 3) return 1900;
+  return Math.max(580, 940 - (phase - 4) * 20);
+}
+function openingRamp() {
+  return clamp(state.frame / 7200, 0, 1);
+}
+function openingCalm() {
+  return 1 - openingRamp();
 }
 function rhythmProfile() {
   if (state.boss || state.bossDeath) return { pressure: 0, interval: 0 };
   const beat = state.waveTimer % 240;
+  const calm = openingCalm();
   if (beat < 45) return { pressure: -7, interval: 18 };
-  if (beat < 135) return { pressure: 10, interval: -12 };
+  if (beat < 135) return { pressure: 10 - calm * 8, interval: -12 + calm * 20 };
   if (beat < 170) return { pressure: -4, interval: 10 };
-  return { pressure: 12, interval: -16 };
+  return { pressure: 12 - calm * 9, interval: -16 + calm * 22 };
 }
 function phaseArcBias() {
   const dur = Math.max(1, phaseDuration(state.phase));
@@ -63,6 +70,11 @@ function updateIntensityCycle() {
     state.intensityTimer = Math.max(state.intensityTimer, 120);
     return;
   }
+  if (state.frame < 2400 || state.phase <= 1) {
+    state.intensityPhase = "cooldown";
+    state.intensityTimer = Math.max(state.intensityTimer, 120);
+    return;
+  }
   const d = state.difficulty;
   const p = state.player;
   const sinceHit = state.frame - d.lastHitFrame;
@@ -101,7 +113,8 @@ function updatePressure() {
   const relief = (5 - p.hp) * 8 + (state.difficulty.grace > 0 ? 10 : 0) + (state.difficulty.ghostGrace > 0 ? 4 : 0);
   const rhythm = rhythmProfile();
   const intensityBias = state.intensityPhase === "surge" ? 9 : state.intensityPhase === "cooldown" ? -8 : 0;
-  const target = clamp(18 + state.phase * 4 + enemyLoad + bulletLoad + queueLoad + comboLoad + bossLoad - relief + rhythm.pressure + intensityBias, 0, 100);
+  const basePressure = 10 + openingRamp() * 8 + state.phase * 3.4;
+  const target = clamp(basePressure + enemyLoad + bulletLoad + queueLoad + comboLoad + bossLoad - relief + rhythm.pressure + intensityBias, 0, 100);
   state.pressure += (target - state.pressure) * 0.04;
 }
 function updatePacingMemory() {
@@ -132,7 +145,7 @@ function updateWaveMood() {
     else next = Math.random() < 0.55 ? "open" : "recovery";
   } else if (early) {
     if (recoveryNeed || arc < -0.20) next = "open";
-    else if (arc > 0.42 && state.phaseTimer > 160) next = Math.random() < 0.55 ? "spike" : "open";
+    else if (state.phase >= 2 && state.phaseTimer > 900 && arc > 0.52 && openingRamp() > 0.35) next = Math.random() < 0.40 ? "spike" : "open";
     else next = Math.random() < 0.70 ? "open" : "recovery";
   } else {
     if (recoveryNeed) next = Math.random() < 0.72 ? "recovery" : "open";
@@ -160,9 +173,14 @@ function updateDifficulty() {
     d.burst = Math.max(0, d.burst - 0.03);
     return;
   }
-  let target = 0.78 + (state.phase - 1) * 0.075;
-  if (state.phase === 1) target += clamp(state.phaseTimer / 1800, 0, 0.20);
-  else target += clamp((state.phaseTimer - 180) / 2200, 0, 0.14);
+  let target;
+  if (state.phase <= 3) {
+    target = 0.56 + openingRamp() * 0.20 + (state.phase - 1) * 0.055;
+    target += clamp(state.phaseTimer / phaseDuration(state.phase), 0, 1) * 0.07;
+  } else {
+    target = 0.78 + (state.phase - 4) * 0.075;
+    target += clamp((state.phaseTimer - 180) / 2400, 0, 0.14);
+  }
   target -= (p.maxHp - p.hp) * 0.05;
   if (p.hp === 1) target -= 0.04;
   if (d.grace > 0) target -= 0.10;
@@ -185,13 +203,13 @@ function updateDifficulty() {
   else if (state.waveMood === "rule") target += 0.01;
   if (state.intensityPhase === "surge") target += 0.06;
   if (state.intensityPhase === "cooldown") target -= 0.05;
-  d.target = clamp(target, 0.70, 1.45);
+  d.target = clamp(target, 0.54, 1.45);
   let lerp = 0.025;
   if (p.hp === 1) lerp = 0.06;
   else if (p.hp === p.maxHp && (d.killStreak > 0 || d.pacingMemory > 0.25 || accuracy > 0.6)) lerp = 0.03;
   else if (state.pressure > 70 || d.pacingMemory < -0.35) lerp = 0.04;
   d.threat += (d.target - d.threat) * lerp;
-  d.threat = clamp(d.threat, 0.70, 1.45);
+  d.threat = clamp(d.threat, 0.54, 1.45);
   if (d.grace > 0) d.grace--;
   if (d.ghostGrace > 0) d.ghostGrace--;
   d.burst = Math.max(0, d.burst - 0.03);

@@ -458,7 +458,8 @@ function enemyBulletCost(kind) {
 function enemyBulletPressure() { let total = 0; for (const b of state.enemyBullets) total += enemyBulletCost(b.kind); return total; }
 function enemyBulletBudget() {
   let base = 11 + state.phase * 1.4;
-  if (state.phase === 1) base = 8.5 + state.phaseTimer / 240;
+  if (state.phase === 1) base = 5.8 + state.phaseTimer / 520;
+  else if (state.phase === 2) base = 8.0 + state.phaseTimer / 640;
   if (state.player.hp <= 2) base -= 2.0;
   if (state.player.hp === 1) base -= 1.0;
   if (state.difficulty.grace > 0) base -= 2.0;
@@ -467,7 +468,8 @@ function enemyBulletBudget() {
   base -= state.difficulty.burst * 3.5;
   if (state.intensityPhase === "surge") base += 2.0;
   if (state.intensityPhase === "cooldown") base -= 1.3;
-  return clamp(base * state.difficulty.threat, 8, 26);
+  const minBudget = state.phase === 1 ? 4.8 : state.phase === 2 ? 6.5 : 8;
+  return clamp(base * state.difficulty.threat, minBudget, 26);
 }
 function canSpendBulletBudget(cost) {
   const budget = state.cachedBulletBudget || enemyBulletBudget();
@@ -507,7 +509,7 @@ const state = {
   phaseTimer: 0,
   waveIndex: 0,
   waveRest: 0,
-  pressure: 20,
+  pressure: 8,
   threatScore: 0,
   cachedBulletPressure: 0,
   cachedBulletBudget: 0,
@@ -520,8 +522,8 @@ const state = {
   gameOverShake: 0,
   gameOverShakeTimer: 0,
   difficulty: {
-    threat: 0.75,
-    target: 0.75,
+    threat: 0.58,
+    target: 0.58,
     grace: 0,
     ghostGrace: 0,
     heatStreak: false,

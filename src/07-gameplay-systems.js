@@ -570,9 +570,10 @@ function updateWavesAndPhaseAndPressure() {
   const sinceHit = state.frame - state.difficulty.lastHitFrame;
   const strongPerformance = sinceHit > 720 && state.difficulty.killStreak >= 5 && !bossLocked;
   const comfort = sinceHit > 840 && state.player.hp === state.player.maxHp && state.pressure < 48 && !bossLocked;
-  if (strongPerformance) { state.phaseTimer += 0.25; state.waveTimer += 0.10; }
-  if (comfort) { state.phaseTimer += 0.40; state.waveTimer += 0.18; }
-  if (state.difficulty.pacingMemory > 0.35) { state.phaseTimer += 0.10; state.waveTimer += 0.05; }
+  const ramp = openingRamp();
+  if (strongPerformance && ramp > 0.55) { state.phaseTimer += 0.18; state.waveTimer += 0.08; }
+  if (comfort && ramp > 0.50) { state.phaseTimer += 0.24; state.waveTimer += 0.10; }
+  if (state.difficulty.pacingMemory > 0.35 && ramp > 0.60) { state.phaseTimer += 0.07; state.waveTimer += 0.035; }
   if (state.intensityPhase === "surge") { state.phaseTimer += 0.10; state.waveTimer += 0.10; }
   updatePressure();
   updatePacingMemory();
@@ -596,7 +597,8 @@ function updateWavesAndPhaseAndPressure() {
     if (state.phase % 4 === 0) spawnBoss();
   }
   let baseInterval;
-  if (state.phase === 1) baseInterval = state.phaseTimer < 500 ? 118 : state.phaseTimer < 900 ? 104 : 92;
+  if (state.phase === 1) baseInterval = state.phaseTimer < 900 ? 168 : state.phaseTimer < 1650 ? 142 : 120;
+  else if (state.phase === 2) baseInterval = state.phaseTimer < 800 ? 128 : 108;
   else baseInterval = Math.max(38, 88 - state.phase * 3.5);
   const rhythm = rhythmProfile();
   baseInterval += rhythm.interval;
@@ -616,8 +618,10 @@ function updateWavesAndPhaseAndPressure() {
   const load = peakLoad();
   baseInterval += Math.round(load * 18);
   baseInterval += Math.round((state.pressure - 50) * 0.08);
-  const interval = Math.round(baseInterval / clamp(state.difficulty.threat, 0.75, 1.25));
+  const interval = Math.round(baseInterval / clamp(state.difficulty.threat, 0.55, 1.25));
   let threatBudget = 11.5 + state.phase * 2.8 + (state.intensityPhase === "surge" ? 0.8 : state.intensityPhase === "cooldown" ? -0.8 : 0);
+  if (state.phase === 1) threatBudget = 6.8 + openingRamp() * 2.8;
+  else if (state.phase === 2) threatBudget = 9.5 + openingRamp() * 2.2;
   if (state.waveMood === "spike") threatBudget += 1.2;
   else if (state.waveMood === "recovery") threatBudget -= 1.2;
   else if (state.waveMood === "rule") threatBudget += 0.5;

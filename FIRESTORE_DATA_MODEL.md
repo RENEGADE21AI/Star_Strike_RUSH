@@ -145,15 +145,14 @@ Implemented now:
 
 Explicitly not implemented yet:
 
-- Stripe checkout, webhooks, purchases, Gems grants, or Premium Flight Pass.
 - AdMob rewarded ads.
-- Cosmetic inventory, shop, user-generated cosmetic submissions, voting, and
-  moderation flows.
+- Season Road reward claiming.
+- Missions, practice, run history, and accessibility settings sync.
 - Server-authoritative Cloud Functions for progression grants.
 
 ## Production Note
 
 For a serious competitive leaderboard, move score submission behind a trusted
 backend such as Cloud Functions and have the server write `leaderboard_scores`,
-authoritative Glory, Credits, Season XP, inventory, and purchase state. Firestore
-rules cannot independently verify gameplay from a browser client.
+authoritative Glory, Credits, and Season XP. Firestore rules cannot
+independently verify gameplay from a browser client.

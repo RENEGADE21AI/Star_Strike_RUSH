@@ -31,35 +31,6 @@ function drawSimpleButton(rect, label, stroke = "rgba(255,255,255,0.28)") {
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
   ctx.restore();
 }
-function drawGearIcon(rect, active = false) {
-  const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.strokeStyle = active ? "rgba(120,255,180,0.90)" : "rgba(255,255,255,0.92)";
-  ctx.fillStyle = active ? "rgba(120,255,180,0.20)" : "rgba(255,255,255,0.16)";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(0, 0, 13.2, 0, TAU);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  for (let i = 0; i < 8; i++) {
-    const a = i * (TAU / 8);
-    ctx.save();
-    ctx.rotate(a);
-    ctx.fillRect(11.9, -1.8, 4.8, 3.6);
-    ctx.restore();
-  }
-
-  ctx.fillStyle = active ? "rgba(250,255,255,0.92)" : "rgba(235,240,245,0.88)";
-  ctx.beginPath(); ctx.arc(0, 0, 8.4, 0, TAU); ctx.fill();
-  ctx.fillStyle = active ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.18)";
-  ctx.beginPath(); ctx.arc(0, 0, 5.0, 0, TAU); ctx.fill();
-  ctx.fillStyle = active ? "rgba(0,20,10,0.85)" : "rgba(0,0,0,0.78)";
-  ctx.beginPath(); ctx.arc(0, 0, 4.3, 0, TAU); ctx.fill();
-  ctx.restore();
-}
 function drawBookIcon(rect, active = false) {
   const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
   ctx.save();
@@ -115,8 +86,8 @@ function drawTrophyIcon(rect, active = false) {
   ctx.beginPath();
   ctx.moveTo(-10, -13); ctx.lineTo(10, -13); ctx.lineTo(7, 4); ctx.quadraticCurveTo(0, 10, -7, 4); ctx.closePath();
   ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.arc(-13, -8, 7, -Math.PI / 2, Math.PI / 2); ctx.stroke();
-  ctx.beginPath(); ctx.arc(13, -8, 7, Math.PI / 2, -Math.PI / 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-13, -8, 7, Math.PI / 2, -Math.PI / 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(13, -8, 7, -Math.PI / 2, Math.PI / 2); ctx.stroke();
   ctx.fillStyle = active ? "rgba(255,230,128,0.80)" : "rgba(255,255,255,0.72)";
   ctx.fillRect(-3, 8, 6, 7);
   ctx.beginPath(); ctx.roundRect(-12, 15, 24, 4, 2); ctx.fill();

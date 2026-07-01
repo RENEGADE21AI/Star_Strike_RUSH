@@ -1,6 +1,35 @@
+function drawTitleMetaStrip(x, y, w) {
+  const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
+  if (!meta) return;
+  const chips = [
+    { label: "GLORY", value: Number(meta.totalGlory || 0).toLocaleString(), color: "rgba(255,230,128,0.70)" },
+    { label: "CREDITS", value: Number(meta.credits || 0).toLocaleString(), color: "rgba(120,210,255,0.70)" },
+    { label: "TIER", value: String(meta.seasonTier || 1), color: "rgba(120,255,180,0.72)" }
+  ];
+  const gap = 6;
+  const chipW = Math.max(72, Math.floor((w - gap * (chips.length - 1)) / chips.length));
+  ctx.save();
+  ctx.font = "900 8px 'Arial Narrow', Arial, sans-serif";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i < chips.length; i++) {
+    const chip = chips[i];
+    const rx = x + i * (chipW + gap);
+    ctx.fillStyle = "rgba(5,8,18,0.72)";
+    ctx.fillRect(rx, y, chipW, 22);
+    ctx.strokeStyle = chip.color;
+    ctx.strokeRect(rx, y, chipW, 22);
+    ctx.textAlign = "left";
+    ctx.fillStyle = chip.color;
+    ctx.fillText(chip.label, rx + 7, y + 11);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#fff";
+    ctx.fillText(String(chip.value).slice(0, 8), rx + chipW - 7, y + 11);
+  }
+  ctx.restore();
+}
 function drawTitlePanelFrame(panel, title) {
   ctx.save();
-  ctx.fillStyle = "rgba(10,10,20,0.92)";
+  ctx.fillStyle = "#080a14";
   ctx.beginPath();
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 10);
   ctx.fill();
@@ -17,70 +46,7 @@ function drawTitlePanelFrame(panel, title) {
   ctx.fillStyle = "#fff";
   ctx.fillText(title, panel.x + 18, panel.y + 14);
   ctx.restore();
-}
-function drawSettingsPanel() {
-  const r = getSettingsRects();
-  drawTitlePanelFrame(r.panel, "PERFORMANCE");
-  ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.10)";
-  ctx.fillRect(r.closeRect.x, r.closeRect.y, r.closeRect.w, r.closeRect.h);
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.strokeRect(r.closeRect.x, r.closeRect.y, r.closeRect.w, r.closeRect.h);
-  ctx.fillStyle = "#fff";
-  ctx.font = FONT_HUD;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("X", r.closeRect.x + r.closeRect.w / 2, r.closeRect.y + r.closeRect.h / 2);
-  ctx.restore();
-
-  const innerX = r.panel.x + 20;
-  const innerY = r.panel.y + 56;
-  ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.font = FONT_SMALL;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.fillText("Particle Count", innerX, innerY);
-
-  const btnY = innerY + 18;
-  const btnW = 64, btnH = 28, gap = 10;
-  const labels = [300, 600, 900];
-  for (let i = 0; i < labels.length; i++) {
-    const rect = { x: innerX + i * (btnW + gap), y: btnY, w: btnW, h: btnH };
-    const active = settingMaxParticles === labels[i];
-    ctx.fillStyle = active ? "rgba(120,255,180,0.16)" : "rgba(255,255,255,0.08)";
-    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-    ctx.strokeStyle = active ? "rgba(120,255,180,0.7)" : "rgba(255,255,255,0.22)";
-    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-    ctx.fillStyle = "#fff";
-    ctx.font = FONT_TINY;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(labels[i] === 300 ? "LOW" : labels[i] === 600 ? "MED" : "HIGH", rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
-  }
-
-  const shakeRect = r.shake;
-  ctx.fillStyle = settingScreenShake ? "rgba(120,255,180,0.14)" : "rgba(255,255,255,0.08)";
-  ctx.fillRect(shakeRect.x, shakeRect.y, shakeRect.w, shakeRect.h);
-  ctx.strokeStyle = settingScreenShake ? "rgba(120,255,180,0.7)" : "rgba(255,255,255,0.22)";
-  ctx.strokeRect(shakeRect.x, shakeRect.y, shakeRect.w, shakeRect.h);
-  ctx.fillStyle = "#fff";
-  ctx.font = FONT_TINY;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(`SHAKE: ${settingScreenShake ? "ON" : "OFF"}`, shakeRect.x + shakeRect.w / 2, shakeRect.y + shakeRect.h / 2 + 1);
-
-  const resetRect = r.reset;
-  ctx.fillStyle = "rgba(255,80,80,0.12)";
-  ctx.fillRect(resetRect.x, resetRect.y, resetRect.w, resetRect.h);
-  ctx.strokeStyle = "rgba(255,120,120,0.6)";
-  ctx.strokeRect(resetRect.x, resetRect.y, resetRect.w, resetRect.h);
-  ctx.fillStyle = "#fff";
-  ctx.font = FONT_TINY;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("RESET PROGRESS", resetRect.x + resetRect.w / 2, resetRect.y + resetRect.h / 2 + 1);
-  ctx.restore();
+  drawTitleMetaStrip(panel.x + 18, panel.y + 42, panel.w - 36);
 }
 function drawCodexSilhouetteLockIcon(x, y) {
   ctx.save();
@@ -105,7 +71,7 @@ function codexCardRects(panel) {
   const totalW = cardW * cols + gap * (cols - 1);
   const totalH = cardH * rows + gap * (rows - 1);
   const startX = panel.x + Math.round((panel.w - totalW) / 2);
-  const startY = panel.y + 52;
+  const startY = panel.y + 82;
   const rects = {};
   for (let i = 0; i < types.length; i++) {
     const col = i % cols, row = Math.floor(i / cols);
@@ -172,7 +138,7 @@ function drawStatBar(x, y, label, value, max = 5) {
 function drawCodexDetail(panel, type) {
   const stats = codexTypeStats(type);
   const meta = typeof getCodexMeta === "function" ? getCodexMeta(type) : { color: "#fff" };
-  const card = { x: panel.x + 18, y: panel.y + 46, w: panel.w - 36, h: panel.h - 62 };
+  const card = { x: panel.x + 18, y: panel.y + 78, w: panel.w - 36, h: panel.h - 94 };
   ctx.save();
   ctx.fillStyle = "rgba(0,0,8,0.93)";
   ctx.beginPath(); ctx.roundRect(card.x, card.y, card.w, card.h, 10); ctx.fill();
@@ -330,7 +296,7 @@ function drawOnlinePanel() {
 
   ctx.save();
   const innerX = panel.x + 20;
-  let y = panel.y + 48;
+  let y = panel.y + 76;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.font = FONT_SMALL;
@@ -339,7 +305,7 @@ function drawOnlinePanel() {
   y += 18;
   ctx.fillStyle = online.lastError ? "#ffb0b0" : "rgba(255,255,255,0.72)";
   ctx.fillText(String(status).slice(0, 42), innerX, y);
-  y = panel.y + 188;
+  y = panel.y + 198;
   if (meta) {
     ctx.font = FONT_HUD;
     ctx.fillStyle = "rgba(255,230,128,0.88)";
@@ -355,6 +321,47 @@ function drawOnlinePanel() {
 
   drawOnlineActionButton(r.signIn, user ? "SYNC PROFILE" : "SIGN IN WITH GOOGLE", true);
   drawOnlineActionButton(r.signOut, "SIGN OUT", !!user);
+
+  ctx.save();
+  const labels = [
+    { rect: r.low, value: 300, label: "LOW" },
+    { rect: r.med, value: 600, label: "MED" },
+    { rect: r.high, value: 900, label: "HIGH" }
+  ];
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.font = FONT_SMALL;
+  ctx.fillStyle = "rgba(255,255,255,0.84)";
+  ctx.fillText("SETTINGS", panel.x + 20, r.low.y - 28);
+  ctx.font = FONT_TINY;
+  ctx.fillStyle = "rgba(255,255,255,0.58)";
+  ctx.fillText("PARTICLES", panel.x + 20, r.low.y - 13);
+  for (const item of labels) {
+    const active = settingMaxParticles === item.value;
+    ctx.fillStyle = active ? "rgba(120,255,180,0.16)" : "rgba(255,255,255,0.07)";
+    ctx.fillRect(item.rect.x, item.rect.y, item.rect.w, item.rect.h);
+    ctx.strokeStyle = active ? "rgba(120,255,180,0.70)" : "rgba(255,255,255,0.20)";
+    ctx.strokeRect(item.rect.x, item.rect.y, item.rect.w, item.rect.h);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(item.label, item.rect.x + item.rect.w / 2, item.rect.y + item.rect.h / 2 + 1);
+  }
+  ctx.fillStyle = settingScreenShake ? "rgba(120,255,180,0.14)" : "rgba(255,255,255,0.07)";
+  ctx.fillRect(r.shake.x, r.shake.y, r.shake.w, r.shake.h);
+  ctx.strokeStyle = settingScreenShake ? "rgba(120,255,180,0.68)" : "rgba(255,255,255,0.20)";
+  ctx.strokeRect(r.shake.x, r.shake.y, r.shake.w, r.shake.h);
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.fillText(`SHAKE: ${settingScreenShake ? "ON" : "OFF"}`, r.shake.x + r.shake.w / 2, r.shake.y + r.shake.h / 2 + 1);
+  ctx.fillStyle = "rgba(255,80,80,0.12)";
+  ctx.fillRect(r.reset.x, r.reset.y, r.reset.w, r.reset.h);
+  ctx.strokeStyle = "rgba(255,120,120,0.58)";
+  ctx.strokeRect(r.reset.x, r.reset.y, r.reset.w, r.reset.h);
+  ctx.fillStyle = "#fff";
+  ctx.fillText("RESET PROGRESS", r.reset.x + r.reset.w / 2, r.reset.y + r.reset.h / 2 + 1);
+  ctx.restore();
+
   drawOnlineActionButton(r.refresh, "REFRESH ONLINE DATA", true);
 }
 function drawRecordsPanel() {
@@ -369,7 +376,7 @@ function drawRecordsPanel() {
   ctx.save();
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  let listY = panel.y + 54;
+  let listY = panel.y + 82;
   ctx.font = FONT_SMALL;
   ctx.fillStyle = "rgba(255,255,255,0.70)";
   ctx.fillText(user ? "GLOBAL BEST-SCORE LADDER" : "SIGN IN TO LOAD GLOBAL SCORES", panel.x + 20, listY);
@@ -406,7 +413,7 @@ function drawAchievementsPanel() {
 
   ctx.save();
   const total = Math.max(1, definitions.length);
-  let y = panel.y + 50;
+  let y = panel.y + 82;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.font = FONT_SMALL;
@@ -437,10 +444,9 @@ function drawSettingsAndCodexPanels() {
   if (titlePanelAnim <= 0.02 && titlePanelTarget <= 0) return;
   ctx.save();
   ctx.globalAlpha = clamp(titlePanelAnim, 0, 1);
-  ctx.fillStyle = "rgba(0,0,0,0.30)";
+  ctx.fillStyle = "rgba(0,0,0,0.56)";
   ctx.fillRect(0, 0, W, H);
-  if (titleSubState === "settings") drawSettingsPanel();
-  else if (titleSubState === "codex") drawCodexPanel();
+  if (titleSubState === "codex") drawCodexPanel();
   else if (titleSubState === "online") drawOnlinePanel();
   else if (titleSubState === "records") drawRecordsPanel();
   else if (titleSubState === "achievements") drawAchievementsPanel();

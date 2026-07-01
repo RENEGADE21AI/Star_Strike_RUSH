@@ -314,6 +314,28 @@
       text-align: center;
     }
 
+    .currency-strip {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      top: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .currency-strip span {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 8px;
+      border: 1px solid rgba(120,210,255,0.30);
+      background: rgba(5,8,18,0.62);
+      border-radius: var(--radius);
+    }
+
     .call-box, .button, .icon-button, .panel, .hud-box, .row, .tab, .meter, .pill, .modal {
       border: 1px solid var(--line-strong);
       background: rgba(255,255,255,0.07);
@@ -322,8 +344,8 @@
 
     .call-box {
       position: absolute;
-      left: 68px;
-      right: 54px;
+      left: 70px;
+      right: 24px;
       top: 234px;
       height: 44px;
       display: flex;
@@ -336,7 +358,7 @@
     .account-chip {
       position: absolute;
       top: 234px;
-      right: 14px;
+      left: 24px;
       width: 36px;
       height: 44px;
       border: 2px solid rgba(255,255,255,0.38);
@@ -393,7 +415,7 @@
       right: 51px;
       top: 418px;
       display: grid;
-      grid-template-columns: repeat(5, 42px);
+      grid-template-columns: repeat(4, 42px);
       gap: 10px;
       justify-content: center;
     }
@@ -752,11 +774,11 @@
       color: rgba(255,255,255,0.68);
     }
 
-    .tier-step .reward.free {
+    .tier-step .reward.flight {
       border-color: rgba(120,255,180,0.34);
     }
 
-    .tier-step .reward.premium {
+    .tier-step .reward.supply {
       border-color: rgba(255,230,128,0.28);
       opacity: 0.70;
     }
@@ -1062,7 +1084,7 @@
           <li><a href="#records">World Records</a></li>
           <li><a href="#codex">Codex Grid</a></li>
           <li><a href="#codex-detail">Codex Detail</a></li>
-          <li><a href="#gear">Gear</a></li>
+          <li><a href="#account-settings">Account Settings Area</a></li>
           <li><a href="#reset">Reset Confirm</a></li>
           <li><a href="#gameplay">Gameplay HUD</a></li>
           <li><a href="#boss">Boss/Warning HUD</a></li>
@@ -1079,16 +1101,16 @@
         <p>Every non-combat surface points back to Play. The title screen is not a dashboard.</p>
       </div>
       <div class="principle">
-        <h3>One Job Per Panel</h3>
-        <p>Account, records, achievements, progress, codex, and settings stay separate.</p>
+        <h3>One Job Per Screen</h3>
+        <p>Account owns profile, sync, and settings. Records, achievements, progress, and codex stay focused.</p>
       </div>
       <div class="principle">
         <h3>Fair Readability</h3>
         <p>Combat UI must leave center and lower-middle playfield open for dodging.</p>
       </div>
       <div class="principle">
-        <h3>No Paid Power</h3>
-        <p>Shop, pass, cosmetics, and rewards never imply HP, damage, score, or power advantage.</p>
+        <h3>No Cosmetic Economy</h3>
+        <p>Progression rewards are Glory, Credits, Season XP, records, and achievements. Do not add dress-up economies to this game.</p>
       </div>
     </section>
 
@@ -1099,9 +1121,10 @@
         <p>The first screen is a playable arcade cockpit, not a landing page. It should say: choose a pilot identity, press Play, or inspect one focused meta surface.</p>
         <ul>
           <li>Logo sits in the upper third, readable over menu-flight background.</li>
-          <li>Call sign is the pilot-card anchor; account chip is attached to the right.</li>
+          <li>Currency values sit at the top: Glory, Credits, and current Season Tier.</li>
+          <li>Call sign is the pilot-card anchor; account chip sits to the left and opens profile/settings.</li>
           <li>Play is the dominant action and wider than every other control.</li>
-          <li>Icon order: Badges, Road, Records, Codex, Gear.</li>
+          <li>Icon order: Badges, Road, Records, Codex.</li>
           <li>The icon row should read as a small Pilot Meta dock so players understand these are secondary progression/profile surfaces.</li>
           <li>The account chip should be labelled as Account so sync/profile is not confused with the call sign field.</li>
           <li>High score and Glory rank stay below the icon row as a compact status strip.</li>
@@ -1110,17 +1133,17 @@
       </div>
       <div class="screen-frame">
         <div class="phone">
+          <div class="currency-strip"><span>Glory <b>0</b></span><span>Credits <b>0</b></span><span>Tier <b>1</b></span></div>
           <div class="title-logo">STAR STRIKE <span>RUSH</span></div>
           <div class="label" style="top:216px;left:0;right:0;">Call Sign</div>
-          <div class="call-box">ENTER CALL SIGN</div>
           <div class="account-chip"></div>
+          <div class="call-box">ENTER CALL SIGN</div>
           <div class="button" style="left:82px;right:82px;top:307px;height:56px;">Play</div>
           <div class="icon-row">
             <div class="icon-button">T<small>BADGES</small></div>
             <div class="icon-button">R<small>ROAD</small></div>
             <div class="icon-button">G<small>RECORDS</small></div>
             <div class="icon-button">B<small>CODEX</small></div>
-            <div class="icon-button">S<small>GEAR</small></div>
           </div>
           <div class="stat-line" style="top:512px;">High Score: 0</div>
           <div class="stat-line rank-line" style="top:535px;">Rookie Pilot | Glory 0</div>
@@ -1132,11 +1155,12 @@
       <div class="screen-copy">
         <span class="status current">Current</span>
         <h2>Account Panel</h2>
-        <p>Account is utility, not progression. It tells the player whether online sync is available and gives safe controls for sign-in, sign-out, sync, and refresh.</p>
+        <p>Account is the pilot utility screen. It tells the player whether online sync is available and gives safe controls for sign-in, sign-out, sync, settings, and reset.</p>
         <ul>
           <li>Opens from the small account chip, not the main icon row.</li>
           <li>Status and errors live above buttons and never overlap actions.</li>
-          <li>Shows local rank/Glory/Tier even when signed out.</li>
+          <li>Shows local rank/Glory/Tier/Credits even when signed out.</li>
+          <li>Settings live here: particle count, screen shake, and reset progress.</li>
           <li>Refresh remains available but should not feel like a required pre-run step.</li>
         </ul>
       </div>
@@ -1153,6 +1177,16 @@
               <div class="gold-text" style="font-weight:900;text-transform:uppercase;">Rookie Pilot</div>
               <div class="muted" style="font-size:11px;margin-top:8px;">Glory 0 | Tier 1</div>
               <div class="muted" style="font-size:11px;margin-top:8px;">Credits 0 | Best 0</div>
+            </div>
+            <div style="position:absolute;left:20px;right:20px;top:288px;">
+              <div class="muted" style="font-weight:900;margin-bottom:12px;">Settings</div>
+              <div style="display:flex;gap:10px;margin-bottom:14px;">
+                <div class="button secondary" style="position:static;width:64px;height:28px;">Low</div>
+                <div class="button secondary" style="position:static;width:64px;height:28px;">Med</div>
+                <div class="button" style="position:static;width:64px;height:28px;">High</div>
+              </div>
+              <div class="button" style="position:static;width:130px;height:32px;display:inline-flex;margin-right:16px;">Shake: On</div>
+              <div class="button danger" style="position:static;width:150px;height:32px;display:inline-flex;">Reset</div>
             </div>
             <div class="button" style="left:20px;right:20px;bottom:18px;height:36px;">Refresh online data</div>
           </div>
@@ -1240,7 +1274,7 @@
               <div class="road-node right"><span class="node-title">750 Glory</span><span class="node-sub">Rank-up warning glow.</span></div>
               <div class="road-node left major"><span class="node-title">Star Cadet</span><span class="node-sub">1,000 Glory. New rank badge.</span></div>
               <div class="road-node right"><span class="node-title">2,000 Glory</span><span class="node-sub">Cadet road checkpoint.</span></div>
-              <div class="road-node left major"><span class="node-title">Strike Pilot</span><span class="node-sub">3,000 Glory. Sharper title frame.</span></div>
+              <div class="road-node left major"><span class="node-title">Strike Pilot</span><span class="node-sub">3,000 Glory. Stronger rank marker.</span></div>
               <div class="road-node right"><span class="node-title">5,000 Glory</span><span class="node-sub">Mid-road identity marker.</span></div>
               <div class="road-node left major"><span class="node-title">Void Runner</span><span class="node-sub">7,500 Glory. Deep-space badge.</span></div>
               <div class="road-node right"><span class="node-title">11,000 Glory</span><span class="node-sub">Ace approach marker.</span></div>
@@ -1261,11 +1295,11 @@
       <div class="screen-copy">
         <span class="status current expandable">Current, expandable</span>
         <h2>Season Road</h2>
-        <p>Season Road is the temporary 8-week progress surface. It should feel like a classic pass: lots of tiers, a central spine, frequent small rewards, and bigger milestone rewards every few steps.</p>
+        <p>Season Road is the temporary 8-week progress surface. It should feel like a classic long progression road: lots of tiers, a central spine, frequent small resource rewards, and bigger milestone rewards every few steps.</p>
         <ul>
           <li>Use green/cyan instead of gold so it does not compete with lifetime Glory.</li>
           <li>Tier rows become a long scroll track, not a compact list.</li>
-          <li>Free rewards sit on the left lane; cosmetic rewards sit on the right lane. Do not imply Stripe or a paid pass here.</li>
+          <li>Flight rewards sit on the left lane; Supply rewards sit on the right lane. Both lanes are earned through play.</li>
           <li>Reward cards use real reward data: tier, reward type, amount/name, detail text, and claimed/unclaimed/locked state.</li>
           <li>Opening the Season Road should auto-position near the player's current tier.</li>
           <li>Every fifth tier should feel like a larger milestone node.</li>
@@ -1288,34 +1322,34 @@
               </div>
               <div class="meter"><span style="width:0%;"></span></div>
             </div>
-            <div class="track-labels"><span>Free Track</span><span>Tier</span><span>Premium Later</span></div>
+            <div class="track-labels"><span>Flight</span><span>Tier</span><span>Supply</span></div>
             <div class="season-map">
-              <div class="tier-step reached"><div class="reward free">Starter Badge</div><div class="tier-dot">1</div><div class="reward premium">Locked Track</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">2</div><div class="reward premium">Trail Tint</div></div>
-              <div class="tier-step"><div class="reward free">Title: Launch</div><div class="tier-dot">3</div><div class="reward premium">Banner</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">4</div><div class="reward premium">Badge Trim</div></div>
-              <div class="tier-step milestone"><div class="reward free">Ship Skin Preview</div><div class="tier-dot">5</div><div class="reward premium">Premium Skin</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">6</div><div class="reward premium">Trail Tint</div></div>
-              <div class="tier-step"><div class="reward free">Banner</div><div class="tier-dot">7</div><div class="reward premium">Title Frame</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">8</div><div class="reward premium">Ship Decal</div></div>
-              <div class="tier-step"><div class="reward free">Badge</div><div class="tier-dot">9</div><div class="reward premium">Glow Color</div></div>
-              <div class="tier-step milestone"><div class="reward free">Comet Trail</div><div class="tier-dot">10</div><div class="reward premium">Gold Variant</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">11</div><div class="reward premium">Banner</div></div>
-              <div class="tier-step"><div class="reward free">Title</div><div class="tier-dot">12</div><div class="reward premium">Trail Tint</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">13</div><div class="reward premium">Badge Trim</div></div>
-              <div class="tier-step"><div class="reward free">Player Card</div><div class="tier-dot">14</div><div class="reward premium">Profile Frame</div></div>
-              <div class="tier-step milestone"><div class="reward free">Ship Skin</div><div class="tier-dot">15</div><div class="reward premium">Animated Trail</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">16</div><div class="reward premium">Banner</div></div>
-              <div class="tier-step"><div class="reward free">Badge</div><div class="tier-dot">17</div><div class="reward premium">Title Frame</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">18</div><div class="reward premium">Decal</div></div>
-              <div class="tier-step"><div class="reward free">Trail Tint</div><div class="tier-dot">19</div><div class="reward premium">Glow Color</div></div>
-              <div class="tier-step milestone"><div class="reward free">Boss Banner</div><div class="tier-dot">20</div><div class="reward premium">Premium Ship</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">21</div><div class="reward premium">Badge Trim</div></div>
-              <div class="tier-step"><div class="reward free">Title</div><div class="tier-dot">22</div><div class="reward premium">Banner</div></div>
-              <div class="tier-step"><div class="reward free">Credits</div><div class="tier-dot">23</div><div class="reward premium">Trail Tint</div></div>
-              <div class="tier-step"><div class="reward free">Profile Badge</div><div class="tier-dot">24</div><div class="reward premium">Profile Frame</div></div>
-              <div class="tier-step milestone"><div class="reward free">Midseason Skin</div><div class="tier-dot">25</div><div class="reward premium">Animated Skin</div></div>
-              <div class="future-note">Blueprint shows the scroll rhythm. Full implementation target is 50 tiers across an 8-week season, with cosmetic-only rewards.</div>
+              <div class="tier-step reached"><div class="reward flight">52 Season XP</div><div class="tier-dot">1</div><div class="reward supply">100 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">59 Season XP</div><div class="tier-dot">2</div><div class="reward supply">110 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">66 Season XP</div><div class="tier-dot">3</div><div class="reward supply">120 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">73 Season XP</div><div class="tier-dot">4</div><div class="reward supply">130 Credits</div></div>
+              <div class="tier-step milestone"><div class="reward flight">270 Glory Cache</div><div class="tier-dot">5</div><div class="reward supply">430 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">87 Season XP</div><div class="tier-dot">6</div><div class="reward supply">150 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">94 Season XP</div><div class="tier-dot">7</div><div class="reward supply">160 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">101 Season XP</div><div class="tier-dot">8</div><div class="reward supply">170 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">108 Season XP</div><div class="tier-dot">9</div><div class="reward supply">180 Credits</div></div>
+              <div class="tier-step milestone"><div class="reward flight">360 Glory Cache</div><div class="tier-dot">10</div><div class="reward supply">540 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">122 Season XP</div><div class="tier-dot">11</div><div class="reward supply">200 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">129 Season XP</div><div class="tier-dot">12</div><div class="reward supply">210 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">136 Season XP</div><div class="tier-dot">13</div><div class="reward supply">220 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">143 Season XP</div><div class="tier-dot">14</div><div class="reward supply">230 Credits</div></div>
+              <div class="tier-step milestone"><div class="reward flight">450 Glory Cache</div><div class="tier-dot">15</div><div class="reward supply">650 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">157 Season XP</div><div class="tier-dot">16</div><div class="reward supply">250 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">164 Season XP</div><div class="tier-dot">17</div><div class="reward supply">260 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">171 Season XP</div><div class="tier-dot">18</div><div class="reward supply">270 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">178 Season XP</div><div class="tier-dot">19</div><div class="reward supply">280 Credits</div></div>
+              <div class="tier-step milestone"><div class="reward flight">540 Glory Cache</div><div class="tier-dot">20</div><div class="reward supply">760 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">192 Season XP</div><div class="tier-dot">21</div><div class="reward supply">300 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">199 Season XP</div><div class="tier-dot">22</div><div class="reward supply">310 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">206 Season XP</div><div class="tier-dot">23</div><div class="reward supply">320 Credits</div></div>
+              <div class="tier-step"><div class="reward flight">213 Season XP</div><div class="tier-dot">24</div><div class="reward supply">330 Credits</div></div>
+              <div class="tier-step milestone"><div class="reward flight">630 Glory Cache</div><div class="tier-dot">25</div><div class="reward supply">870 Credits</div></div>
+              <div class="future-note">Blueprint shows the scroll rhythm. Full implementation target is 50 earned tiers across an 8-week season, with Flight and Supply reward data only.</div>
             </div>
           </div>
         </div>
@@ -1430,16 +1464,16 @@
       </div>
     </section>
 
-    <section id="gear" class="screen-spec">
+    <section id="account-settings" class="screen-spec">
       <div class="screen-copy">
         <span class="status current">Current</span>
-        <h2>Gear / Settings</h2>
-        <p>Gear is operational, restrained, and not a place for game goals. It protects performance and safety controls.</p>
+        <h2>Account Settings Area</h2>
+        <p>Settings are an operational subsection inside Account. They protect performance and safety controls without taking over the title screen.</p>
         <ul>
           <li>Particle count: Low, Med, High.</li>
           <li>Screen shake toggle.</li>
           <li>Reset progress is present but visually dangerous and separated.</li>
-          <li>Future audio and accessibility controls belong here.</li>
+          <li>Future audio and accessibility controls belong in this Account area.</li>
         </ul>
       </div>
       <div class="screen-frame">
@@ -1602,13 +1636,12 @@
       <div class="screen-copy">
         <span class="status future">Future screens</span>
         <h2>Future Meta Map</h2>
-        <p>These are not implemented screens yet. They are included so future monetization and progression work has guardrails before code starts.</p>
+        <p>These are not implemented screens yet. They are included so future progression and utility work has guardrails before code starts.</p>
         <ul>
-          <li>Missions: daily and weekly objectives, no paid rerolls.</li>
-          <li>Flight Pass: free first, premium later, cosmetic rewards only.</li>
-          <li>Customize: ship skins, trails, banners, titles, badges.</li>
-          <li>Shop: Stripe/web checkout via server only, no client-granted goods.</li>
-          <li>Cosmetic Lab: community voting, no buying votes.</li>
+          <li>Missions: daily and weekly objectives that reward Season XP, Glory, or Credits.</li>
+          <li>Practice: a low-pressure training surface for dash timing, boss warnings, and enemy study.</li>
+          <li>Accessibility: audio, contrast, input, and readable-warning controls.</li>
+          <li>Run History: recent local and synced runs with score, phase, rank, and road gains.</li>
         </ul>
       </div>
       <div class="screen-frame">
@@ -1618,18 +1651,16 @@
             <div class="future-note">Each future screen gets its own dedicated panel. Do not bury these in Account.</div>
             <div class="row active"><span>Missions</span><span>Daily / Weekly</span></div>
             <div class="row"><span>Purpose</span><span>Session goals and XP rewards</span></div>
-            <div class="row"><span>Rule</span><span>No Gem rerolls</span></div>
-            <div class="row gold"><span>Flight Pass</span><span>50 tiers</span></div>
-            <div class="row"><span>Free</span><span>Always visible first</span></div>
-            <div class="row"><span>Premium</span><span>Separate cosmetic track later</span></div>
-            <div class="row active"><span>Customize</span><span>Cosmetic loadout</span></div>
-            <div class="row"><span>Slots</span><span>Ship, trail, title, banner, badge</span></div>
-            <div class="row"><span>Rule</span><span>No gameplay stats</span></div>
-            <div class="row gold"><span>Shop</span><span>Stripe server checkout</span></div>
-            <div class="row"><span>Products</span><span>Gems, pass, cosmetics</span></div>
-            <div class="row"><span>Rule</span><span>Webhook grants only</span></div>
-            <div class="row active"><span>Cosmetic Lab</span><span>Community voting</span></div>
-            <div class="row"><span>Rule</span><span>No paid votes or forced inclusion</span></div>
+            <div class="row"><span>Rule</span><span>No paid rerolls</span></div>
+            <div class="row gold"><span>Practice</span><span>Training lanes</span></div>
+            <div class="row"><span>Focus</span><span>Dash, warnings, boss reads</span></div>
+            <div class="row"><span>Rule</span><span>No leaderboard credit</span></div>
+            <div class="row active"><span>Accessibility</span><span>Readable action</span></div>
+            <div class="row"><span>Controls</span><span>Audio, contrast, input</span></div>
+            <div class="row"><span>Rule</span><span>Never hide danger states</span></div>
+            <div class="row gold"><span>Run History</span><span>Recent progress</span></div>
+            <div class="row"><span>Fields</span><span>Score, phase, Glory, XP</span></div>
+            <div class="row"><span>Rule</span><span>Local-first, sync when signed in</span></div>
           </div>
         </div>
       </div>

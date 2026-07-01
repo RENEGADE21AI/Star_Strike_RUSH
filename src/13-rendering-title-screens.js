@@ -1,4 +1,6 @@
 function drawTitleAndButtons() {
+  drawTitleMetaStrip(14, 12, W - 28);
+
   ctx.save();
   ctx.translate(W / 2, H * 0.22);
   ctx.transform(1, 0, -0.13, 1, 0, 0);
@@ -45,6 +47,9 @@ function drawTitleAndButtons() {
   }
   ctx.fillStyle = callSign ? "#fff" : "rgba(255,255,255,0.30)";
   ctx.fillText(txt, callRect.x + callRect.w / 2, callRect.y + callRect.h / 2 + 1);
+  ctx.font = "900 8px 'Arial Narrow', Arial, sans-serif";
+  ctx.fillStyle = callSignEditing ? "#78ffb4" : "rgba(255,255,255,0.48)";
+  ctx.fillText(callSignEditing ? "ENTER SAVES" : "TAP TO EDIT", callRect.x + callRect.w / 2, callRect.y + callRect.h - 7);
   ctx.restore();
 
   const iconRects = getTitleIconRects();
@@ -65,7 +70,7 @@ function drawTitleAndButtons() {
 
   const dockX = iconRects.achievements.x - 8;
   const dockY = iconRects.achievements.y - 18;
-  const dockW = iconRects.settings.x + iconRects.settings.w - iconRects.achievements.x + 16;
+  const dockW = iconRects.codex.x + iconRects.codex.w - iconRects.achievements.x + 16;
   const dockH = 82;
   ctx.save();
   ctx.fillStyle = "rgba(5,8,18,0.44)";
@@ -85,12 +90,10 @@ function drawTitleAndButtons() {
   drawSimpleButton(iconRects.progress, "");
   drawSimpleButton(iconRects.records, "");
   drawSimpleButton(iconRects.codex, "");
-  drawSimpleButton(iconRects.settings, "");
   drawTrophyIcon(iconRects.achievements, titleSubState === "achievements" && titlePanelTarget === 1);
   drawRoadIcon(iconRects.progress, titleSubState === "progress" && titlePanelTarget === 1);
   drawRecordsIcon(iconRects.records, titleSubState === "records" && titlePanelTarget === 1);
   drawBookIcon(iconRects.codex, titleSubState === "codex" && titlePanelTarget === 1);
-  drawGearIcon(iconRects.settings, titleSubState === "settings" && titlePanelTarget === 1);
   ctx.save();
   ctx.fillStyle = "rgba(255,255,255,0.80)";
   ctx.font = FONT_TINY;
@@ -100,7 +103,6 @@ function drawTitleAndButtons() {
   ctx.fillText("ROAD", iconRects.progress.x + iconRects.progress.w / 2, iconRects.progress.y + iconRects.progress.h + 4);
   ctx.fillText("RECORDS", iconRects.records.x + iconRects.records.w / 2, iconRects.records.y + iconRects.records.h + 4);
   ctx.fillText("CODEX", iconRects.codex.x + iconRects.codex.w / 2, iconRects.codex.y + iconRects.codex.h + 4);
-  ctx.fillText("GEAR", iconRects.settings.x + iconRects.settings.w / 2, iconRects.settings.y + iconRects.settings.h + 4);
   ctx.restore();
 
   ctx.save();

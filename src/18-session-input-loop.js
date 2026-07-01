@@ -24,7 +24,7 @@ function setupSession(mode = "start") {
   state.phaseTimer = 0;
   state.waveIndex = 0;
   state.waveRest = 0;
-  state.pressure = 20;
+  state.pressure = 8;
   state.threatScore = 0;
   state.cachedBulletPressure = 0;
   state.cachedBulletBudget = 0;
@@ -49,8 +49,8 @@ function setupSession(mode = "start") {
   state.waveMood = "open";
   state.waveMoodTimer = 120;
   state.lastWaveTemplateName = null;
-  state.difficulty.threat = 0.75;
-  state.difficulty.target = 0.75;
+  state.difficulty.threat = 0.58;
+  state.difficulty.target = 0.58;
   state.difficulty.grace = 0;
   state.difficulty.ghostGrace = 0;
   state.difficulty.heatStreak = false;
@@ -242,21 +242,11 @@ function handleTitlePointerDown(x, y, pointerId = null) {
 
   if (titlePanelAnim > 0.02) {
     if (titlePanelHit(x, y)) {
-      if (titleSubState === "settings") {
-        const r = getSettingsRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
-        if (hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-        if (hitRect(r.med, x, y)) { settingMaxParticles = 600; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-        if (hitRect(r.high, x, y)) { settingMaxParticles = 900; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-        if (hitRect(r.shake, x, y)) { settingScreenShake = !settingScreenShake; saveSettings(); return true; }
-        if (hitRect(r.reset, x, y)) { resetProgressConfirm = true; return true; }
-        return true;
-      }
       if (titleSubState === "codex") {
         const r = getCodexRects();
         if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
         if (codexDetailType) {
-          const detailCard = { x: r.panel.x + 18, y: r.panel.y + 46, w: r.panel.w - 36, h: r.panel.h - 62 };
+          const detailCard = { x: r.panel.x + 18, y: r.panel.y + 78, w: r.panel.w - 36, h: r.panel.h - 94 };
           const backRect = { x: detailCard.x + 10, y: detailCard.y + 10, w: 28, h: 22 };
           if (hitRect(backRect, x, y)) { codexDetailType = null; return true; }
           if (!(x >= detailCard.x && x <= detailCard.x + detailCard.w && y >= detailCard.y && y <= detailCard.y + detailCard.h)) {
@@ -281,6 +271,11 @@ function handleTitlePointerDown(x, y, pointerId = null) {
         if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
         if (hitRect(r.signIn, x, y)) { requestOnlineSignIn(); return true; }
         if (hitRect(r.signOut, x, y)) { requestOnlineSignOut(); return true; }
+        if (hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
+        if (hitRect(r.med, x, y)) { settingMaxParticles = 600; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
+        if (hitRect(r.high, x, y)) { settingMaxParticles = 900; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
+        if (hitRect(r.shake, x, y)) { settingScreenShake = !settingScreenShake; saveSettings(); return true; }
+        if (hitRect(r.reset, x, y)) { resetProgressConfirm = true; return true; }
         if (hitRect(r.refresh, x, y)) { requestOnlineRefresh(); return true; }
         return true;
       }
@@ -347,11 +342,6 @@ function handleTitlePointerDown(x, y, pointerId = null) {
   if (hitRect(iconRects.records, x, y)) {
     if (titleSubState === "records" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
     else { titleSubState = "records"; titlePanelTarget = 1; codexDetailType = null; }
-    return true;
-  }
-  if (hitRect(iconRects.settings, x, y)) {
-    if (titleSubState === "settings" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "settings"; titlePanelTarget = 1; codexDetailType = null; }
     return true;
   }
   if (hitRect(iconRects.codex, x, y)) {

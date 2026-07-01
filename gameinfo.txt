@@ -143,43 +143,34 @@ Glory ranks:
 Season structure target:
 
 - 8-week seasons.
-- 50 Flight Pass tiers.
-- Free reward track first.
-- Premium reward track later.
+- 50 Season Road tiers.
+- Flight reward lane for Season XP and Glory caches.
+- Supply reward lane for Credits.
 - Daily and weekly missions later.
-- Cosmetic Lab voting later.
 - No season gameplay events.
 
 Meta systems that are planned but not implemented yet:
 
 - Daily missions.
 - Weekly missions.
-- Flight Pass reward claiming.
-- Cosmetic inventory.
-- Customize screen.
-- Shop.
-- Gems.
-- Stripe web purchases.
-- Premium Flight Pass.
+- Season Road reward claiming.
+- Practice/training screen.
+- Run history screen.
+- Accessibility/audio controls.
 - AdMob rewarded ads.
-- Community Cosmetic Lab.
-- UGC moderation and voting.
 
 Hard monetization and community constraints:
 
 - No fan-fund or fuel system.
-- No paying to force a cosmetic into the game.
-- No buying votes with Gems.
-- No Gem mission rerolls.
 - No loot boxes.
 - No paid gameplay advantage.
 - No permanent gameplay upgrades.
-- No gameplay power from cosmetics, purchases, Glory, Credits, Gems, or seasons.
+- No gameplay power from purchases, Glory, Credits, or seasons.
 
-Stripe is not added yet. When web payments are added, Stripe must be handled by
-server-side checkout and webhooks, and clients must not grant Gems, purchases,
-premium pass ownership, or inventory directly. Android/iOS builds should use a
-purchase-provider abstraction for platform billing.
+Stripe is not added yet. If web payments are ever added, Stripe must be handled
+by server-side checkout and webhooks, and clients must not grant purchases or
+spendable balances directly. Android/iOS builds should use a purchase-provider
+abstraction for platform billing.
 
 Signed-in players can sync:
 
@@ -193,29 +184,34 @@ Signed-in players can sync:
 Title screen meta placement:
 
 - Play remains the largest central action.
+- Glory, Credits, and current Season Tier are visible at the top of the title
+  screen and in title-side meta screens.
 - The call sign area doubles as the pilot card, showing current Glory rank and
   total Glory.
-- A small account chip sits beside the call sign. It opens account sign-in,
-  sign-out, profile sync, and online refresh controls.
-- The main icon row under Play is: Badges, Road, Records, Codex, Gear.
+- A small account chip sits to the left of the call sign. It opens account
+  sign-in, sign-out, profile sync, online refresh, settings, and reset controls.
+- The main icon row under Play is: Badges, Road, Records, Codex.
 - Badges opens the achievements trophy panel.
 - Road opens Glory Road and Season Road tabs. These tracks should feel like
   classic long-scroll progression roads with a central spine, nodes, milestone
   rewards, and visible travel distance. Do not compress them into short lists.
   The current canvas implementation uses a draggable/wheel-scroll road viewport:
   Glory alternates rank milestones and checkpoints, while Season displays all
-  50 supported tiers on a central rail with free and cosmetic reward markers.
+  50 supported tiers on a central rail with Flight and Supply reward markers.
   Road opens around current progress instead of always starting at tier/rank 1.
   The current node has a pulsing marker ship, and tapping nodes or reward cards
   opens an inspect panel with requirement, reward, and reached/locked/claimed
   state.
 - Records opens the world-record leaderboard and refresh controls.
 - Codex opens enemy and boss discovery.
-- Gear opens performance/settings/reset controls.
 
 The old combined Online drawer should not be the default information model.
 Account, achievements, records, and progression should remain distinct so each
 screen has one obvious purpose.
+
+The old standalone settings screen should not return. Settings belong inside
+Account because they are personal/profile utility, not a fifth title-screen
+destination.
 
 Game over should bridge into meta progression. After a run, the player sees
 Glory, Season XP, Credits, rank/tier movement, and a `VIEW ROAD` action that
