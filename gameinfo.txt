@@ -294,7 +294,15 @@ and deaths. Use this sampling when tuning opening, mid-game, and low-HP relief.
 
 ## 8. Enemy Roster
 
-All enemies are geometric, color-coded, and readable at a glance.
+All enemies are geometric, color-coded, and readable at a glance, but they
+should still read as real manufactured fighters rather than flat icons. The Red
+Scout, Orange Light Interceptor, and Purple Heavy are the baseline: clear nose,
+hull mass, wings, canopy/core, and engine flare. Expansion enemies keep that
+ship grammar while adding one obvious role cue: Splitter has cracked armor,
+Carrier has launch bays, Siphon has prongs and a glowing energy core, Leech has
+hooked tether hardware, Minecaster has a cargo/mine hatch and hazard lights,
+Shieldbearer has emitter wings and a shield ring, Railgunner has a long barrel,
+and Repair Drone has tool arms and green repair sparks.
 
 ### Red Scout
 
