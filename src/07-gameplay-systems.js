@@ -273,6 +273,7 @@ function damagePlayer(amount = 1) {
   p.energy = clamp(p.energy + 12, 0, p.maxEnergy);
   state.difficulty.grace = 120;
   state.difficulty.ghostGrace = 0;
+  if (typeof applyLowHpReliefAfterHit === "function") applyLowHpReliefAfterHit();
   kickShake(amount >= 2 ? 12 : 8);
   state.fx.flash = Math.max(state.fx.flash, amount >= 2 ? 10 : 8);
   resetCombo();
@@ -571,9 +572,9 @@ function updateWavesAndPhaseAndPressure() {
   const strongPerformance = sinceHit > 720 && state.difficulty.killStreak >= 5 && !bossLocked;
   const comfort = sinceHit > 840 && state.player.hp === state.player.maxHp && state.pressure < 48 && !bossLocked;
   const ramp = openingRamp();
-  if (strongPerformance && ramp > 0.55) { state.phaseTimer += 0.18; state.waveTimer += 0.08; }
-  if (comfort && ramp > 0.50) { state.phaseTimer += 0.24; state.waveTimer += 0.10; }
-  if (state.difficulty.pacingMemory > 0.35 && ramp > 0.60) { state.phaseTimer += 0.07; state.waveTimer += 0.035; }
+  if (strongPerformance && ramp > 0.72) { state.phaseTimer += 0.12; state.waveTimer += 0.05; }
+  if (comfort && ramp > 0.70) { state.phaseTimer += 0.16; state.waveTimer += 0.06; }
+  if (state.difficulty.pacingMemory > 0.35 && ramp > 0.76) { state.phaseTimer += 0.04; state.waveTimer += 0.02; }
   if (state.intensityPhase === "surge") { state.phaseTimer += 0.10; state.waveTimer += 0.10; }
   updatePressure();
   updatePacingMemory();
@@ -597,8 +598,9 @@ function updateWavesAndPhaseAndPressure() {
     if (state.phase % 4 === 0) spawnBoss();
   }
   let baseInterval;
-  if (state.phase === 1) baseInterval = state.phaseTimer < 900 ? 168 : state.phaseTimer < 1650 ? 142 : 120;
-  else if (state.phase === 2) baseInterval = state.phaseTimer < 800 ? 128 : 108;
+  if (state.phase === 1) baseInterval = state.phaseTimer < 1000 ? 180 : state.phaseTimer < 2100 ? 156 : 136;
+  else if (state.phase === 2) baseInterval = state.phaseTimer < 1300 ? 156 : 132;
+  else if (state.phase === 3) baseInterval = 118;
   else baseInterval = Math.max(38, 88 - state.phase * 3.5);
   const rhythm = rhythmProfile();
   baseInterval += rhythm.interval;
@@ -611,8 +613,8 @@ function updateWavesAndPhaseAndPressure() {
   if (state.intensityPhase === "cooldown") baseInterval *= 1.18;
   if (state.difficulty.grace > 0) baseInterval += 10;
   if (state.difficulty.ghostGrace > 0) baseInterval += 8;
-  if (state.player.hp <= 2) baseInterval += 8;
-  if (state.player.hp === 1) baseInterval += 6;
+  if (state.player.hp <= 2) baseInterval += 16;
+  if (state.player.hp === 1) baseInterval += 18;
   if (state.boss) baseInterval += 12;
   if (state.waveRest > 0) baseInterval += Math.floor(state.waveRest * 0.5);
   const load = peakLoad();
@@ -621,12 +623,15 @@ function updateWavesAndPhaseAndPressure() {
   const interval = Math.round(baseInterval / clamp(state.difficulty.threat, 0.55, 1.25));
   let threatBudget = 11.5 + state.phase * 2.8 + (state.intensityPhase === "surge" ? 0.8 : state.intensityPhase === "cooldown" ? -0.8 : 0);
   if (state.phase === 1) threatBudget = 6.8 + openingRamp() * 2.8;
-  else if (state.phase === 2) threatBudget = 9.5 + openingRamp() * 2.2;
+  else if (state.phase === 2) threatBudget = 8.4 + openingRamp() * 1.4;
+  else if (state.phase === 3) threatBudget = 10.8 + openingRamp() * 1.8;
   if (state.waveMood === "spike") threatBudget += 1.2;
   else if (state.waveMood === "recovery") threatBudget -= 1.2;
   else if (state.waveMood === "rule") threatBudget += 0.5;
   if (state.difficulty.pacingMemory > 0.45) threatBudget += 0.75;
   if (state.difficulty.pacingMemory < -0.35) threatBudget -= 0.6;
+  if (state.player.hp <= 2) threatBudget -= 1.8;
+  if (state.player.hp === 1) threatBudget -= 1.4;
   if (!state.boss && state.pendingSpawns.length === 0 && state.waveTimer >= interval && state.threatScore < threatBudget) {
     spawnWave();
     state.waveTimer = 0;

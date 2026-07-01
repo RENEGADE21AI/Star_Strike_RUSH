@@ -575,6 +575,8 @@ const state = {
   joystick: { active: false, id: null, cx: 0, cy: 0, ax: 0, ay: 0, radius: 56 },
   playerRealm: 0,
   devStatsVisible: false,
+  difficultySamples: [],
+  difficultyDeaths: 0,
   runStats: { kills: 0, powerups: 0, ghostUses: 0, bosses: 0, damageTaken: 0, highestCombo: 0, startedAtMs: 0, metaApplied: false },
   killsSinceLastDrop: 0,
   framesSinceLastDrop: 0,

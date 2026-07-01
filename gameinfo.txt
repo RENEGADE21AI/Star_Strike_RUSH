@@ -275,6 +275,23 @@ Difficulty scaling affects movement, firing cadence, enemy mix, pressure budget,
 - No boss-shielding.
 - No shield stacking.
 
+Opening difficulty targets:
+
+- First 30 seconds: readable warmup, phase 1, no bullet flood, mostly open or
+  recovery wave moods.
+- First 2 minutes: gentle ramp, no first boss yet, no normal bullet flood, and
+  pressure should reflect actual screen danger rather than combo success alone.
+- Mid-game: pressure can rise through spikes and rule waves, but enemy counts,
+  bullets, pending spawns, and support enemies should stay within visible
+  dodging space.
+- Low HP: hits force a recovery window, stretch wave gaps, trim queued spawns,
+  and reduce active bullet pressure outside boss-locked patterns.
+
+Debug mode (`?debug`) records a bounded difficulty sample history containing
+frame/time, phase, HP, energy, pressure, threat, bullet budget/load, enemy and
+spawn counts, wave mood, intensity phase, relief state, kills, damage taken,
+and deaths. Use this sampling when tuning opening, mid-game, and low-HP relief.
+
 ## 8. Enemy Roster
 
 All enemies are geometric, color-coded, and readable at a glance.

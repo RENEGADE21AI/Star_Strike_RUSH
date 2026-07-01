@@ -62,6 +62,8 @@ function setupSession(mode = "start") {
   state.difficulty.pacingMemory = 0;
   state.playerRealm = 0;
   state.devStatsVisible = false;
+  state.difficultySamples = [];
+  state.difficultyDeaths = 0;
   state.runStats.kills = 0;
   state.runStats.powerups = 0;
   state.runStats.ghostUses = 0;
@@ -127,6 +129,8 @@ function enterGameOver() {
   state.fx.flash = 0;
   state.gameOverShakeTimer = 180;
   state.gameOverShake = 6;
+  state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
+  if (typeof recordDifficultySample === "function") recordDifficultySample(true);
   submitOnlineRun();
 }
 function resize() {
@@ -701,12 +705,19 @@ function getDebugSnapshot() {
         status: titleProgressSelectedNode.status
       } : null,
       resetProgressConfirm
+    },
+    difficulty: {
+      latestSample: state.difficultySamples && state.difficultySamples.length
+        ? state.difficultySamples[state.difficultySamples.length - 1]
+        : null,
+      samples: state.difficultySamples ? state.difficultySamples.slice(-180) : []
     }
   };
 }
 
 function updateDebugSnapshot() {
   if (!DEBUG_SNAPSHOT_ENABLED) return;
+  if (typeof recordDifficultySample === "function") recordDifficultySample();
   if (!debugSnapshotEl) {
     debugSnapshotEl = document.createElement("pre");
     debugSnapshotEl.id = "debugSnapshot";
