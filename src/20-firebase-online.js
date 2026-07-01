@@ -7,6 +7,7 @@ const FIREBASE_CONFIG_CANDIDATES = [
 let app = null;
 let auth = null;
 let db = null;
+let functionsApi = null;
 let leaderboardUnsubscribe = null;
 
 const GLORY_RANK_NAMES = [
@@ -161,6 +162,9 @@ function normalizeMetaSnapshot(meta) {
     seasonName: safeText(meta && meta.seasonName, "Launch Flight", 60),
     seasonXP: boundedNumber(meta && meta.seasonXP, 999999999),
     seasonTier: Math.max(1, Math.min(50, numberOrZero(meta && meta.seasonTier) || 1)),
+    seasonClaimedRewardIds: Array.isArray(meta && meta.seasonClaimedRewardIds)
+      ? meta.seasonClaimedRewardIds.map((id) => safeId(id, "")).filter(Boolean).slice(0, 220)
+      : [],
     credits: boundedNumber(meta && meta.credits, 999999999),
     lifetime: {
       runs: boundedNumber(meta && meta.lifetime && meta.lifetime.runs, 1000000),
@@ -273,6 +277,8 @@ async function syncProfile(callSignOverride = "") {
   const gloryRank = localMeta.totalGlory >= totalGlory ? localMeta.gloryRank : (remoteRank === GLORY_RANK_NAMES[0] && gloryRankIndex > 0 ? gloryRankNameForIndex(gloryRankIndex) : remoteRank);
   const currentSeasonXP = Math.max(localMeta.seasonXP, numberOrZero(privateData.currentSeasonXP));
   const currentSeasonTier = Math.max(localMeta.seasonTier, numberOrZero(publicData.seasonTier), numberOrZero(privateData.currentSeasonTier), 1);
+  const remoteClaimed = Array.isArray(privateData.seasonClaimedRewardIds) ? privateData.seasonClaimedRewardIds.map((id) => safeId(id, "")).filter(Boolean) : [];
+  const seasonClaimedRewardIds = Array.from(new Set([...remoteClaimed, ...localMeta.seasonClaimedRewardIds])).slice(0, 220);
   const credits = Math.max(localMeta.credits, numberOrZero(privateData.credits));
   const timestamp = serverTimestamp();
 
@@ -296,6 +302,7 @@ async function syncProfile(callSignOverride = "") {
     lifetimeBosses: Math.max(localMeta.lifetime.bosses, numberOrZero(privateData.lifetimeBosses)),
     lifetimeDamageTaken: Math.max(localMeta.lifetime.damageTaken, numberOrZero(privateData.lifetimeDamageTaken)),
     highestCombo: Math.max(localMeta.lifetime.highestCombo, numberOrZero(privateData.highestCombo)),
+    seasonClaimedRewardIds,
     lastSeenAt: timestamp,
     updatedAt: timestamp
   };
@@ -333,6 +340,7 @@ async function syncProfile(callSignOverride = "") {
     gloryRankIndex,
     currentSeasonXP,
     currentSeasonTier,
+    seasonClaimedRewardIds,
     credits
   };
   setStatus("Profile synced.");
@@ -453,6 +461,23 @@ async function signOutOnline() {
   }
 }
 
+function applyServerProfile(profile) {
+  if (!profile || typeof profile !== "object") return null;
+  const snapshot = typeof window.mergeServerMetaProgress === "function"
+    ? window.mergeServerMetaProgress(profile)
+    : normalizeMetaSnapshot(profile);
+  online.profileMeta = {
+    totalGlory: snapshot.totalGlory,
+    gloryRank: snapshot.gloryRank,
+    gloryRankIndex: snapshot.gloryRankIndex,
+    currentSeasonXP: snapshot.seasonXP,
+    currentSeasonTier: snapshot.seasonTier,
+    seasonClaimedRewardIds: snapshot.seasonClaimedRewardIds || [],
+    credits: snapshot.credits
+  };
+  return snapshot;
+}
+
 async function submitRun(rawRun) {
   if (!online.ready || !auth || !db) {
     setStatus("Firebase is still connecting.");
@@ -462,115 +487,71 @@ async function submitRun(rawRun) {
     setStatus("Sign in to sync runs.");
     return;
   }
-  const {
-    collection,
-    doc,
-    getDoc,
-    serverTimestamp,
-    setDoc
-  } = window.starStrikeFirebaseApi;
-  const user = auth.currentUser;
-  const uid = user.uid;
   const run = normalizeRun(rawRun || {});
-  const runBest = Math.max(run.score, run.highScore);
 
   try {
-    await syncProfile(run.callSign || online.profileCallSign);
-    const publicRef = doc(db, "players_public", uid);
-    const leaderboardRef = doc(db, "leaderboard_scores", uid);
-    const [publicSnap, leaderboardSnap] = await Promise.all([
-      getDoc(publicRef),
-      getDoc(leaderboardRef)
-    ]);
-    const publicData = publicSnap.exists() ? publicSnap.data() : {};
-    const leaderboardData = leaderboardSnap.exists() ? leaderboardSnap.data() : {};
-    const currentBest = Math.max(numberOrZero(publicData.bestScore), numberOrZero(leaderboardData.bestScore));
-    const currentPhase = Math.max(numberOrZero(publicData.phase), numberOrZero(leaderboardData.phase), 1);
-    const unlocked = new Set(online.achievements);
-    const newAchievementIds = run.achievements.filter((id) => !unlocked.has(id));
-    const bestScore = Math.max(currentBest, runBest);
-    const phase = Math.max(currentPhase, run.phase);
-    const glory = Math.max(numberOrZero(publicData.glory), numberOrZero(leaderboardData.glory), run.meta.totalGlory, run.runMeta.gloryAfter);
-    const gloryRankIndex = Math.max(
-      numberOrZero(publicData.gloryRankIndex),
-      numberOrZero(leaderboardData.gloryRankIndex),
-      run.meta.gloryRankIndex,
-      run.runMeta.rankIndexAfter
-    );
-    const remoteRank = safeGloryRank(publicData.gloryRank || leaderboardData.gloryRank || run.runMeta.rankAfter || gloryRankNameForIndex(gloryRankIndex));
-    const gloryRank = run.meta.totalGlory >= glory ? run.meta.gloryRank : (remoteRank === GLORY_RANK_NAMES[0] && gloryRankIndex > 0 ? gloryRankNameForIndex(gloryRankIndex) : remoteRank);
-    const seasonTier = Math.max(
-      numberOrZero(publicData.seasonTier),
-      numberOrZero(leaderboardData.seasonTier),
-      run.meta.seasonTier,
-      run.runMeta.seasonTier,
-      1
-    );
-    const achievementsCount = Math.max(
-      numberOrZero(publicData.achievementsCount),
-      numberOrZero(leaderboardData.achievementsCount),
-      unlocked.size + newAchievementIds.length
-    );
-    const timestamp = serverTimestamp();
-    const displayName = safeText(user.displayName || run.callSign, "Pilot", 60);
-    const recordPayload = {
-      uid,
-      displayName,
+    if (!functionsApi || !window.starStrikeFirebaseApi || typeof window.starStrikeFirebaseApi.httpsCallable !== "function") {
+      throw new Error("Cloud Functions are not ready.");
+    }
+    const submitRunReceipt = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "submitRunReceipt");
+    const response = await submitRunReceipt({
       callSign: safeCallSign(run.callSign || online.profileCallSign),
-      photoURL: safeUrl(user.photoURL),
-      bestScore,
-      phase,
-      achievementsCount,
-      glory,
-      gloryRank,
-      gloryRankIndex,
-      seasonTier,
-      updatedAt: timestamp
-    };
-    const receiptRef = doc(collection(db, "run_receipts", uid, "items"));
-    const receiptPayload = {
-      uid,
-      receiptId: receiptRef.id,
-      clientReceiptId: run.receipt.clientReceiptId,
-      score: run.receipt.score,
-      phaseReached: run.receipt.phaseReached,
-      runDurationMs: run.receipt.runDurationMs,
-      enemiesKilled: run.receipt.enemiesKilled,
-      bossesKilled: run.receipt.bossesKilled,
-      powerupsCollected: run.receipt.powerupsCollected,
-      ghostUses: run.receipt.ghostUses,
-      damageTaken: run.receipt.damageTaken,
-      highestCombo: run.receipt.highestCombo,
-      gloryGained: run.receipt.gloryGained,
-      seasonXPGained: run.receipt.seasonXPGained,
-      creditsEarned: run.receipt.creditsEarned,
-      clientVersion: run.receipt.clientVersion,
-      endedAtMs: run.receipt.endedAtMs,
-      submittedAt: timestamp
-    };
-    const achievementWrites = newAchievementIds.map((achievementId) => {
-      const achievementRef = doc(db, "player_achievements", uid, "items", achievementId);
-      return setDoc(achievementRef, {
-        uid,
-        achievementId,
-        title: achievementTitle(achievementId),
-        unlockedAt: timestamp
-      });
+      receipt: {
+        clientReceiptId: run.receipt.clientReceiptId,
+        score: run.receipt.score,
+        phaseReached: run.receipt.phaseReached,
+        runDurationMs: run.receipt.runDurationMs,
+        enemiesKilled: run.receipt.enemiesKilled,
+        bossesKilled: run.receipt.bossesKilled,
+        powerupsCollected: run.receipt.powerupsCollected,
+        ghostUses: run.receipt.ghostUses,
+        damageTaken: run.receipt.damageTaken,
+        highestCombo: run.receipt.highestCombo,
+        clientVersion: run.receipt.clientVersion
+      }
     });
-
-    await Promise.all([
-      setDoc(publicRef, recordPayload, { merge: true }),
-      setDoc(leaderboardRef, recordPayload, { merge: true }),
-      setDoc(receiptRef, receiptPayload),
-      ...achievementWrites
-    ]);
+    const result = response && response.data ? response.data : {};
+    applyServerProfile(result.profile);
     await loadAchievements();
     subscribeLeaderboard();
-    setStatus(newAchievementIds.length ? "Run, Glory, and achievements synced." : "Run and Glory synced.");
+    const newAchievementIds = Array.isArray(result.newAchievementIds) ? result.newAchievementIds : [];
+    setStatus(newAchievementIds.length ? "Server run and achievements synced." : "Server run synced.");
     notify(newAchievementIds.length ? "ACHIEVEMENTS SYNCED" : "RUN SYNCED");
   } catch (error) {
     setError(error, "Run sync failed.");
     notify("ONLINE SYNC FAILED");
+  }
+}
+
+async function claimSeasonRewardOnline(rewardId) {
+  if (!online.ready || !auth || !functionsApi) {
+    setStatus("Firebase is still connecting.");
+    return { ok: false, reason: "not_ready" };
+  }
+  if (!auth.currentUser) {
+    setStatus("Sign in to claim online rewards.");
+    return { ok: false, reason: "signed_out" };
+  }
+  try {
+    const claimSeasonRewardCallable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "claimSeasonReward");
+    const response = await claimSeasonRewardCallable({ rewardId: safeId(rewardId, "") });
+    const result = response && response.data ? response.data : {};
+    applyServerProfile(result.profile);
+    if (result.ok) {
+      setStatus("Season reward claimed on server.");
+      notify("REWARD CLAIMED");
+    } else if (result.reason === "already_claimed") {
+      setStatus("Season reward already claimed.");
+      notify("ALREADY CLAIMED");
+    } else if (result.reason === "locked") {
+      setStatus("Season reward is locked.");
+      notify("REWARD LOCKED");
+    }
+    return result;
+  } catch (error) {
+    setError(error, "Reward claim failed.");
+    notify("ONLINE CLAIM FAILED");
+    return { ok: false, reason: "error" };
   }
 }
 
@@ -579,7 +560,8 @@ window.starStrikeOnline = {
   signIn,
   signOut: signOutOnline,
   refresh,
-  submitRun
+  submitRun,
+  claimSeasonReward: claimSeasonRewardOnline
 };
 
 async function bootFirebase() {
@@ -588,11 +570,13 @@ async function bootFirebase() {
     const [
       appModule,
       authModule,
-      firestoreModule
+      firestoreModule,
+      functionsModule
     ] = await Promise.all([
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app.js`),
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth.js`),
-      import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`)
+      import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`),
+      import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-functions.js`)
     ]);
     window.starStrikeFirebaseApi = {
       GoogleAuthProvider: authModule.GoogleAuthProvider,
@@ -601,6 +585,8 @@ async function bootFirebase() {
       getDoc: firestoreModule.getDoc,
       getDocs: firestoreModule.getDocs,
       getFirestore: firestoreModule.getFirestore,
+      getFunctions: functionsModule.getFunctions,
+      httpsCallable: functionsModule.httpsCallable,
       limit: firestoreModule.limit,
       onAuthStateChanged: authModule.onAuthStateChanged,
       onSnapshot: firestoreModule.onSnapshot,
@@ -614,6 +600,7 @@ async function bootFirebase() {
     app = appModule.initializeApp(firebaseConfig);
     auth = authModule.getAuth(app);
     db = firestoreModule.getFirestore(app);
+    functionsApi = functionsModule.getFunctions(app, "us-central1");
     online.ready = true;
     setStatus("Firebase connected.");
     authModule.onAuthStateChanged(auth, async (user) => {

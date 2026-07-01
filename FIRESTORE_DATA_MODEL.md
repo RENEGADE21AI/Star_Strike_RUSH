@@ -4,12 +4,12 @@ Firebase project: `star-strike-rush`
 Firestore database: `(default)`, Standard edition, `nam5 (United States)`
 Firebase Hosting live URL: `https://star-strike-rush.web.app`
 
-The game uses Firebase Auth for Google accounts and Cloud Firestore for public
-records plus private player data. The current setup is a prototype-safe,
-client-side implementation: rules protect ownership, field shape, read scope,
-immutable run receipts, and write monotonicity, but a browser client is still
-the authority for score and progression submissions until Cloud Functions
-validation is added.
+The game uses Firebase Auth for Google accounts, Cloud Firestore for public
+records plus private player data, and Cloud Functions for server-side
+progression validation. Firestore rules protect ownership, field shape, read
+scope, immutable run receipts, and write monotonicity. The repo includes
+callable Functions for authoritative run receipts and Season reward claims, but
+they require the Firebase project to be on the Blaze plan before deployment.
 
 Firebase web config is loaded at runtime. Real API keys must not be committed to
 the repository. Local development can use ignored `src/firebase-config.local.json`
@@ -43,6 +43,8 @@ Owner-only account profile. This is not queryable.
 - `currentSeasonTier`: non-decreasing tier, 1-50.
 - `credits`: non-decreasing earned Credits preview. Spending is not implemented
   yet; future authoritative spending should move to Cloud Functions.
+- `seasonClaimedRewardIds`: claimed Season Road reward ids for the active
+  season.
 - Lifetime counters: runs, score, kills, powerups, ghost uses, bosses, damage
   taken, and highest combo.
 - `createdAt`: server timestamp on first create.
@@ -95,9 +97,24 @@ own uid only; updates and deletes are denied. The receipt records:
 - client version
 - submitted server timestamp
 
-This collection is a bridge toward server-authoritative validation. A future
-`submitRunReceipt()` Cloud Function should validate receipt plausibility, grant
-authoritative Glory/Credits/Season XP, and write competitive leaderboard records.
+`submitRunReceipt()` validates receipt plausibility, grants authoritative
+Glory/Credits/Season XP, writes the immutable receipt, updates public records,
+and creates earned achievement records from server-side thresholds.
+
+### `season_reward_claims/{uid}/items/{rewardId}`
+
+Owner reward-claim archive written by Cloud Functions. Each document records:
+
+- reward id
+- reward type
+- amount
+- tier
+- lane
+- claimed server timestamp
+
+The callable `claimSeasonReward()` validates that the user owns the profile,
+the reward exists, the tier is unlocked, and the reward has not already been
+claimed before applying Credits, Glory cache, or Season XP cache.
 
 ### `player_achievements/{uid}/items/{achievementId}`
 
@@ -128,10 +145,14 @@ Current achievement ids:
 1. The player opens the Online panel and signs in with Google.
 2. The game syncs private and public profile documents.
 3. On game over, `submitOnlineRun()` builds a score and achievement payload.
-4. Score converts to Glory locally at `floor(score / 10)`.
-5. Firebase stores an immutable owner-scoped run receipt.
-6. Firebase updates the player's public profile and best leaderboard record.
-7. Newly earned achievement documents are created under the player's account.
+4. Signed-in clients submit the receipt to `submitRunReceipt()`.
+5. The server validates plausibility and computes Glory, Season XP, Credits, and
+   achievements.
+6. Firebase stores an immutable owner-scoped run receipt.
+7. Firebase updates the player's public profile and best leaderboard record.
+8. Newly earned achievement documents are created under the player's account.
+9. Season reward claims use `claimSeasonReward()` when signed in, or local
+   fallback when signed out.
 
 ## Meta Layer Scope
 
@@ -140,19 +161,21 @@ Implemented now:
 - Score to Glory at 10:1.
 - Glory ranks and local player-card summary.
 - End-of-run Glory, Season XP, and Credits preview.
+- Season Road reward claiming, claimed-state persistence, and reward application.
 - Run receipts.
 - Public player-card fields on profiles and leaderboard rows.
+- Cloud Function source for `submitRunReceipt()` and `claimSeasonReward()`.
 
 Explicitly not implemented yet:
 
 - AdMob rewarded ads.
-- Season Road reward claiming.
 - Missions, practice, run history, and accessibility settings sync.
-- Server-authoritative Cloud Functions for progression grants.
+- Cloud Functions deployment, because the Firebase project must be upgraded to
+  Blaze before required Functions/Artifact Registry APIs can be enabled.
 
 ## Production Note
 
-For a serious competitive leaderboard, move score submission behind a trusted
-backend such as Cloud Functions and have the server write `leaderboard_scores`,
-authoritative Glory, Credits, and Season XP. Firestore rules cannot
-independently verify gameplay from a browser client.
+For a serious competitive leaderboard, deploy the included Cloud Functions and
+then tighten Firestore rules so browser clients can no longer write progression
+or leaderboard documents directly. Firestore rules cannot independently verify
+gameplay from a browser client.

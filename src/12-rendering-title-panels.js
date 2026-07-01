@@ -40,11 +40,11 @@ function drawTitlePanelFrame(panel, title) {
   ctx.beginPath();
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 10);
   ctx.stroke();
-  ctx.textAlign = "left";
+  ctx.textAlign = "center";
   ctx.textBaseline = "top";
   ctx.font = FONT_HUD;
   ctx.fillStyle = "#fff";
-  ctx.fillText(title, panel.x + 18, panel.y + 14);
+  ctx.fillText(title, panel.x + panel.w / 2, panel.y + 14);
   ctx.restore();
   drawTitleMetaStrip(panel.x + 18, panel.y + 42, panel.w - 36);
 }
@@ -177,20 +177,10 @@ function drawCodexDetail(panel, type) {
   ctx.restore();
 }
 function drawCodexPanel() {
-  const panel = getTitlePanelRect();
+  const r = getCodexRects();
+  const panel = r.panel;
   drawTitlePanelFrame(panel, "CODEX");
-  const closeRect = { x: panel.x + panel.w - 34, y: panel.y + 12, w: 22, h: 22 };
-  ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.10)";
-  ctx.fillRect(closeRect.x, closeRect.y, closeRect.w, closeRect.h);
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.strokeRect(closeRect.x, closeRect.y, closeRect.w, closeRect.h);
-  ctx.fillStyle = "#fff";
-  ctx.font = FONT_HUD;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("X", closeRect.x + closeRect.w / 2, closeRect.y + closeRect.h / 2);
-  ctx.restore();
+  drawPanelCloseButton(r.closeRect);
   if (codexDetailType) drawCodexDetail(panel, codexDetailType);
   else drawCodexGrid(panel);
 }
@@ -266,10 +256,10 @@ function drawPanelCloseButton(rect) {
   ctx.strokeStyle = "rgba(255,255,255,0.35)";
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
   ctx.fillStyle = "#fff";
-  ctx.font = FONT_HUD;
+  ctx.font = "900 10px 'Arial Narrow', Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("X", rect.x + rect.w / 2, rect.y + rect.h / 2);
+  ctx.fillText("< BACK", rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
   ctx.restore();
 }
 function drawMetaBar(x, y, w, ratio, color) {
@@ -443,9 +433,13 @@ function drawAchievementsPanel() {
 function drawSettingsAndCodexPanels() {
   if (titlePanelAnim <= 0.02 && titlePanelTarget <= 0) return;
   ctx.save();
-  ctx.globalAlpha = clamp(titlePanelAnim, 0, 1);
+  const panelAlpha = clamp(titlePanelAnim, 0, 1);
+  const screenEase = easeOutCubic(clamp(titleMetaScreenTransition, 0, 1));
+  ctx.globalAlpha = panelAlpha;
   ctx.fillStyle = "rgba(0,0,0,0.56)";
   ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = panelAlpha * screenEase;
+  ctx.translate((1 - screenEase) * 18, 0);
   if (titleSubState === "codex") drawCodexPanel();
   else if (titleSubState === "online") drawOnlinePanel();
   else if (titleSubState === "records") drawRecordsPanel();

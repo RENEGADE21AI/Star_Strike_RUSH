@@ -62,6 +62,8 @@ function setupSession(mode = "start") {
   state.difficulty.pacingMemory = 0;
   state.playerRealm = 0;
   state.devStatsVisible = false;
+  state.difficultySamples = [];
+  state.difficultyDeaths = 0;
   state.runStats.kills = 0;
   state.runStats.powerups = 0;
   state.runStats.ghostUses = 0;
@@ -101,6 +103,8 @@ function setupSession(mode = "start") {
   titleProgressDragMoved = false;
   titleProgressPointerDownNode = null;
   titleProgressSelectedNode = null;
+  titleProgressClaimPulse = 0;
+  titleMetaScreenTransition = 1;
   codexDetailType = null;
   resetProgressConfirm = false;
   highScoreDirty = false;
@@ -125,6 +129,8 @@ function enterGameOver() {
   state.fx.flash = 0;
   state.gameOverShakeTimer = 180;
   state.gameOverShake = 6;
+  state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
+  if (typeof recordDifficultySample === "function") recordDifficultySample(true);
   submitOnlineRun();
 }
 function resize() {
@@ -147,212 +153,6 @@ function resize() {
   if (state.gameState === "start") initTitleFormations();
 }
 
-function resetProgressData() {
-  highScore = 0;
-  previousHighScore = 0;
-  highScoreDirty = true;
-  saveHighScore();
-  codexDiscovered = {};
-  codexHasNew = false;
-  saveCodexDiscovered();
-  metaProgress = makeDefaultMetaProgress();
-  lastRunMeta = null;
-  saveMetaProgress();
-  encounterQueue = [];
-  encounterCard = null;
-}
-function titlePanelHit(x, y) {
-  const panel = getTitlePanelRect();
-  return titlePanelAnim > 0.02 && x >= panel.x && x <= panel.x + panel.w && y >= panel.y && y <= panel.y + panel.h;
-}
-function handleResetProgressConfirmDown(x, y) {
-  if (!resetProgressConfirm) return false;
-  const r = getResetConfirmRects();
-  if (hitRect(r.yes, x, y)) {
-    resetProgressConfirm = false;
-    resetProgressData();
-    titleSubState = "main";
-    titlePanelTarget = 0;
-    codexDetailType = null;
-    return true;
-  }
-  if (hitRect(r.no, x, y)) {
-    resetProgressConfirm = false;
-    return true;
-  }
-  return true;
-}
-function setTitleProgressTab(tab) {
-  if (titleProgressTab !== tab) {
-    titleProgressTab = tab;
-    titleProgressDragActive = false;
-    titleProgressDragPointerId = null;
-    titleProgressPointerDownNode = null;
-    titleProgressSelectedNode = null;
-    if (typeof focusTitleProgressOnCurrent === "function") focusTitleProgressOnCurrent();
-  }
-  clampTitleProgressScroll();
-}
-function beginTitleProgressDrag(pointerId, x, y) {
-  titleProgressDragActive = true;
-  titleProgressDragPointerId = pointerId;
-  titleProgressDragY = y;
-  titleProgressDragX = x;
-  titleProgressDragStartScroll = titleProgressScroll;
-  titleProgressDragMoved = false;
-  titleProgressPointerDownNode = typeof getProgressNodeAt === "function" ? getProgressNodeAt(x, y) : null;
-  if (pointerId !== null && pointerId !== undefined) {
-    try { canvas.setPointerCapture(pointerId); } catch {}
-  }
-}
-function updateTitleProgressDrag(pointerId, x, y) {
-  if (!titleProgressDragActive) return false;
-  if (titleProgressDragPointerId !== null && titleProgressDragPointerId !== pointerId) return false;
-  if (Math.hypot(x - titleProgressDragX, y - titleProgressDragY) > 7) {
-    titleProgressDragMoved = true;
-    titleProgressSelectedNode = null;
-  }
-  titleProgressScroll = titleProgressDragStartScroll + (titleProgressDragY - y) * 1.12;
-  clampTitleProgressScroll();
-  return true;
-}
-function endTitleProgressDrag(pointerId) {
-  if (!titleProgressDragActive) return false;
-  if (titleProgressDragPointerId !== null && titleProgressDragPointerId !== pointerId) return false;
-  if (!titleProgressDragMoved) titleProgressSelectedNode = titleProgressPointerDownNode;
-  titleProgressDragActive = false;
-  titleProgressDragPointerId = null;
-  titleProgressPointerDownNode = null;
-  return true;
-}
-function openTitleProgressRoad(tab = null) {
-  titleSubState = "progress";
-  titlePanelTarget = 1;
-  codexDetailType = null;
-  titleProgressDragActive = false;
-  titleProgressDragPointerId = null;
-  titleProgressPointerDownNode = null;
-  titleProgressSelectedNode = null;
-  if (tab) titleProgressTab = tab;
-  if (typeof focusTitleProgressOnCurrent === "function") focusTitleProgressOnCurrent();
-  else clampTitleProgressScroll();
-}
-function handleTitlePointerDown(x, y, pointerId = null) {
-  if (resetProgressConfirm) return handleResetProgressConfirmDown(x, y);
-
-  if (titlePanelAnim > 0.02) {
-    if (titlePanelHit(x, y)) {
-      if (titleSubState === "codex") {
-        const r = getCodexRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
-        if (codexDetailType) {
-          const detailCard = { x: r.panel.x + 18, y: r.panel.y + 78, w: r.panel.w - 36, h: r.panel.h - 94 };
-          const backRect = { x: detailCard.x + 10, y: detailCard.y + 10, w: 28, h: 22 };
-          if (hitRect(backRect, x, y)) { codexDetailType = null; return true; }
-          if (!(x >= detailCard.x && x <= detailCard.x + detailCard.w && y >= detailCard.y && y <= detailCard.y + detailCard.h)) {
-            codexDetailType = null;
-            return true;
-          }
-          return true;
-        }
-        const types = typeof getCodexTypes === "function" ? getCodexTypes() : ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"];
-        for (const type of types) {
-          const card = r.rects[type];
-          if (!hitRect(card, x, y)) continue;
-          if (codexDiscovered[type]) {
-            codexDetailType = type;
-          }
-          return true;
-        }
-        return true;
-      }
-      if (titleSubState === "online") {
-        const r = getOnlineRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
-        if (hitRect(r.signIn, x, y)) { requestOnlineSignIn(); return true; }
-        if (hitRect(r.signOut, x, y)) { requestOnlineSignOut(); return true; }
-        if (hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-        if (hitRect(r.med, x, y)) { settingMaxParticles = 600; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-        if (hitRect(r.high, x, y)) { settingMaxParticles = 900; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-        if (hitRect(r.shake, x, y)) { settingScreenShake = !settingScreenShake; saveSettings(); return true; }
-        if (hitRect(r.reset, x, y)) { resetProgressConfirm = true; return true; }
-        if (hitRect(r.refresh, x, y)) { requestOnlineRefresh(); return true; }
-        return true;
-      }
-      if (titleSubState === "records") {
-        const r = getRecordsRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
-        if (hitRect(r.refresh, x, y)) { requestOnlineRefresh(); return true; }
-        return true;
-      }
-      if (titleSubState === "achievements") {
-        const r = getAchievementsRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
-        return true;
-      }
-      if (titleSubState === "progress") {
-        const r = getProgressRects();
-        if (hitRect(r.closeRect, x, y)) { titlePanelTarget = 0; codexDetailType = null; return true; }
-        if (hitRect(r.gloryTab, x, y)) { setTitleProgressTab("glory"); return true; }
-        if (hitRect(r.seasonTab, x, y)) { setTitleProgressTab("season"); return true; }
-        if (typeof getProgressDetailRect === "function" && titleProgressSelectedNode && hitRect(getProgressDetailRect(), x, y)) return true;
-        if (hitRect(r.contentRect, x, y)) { beginTitleProgressDrag(pointerId, x, y); return true; }
-        return true;
-      }
-    }
-    return true;
-  }
-
-  const callRect = getCallSignRect();
-  const playRect = getPlayButtonRect();
-  const iconRects = getTitleIconRects();
-
-  if (hitRect(callRect, x, y)) {
-    callSignEditing = true;
-    callSignInputEl.value = callSign;
-    callSignInputEl.focus();
-    return true;
-  }
-  if (callSignEditing) {
-    callSignEditing = false;
-    callSignInputEl.blur();
-  }
-
-  if (hitRect(playRect, x, y)) {
-    playBtnPointerDown = true;
-    playBtnPointerInside = true;
-    playBtnHold = 0;
-    return true;
-  }
-  if (hitRect(iconRects.account, x, y)) {
-    if (titleSubState === "online" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "online"; titlePanelTarget = 1; codexDetailType = null; }
-    return true;
-  }
-  if (hitRect(iconRects.achievements, x, y)) {
-    if (titleSubState === "achievements" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "achievements"; titlePanelTarget = 1; codexDetailType = null; }
-    return true;
-  }
-  if (hitRect(iconRects.progress, x, y)) {
-    if (titleSubState === "progress" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else openTitleProgressRoad();
-    return true;
-  }
-  if (hitRect(iconRects.records, x, y)) {
-    if (titleSubState === "records" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "records"; titlePanelTarget = 1; codexDetailType = null; }
-    return true;
-  }
-  if (hitRect(iconRects.codex, x, y)) {
-    codexHasNew = false;
-    if (titleSubState === "codex" && titlePanelTarget === 1) { titlePanelTarget = 0; codexDetailType = null; }
-    else { titleSubState = "codex"; titlePanelTarget = 1; }
-    return true;
-  }
-
-  return false;
-}
 function handleGameOverPointerDown(x, y) {
   const buttons = getGameOverButtons();
   if (hitRect(buttons.respawn, x, y)) {
@@ -655,12 +455,19 @@ function getDebugSnapshot() {
         status: titleProgressSelectedNode.status
       } : null,
       resetProgressConfirm
+    },
+    difficulty: {
+      latestSample: state.difficultySamples && state.difficultySamples.length
+        ? state.difficultySamples[state.difficultySamples.length - 1]
+        : null,
+      samples: state.difficultySamples ? state.difficultySamples.slice(-180) : []
     }
   };
 }
 
 function updateDebugSnapshot() {
   if (!DEBUG_SNAPSHOT_ENABLED) return;
+  if (typeof recordDifficultySample === "function") recordDifficultySample();
   if (!debugSnapshotEl) {
     debugSnapshotEl = document.createElement("pre");
     debugSnapshotEl.id = "debugSnapshot";

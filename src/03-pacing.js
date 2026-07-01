@@ -1,7 +1,7 @@
 function phaseDuration(phase) {
-  if (phase === 1) return 2500;
-  if (phase === 2) return 2200;
-  if (phase === 3) return 1900;
+  if (phase === 1) return 3000;
+  if (phase === 2) return 3300;
+  if (phase === 3) return 3000;
   return Math.max(580, 940 - (phase - 4) * 20);
 }
 function openingRamp() {
@@ -28,6 +28,83 @@ function peakLoad() {
   const enemyLoad = Math.max(0, state.enemies.length - 8) / 14;
   const bulletLoad = Math.max(0, enemyBulletPressure() - enemyBulletBudget()) / 8;
   return clamp(enemyLoad + bulletLoad, 0, 1.2);
+}
+
+const DIFFICULTY_SAMPLE_INTERVAL = 60;
+const MAX_DIFFICULTY_SAMPLES = 720;
+
+function roundSample(value, digits = 2) {
+  const m = Math.pow(10, digits);
+  return Math.round((Number(value) || 0) * m) / m;
+}
+
+function makeDifficultySample() {
+  const p = state.player || {};
+  return {
+    frame: Math.max(0, Math.floor(state.frame || 0)),
+    seconds: roundSample((state.frame || 0) / 60, 2),
+    gameState: state.gameState,
+    phase: Math.max(1, Math.floor(state.phase || 1)),
+    phaseTimer: roundSample(state.phaseTimer || 0, 2),
+    waveTimer: roundSample(state.waveTimer || 0, 2),
+    hp: Math.max(0, Math.floor(p.hp || 0)),
+    maxHp: Math.max(0, Math.floor(p.maxHp || 0)),
+    energy: roundSample(p.energy || 0, 1),
+    pressure: roundSample(state.pressure || 0, 1),
+    threat: roundSample(state.difficulty.threat || 0, 3),
+    target: roundSample(state.difficulty.target || 0, 3),
+    threatScore: roundSample(state.threatScore || 0, 2),
+    bulletPressure: roundSample(typeof enemyBulletPressure === "function" ? enemyBulletPressure() : 0, 2),
+    bulletBudget: roundSample(typeof enemyBulletBudget === "function" ? enemyBulletBudget() : 0, 2),
+    waveMood: state.waveMood,
+    intensityPhase: state.intensityPhase,
+    lastWaveTemplateName: state.lastWaveTemplateName || "",
+    counts: {
+      enemies: state.enemies.length,
+      enemyBullets: state.enemyBullets.length,
+      pendingSpawns: state.pendingSpawns.length,
+      debris: state.debris.length,
+      powerups: state.powerups.length
+    },
+    relief: {
+      grace: Math.max(0, Math.floor(state.difficulty.grace || 0)),
+      ghostGrace: Math.max(0, Math.floor(state.difficulty.ghostGrace || 0)),
+      pacingMemory: roundSample(state.difficulty.pacingMemory || 0, 3)
+    },
+    run: {
+      kills: Math.max(0, Math.floor((state.runStats && state.runStats.kills) || 0)),
+      damageTaken: Math.max(0, Math.floor((state.runStats && state.runStats.damageTaken) || 0)),
+      deaths: Math.max(0, Math.floor(state.difficultyDeaths || 0))
+    }
+  };
+}
+
+function recordDifficultySample(force = false) {
+  if (!state.difficultySamples) state.difficultySamples = [];
+  if (!force) {
+    if (typeof DEBUG_SNAPSHOT_ENABLED !== "undefined" && !DEBUG_SNAPSHOT_ENABLED) return;
+    if ((state.frame || 0) % DIFFICULTY_SAMPLE_INTERVAL !== 0) return;
+  }
+  state.difficultySamples.push(makeDifficultySample());
+  if (state.difficultySamples.length > MAX_DIFFICULTY_SAMPLES) {
+    state.difficultySamples.splice(0, state.difficultySamples.length - MAX_DIFFICULTY_SAMPLES);
+  }
+}
+
+function applyLowHpReliefAfterHit() {
+  const p = state.player;
+  if (!p || p.hp > 2) return;
+  state.waveMood = "recovery";
+  state.waveMoodTimer = Math.max(state.waveMoodTimer || 0, p.hp <= 1 ? 170 : 140);
+  state.waveRest = Math.max(state.waveRest || 0, p.hp <= 1 ? 72 : 48);
+  if (!state.boss && !state.bossDeath) {
+    if (p.hp <= 1) state.pendingSpawns.length = 0;
+    else if (state.pendingSpawns.length > 2) state.pendingSpawns.splice(0, Math.floor(state.pendingSpawns.length / 2));
+    const keepBullets = p.hp <= 1 ? 2 : 4;
+    if (state.enemyBullets.length > keepBullets) {
+      state.enemyBullets.splice(0, state.enemyBullets.length - keepBullets);
+    }
+  }
 }
 
 function triggerPhaseSkip() {
@@ -70,7 +147,7 @@ function updateIntensityCycle() {
     state.intensityTimer = Math.max(state.intensityTimer, 120);
     return;
   }
-  if (state.frame < 2400 || state.phase <= 1) {
+  if (state.frame < 5400 || state.phase <= 2) {
     state.intensityPhase = "cooldown";
     state.intensityTimer = Math.max(state.intensityTimer, 120);
     return;
@@ -108,7 +185,7 @@ function updatePressure() {
   const enemyLoad = state.enemies.length * 3.5;
   const bulletLoad = state.enemyBullets.length * 2.1;
   const queueLoad = state.pendingSpawns.length * 1.2;
-  const comboLoad = Math.max(0, state.comboKills - 3) * 0.8;
+  const comboLoad = clamp(Math.max(0, state.comboKills - 5) * 0.16, 0, 8);
   const bossLoad = state.boss ? 12 : 0;
   const relief = (5 - p.hp) * 8 + (state.difficulty.grace > 0 ? 10 : 0) + (state.difficulty.ghostGrace > 0 ? 4 : 0);
   const rhythm = rhythmProfile();
@@ -175,8 +252,8 @@ function updateDifficulty() {
   }
   let target;
   if (state.phase <= 3) {
-    target = 0.56 + openingRamp() * 0.20 + (state.phase - 1) * 0.055;
-    target += clamp(state.phaseTimer / phaseDuration(state.phase), 0, 1) * 0.07;
+    target = 0.52 + openingRamp() * 0.17 + (state.phase - 1) * 0.045;
+    target += clamp(state.phaseTimer / phaseDuration(state.phase), 0, 1) * 0.05;
   } else {
     target = 0.78 + (state.phase - 4) * 0.075;
     target += clamp((state.phaseTimer - 180) / 2400, 0, 0.14);
@@ -203,13 +280,13 @@ function updateDifficulty() {
   else if (state.waveMood === "rule") target += 0.01;
   if (state.intensityPhase === "surge") target += 0.06;
   if (state.intensityPhase === "cooldown") target -= 0.05;
-  d.target = clamp(target, 0.54, 1.45);
+  d.target = clamp(target, 0.50, 1.45);
   let lerp = 0.025;
   if (p.hp === 1) lerp = 0.06;
   else if (p.hp === p.maxHp && (d.killStreak > 0 || d.pacingMemory > 0.25 || accuracy > 0.6)) lerp = 0.03;
   else if (state.pressure > 70 || d.pacingMemory < -0.35) lerp = 0.04;
   d.threat += (d.target - d.threat) * lerp;
-  d.threat = clamp(d.threat, 0.54, 1.45);
+  d.threat = clamp(d.threat, 0.50, 1.45);
   if (d.grace > 0) d.grace--;
   if (d.ghostGrace > 0) d.ghostGrace--;
   d.burst = Math.max(0, d.burst - 0.03);

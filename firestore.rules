@@ -88,6 +88,10 @@ service cloud.firestore {
       return value is int && value >= 1 && value <= 50;
     }
 
+    function validSeasonClaimedRewardIds(value) {
+      return value is list && value.size() <= 220;
+    }
+
     function validPrivateAccount(data, userId) {
       return hasRequired(data, [
           'uid',
@@ -101,6 +105,7 @@ service cloud.firestore {
           'currentSeasonXP',
           'currentSeasonTier',
           'credits',
+          'seasonClaimedRewardIds',
           'lifetimeRuns',
           'lifetimeScore',
           'lifetimeKills',
@@ -125,6 +130,7 @@ service cloud.firestore {
           'currentSeasonXP',
           'currentSeasonTier',
           'credits',
+          'seasonClaimedRewardIds',
           'lifetimeRuns',
           'lifetimeScore',
           'lifetimeKills',
@@ -148,6 +154,7 @@ service cloud.firestore {
         && validScore(data.currentSeasonXP)
         && validSeasonTier(data.currentSeasonTier)
         && validScore(data.credits)
+        && validSeasonClaimedRewardIds(data.seasonClaimedRewardIds)
         && validCounter(data.lifetimeRuns)
         && validScore(data.lifetimeScore)
         && validCounter(data.lifetimeKills)

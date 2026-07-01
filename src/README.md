@@ -16,7 +16,9 @@ after the files they depend on, because the current code intentionally shares gl
 - `11-rendering-title-effects.js`: title sun, menu flights, encounter cards.
 - `12-rendering-title-panels.js`: account/settings, records, achievements, codex,
   and reset-confirm panels.
-- `12-rendering-progress-road.js`: Glory Road and Season Road rendering.
+- `12-progress-road-data.js`: Glory Road and Season Road reward tables, detail
+  payloads, and local reward claim logic.
+- `12-rendering-progress-road.js`: Glory Road and Season Road layout and rendering.
 - `13-rendering-title-screens.js`: title screen and game-over screen composition.
 - `14-rendering-player.js`: background and player ship rendering.
 - `15-rendering-entities.js`: wingmen, bullets, enemies, bosses, powerups, particles.
@@ -30,6 +32,8 @@ after the files they depend on, because the current code intentionally shares gl
   gravity wells, and expansion boss attack scripts.
 - `18-expansion-rendering-waves.js`: expansion rendering helpers, boss art,
   hazard drawing, overlays, and expansion wave template registration.
+- `18-title-input.js`: title-screen meta panel routing, account/settings actions,
+  progress-road drag/claim input, and reset-progress confirmation.
 - `18-session-input-loop.js`: session setup, resize, input events, update loop,
   and the hidden `#debugSnapshot` smoke-test state when loaded with `?debug=1`.
 - `19-game-achievements.js`: run stat payloads, achievement definitions, and
