@@ -61,17 +61,65 @@ function drawCodexSilhouetteLockIcon(x, y) {
   ctx.stroke();
   ctx.restore();
 }
+
+function codexColorAlpha(color, alpha) {
+  const raw = String(color || "#ffffff").trim();
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(raw);
+  const full = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(raw);
+  const parts = short
+    ? [short[1] + short[1], short[2] + short[2], short[3] + short[3]]
+    : full
+      ? [full[1], full[2], full[3]]
+      : null;
+  if (!parts) return `rgba(255,255,255,${alpha})`;
+  const [r, g, b] = parts.map((part) => parseInt(part, 16));
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function codexGridTypes() {
+  return typeof getCodexTypes === "function" ? getCodexTypes() : ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"];
+}
+
+function codexShipScale(type, detail = false) {
+  const boss = String(type || "").startsWith("boss");
+  if (detail) return boss ? 0.72 : type === "carrier" ? 1.22 : (type === "repair_drone" || type === "splitter_shard") ? 1.80 : 1.62;
+  if (boss) return 0.23;
+  if (type === "carrier") return 0.50;
+  if (type === "repair_drone" || type === "splitter_shard") return 0.70;
+  return 0.60;
+}
+
+function drawCodexShipDisplay(type, x, y, scale, silhouette, meta) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.scale(1, -1);
+  drawEnemyGeometry(type, { hitMix: 0, alpha: 1, silhouette, stateMode: "physical", realm: 0, phase: state.frame * 0.04 });
+  ctx.restore();
+  if (!silhouette && meta && meta.color) {
+    ctx.save();
+    ctx.strokeStyle = meta.color;
+    ctx.globalAlpha = 0.18;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(x, y + 2, 28 * scale, 13 * scale, 0, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function codexCardRects(panel) {
-  const types = typeof getCodexTypes === "function" ? getCodexTypes() : ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"];
-  const cols = types.length > 8 ? 4 : 3;
-  const cardW = types.length > 8 ? 66 : 80;
-  const cardH = types.length > 8 ? 76 : 100;
-  const gap = types.length > 8 ? 8 : 12;
+  const types = codexGridTypes();
+  const cols = types.length > 8 ? 3 : 3;
+  const gap = types.length > 8 ? 6 : 12;
+  const sidePad = types.length > 8 ? 16 : 36;
+  const cardW = Math.floor((panel.w - sidePad * 2 - gap * (cols - 1)) / cols);
+  const cardH = types.length > 8 ? 72 : 100;
   const rows = Math.ceil(types.length / cols);
   const totalW = cardW * cols + gap * (cols - 1);
   const totalH = cardH * rows + gap * (rows - 1);
   const startX = panel.x + Math.round((panel.w - totalW) / 2);
-  const startY = panel.y + 82;
+  const startY = panel.y + (types.length > 8 ? 76 : 82);
   const rects = {};
   for (let i = 0; i < types.length; i++) {
     const col = i % cols, row = Math.floor(i / cols);
@@ -81,30 +129,37 @@ function codexCardRects(panel) {
 }
 function drawCodexGrid(panel) {
   const rects = codexCardRects(panel);
-  const types = typeof getCodexTypes === "function" ? getCodexTypes() : ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"];
+  const types = codexGridTypes();
+  const compact = types.length > 8;
   for (const type of types) {
     const r = rects[type];
     const meta = typeof getCodexMeta === "function" ? getCodexMeta(type) : { color: "#fff", shortName: type.toUpperCase() };
     const discovered = !!codexDiscovered[type];
     ctx.save();
-    ctx.fillStyle = discovered ? "rgba(255,255,255,0.06)" : "rgba(30,30,30,0.92)";
+    ctx.fillStyle = discovered ? "rgba(255,255,255,0.055)" : "rgba(22,24,32,0.94)";
     ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 8); ctx.fill();
+    ctx.fillStyle = discovered ? "rgba(0,0,0,0.25)" : "rgba(0,0,0,0.42)";
+    ctx.beginPath(); ctx.roundRect(r.x + 6, r.y + 7, r.w - 12, compact ? 42 : 57, 6); ctx.fill();
+    if (discovered) {
+      const glow = ctx.createLinearGradient(r.x, r.y, r.x + r.w, r.y);
+      glow.addColorStop(0, "rgba(255,255,255,0.00)");
+      glow.addColorStop(0.5, codexColorAlpha(meta.color, 0.20));
+      glow.addColorStop(1, "rgba(255,255,255,0.00)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(r.x + 6, r.y + 7, r.w - 12, compact ? 42 : 57);
+    }
     ctx.strokeStyle = discovered ? meta.color : "rgba(255,255,255,0.18)";
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 8); ctx.stroke();
-    ctx.save();
-    ctx.translate(r.x + r.w / 2, r.y + 42);
-    if (discovered) {
-      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.25 : 0.34, silhouette: false, stateMode: "physical", realm: 0 });
-    } else {
-      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.25 : 0.34, silhouette: true, stateMode: "physical", realm: 0 });
-    }
-    ctx.restore();
+    drawCodexShipDisplay(type, r.x + r.w / 2, r.y + (compact ? 29 : 42), codexShipScale(type), !discovered, meta);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = FONT_TINY;
     ctx.fillStyle = discovered ? "#fff" : "rgba(255,255,255,0.35)";
-    ctx.fillText(discovered ? (meta.shortName || type.toUpperCase()) : "???", r.x + r.w / 2, r.y + r.h - 13);
+    ctx.fillText(discovered ? (meta.shortName || type.toUpperCase()).slice(0, compact ? 8 : 12) : "???", r.x + r.w / 2, r.y + r.h - 16);
+    ctx.font = "700 7px 'Arial Narrow', Arial, sans-serif";
+    ctx.fillStyle = discovered ? "rgba(255,255,255,0.42)" : "rgba(255,255,255,0.22)";
+    ctx.fillText(discovered ? String(meta.trait || "UNKNOWN THREAT").toUpperCase().slice(0, compact ? 14 : 18) : "UNDISCOVERED", r.x + r.w / 2, r.y + r.h - 6);
     if (discovered) {
       ctx.fillStyle = meta.color;
       ctx.beginPath(); ctx.arc(r.x + r.w - 10, r.y + 10, 3, 0, TAU); ctx.fill();
@@ -157,8 +212,18 @@ function drawCodexDetail(panel, type) {
   ctx.textBaseline = "middle";
   ctx.fillText("<", backRect.x + backRect.w / 2, backRect.y + backRect.h / 2 + 1);
 
-  ctx.translate(card.x + 44, card.y + 56);
-  drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.85 : 0.85, silhouette: false, stateMode: "physical", realm: 0 });
+  const artRect = { x: card.x + 12, y: card.y + 42, w: card.w - 24, h: 145 };
+  ctx.fillStyle = "rgba(255,255,255,0.045)";
+  ctx.beginPath(); ctx.roundRect(artRect.x, artRect.y, artRect.w, artRect.h, 10); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.strokeRect(artRect.x, artRect.y, artRect.w, artRect.h);
+  if (meta.color) {
+    ctx.strokeStyle = meta.color;
+    ctx.globalAlpha = 0.22;
+    ctx.beginPath(); ctx.moveTo(artRect.x + 12, artRect.y + artRect.h - 26); ctx.lineTo(artRect.x + artRect.w - 12, artRect.y + artRect.h - 26); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  drawCodexShipDisplay(type, artRect.x + artRect.w / 2, artRect.y + artRect.h / 2 + 8, codexShipScale(type, true), false, meta);
   ctx.restore();
 
   ctx.save();
@@ -166,14 +231,16 @@ function drawCodexDetail(panel, type) {
   ctx.font = FONT_HUD;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.fillText(stats.name, card.x + 88, card.y + 12);
+  ctx.fillText(String(stats.name || type).slice(0, 26), card.x + 50, card.y + 12);
   ctx.fillStyle = "rgba(255,255,255,0.76)";
   ctx.font = FONT_SMALL;
-  ctx.fillText(`Threat: ${stats.threat.toFixed(2)}`, card.x + 88, card.y + 42);
-  ctx.fillText(`HP: ${stats.hp}`, card.x + 88, card.y + 60);
-  drawStatBar(card.x + 88, card.y + 86, "Speed", stats.speed);
-  drawStatBar(card.x + 88, card.y + 108, "Aggression", stats.aggression);
-  drawStatBar(card.x + 88, card.y + 130, "Fire Rate", stats.fire);
+  ctx.fillStyle = meta.color || "rgba(255,255,255,0.78)";
+  ctx.fillText(String(meta.trait || "Unknown threat.").slice(0, 40), card.x + 16, card.y + 206);
+  ctx.fillStyle = "rgba(255,255,255,0.76)";
+  ctx.fillText(`Threat: ${stats.threat.toFixed(2)}    HP: ${stats.hp}`, card.x + 16, card.y + 228);
+  drawStatBar(card.x + 16, card.y + 258, "Speed", stats.speed);
+  drawStatBar(card.x + 16, card.y + 280, "Aggression", stats.aggression);
+  drawStatBar(card.x + 16, card.y + 302, "Fire Rate", stats.fire);
   ctx.restore();
 }
 function drawCodexPanel() {
