@@ -311,16 +311,33 @@ function handleTitlePointerDown(x, y, pointerId = null) {
             progressDetailCanClaim(titleProgressSelectedNode) &&
             hitRect(getProgressClaimRect(), x, y)
           ) {
-            const result = claimSeasonReward(titleProgressSelectedNode.id);
-            titleProgressClaimPulse = 32;
-            const refreshed = typeof getProgressDetailById === "function" ? getProgressDetailById(titleProgressSelectedNode.id) : null;
-            if (refreshed) titleProgressSelectedNode = refreshed;
-            if (result.ok) {
-              showMessage(`CLAIMED ${String((result.applied && result.applied.name) || "REWARD").toUpperCase()}`, 100);
-            } else if (result.reason === "already_claimed") {
-              showMessage("ALREADY CLAIMED", 80);
-            } else if (result.reason === "locked") {
-              showMessage("REWARD LOCKED", 80);
+            const rewardId = titleProgressSelectedNode.id;
+            const onlineSvc = window.starStrikeOnline;
+            const onlineState = onlineSvc && typeof onlineSvc.getState === "function" ? onlineSvc.getState() : null;
+            if (onlineState && onlineState.user && typeof onlineSvc.claimSeasonReward === "function") {
+              titleProgressSelectedNode = { ...titleProgressSelectedNode, status: "CLAIMING" };
+              titleProgressClaimPulse = 32;
+              onlineSvc.claimSeasonReward(rewardId).then((result) => {
+                const refreshed = typeof getProgressDetailById === "function" ? getProgressDetailById(rewardId) : null;
+                if (refreshed) titleProgressSelectedNode = refreshed;
+                titleProgressClaimPulse = result && result.ok ? 32 : 0;
+              }).catch(() => {
+                const refreshed = typeof getProgressDetailById === "function" ? getProgressDetailById(rewardId) : null;
+                if (refreshed) titleProgressSelectedNode = refreshed;
+                showMessage("ONLINE CLAIM FAILED", 90);
+              });
+            } else {
+              const result = claimSeasonReward(rewardId);
+              titleProgressClaimPulse = 32;
+              const refreshed = typeof getProgressDetailById === "function" ? getProgressDetailById(rewardId) : null;
+              if (refreshed) titleProgressSelectedNode = refreshed;
+              if (result.ok) {
+                showMessage(`CLAIMED ${String((result.applied && result.applied.name) || "REWARD").toUpperCase()}`, 100);
+              } else if (result.reason === "already_claimed") {
+                showMessage("ALREADY CLAIMED", 80);
+              } else if (result.reason === "locked") {
+                showMessage("REWARD LOCKED", 80);
+              }
             }
           }
           return true;

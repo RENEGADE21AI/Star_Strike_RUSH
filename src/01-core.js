@@ -319,6 +319,41 @@ function currentMetaSnapshot() {
     lifetime: { ...progress.lifetime }
   };
 }
+function mergeServerMetaProgress(serverMeta) {
+  if (!serverMeta || typeof serverMeta !== "object") return currentMetaSnapshot();
+  const progress = getMetaProgress();
+  const lifetime = serverMeta.lifetime && typeof serverMeta.lifetime === "object" ? serverMeta.lifetime : {};
+  progress.totalGlory = Math.max(0, Math.floor(serverMeta.totalGlory || 0));
+  progress.currentSeason.id = String(serverMeta.seasonId || CURRENT_SEASON_ID).slice(0, 40);
+  progress.currentSeason.name = String(serverMeta.seasonName || CURRENT_SEASON_NAME).slice(0, 60);
+  if (progress.currentSeason.id !== CURRENT_SEASON_ID) {
+    progress.currentSeason.id = CURRENT_SEASON_ID;
+    progress.currentSeason.name = CURRENT_SEASON_NAME;
+    progress.currentSeason.xp = 0;
+    progress.currentSeason.tier = 1;
+    progress.currentSeason.claimedRewardIds = [];
+  } else {
+    progress.currentSeason.xp = Math.max(0, Math.floor(serverMeta.seasonXP || 0));
+    progress.currentSeason.tier = currentSeasonTierForXP(progress.currentSeason.xp);
+    progress.currentSeason.claimedRewardIds = Array.isArray(serverMeta.seasonClaimedRewardIds)
+      ? Array.from(new Set(serverMeta.seasonClaimedRewardIds.map((id) => String(id).slice(0, 80)))).slice(0, 220)
+      : [];
+  }
+  progress.credits = Math.max(0, Math.floor(serverMeta.credits || 0));
+  progress.lifetime.runs = Math.max(0, Math.floor(lifetime.runs || 0));
+  progress.lifetime.score = Math.max(0, Math.floor(lifetime.score || 0));
+  progress.lifetime.kills = Math.max(0, Math.floor(lifetime.kills || 0));
+  progress.lifetime.powerups = Math.max(0, Math.floor(lifetime.powerups || 0));
+  progress.lifetime.ghostUses = Math.max(0, Math.floor(lifetime.ghostUses || 0));
+  progress.lifetime.bosses = Math.max(0, Math.floor(lifetime.bosses || 0));
+  progress.lifetime.damageTaken = Math.max(0, Math.floor(lifetime.damageTaken || 0));
+  progress.lifetime.highestCombo = Math.max(0, Math.floor(lifetime.highestCombo || 0));
+  progress.lifetime.bestScore = Math.max(0, Math.floor(lifetime.bestScore || 0));
+  progress.lifetime.bestPhase = Math.max(1, Math.floor(lifetime.bestPhase || 1));
+  progress.lastUpdatedAtMs = Date.now();
+  saveMetaProgress();
+  return currentMetaSnapshot();
+}
 function currentRunReceiptSnapshot() {
   const stats = state.runStats || {};
   const score = Math.max(0, Math.floor(state.score || 0));

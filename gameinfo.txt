@@ -37,6 +37,9 @@ Persistence:
 - Firebase Auth supports Google sign-in.
 - Cloud Firestore stores online profiles, player-card progression fields, world
   record leaderboard entries, immutable run receipts, and earned achievements.
+- Cloud Functions source exists for server-side run receipt validation and
+  Season reward claiming. Deployment requires the Firebase project to be on the
+  Blaze plan.
 - The game remains playable signed out; online sync is additive.
 
 Source layout:
@@ -55,6 +58,8 @@ Source layout:
   `src/18-expansion-rendering-waves.js` own the final expansion package.
 - `src/19-game-achievements.js` defines achievement, run receipt, and online payloads.
 - `src/20-firebase-online.js` owns Firebase Auth and Firestore sync.
+- `functions/` owns callable Firebase Functions and shared server progression
+  math for authoritative online rewards.
 
 ## 3. Core Loop
 
@@ -126,6 +131,11 @@ Current implemented meta layer:
 - Local guest progression works signed out. Signed-in accounts sync public
   profile fields, leaderboard records, achievements, and owner-only receipt
   archives.
+- Season Road rewards are claimable. Claimed state persists, rewards apply to
+  Credits, Glory, or Season XP, and signed-out players use local fallback.
+- Signed-in run submissions are wired to `submitRunReceipt()` so the server can
+  validate plausibility and compute Glory, Season XP, Credits, achievements, and
+  leaderboard records after Functions are deployed.
 
 Glory ranks:
 
@@ -153,7 +163,6 @@ Meta systems that are planned but not implemented yet:
 
 - Daily missions.
 - Weekly missions.
-- Season Road reward claiming.
 - Practice/training screen.
 - Run history screen.
 - Accessibility/audio controls.
@@ -201,7 +210,7 @@ Title screen meta placement:
   Road opens around current progress instead of always starting at tier/rank 1.
   The current node has a pulsing marker ship, and tapping nodes or reward cards
   opens an inspect panel with requirement, reward, and reached/locked/claimed
-  state.
+  state. Unclaimed Season rewards can be claimed from the detail panel.
 - Records opens the world-record leaderboard and refresh controls.
 - Codex opens enemy and boss discovery.
 
@@ -220,9 +229,11 @@ opens the Road panel near the newly relevant progress.
 The game must remain functional if Firebase is unavailable or the player is signed out. In that case, local play and local high score continue normally.
 
 Competitive production rule: Firestore rules can protect owner scope and data
-shape, but they cannot prove a browser-reported run is real. A future
-`submitRunReceipt()` Cloud Function should validate run plausibility, grant
-authoritative Glory/Season XP/Credits, and write competitive leaderboard records.
+shape, but they cannot prove a browser-reported run is real. The repo includes
+`submitRunReceipt()` and `claimSeasonReward()` Cloud Functions for this, but the
+Firebase project must be upgraded to Blaze before Functions can be deployed.
+After deployment is verified, Firestore rules should be tightened so browser
+clients no longer write leaderboard/progression grants directly.
 
 ## 6. Progression And Boss Rotation
 

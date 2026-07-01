@@ -164,3 +164,44 @@ test("Season Road layout ascends: later tiers sit higher than earlier tiers", ()
   assert.ok(data.tier50 < data.tier18, "tier 50 should be above the current tier");
   assert.ok(data.tier18 < data.tier1, "current progress should climb upward from tier 1");
 });
+
+test("server meta snapshots replace local signed-in progression state", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    metaProgress = makeDefaultMetaProgress();
+    metaProgress.totalGlory = 99999;
+    metaProgress.currentSeason.xp = 99999;
+    metaProgress.currentSeason.tier = currentSeasonTierForXP(metaProgress.currentSeason.xp);
+    metaProgress.credits = 99999;
+    mergeServerMetaProgress({
+      totalGlory: 1200,
+      seasonId: CURRENT_SEASON_ID,
+      seasonName: CURRENT_SEASON_NAME,
+      seasonXP: 2052,
+      seasonTier: 3,
+      credits: 140,
+      seasonClaimedRewardIds: ["s01_supply_01"],
+      lifetime: {
+        runs: 4,
+        score: 5000,
+        kills: 30,
+        powerups: 6,
+        ghostUses: 8,
+        bosses: 1,
+        damageTaken: 3,
+        highestCombo: 14,
+        bestScore: 3000,
+        bestPhase: 3
+      }
+    });
+    JSON.stringify(currentMetaSnapshot());
+  `);
+  const snapshot = JSON.parse(result);
+
+  assert.equal(snapshot.totalGlory, 1200);
+  assert.equal(snapshot.seasonXP, 2052);
+  assert.equal(snapshot.seasonTier, 3);
+  assert.equal(snapshot.credits, 140);
+  assert.deepEqual(snapshot.seasonClaimedRewardIds, ["s01_supply_01"]);
+  assert.equal(snapshot.lifetime.runs, 4);
+});
