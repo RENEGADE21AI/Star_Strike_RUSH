@@ -4,11 +4,11 @@ function buildGloryRoadLayout(rect, meta) {
   const activeIndex = currentRoadIndexForThresholds(nodes, total);
   const roadX = Math.round(rect.x + rect.w / 2);
   return nodes.map((node, index) => {
-    const y = rect.y + ROAD_GLORY_START_Y + index * ROAD_GLORY_GAP;
+    const y = rect.y + ROAD_GLORY_START_Y + (nodes.length - 1 - index) * ROAD_GLORY_GAP;
     const side = index % 2 === 0 ? -1 : 1;
     const cardW = node.major ? 116 : 96;
-    const cardH = node.major ? 52 : 40;
-    const cardX = side < 0 ? roadX - 24 - cardW : roadX + 24;
+    const cardH = node.major ? 58 : 44;
+    const cardX = side < 0 ? roadX - 26 - cardW : roadX + 26;
     const cardY = y - cardH / 2;
     return {
       node,
@@ -29,10 +29,10 @@ function buildGloryRoadLayout(rect, meta) {
 function buildSeasonRoadLayout(rect, meta) {
   const tier = Math.max(1, Math.floor(meta.seasonTier || 1));
   const roadX = Math.round(rect.x + rect.w / 2);
-  const leftW = Math.min(106, Math.floor((rect.w - 64) / 2));
+  const leftW = Math.min(112, Math.floor((rect.w - 72) / 2));
   const rightW = leftW;
-  const leftX = rect.x + 8;
-  const rightX = rect.x + rect.w - rightW - 8;
+  const leftX = rect.x + 10;
+  const rightX = rect.x + rect.w - rightW - 10;
   const rows = [];
   for (let i = 1; i <= ROAD_SEASON_TIERS; i++) {
     const reward = getSeasonRewardForTier(i);
@@ -47,8 +47,8 @@ function buildSeasonRoadLayout(rect, meta) {
       reached: i <= tier,
       active: i === tier,
       milestone: i % 5 === 0,
-      flightRect: { x: leftX, y: y - 19, w: leftW, h: 38 },
-      supplyRect: { x: rightX, y: y - 19, w: rightW, h: 38 },
+      flightRect: { x: leftX, y: y - 23, w: leftW, h: 46 },
+      supplyRect: { x: rightX, y: y - 23, w: rightW, h: 46 },
       flightDetail: seasonRewardDetail(i, "flight", reward.flight, meta),
       supplyDetail: seasonRewardDetail(i, "supply", reward.supply, meta),
       tierDetail: seasonTierDetail(i, meta)
@@ -71,11 +71,9 @@ function focusTitleProgressOnCurrent() {
   } else {
     const nodes = makeGloryRoadNodes();
     const index = currentRoadIndexForThresholds(nodes, Math.max(0, Math.floor(meta.totalGlory || 0)));
-    targetY = r.contentRect.y + ROAD_GLORY_START_Y + index * ROAD_GLORY_GAP;
+    targetY = r.contentRect.y + ROAD_GLORY_START_Y + (nodes.length - 1 - index) * ROAD_GLORY_GAP;
   }
-  const focusAnchor = titleProgressTab === "season"
-    ? r.contentRect.y + r.contentRect.h * 0.64
-    : r.contentRect.y + Math.min(118, r.contentRect.h * 0.38);
+  const focusAnchor = r.contentRect.y + r.contentRect.h * 0.70;
   titleProgressScroll = targetY - focusAnchor;
   clampTitleProgressScroll();
 }
@@ -108,14 +106,21 @@ function drawProgressSummary(panel, meta) {
   const x = panel.x + 20;
   const y = panel.y + 112;
   const w = panel.w - 40;
+  const h = 44;
   const isSeason = titleProgressTab === "season";
   ctx.save();
-  ctx.fillStyle = "rgba(8,10,22,0.92)";
-  ctx.fillRect(x, y, w, 38);
-  ctx.fillStyle = isSeason ? "rgba(35,255,170,0.09)" : "rgba(255,230,128,0.10)";
-  ctx.fillRect(x, y, w, 38);
+  const fill = ctx.createLinearGradient(x, y, x + w, y + h);
+  fill.addColorStop(0, isSeason ? "rgba(35,255,170,0.13)" : "rgba(255,230,128,0.13)");
+  fill.addColorStop(0.45, "rgba(8,10,22,0.94)");
+  fill.addColorStop(1, "rgba(8,10,22,0.86)");
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill();
   ctx.strokeStyle = isSeason ? "rgba(120,255,180,0.28)" : "rgba(255,230,128,0.30)";
-  ctx.strokeRect(x, y, w, 38);
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.stroke();
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   if (isSeason) {
@@ -129,7 +134,7 @@ function drawProgressSummary(panel, meta) {
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,255,255,0.68)";
     ctx.fillText(`${Number(tierXP).toLocaleString()} XP  |  ${Number(SEASON_TIER_XP - inTier).toLocaleString()} TO NEXT`, x + 9, y + 22);
-    drawMetaBar(x + w - 96, y + 15, 82, inTier / SEASON_TIER_XP, "rgba(120,255,180,0.72)");
+    drawMetaBar(x + w - 100, y + 18, 86, inTier / SEASON_TIER_XP, "rgba(120,255,180,0.72)");
   } else {
     const next = meta.nextGloryRank ? `NEXT ${formatRoadNumber(meta.nextGloryThreshold)} ${String(meta.nextGloryRank).toUpperCase()}` : "MAX RANK";
     ctx.font = FONT_SMALL;
@@ -138,26 +143,37 @@ function drawProgressSummary(panel, meta) {
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,255,255,0.68)";
     ctx.fillText(`${Number(meta.totalGlory || 0).toLocaleString()} GLORY  |  ${next}`.slice(0, 42), x + 9, y + 22);
-    drawMetaBar(x + w - 96, y + 15, 82, meta.rankProgress || 0, "rgba(255,230,128,0.72)");
+    drawMetaBar(x + w - 100, y + 18, 86, meta.rankProgress || 0, "rgba(255,230,128,0.72)");
   }
   ctx.restore();
 }
 
 function drawRoadNodeCard(x, y, w, h, node, reached, active, color) {
   ctx.save();
-  ctx.fillStyle = active ? color.fillActive : reached ? color.fillReached : "rgba(255,255,255,0.055)";
-  ctx.fillRect(x, y, w, h);
+  const fill = ctx.createLinearGradient(x, y, x + w, y + h);
+  fill.addColorStop(0, active ? color.fillActive : reached ? color.fillReached : "rgba(255,255,255,0.060)");
+  fill.addColorStop(1, active ? "rgba(255,255,255,0.075)" : "rgba(0,0,0,0.16)");
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill();
   ctx.strokeStyle = active ? color.strokeActive : reached ? color.strokeReached : "rgba(255,255,255,0.12)";
   ctx.lineWidth = active ? 2 : 1;
-  ctx.strokeRect(x, y, w, h);
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.stroke();
+  ctx.fillStyle = active ? color.strokeActive : reached ? color.strokeReached : "rgba(255,255,255,0.14)";
+  ctx.beginPath();
+  ctx.roundRect(x + 5, y + 5, 4, h - 10, 3);
+  ctx.fill();
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.font = node.major ? FONT_SMALL : FONT_TINY;
   ctx.fillStyle = reached ? "#fff" : "rgba(255,255,255,0.48)";
-  ctx.fillText(String(node.label).slice(0, node.major ? 17 : 15), x + 8, y + 7);
+  ctx.fillText(String(node.label).slice(0, node.major ? 17 : 15), x + 14, y + 8);
   ctx.font = FONT_TINY;
   ctx.fillStyle = active ? color.textActive : reached ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.34)";
-  ctx.fillText(String(node.sub).slice(0, 18), x + 8, y + h - 16);
+  ctx.fillText(String(node.sub).slice(0, 18), x + 14, y + h - 17);
   ctx.restore();
 }
 
@@ -193,6 +209,14 @@ function drawRoadShipMarker(x, y, color) {
   ctx.translate(x, y - 29 + bob);
   ctx.shadowColor = color.shadow;
   ctx.shadowBlur = 12;
+  ctx.strokeStyle = color.flame;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  ctx.moveTo(0, 16);
+  ctx.lineTo(0, 31);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
   ctx.fillStyle = color.ship;
   ctx.beginPath();
   ctx.moveTo(0, -10);
@@ -218,8 +242,8 @@ function drawRoadShipMarker(x, y, color) {
 function drawGloryRoadContent(rect, meta) {
   const layout = buildGloryRoadLayout(rect, meta);
   const roadX = Math.round(rect.x + rect.w / 2);
-  const startY = rect.y + ROAD_GLORY_START_Y;
-  const endY = layout.length ? layout[layout.length - 1].dotY : startY;
+  const topY = layout.length ? Math.min(...layout.map((item) => item.dotY)) : rect.y + ROAD_GLORY_START_Y;
+  const bottomY = layout.length ? Math.max(...layout.map((item) => item.dotY)) : topY;
   const color = {
     fillActive: "rgba(255,230,128,0.18)",
     fillReached: "rgba(120,255,180,0.09)",
@@ -235,26 +259,38 @@ function drawGloryRoadContent(rect, meta) {
     flame: "rgba(120,255,180,0.78)"
   };
   ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.font = FONT_TINY;
+  ctx.fillStyle = "rgba(255,255,255,0.42)";
+  ctx.fillText("SUMMIT", roadX, topY - 62);
+  ctx.fillStyle = "rgba(255,230,128,0.52)";
+  ctx.beginPath();
+  ctx.moveTo(roadX, topY - 42);
+  ctx.lineTo(roadX - 7, topY - 27);
+  ctx.lineTo(roadX + 7, topY - 27);
+  ctx.closePath();
+  ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.10)";
   ctx.lineWidth = 6;
   ctx.beginPath();
-  ctx.moveTo(roadX, startY - 34);
-  ctx.lineTo(roadX, endY + 34);
+  ctx.moveTo(roadX, topY - 34);
+  ctx.lineTo(roadX, bottomY + 34);
   ctx.stroke();
   const active = layout.find((item) => item.active) || layout[0];
   ctx.strokeStyle = "rgba(255,230,128,0.24)";
   ctx.lineWidth = 2;
   ctx.setLineDash([10, 8]);
   ctx.beginPath();
-  ctx.moveTo(roadX, startY - 34);
-  ctx.lineTo(roadX, active ? active.dotY : startY);
+  ctx.moveTo(roadX, bottomY + 34);
+  ctx.lineTo(roadX, active ? active.dotY : bottomY);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("GLORY ROAD", roadX, rect.y + 8);
+  ctx.fillText("ASCEND GLORY", roadX, rect.y + 14);
   for (const item of layout) {
     const node = item.node;
     const card = item.cardRect;
@@ -279,18 +315,29 @@ function drawSeasonRewardCard(x, y, w, h, detail, active, lane) {
   const activeFill = isSupply ? "rgba(255,230,128,0.14)" : "rgba(120,255,180,0.15)";
   const reachedFill = isSupply ? "rgba(255,230,128,0.07)" : "rgba(120,210,255,0.08)";
   ctx.save();
-  ctx.fillStyle = active ? activeFill : reached ? reachedFill : "rgba(255,255,255,0.045)";
-  ctx.fillRect(x, y, w, h);
+  const fill = ctx.createLinearGradient(x, y, x + w, y + h);
+  fill.addColorStop(0, active ? activeFill : reached ? reachedFill : "rgba(255,255,255,0.050)");
+  fill.addColorStop(1, "rgba(0,0,0,0.15)");
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill();
   ctx.strokeStyle = active ? (isSupply ? "rgba(255,230,128,0.56)" : "rgba(120,255,180,0.60)") : claimed ? "rgba(120,255,180,0.32)" : "rgba(255,255,255,0.12)";
-  ctx.strokeRect(x, y, w, h);
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.stroke();
+  ctx.fillStyle = isSupply ? "rgba(255,230,128,0.50)" : "rgba(120,255,180,0.52)";
+  ctx.beginPath();
+  ctx.arc(x + 10, y + 11, 3, 0, TAU);
+  ctx.fill();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = FONT_TINY;
   ctx.fillStyle = active ? "#fff" : reached ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.38)";
-  ctx.fillText(String(detail.title).slice(0, 14), x + w / 2, y + h / 2 - 3);
+  ctx.fillText(String(detail.title).slice(0, 15), x + w / 2, y + h / 2 - 5);
   ctx.font = "700 8px 'Arial Narrow', Arial, sans-serif";
   ctx.fillStyle = claimed ? "#78ffb4" : status === "UNCLAIMED" ? "#ffe680" : "rgba(255,255,255,0.28)";
-  ctx.fillText(status, x + w / 2, y + h / 2 + 10);
+  ctx.fillText(status, x + w / 2, y + h / 2 + 11);
   ctx.restore();
 }
 
@@ -299,10 +346,10 @@ function drawSeasonRoadContent(rect, meta) {
   const roadX = Math.round(rect.x + rect.w / 2);
   const topY = layout.length ? Math.min(...layout.map((item) => item.dotY)) : rect.y + ROAD_SEASON_START_Y;
   const bottomY = layout.length ? Math.max(...layout.map((item) => item.dotY)) : topY;
-  const leftX = rect.x + 8;
-  const leftW = Math.min(106, Math.floor((rect.w - 64) / 2));
+  const leftX = rect.x + 10;
+  const leftW = Math.min(112, Math.floor((rect.w - 72) / 2));
   const rightW = leftW;
-  const rightX = rect.x + rect.w - rightW - 8;
+  const rightX = rect.x + rect.w - rightW - 10;
   const color = {
     dotActive: "#78ffb4",
     dotReached: "#78d2ff",
@@ -323,6 +370,10 @@ function drawSeasonRoadContent(rect, meta) {
   ctx.fillText("SUPPLY", rightX + rightW / 2, rect.y + 12);
   ctx.fillStyle = "rgba(120,255,180,0.58)";
   ctx.fillText("TIER", roadX, rect.y + 12);
+  ctx.fillStyle = "rgba(255,255,255,0.42)";
+  ctx.fillText("SUMMIT", roadX, topY - 66);
+  ctx.fillStyle = "rgba(255,255,255,0.34)";
+  ctx.fillText("BASE", roadX, bottomY + 48);
   ctx.strokeStyle = "rgba(255,255,255,0.10)";
   ctx.lineWidth = 6;
   ctx.beginPath();
@@ -368,14 +419,25 @@ function drawSeasonRoadContent(rect, meta) {
 function drawProgressScrollBar(rect, contentHeight) {
   const maxScroll = Math.max(0, contentHeight - rect.h);
   if (maxScroll <= 0) return;
-  const trackX = rect.x + rect.w - 5;
+  const trackX = rect.x + rect.w - 7;
   const thumbH = clamp((rect.h * rect.h) / contentHeight, 26, rect.h);
   const thumbY = rect.y + (rect.h - thumbH) * (titleProgressScroll / maxScroll);
   ctx.save();
   ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.fillRect(trackX, rect.y, 3, rect.h);
+  ctx.beginPath();
+  ctx.roundRect(trackX, rect.y + 8, 4, rect.h - 16, 3);
+  ctx.fill();
   ctx.fillStyle = titleProgressTab === "season" ? "rgba(120,255,180,0.62)" : "rgba(255,230,128,0.62)";
-  ctx.fillRect(trackX - 1, thumbY, 5, thumbH);
+  ctx.beginPath();
+  ctx.roundRect(trackX - 1, thumbY, 6, thumbH, 3);
+  ctx.fill();
+  ctx.font = "700 7px 'Arial Narrow', Arial, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "rgba(255,255,255,0.34)";
+  ctx.fillText("PEAK", trackX - 4, rect.y + 8);
+  ctx.textBaseline = "bottom";
+  ctx.fillText("BASE", trackX - 4, rect.y + rect.h - 8);
   ctx.restore();
 }
 
@@ -418,13 +480,17 @@ function drawProgressClaimButton(detail) {
     : detail.status === "CLAIMED"
       ? "rgba(120,255,180,0.10)"
       : "rgba(255,255,255,0.06)";
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7);
+  ctx.fill();
   ctx.strokeStyle = claimable
     ? "rgba(120,255,180,0.72)"
     : detail.status === "CLAIMED"
       ? "rgba(120,255,180,0.38)"
       : "rgba(255,255,255,0.18)";
-  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7);
+  ctx.stroke();
   ctx.fillStyle = claimable ? "#fff" : detail.status === "CLAIMED" ? "#78ffb4" : "rgba(255,255,255,0.42)";
   ctx.font = FONT_TINY;
   ctx.textAlign = "center";
@@ -439,11 +505,22 @@ function drawProgressDetailPanel() {
   const rect = getProgressDetailRect();
   const season = detail.tab === "season";
   ctx.save();
-  ctx.fillStyle = "rgba(6,8,18,0.96)";
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.shadowColor = season ? "rgba(120,255,180,0.28)" : "rgba(255,230,128,0.25)";
+  ctx.shadowBlur = 14;
+  const fill = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+  fill.addColorStop(0, season ? "rgba(24,64,48,0.96)" : "rgba(64,52,20,0.95)");
+  fill.addColorStop(0.32, "rgba(6,8,18,0.97)");
+  fill.addColorStop(1, "rgba(4,6,14,0.94)");
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 10);
+  ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.strokeStyle = season ? "rgba(120,255,180,0.55)" : "rgba(255,230,128,0.55)";
   ctx.lineWidth = 2;
-  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 10);
+  ctx.stroke();
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.font = FONT_TINY;
@@ -489,10 +566,18 @@ function drawProgressPanel() {
 
   clampTitleProgressScroll();
   drawProgressSummary(panel, meta);
-  ctx.fillStyle = "rgba(7,9,20,0.90)";
-  ctx.fillRect(r.contentRect.x, r.contentRect.y, r.contentRect.w, r.contentRect.h);
+  const roadFill = ctx.createLinearGradient(r.contentRect.x, r.contentRect.y, r.contentRect.x, r.contentRect.y + r.contentRect.h);
+  roadFill.addColorStop(0, "rgba(10,14,28,0.93)");
+  roadFill.addColorStop(0.55, "rgba(6,8,19,0.91)");
+  roadFill.addColorStop(1, "rgba(4,6,14,0.94)");
+  ctx.fillStyle = roadFill;
+  ctx.beginPath();
+  ctx.roundRect(r.contentRect.x, r.contentRect.y, r.contentRect.w, r.contentRect.h, 10);
+  ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.14)";
-  ctx.strokeRect(r.contentRect.x, r.contentRect.y, r.contentRect.w, r.contentRect.h);
+  ctx.beginPath();
+  ctx.roundRect(r.contentRect.x, r.contentRect.y, r.contentRect.w, r.contentRect.h, 10);
+  ctx.stroke();
 
   ctx.save();
   ctx.beginPath();
@@ -507,10 +592,15 @@ function drawProgressPanel() {
   drawProgressScrollBar(r.contentRect, getProgressContentHeight());
   drawProgressDetailPanel();
   const maxScroll = getProgressMaxScroll();
-  const atEnd = maxScroll > 0 && titleProgressScroll >= maxScroll - 2;
+  const atBase = maxScroll > 0 && titleProgressScroll >= maxScroll - 2;
+  const atSummit = maxScroll > 0 && titleProgressScroll <= 2;
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.50)";
   ctx.textAlign = "center";
-  ctx.fillText(atEnd ? "END OF ROAD" : titleProgressDragActive ? "DRAGGING ROAD" : titleProgressSelectedNode ? "NODE SELECTED" : "DRAG, WHEEL, OR TAP NODES", panel.x + panel.w / 2, panel.y + panel.h - 26);
+  ctx.fillText(
+    atBase ? "BASE OF ROAD" : atSummit ? "SUMMIT RANGE" : titleProgressDragActive ? "DRAGGING ASCENT" : titleProgressSelectedNode ? "NODE DETAILS" : "DRAG, WHEEL, OR TAP NODES",
+    panel.x + panel.w / 2,
+    panel.y + panel.h - 26
+  );
   ctx.restore();
 }

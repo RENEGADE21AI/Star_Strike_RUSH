@@ -646,6 +646,8 @@
 
     .road-map {
       position: relative;
+      display: flex;
+      flex-direction: column-reverse;
       min-height: 1180px;
       padding: 16px 0 36px;
     }
@@ -659,7 +661,7 @@
       width: 4px;
       transform: translateX(-50%);
       border-radius: 999px;
-      background: linear-gradient(180deg, var(--green) 0 10%, rgba(255,230,128,0.72) 10% 46%, rgba(255,255,255,0.18) 46% 100%);
+      background: linear-gradient(180deg, var(--gold) 0 12%, rgba(120,255,180,0.72) 12% 58%, rgba(255,255,255,0.18) 58% 100%);
       box-shadow: 0 0 18px rgba(255,230,128,0.18);
     }
 
@@ -735,6 +737,8 @@
 
     .season-map {
       position: relative;
+      display: flex;
+      flex-direction: column-reverse;
       min-height: 1560px;
       padding: 14px 0 40px;
     }
@@ -748,7 +752,7 @@
       width: 4px;
       transform: translateX(-50%);
       border-radius: 999px;
-      background: linear-gradient(180deg, var(--green) 0 4%, rgba(120,210,255,0.72) 4% 46%, rgba(255,255,255,0.16) 46% 100%);
+      background: linear-gradient(180deg, var(--gold) 0 4%, rgba(120,210,255,0.72) 4% 52%, rgba(255,255,255,0.16) 52% 100%);
       box-shadow: 0 0 18px rgba(120,210,255,0.22);
     }
 
@@ -815,6 +819,7 @@
     }
 
     .track-labels {
+      order: 1000;
       display: grid;
       grid-template-columns: 105px 34px 105px;
       gap: 10px;
@@ -1244,8 +1249,9 @@
           <li>Top tabs switch Glory Road and Season Road.</li>
           <li>Current rank is the headline, with next rank and progress bar pinned near the top.</li>
           <li>The road itself is long, with alternating rank cards on a central rail.</li>
+          <li>Progression direction is upward: Rookie starts at the base, higher ranks climb toward the summit.</li>
           <li>Major ranks get larger glowing nodes; minor checkpoints preview the climb between ranks.</li>
-          <li>Opening the Road should auto-position near the player's current rank, with a little space above it.</li>
+          <li>Opening the Road should auto-position near the player's current rank, with a little space above it and the current node lower in the viewport.</li>
           <li>The current node should have extra energy: pulse, glow, and a small ship marker on the rail.</li>
           <li>Tapping a node opens an inspect panel with requirement, status, and identity reward.</li>
           <li>Use gold for lifetime identity, green for reached status.</li>
@@ -1301,7 +1307,8 @@
           <li>Tier rows become a long scroll track, not a compact list.</li>
           <li>Flight rewards sit on the left lane; Supply rewards sit on the right lane. Both lanes are earned through play.</li>
           <li>Reward cards use real reward data: tier, reward type, amount/name, detail text, and claimed/unclaimed/locked state.</li>
-          <li>Opening the Season Road should auto-position near the player's current tier.</li>
+          <li>Opening the Season Road should auto-position near the player's current tier with future tiers visible above.</li>
+          <li>Tier 1 starts at the road base; tier 50 is the summit target.</li>
           <li>Every fifth tier should feel like a larger milestone node.</li>
           <li>Reward claiming happens here through the selected reward detail panel, not directly on the title screen.</li>
         </ul>

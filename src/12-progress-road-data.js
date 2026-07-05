@@ -1,7 +1,7 @@
-const ROAD_GLORY_START_Y = 44;
-const ROAD_GLORY_GAP = 80;
-const ROAD_SEASON_START_Y = 62;
-const ROAD_SEASON_GAP = 62;
+const ROAD_GLORY_START_Y = 88;
+const ROAD_GLORY_GAP = 96;
+const ROAD_SEASON_START_Y = 92;
+const ROAD_SEASON_GAP = 76;
 const ROAD_SEASON_TIERS = 50;
 
 const SEASON_REWARDS = buildSeasonRewardTable();
@@ -18,9 +18,9 @@ function buildSeasonRewardTable() {
     const flightAmount = milestone ? 180 + tier * 18 : 45 + tier * 7;
     const supplyAmount = milestone ? 320 + tier * 22 : 90 + tier * 10;
     const flight = milestone
-      ? seasonReward(`s01_flight_${pad}`, "glory_cache", flightAmount, `${flightAmount} Glory Cache`, "Adds lifetime Glory progress for the permanent Glory Road.")
-      : seasonReward(`s01_flight_${pad}`, "season_xp_cache", flightAmount, `${flightAmount} Season XP`, "Adds progress toward the next Season Road tier.");
-    const supply = seasonReward(`s01_supply_${pad}`, "credits", supplyAmount, `${supplyAmount} Credits`, "Adds Credits to the pilot account balance.");
+      ? seasonReward(`s01_flight_${pad}`, "glory_cache", flightAmount, `${flightAmount} Glory Cache`, "Adds lifetime Glory to Glory Road.")
+      : seasonReward(`s01_flight_${pad}`, "season_xp_cache", flightAmount, `${flightAmount} Season XP`, "Adds Season XP toward next tier.");
+    const supply = seasonReward(`s01_supply_${pad}`, "credits", supplyAmount, `${supplyAmount} Credits`, "Adds Credits to pilot balance.");
     rows.push({ tier, flight, supply });
   }
   return rows;
@@ -69,9 +69,9 @@ function makeGloryRoadNodes() {
 }
 
 function getProgressRoadContentHeight() {
-  if (titleProgressTab === "season") return 86 + ROAD_SEASON_TIERS * ROAD_SEASON_GAP;
+  if (titleProgressTab === "season") return ROAD_SEASON_START_Y + Math.max(0, ROAD_SEASON_TIERS - 1) * ROAD_SEASON_GAP + 132;
   const gloryStepCount = Math.max(1, GLORY_RANKS.length * 2 - 1);
-  return 72 + gloryStepCount * ROAD_GLORY_GAP;
+  return ROAD_GLORY_START_Y + Math.max(0, gloryStepCount - 1) * ROAD_GLORY_GAP + 132;
 }
 
 function currentRoadIndexForThresholds(nodes, total) {

@@ -166,6 +166,26 @@ test("Season Road layout ascends: later tiers sit higher than earlier tiers", ()
   assert.ok(data.tier18 < data.tier1, "current progress should climb upward from tier 1");
 });
 
+test("Glory Road layout ascends: higher ranks sit above early ranks", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    metaProgress = makeDefaultMetaProgress();
+    metaProgress.totalGlory = GLORY_RANKS[3].threshold;
+    const layout = buildGloryRoadLayout({ x: 18, y: 170, w: 324, h: 420 }, currentMetaSnapshot());
+    JSON.stringify({
+      rookie: layout.find((item) => item.node.id === "glory_rank_0").dotY,
+      active: layout.find((item) => item.active).dotY,
+      capstone: layout.find((item) => item.node.id === "glory_rank_" + (GLORY_RANKS.length - 1)).dotY,
+      activeId: layout.find((item) => item.active).node.id
+    });
+  `);
+  const data = JSON.parse(result);
+
+  assert.equal(data.activeId, "glory_rank_3");
+  assert.ok(data.capstone < data.active, "capstone rank should sit above the current rank");
+  assert.ok(data.active < data.rookie, "current Glory progress should climb upward from Rookie");
+});
+
 test("server meta snapshots replace local signed-in progression state", () => {
   const context = loadGameContext();
   const result = runInGame(context, `

@@ -358,14 +358,14 @@ function getProgressRects() {
   const tabW = Math.floor((panel.w - 48) / 2);
   const gloryTab = { x: panel.x + 20, y: panel.y + 72, w: tabW, h: 30 };
   const seasonTab = { x: gloryTab.x + tabW + 8, y: gloryTab.y, w: tabW, h: 30 };
-  const contentRect = { x: panel.x + 18, y: panel.y + 162, w: panel.w - 36, h: panel.h - 198 };
+  const contentRect = { x: panel.x + 18, y: panel.y + 170, w: panel.w - 36, h: panel.h - 208 };
   return { panel, closeRect, gloryTab, seasonTab, contentRect };
 }
 function getProgressContentHeight() {
   if (typeof getProgressRoadContentHeight === "function") return getProgressRoadContentHeight();
-  if (titleProgressTab === "season") return 86 + 50 * 62;
+  if (titleProgressTab === "season") return 92 + 49 * 76 + 132;
   const gloryStepCount = Math.max(1, GLORY_RANKS.length * 2 - 1);
-  return 72 + gloryStepCount * 80;
+  return 88 + Math.max(0, gloryStepCount - 1) * 96 + 132;
 }
 function getProgressMaxScroll() {
   const r = getProgressRects();
@@ -376,9 +376,9 @@ function clampTitleProgressScroll() {
 }
 function getProgressDetailRect() {
   const r = getProgressRects();
-  const w = r.contentRect.w - 24;
-  const h = 112;
-  return { x: r.contentRect.x + 12, y: r.contentRect.y + r.contentRect.h - h - 10, w, h };
+  const w = r.contentRect.w - 20;
+  const h = 124;
+  return { x: r.contentRect.x + 10, y: r.contentRect.y + r.contentRect.h - h - 12, w, h };
 }
 function getResetConfirmRects() {
   const boxW = Math.min(460, W - 28);

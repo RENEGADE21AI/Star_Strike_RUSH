@@ -204,10 +204,14 @@ Title screen meta placement:
 - Road opens Glory Road and Season Road tabs. These tracks should feel like
   classic long-scroll progression roads with a central spine, nodes, milestone
   rewards, and visible travel distance. Do not compress them into short lists.
+  Progression ascends: early nodes live near the road base and later rewards
+  climb upward toward the summit, so the ship marker appears to move forward
+  and up as the player advances.
   The current canvas implementation uses a draggable/wheel-scroll road viewport:
   Glory alternates rank milestones and checkpoints, while Season displays all
   50 supported tiers on a central rail with Flight and Supply reward markers.
-  Road opens around current progress instead of always starting at tier/rank 1.
+  Road opens around current progress with the current node parked lower in the
+  viewport and future milestones visible above it.
   The current node has a pulsing marker ship, and tapping nodes or reward cards
   opens an inspect panel with requirement, reward, and reached/locked/claimed
   state. Unclaimed Season rewards can be claimed from the detail panel.
