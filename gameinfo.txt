@@ -212,11 +212,25 @@ Title screen meta placement:
   50 supported tiers on a central rail with Flight and Supply reward markers.
   Road opens around current progress with the current node parked lower in the
   viewport and future milestones visible above it.
+  Road tabs, summary, rail viewport, and selected reward tray share the
+  dedicated-screen geometry. The tray stays inside the content region and
+  appears only after the player inspects a node or reward.
   The current node has a pulsing marker ship, and tapping nodes or reward cards
   opens an inspect panel with requirement, reward, and reached/locked/claimed
   state. Unclaimed Season rewards can be claimed from the detail panel.
 - Records opens the world-record leaderboard and refresh controls.
 - Codex opens enemy and boss discovery.
+- Each meta destination is a dedicated title-layer screen, not a small modal:
+  a persistent header provides Back, destination context, and the shared
+  currency strip. Its content viewport remains separate from a bottom-safe
+  action zone so compact portrait screens stay readable.
+- Screen motion is restrained: a short directional slide/fade on entry, a
+  small active-destination pulse, Road marker/trail energy, and reward claim
+  confirmation. No constant decorative motion should compete with Play.
+- Account begins with a pilot card followed by connectivity, settings, and
+  reset utility groups. Achievements prioritize a roomy earned/locked archive;
+  Records prioritize place, pilot, rank, and score; Codex prioritizes a clear
+  specimen grid and full inspection view.
 
 The old combined Online drawer should not be the default information model.
 Account, achievements, records, and progression should remain distinct so each

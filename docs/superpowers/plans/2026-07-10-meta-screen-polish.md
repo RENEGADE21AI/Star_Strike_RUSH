@@ -1,6 +1,6 @@
 # Star Strike RUSH Meta-Screen Polish Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan one item at a time. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the title and meta layer feel like a spacious arcade command deck while preserving the canvas architecture and all in-run visuals.
 
@@ -317,7 +317,7 @@ Expected: exit code 0.
 
 - [ ] **Step 3: Run secret scan and visual QA**
 
-Run: `rg -n "AIza[0-9A-Za-z_-]+|sk-[0-9A-Za-z_-]+|sk-proj-[0-9A-Za-z_-]+" -g "!*package-lock.json" -g "!*node_modules*" .`
+Run the repository's credential-pattern scan, excluding dependency lockfiles and dependencies.
 
 Capture desktop and 375 x 667 title, Account, Achievements, Records, Codex, Glory Road, Season Road, selected reward, and game-over Road entry. Correct clipped copy, overlap, weak state hierarchy, or touch-target collisions before the final commit.
 
