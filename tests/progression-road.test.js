@@ -63,6 +63,7 @@ function loadGameContext() {
   context.globalThis = context;
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/01-core.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/08-title-screen.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/12-progress-road-data.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/12-rendering-progress-road.js"), "utf8"), context);
   context.__storage = storage;
@@ -82,6 +83,22 @@ function test(name, fn) {
     throw error;
   }
 }
+
+test("meta screens reserve header and action zones", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    W = 375; H = 667;
+    const panel = getTitlePanelRect();
+    const metrics = getMetaScreenMetrics(panel);
+    const content = getMetaScreenContentRect(panel, 0, 0);
+    JSON.stringify({ panel, metrics, content });
+  `);
+  const data = JSON.parse(result);
+
+  assert.ok(data.metrics.headerH >= 66);
+  assert.ok(data.content.y >= data.panel.y + data.metrics.headerH);
+  assert.ok(data.content.y + data.content.h <= data.metrics.actionY);
+});
 
 test("unlocked Season rewards can be claimed once and applied to local meta progress", () => {
   const context = loadGameContext();

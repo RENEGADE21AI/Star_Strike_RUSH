@@ -310,6 +310,29 @@ function getTitlePanelRect() {
   const y = marginY;
   return { x, y, w: panelW, h: panelH };
 }
+function getMetaScreenMetrics(panel = getTitlePanelRect()) {
+  const compact = panel.h < 620;
+  const headerH = compact ? 70 : 76;
+  const actionH = compact ? 46 : 52;
+  return {
+    headerH,
+    statusY: panel.y + 48,
+    contentTop: panel.y + headerH,
+    contentBottom: panel.y + panel.h - actionH,
+    contentH: Math.max(0, panel.h - headerH - actionH),
+    actionY: panel.y + panel.h - actionH
+  };
+}
+function getMetaScreenContentRect(panel, topInset = 0, bottomInset = 0) {
+  const metrics = getMetaScreenMetrics(panel);
+  const y = metrics.contentTop + topInset;
+  return {
+    x: panel.x + 18,
+    y,
+    w: panel.w - 36,
+    h: Math.max(0, metrics.actionY - bottomInset - y)
+  };
+}
 function getGameOverButtons() {
   const btnW = 220, btnH = 40, x = Math.round((W - btnW) / 2), y1 = Math.round(H * 0.59), gap = 10;
   return {
