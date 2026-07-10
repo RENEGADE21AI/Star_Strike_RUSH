@@ -349,6 +349,15 @@ function getMetaScreenHeaderRects(panel = getTitlePanelRect()) {
     back: { x: panel.x + 14, y: panel.y + 14, w: 64, h: 30 }
   };
 }
+function getMetaScreenActionRect(panel = getTitlePanelRect(), width = panel.w - 40, h = 36) {
+  const metrics = getMetaScreenMetrics(panel);
+  return {
+    x: Math.round(panel.x + (panel.w - width) / 2),
+    y: Math.round(metrics.actionY + (panel.y + panel.h - metrics.actionY - h) / 2),
+    w: width,
+    h
+  };
+}
 function getGameOverButtons() {
   const btnW = 220, btnH = 40, x = Math.round((W - btnW) / 2), y1 = Math.round(H * 0.59), gap = 10;
   return {
@@ -368,22 +377,27 @@ function getCodexRects() {
 function getOnlineRects() {
   const panel = getTitlePanelRect();
   const closeRect = getMetaScreenHeaderRects(panel).back;
-  const innerX = panel.x + 20;
-  const signIn = { x: innerX, y: panel.y + 112, w: panel.w - 40, h: 34 };
-  const signOut = { x: innerX, y: panel.y + 152, w: panel.w - 40, h: 30 };
-  const btnW = 64, btnH = 28, gap = 10, btnY = panel.y + 286;
+  const content = getMetaScreenContentRect(panel);
+  const innerX = content.x;
+  const profileH = clamp(Math.floor(content.h * 0.22), 86, 102);
+  const profile = { x: content.x, y: content.y + 8, w: content.w, h: profileH };
+  const signIn = { x: content.x, y: profile.y + profile.h + 18, w: content.w, h: 36 };
+  const signOut = { x: content.x, y: signIn.y + 42, w: content.w, h: 30 };
+  const btnW = 64, btnH = 28, gap = 10;
+  const settingsY = Math.min(content.y + content.h - 142, signOut.y + 48);
+  const btnY = Math.round(settingsY + 28);
   const low = { x: innerX, y: btnY, w: btnW, h: btnH };
   const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
   const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
   const shake = { x: innerX, y: btnY + 50, w: 134, h: 30 };
   const reset = { x: panel.x + panel.w - 180, y: btnY + 50, w: 160, h: 30 };
-  const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
-  return { panel, closeRect, signIn, signOut, low, med, high, shake, reset, refresh };
+  const refresh = getMetaScreenActionRect(panel, content.w, 36);
+  return { panel, closeRect, content, profile, signIn, signOut, low, med, high, shake, reset, refresh };
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();
   const closeRect = getMetaScreenHeaderRects(panel).back;
-  const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
+  const refresh = getMetaScreenActionRect(panel);
   return { panel, closeRect, refresh };
 }
 function getAchievementsRects() {

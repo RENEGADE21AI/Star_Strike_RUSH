@@ -140,7 +140,7 @@ function handleCodexPanelPointerDown(x, y) {
   const r = getCodexRects();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
   if (codexDetailType) {
-    const detailCard = { x: r.panel.x + 18, y: r.panel.y + 78, w: r.panel.w - 36, h: r.panel.h - 94 };
+    const detailCard = getMetaScreenContentRect(r.panel, 8, 8);
     const backRect = { x: detailCard.x + 10, y: detailCard.y + 10, w: 28, h: 22 };
     if (hitRect(backRect, x, y)) { codexDetailType = null; return true; }
     if (!(x >= detailCard.x && x <= detailCard.x + detailCard.w && y >= detailCard.y && y <= detailCard.y + detailCard.h)) {

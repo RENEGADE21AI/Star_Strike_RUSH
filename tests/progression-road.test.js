@@ -132,6 +132,22 @@ test("title meta dock holds all four labeled destinations below Play", () => {
   }
 });
 
+test("meta screen action rect stays in the reserved bottom zone", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    W = 375; H = 667;
+    const panel = getTitlePanelRect();
+    const metrics = getMetaScreenMetrics(panel);
+    const action = getMetaScreenActionRect(panel);
+    JSON.stringify({ panel, metrics, action });
+  `);
+  const data = JSON.parse(result);
+
+  assert.ok(data.action.y >= data.metrics.actionY);
+  assert.ok(data.action.y + data.action.h <= data.panel.y + data.panel.h - 8);
+  assert.ok(data.action.h >= 36);
+});
+
 test("unlocked Season rewards can be claimed once and applied to local meta progress", () => {
   const context = loadGameContext();
   const result = runInGame(context, `

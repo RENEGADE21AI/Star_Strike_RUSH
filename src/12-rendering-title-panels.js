@@ -134,15 +134,16 @@ function drawCodexShipDisplay(type, x, y, scale, silhouette, meta) {
 function codexCardRects(panel) {
   const types = codexGridTypes();
   const cols = types.length > 8 ? 3 : 3;
-  const gap = types.length > 8 ? 6 : 12;
-  const sidePad = types.length > 8 ? 16 : 36;
+  const gap = types.length > 8 ? 8 : 12;
+  const sidePad = types.length > 8 ? 16 : 30;
+  const content = getMetaScreenContentRect(panel, 8, 8);
   const cardW = Math.floor((panel.w - sidePad * 2 - gap * (cols - 1)) / cols);
-  const cardH = types.length > 8 ? 72 : 100;
   const rows = Math.ceil(types.length / cols);
+  const cardH = Math.max(62, Math.min(types.length > 8 ? 82 : 104, Math.floor((content.h - gap * (rows - 1)) / rows)));
   const totalW = cardW * cols + gap * (cols - 1);
   const totalH = cardH * rows + gap * (rows - 1);
   const startX = panel.x + Math.round((panel.w - totalW) / 2);
-  const startY = panel.y + (types.length > 8 ? 76 : 82);
+  const startY = content.y + Math.max(0, Math.floor((content.h - totalH) / 2));
   const rects = {};
   for (let i = 0; i < types.length; i++) {
     const col = i % cols, row = Math.floor(i / cols);
@@ -216,7 +217,7 @@ function drawStatBar(x, y, label, value, max = 5) {
 function drawCodexDetail(panel, type) {
   const stats = codexTypeStats(type);
   const meta = typeof getCodexMeta === "function" ? getCodexMeta(type) : { color: "#fff" };
-  const card = { x: panel.x + 18, y: panel.y + 78, w: panel.w - 36, h: panel.h - 94 };
+  const card = getMetaScreenContentRect(panel, 8, 8);
   ctx.save();
   ctx.fillStyle = "rgba(0,0,8,0.93)";
   ctx.beginPath(); ctx.roundRect(card.x, card.y, card.w, card.h, 10); ctx.fill();
@@ -235,7 +236,7 @@ function drawCodexDetail(panel, type) {
   ctx.textBaseline = "middle";
   ctx.fillText("<", backRect.x + backRect.w / 2, backRect.y + backRect.h / 2 + 1);
 
-  const artRect = { x: card.x + 12, y: card.y + 42, w: card.w - 24, h: 145 };
+  const artRect = { x: card.x + 12, y: card.y + 42, w: card.w - 24, h: Math.min(150, Math.max(118, Math.floor(card.h * 0.31))) };
   ctx.fillStyle = "rgba(255,255,255,0.045)";
   ctx.beginPath(); ctx.roundRect(artRect.x, artRect.y, artRect.w, artRect.h, 10); ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.10)";
@@ -258,12 +259,13 @@ function drawCodexDetail(panel, type) {
   ctx.fillStyle = "rgba(255,255,255,0.76)";
   ctx.font = FONT_SMALL;
   ctx.fillStyle = meta.color || "rgba(255,255,255,0.78)";
-  ctx.fillText(String(meta.trait || "Unknown threat.").slice(0, 40), card.x + 16, card.y + 206);
+  const detailY = artRect.y + artRect.h + 18;
+  ctx.fillText(String(meta.trait || "Unknown threat.").slice(0, 40), card.x + 16, detailY);
   ctx.fillStyle = "rgba(255,255,255,0.76)";
-  ctx.fillText(`Threat: ${stats.threat.toFixed(2)}    HP: ${stats.hp}`, card.x + 16, card.y + 228);
-  drawStatBar(card.x + 16, card.y + 258, "Speed", stats.speed);
-  drawStatBar(card.x + 16, card.y + 280, "Aggression", stats.aggression);
-  drawStatBar(card.x + 16, card.y + 302, "Fire Rate", stats.fire);
+  ctx.fillText(`Threat: ${stats.threat.toFixed(2)}    HP: ${stats.hp}`, card.x + 16, detailY + 22);
+  drawStatBar(card.x + 16, detailY + 52, "Speed", stats.speed);
+  drawStatBar(card.x + 16, detailY + 74, "Aggression", stats.aggression);
+  drawStatBar(card.x + 16, detailY + 96, "Fire Rate", stats.fire);
   ctx.restore();
 }
 function drawCodexPanel() {
@@ -328,10 +330,14 @@ function onlineState() {
 function drawOnlineActionButton(rect, label, active = true) {
   ctx.save();
   ctx.fillStyle = active ? "rgba(120,255,180,0.14)" : "rgba(255,255,255,0.06)";
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7);
+  ctx.fill();
   ctx.strokeStyle = active ? "rgba(120,255,180,0.55)" : "rgba(255,255,255,0.18)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7);
+  ctx.stroke();
   ctx.fillStyle = active ? "#fff" : "rgba(255,255,255,0.45)";
   ctx.font = FONT_BUTTON;
   ctx.textAlign = "center";
@@ -379,30 +385,50 @@ function drawOnlinePanel() {
   drawPanelCloseButton(r.closeRect);
 
   ctx.save();
-  const innerX = panel.x + 20;
-  let y = panel.y + 76;
+  const innerX = r.profile.x + 14;
+  const profileFill = ctx.createLinearGradient(r.profile.x, r.profile.y, r.profile.x + r.profile.w, r.profile.y + r.profile.h);
+  profileFill.addColorStop(0, user ? "rgba(22,82,61,0.52)" : "rgba(28,34,54,0.72)");
+  profileFill.addColorStop(1, "rgba(4,6,14,0.74)");
+  ctx.fillStyle = profileFill;
+  ctx.beginPath();
+  ctx.roundRect(r.profile.x, r.profile.y, r.profile.w, r.profile.h, 10);
+  ctx.fill();
+  ctx.strokeStyle = user ? "rgba(120,255,180,0.48)" : "rgba(120,210,255,0.34)";
+  ctx.beginPath();
+  ctx.roundRect(r.profile.x, r.profile.y, r.profile.w, r.profile.h, 10);
+  ctx.stroke();
+  let y = r.profile.y + 12;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.font = FONT_SMALL;
-  ctx.fillStyle = user ? "#78ffb4" : "rgba(255,255,255,0.70)";
-  ctx.fillText(user ? `ACCOUNT: ${String(name).slice(0, 22)}` : "ACCOUNT: SIGNED OUT", innerX, y);
-  y += 18;
+  ctx.font = FONT_TINY;
+  ctx.fillStyle = user ? "#78ffb4" : "rgba(120,210,255,0.82)";
+  ctx.fillText(user ? "PILOT ONLINE" : "LOCAL PILOT", innerX, y);
+  y += 14;
+  ctx.font = FONT_HUD;
+  ctx.fillStyle = "#fff";
+  ctx.fillText(String(name).toUpperCase().slice(0, 22), innerX, y);
+  y += 21;
   ctx.fillStyle = online.lastError ? "#ffb0b0" : "rgba(255,255,255,0.72)";
+  ctx.font = FONT_TINY;
   ctx.fillText(String(status).slice(0, 42), innerX, y);
-  y = panel.y + 198;
+  y += 18;
   if (meta) {
-    ctx.font = FONT_HUD;
-    ctx.fillStyle = "rgba(255,230,128,0.88)";
-    ctx.fillText(meta.gloryRank.toUpperCase(), innerX, y);
-    y += 22;
     ctx.font = FONT_TINY;
-    ctx.fillStyle = "rgba(255,255,255,0.66)";
-    ctx.fillText(`GLORY ${Number(meta.totalGlory || 0).toLocaleString()}  |  TIER ${meta.seasonTier || 1}`, innerX, y);
-    y += 18;
-    ctx.fillText(`CREDITS ${Number(meta.credits || 0).toLocaleString()}  |  BEST ${Number((meta.lifetime && meta.lifetime.bestScore) || highScore || 0).toLocaleString()}`, innerX, y);
+    ctx.fillStyle = "rgba(255,230,128,0.88)";
+    ctx.fillText(`${String(meta.gloryRank || "Rookie Pilot").toUpperCase()}  |  ${Number(meta.totalGlory || 0).toLocaleString()} GLORY`, innerX, y);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(120,210,255,0.88)";
+    ctx.fillText(`${Number(meta.credits || 0).toLocaleString()} CREDITS  |  T${meta.seasonTier || 1}`, r.profile.x + r.profile.w - 14, y);
   }
   ctx.restore();
 
+  ctx.save();
+  ctx.font = FONT_TINY;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "bottom";
+  ctx.fillStyle = "rgba(255,255,255,0.52)";
+  ctx.fillText("CONNECTIVITY", r.signIn.x, r.signIn.y - 7);
+  ctx.restore();
   drawOnlineActionButton(r.signIn, user ? "SYNC PROFILE" : "SIGN IN WITH GOOGLE", true);
   drawOnlineActionButton(r.signOut, "SIGN OUT", !!user);
 
@@ -439,9 +465,9 @@ function drawOnlinePanel() {
   ctx.textAlign = "center";
   ctx.fillText(`SHAKE: ${settingScreenShake ? "ON" : "OFF"}`, r.shake.x + r.shake.w / 2, r.shake.y + r.shake.h / 2 + 1);
   ctx.fillStyle = "rgba(255,80,80,0.12)";
-  ctx.fillRect(r.reset.x, r.reset.y, r.reset.w, r.reset.h);
+  ctx.beginPath(); ctx.roundRect(r.reset.x, r.reset.y, r.reset.w, r.reset.h, 7); ctx.fill();
   ctx.strokeStyle = "rgba(255,120,120,0.58)";
-  ctx.strokeRect(r.reset.x, r.reset.y, r.reset.w, r.reset.h);
+  ctx.beginPath(); ctx.roundRect(r.reset.x, r.reset.y, r.reset.w, r.reset.h, 7); ctx.stroke();
   ctx.fillStyle = "#fff";
   ctx.fillText("RESET PROGRESS", r.reset.x + r.reset.w / 2, r.reset.y + r.reset.h / 2 + 1);
   ctx.restore();
@@ -460,27 +486,49 @@ function drawRecordsPanel() {
   ctx.save();
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  let listY = panel.y + 82;
+  const content = getMetaScreenContentRect(panel, 8, 6);
+  let listY = content.y + 4;
   ctx.font = FONT_SMALL;
-  ctx.fillStyle = "rgba(255,255,255,0.70)";
-  ctx.fillText(user ? "GLOBAL BEST-SCORE LADDER" : "SIGN IN TO LOAD GLOBAL SCORES", panel.x + 20, listY);
-  listY += 30;
+  ctx.fillStyle = user ? "rgba(120,210,255,0.86)" : "rgba(255,255,255,0.70)";
+  ctx.fillText(user ? "GLOBAL BEST-SCORE LADDER" : "GLOBAL LADDER OFFLINE", content.x, listY);
+  listY += 28;
   ctx.font = FONT_TINY;
   if (leaderboard.length) {
-    leaderboard.slice(0, 10).forEach((row, index) => {
+    const rowH = 34;
+    const maxRows = Math.max(1, Math.floor((r.refresh.y - 14 - listY) / rowH));
+    leaderboard.slice(0, maxRows).forEach((row, index) => {
       const who = String(row.callSign || row.displayName || "PILOT").slice(0, 12);
       const score = Number(row.bestScore || 0).toLocaleString();
       const rank = row.gloryRank ? ` ${String(row.gloryRank).slice(0, 14)}` : "";
-      ctx.fillStyle = index === 0 ? "#ffe680" : "rgba(255,255,255,0.82)";
-      ctx.fillText(`${index + 1}. ${who}${rank}`, panel.x + 22, listY);
+      const rowX = content.x;
+      const rowW = content.w;
+      const mine = user && (row.uid === user.uid || String(row.callSign || "").toUpperCase() === String(callSign || "").toUpperCase());
+      ctx.fillStyle = mine ? "rgba(120,255,180,0.10)" : index === 0 ? "rgba(255,230,128,0.11)" : "rgba(255,255,255,0.045)";
+      ctx.beginPath(); ctx.roundRect(rowX, listY - 5, rowW, rowH - 4, 7); ctx.fill();
+      ctx.strokeStyle = mine ? "rgba(120,255,180,0.44)" : index === 0 ? "rgba(255,230,128,0.35)" : "rgba(255,255,255,0.10)";
+      ctx.beginPath(); ctx.roundRect(rowX, listY - 5, rowW, rowH - 4, 7); ctx.stroke();
+      ctx.fillStyle = index === 0 ? "#ffe680" : mine ? "#78ffb4" : "rgba(255,255,255,0.68)";
+      ctx.fillText(`#${index + 1}`, rowX + 10, listY + 4);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(who, rowX + 45, listY + 4);
+      ctx.fillStyle = "rgba(255,255,255,0.46)";
+      ctx.fillText(rank.trim().slice(0, 16), rowX + 45, listY + 16);
       ctx.textAlign = "right";
-      ctx.fillText(score, panel.x + panel.w - 22, listY);
+      ctx.fillStyle = index === 0 ? "#ffe680" : "rgba(255,255,255,0.88)";
+      ctx.fillText(score, rowX + rowW - 10, listY + 10);
       ctx.textAlign = "left";
-      listY += 17;
+      listY += rowH;
     });
   } else {
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText(user ? "No synced records yet." : "Use the account chip to sign in.", panel.x + 22, listY);
+    const empty = { x: content.x, y: listY, w: content.w, h: 74 };
+    ctx.fillStyle = "rgba(255,255,255,0.045)";
+    ctx.beginPath(); ctx.roundRect(empty.x, empty.y, empty.w, empty.h, 9); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
+    ctx.beginPath(); ctx.roundRect(empty.x, empty.y, empty.w, empty.h, 9); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillText(user ? "NO SYNCED RECORDS YET" : "SIGN IN FROM ACCOUNT", empty.x + 14, empty.y + 18);
+    ctx.fillStyle = "rgba(255,255,255,0.46)";
+    ctx.fillText(user ? "Finish a run to establish your record." : "Your local high score stays available offline.", empty.x + 14, empty.y + 40);
   }
   ctx.restore();
 
@@ -522,43 +570,49 @@ function drawAchievementsPanel() {
 
   ctx.save();
   const total = Math.max(1, definitions.length);
-  let y = panel.y + 82;
+  const content = getMetaScreenContentRect(panel, 8, 10);
+  const ordered = definitions.slice().sort((a, b) => Number(earned.has(b.id)) - Number(earned.has(a.id)));
+  let y = content.y + 4;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.font = FONT_SMALL;
   ctx.fillStyle = "#78ffb4";
-  ctx.fillText(`${earned.size}/${definitions.length} UNLOCKED`, panel.x + 54, y + 3);
+  ctx.fillText(`${earned.size}/${definitions.length} UNLOCKED`, content.x + 54, y + 3);
   ctx.save();
-  ctx.translate(panel.x + 35, y + 10);
+  ctx.translate(content.x + 35, y + 10);
   drawAchievementBadgeIcon(0, 0, earned.size > 0);
   ctx.restore();
-  drawMetaBar(panel.x + 20, y + 24, panel.w - 40, earned.size / total, "rgba(255,230,128,0.72)");
-  y += 46;
+  drawMetaBar(content.x, y + 24, content.w, earned.size / total, "rgba(255,230,128,0.72)");
+  y += 50;
   ctx.font = FONT_TINY;
-  for (const achievement of definitions.slice(0, 16)) {
+  let lastUnlocked = null;
+  const rowH = 32;
+  const maxRows = Math.max(1, Math.floor((panel.y + panel.h - 26 - y) / rowH));
+  for (const achievement of ordered.slice(0, maxRows)) {
     const unlocked = earned.has(achievement.id);
-    const rowX = panel.x + 20;
-    const rowW = panel.w - 40;
-    const rowH = 22;
+    if (lastUnlocked !== null && lastUnlocked !== unlocked) y += 8;
+    const rowX = content.x;
+    const rowW = content.w;
     const fill = ctx.createLinearGradient(rowX, y - 2, rowX + rowW, y - 2);
     fill.addColorStop(0, unlocked ? "rgba(255,230,128,0.14)" : "rgba(255,255,255,0.045)");
     fill.addColorStop(1, unlocked ? "rgba(120,255,180,0.07)" : "rgba(255,255,255,0.025)");
     ctx.fillStyle = fill;
-    ctx.fillRect(rowX, y - 2, rowW, rowH);
+    ctx.beginPath(); ctx.roundRect(rowX, y - 2, rowW, rowH - 3, 7); ctx.fill();
     ctx.strokeStyle = unlocked ? "rgba(120,255,180,0.36)" : "rgba(255,255,255,0.10)";
-    ctx.strokeRect(rowX, y - 2, rowW, rowH);
+    ctx.beginPath(); ctx.roundRect(rowX, y - 2, rowW, rowH - 3, 7); ctx.stroke();
     ctx.fillStyle = unlocked ? "rgba(255,230,128,0.72)" : "rgba(255,255,255,0.18)";
-    ctx.fillRect(rowX, y - 2, 3, rowH);
-    drawAchievementBadgeIcon(rowX + 17, y + 8, unlocked);
+    ctx.beginPath(); ctx.roundRect(rowX + 5, y + 4, 3, rowH - 15, 2); ctx.fill();
+    drawAchievementBadgeIcon(rowX + 19, y + 11, unlocked);
     ctx.fillStyle = unlocked ? "#78ffb4" : "rgba(255,255,255,0.34)";
-    ctx.fillText(unlocked ? "DONE" : "LOCK", rowX + 36, y + 4);
+    ctx.fillText(unlocked ? "EARNED" : "LOCKED", rowX + 40, y + 5);
     ctx.fillStyle = unlocked ? "#fff" : "rgba(255,255,255,0.62)";
-    ctx.fillText(String(achievement.name || achievement.id).toUpperCase().slice(0, 23), rowX + 78, y + 4);
-    y += 24;
+    ctx.fillText(String(achievement.name || achievement.id).toUpperCase().slice(0, 26), rowX + 96, y + 5);
+    lastUnlocked = unlocked;
+    y += rowH;
   }
   if (!online.user) {
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText("SIGN IN FROM ACCOUNT TO SYNC ACHIEVEMENTS.", panel.x + 20, panel.y + panel.h - 28);
+    ctx.fillText("SIGN IN FROM ACCOUNT TO SYNC ACHIEVEMENTS.", content.x, panel.y + panel.h - 28);
   }
   ctx.restore();
 }
