@@ -407,12 +407,20 @@ function getAchievementsRects() {
 }
 function getProgressRects() {
   const panel = getTitlePanelRect();
+  const metrics = getMetaScreenMetrics(panel);
+  const content = getMetaScreenContentRect(panel);
   const closeRect = getMetaScreenHeaderRects(panel).back;
   const tabW = Math.floor((panel.w - 48) / 2);
-  const gloryTab = { x: panel.x + 20, y: panel.y + 72, w: tabW, h: 30 };
-  const seasonTab = { x: gloryTab.x + tabW + 8, y: gloryTab.y, w: tabW, h: 30 };
-  const contentRect = { x: panel.x + 18, y: panel.y + 170, w: panel.w - 36, h: panel.h - 208 };
-  return { panel, closeRect, gloryTab, seasonTab, contentRect };
+  const gloryTab = { x: panel.x + 20, y: content.y + 6, w: tabW, h: 32 };
+  const seasonTab = { x: gloryTab.x + tabW + 8, y: gloryTab.y, w: tabW, h: 32 };
+  const summaryRect = { x: content.x + 2, y: gloryTab.y + gloryTab.h + 10, w: content.w - 4, h: 44 };
+  const contentRect = {
+    x: content.x,
+    y: summaryRect.y + summaryRect.h + 8,
+    w: content.w,
+    h: Math.max(120, metrics.actionY - (summaryRect.y + summaryRect.h + 12))
+  };
+  return { panel, closeRect, content, gloryTab, seasonTab, summaryRect, contentRect };
 }
 function getProgressContentHeight() {
   if (typeof getProgressRoadContentHeight === "function") return getProgressRoadContentHeight();
@@ -430,7 +438,7 @@ function clampTitleProgressScroll() {
 function getProgressDetailRect() {
   const r = getProgressRects();
   const w = r.contentRect.w - 20;
-  const h = 124;
+  const h = clamp(Math.floor(r.contentRect.h * 0.28), 96, 118);
   return { x: r.contentRect.x + 10, y: r.contentRect.y + r.contentRect.h - h - 12, w, h };
 }
 function getResetConfirmRects() {

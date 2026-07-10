@@ -102,11 +102,8 @@ function getProgressNodeAt(x, y) {
   return null;
 }
 
-function drawProgressSummary(panel, meta) {
-  const x = panel.x + 20;
-  const y = panel.y + 112;
-  const w = panel.w - 40;
-  const h = 44;
+function drawProgressSummary(rect, meta) {
+  const { x, y, w, h } = rect;
   const isSeason = titleProgressTab === "season";
   ctx.save();
   const fill = ctx.createLinearGradient(x, y, x + w, y + h);
@@ -565,7 +562,7 @@ function drawProgressPanel() {
   }
 
   clampTitleProgressScroll();
-  drawProgressSummary(panel, meta);
+  drawProgressSummary(r.summaryRect, meta);
   const roadFill = ctx.createLinearGradient(r.contentRect.x, r.contentRect.y, r.contentRect.x, r.contentRect.y + r.contentRect.h);
   roadFill.addColorStop(0, "rgba(10,14,28,0.93)");
   roadFill.addColorStop(0.55, "rgba(6,8,19,0.91)");

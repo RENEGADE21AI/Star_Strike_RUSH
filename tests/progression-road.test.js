@@ -148,6 +148,20 @@ test("meta screen action rect stays in the reserved bottom zone", () => {
   assert.ok(data.action.h >= 36);
 });
 
+test("Road detail tray stays inside the content region", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    W = 375; H = 667;
+    const panel = getTitlePanelRect();
+    const metrics = getMetaScreenMetrics(panel);
+    JSON.stringify({ metrics, detail: getProgressDetailRect() });
+  `);
+  const data = JSON.parse(result);
+
+  assert.ok(data.detail.y >= data.metrics.contentTop);
+  assert.ok(data.detail.y + data.detail.h <= data.metrics.actionY);
+});
+
 test("unlocked Season rewards can be claimed once and applied to local meta progress", () => {
   const context = loadGameContext();
   const result = runInGame(context, `
