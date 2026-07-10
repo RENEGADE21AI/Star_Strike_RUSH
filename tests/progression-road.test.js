@@ -116,6 +116,22 @@ test("meta screen back target fits every portrait panel", () => {
   }
 });
 
+test("title meta dock holds all four labeled destinations below Play", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    W = 375; H = 667;
+    JSON.stringify({ dock: getTitleMetaDockRect(), icons: getTitleIconRects(), play: getPlayButtonRect() });
+  `);
+  const data = JSON.parse(result);
+
+  assert.ok(data.dock.y > data.play.y + data.play.h);
+  for (const key of ["achievements", "progress", "records", "codex"]) {
+    const icon = data.icons[key];
+    assert.ok(icon.x >= data.dock.x && icon.x + icon.w <= data.dock.x + data.dock.w);
+    assert.ok(icon.y >= data.dock.y && icon.y + icon.h <= data.dock.y + data.dock.h);
+  }
+});
+
 test("unlocked Season rewards can be claimed once and applied to local meta progress", () => {
   const context = loadGameContext();
   const result = runInGame(context, `

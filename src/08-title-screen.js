@@ -298,6 +298,15 @@ function getTitleIconRects() {
     account: { x: callRect.x - 46, y: callRect.y, w: 36, h: 40 }
   };
 }
+function getTitleMetaDockRect() {
+  const icons = getTitleIconRects();
+  return {
+    x: icons.achievements.x - 10,
+    y: icons.achievements.y - 22,
+    w: icons.codex.x + icons.codex.w - icons.achievements.x + 20,
+    h: 88
+  };
+}
 function getTitlePanelRect() {
   const marginX = 10;
   const marginY = 14;
