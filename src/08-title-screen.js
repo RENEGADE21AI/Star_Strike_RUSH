@@ -333,6 +333,13 @@ function getMetaScreenContentRect(panel, topInset = 0, bottomInset = 0) {
     h: Math.max(0, metrics.actionY - bottomInset - y)
   };
 }
+function getMetaScreenHeaderRects(panel = getTitlePanelRect()) {
+  const metrics = getMetaScreenMetrics(panel);
+  return {
+    header: { x: panel.x, y: panel.y, w: panel.w, h: metrics.headerH },
+    back: { x: panel.x + 14, y: panel.y + 14, w: 64, h: 30 }
+  };
+}
 function getGameOverButtons() {
   const btnW = 220, btnH = 40, x = Math.round((W - btnW) / 2), y1 = Math.round(H * 0.59), gap = 10;
   return {
@@ -345,13 +352,13 @@ function hitRect(rect, x, y) { return x >= rect.x && x <= rect.x + rect.w && y >
 
 function getCodexRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
+  const closeRect = getMetaScreenHeaderRects(panel).back;
   const rects = codexCardRects(panel);
   return { panel, closeRect, rects };
 }
 function getOnlineRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
+  const closeRect = getMetaScreenHeaderRects(panel).back;
   const innerX = panel.x + 20;
   const signIn = { x: innerX, y: panel.y + 112, w: panel.w - 40, h: 34 };
   const signOut = { x: innerX, y: panel.y + 152, w: panel.w - 40, h: 30 };
@@ -366,18 +373,18 @@ function getOnlineRects() {
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
+  const closeRect = getMetaScreenHeaderRects(panel).back;
   const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
   return { panel, closeRect, refresh };
 }
 function getAchievementsRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
+  const closeRect = getMetaScreenHeaderRects(panel).back;
   return { panel, closeRect };
 }
 function getProgressRects() {
   const panel = getTitlePanelRect();
-  const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
+  const closeRect = getMetaScreenHeaderRects(panel).back;
   const tabW = Math.floor((panel.w - 48) / 2);
   const gloryTab = { x: panel.x + 20, y: panel.y + 72, w: tabW, h: 30 };
   const seasonTab = { x: gloryTab.x + tabW + 8, y: gloryTab.y, w: tabW, h: 30 };

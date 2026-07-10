@@ -548,7 +548,7 @@ function drawProgressPanel() {
   const r = getProgressRects();
   const panel = r.panel;
   const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
-  drawTitlePanelFrame(panel, "PROGRESS ROAD");
+  drawTitlePanelFrame(panel, "PROGRESS ROAD", "rgba(120,255,180,0.70)", "ASCENT ROUTE");
   drawPanelCloseButton(r.closeRect);
   drawOnlineActionButton(r.gloryTab, "GLORY ROAD", titleProgressTab === "glory");
   drawOnlineActionButton(r.seasonTab, "SEASON ROAD", titleProgressTab === "season");

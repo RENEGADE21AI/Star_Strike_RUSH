@@ -27,24 +27,47 @@ function drawTitleMetaStrip(x, y, w) {
   }
   ctx.restore();
 }
-function drawTitlePanelFrame(panel, title) {
+function drawTitlePanelFrame(panel, title, accent = "rgba(120,210,255,0.58)", subtitle = "PILOT COMMAND") {
+  const header = getMetaScreenHeaderRects(panel).header;
   ctx.save();
-  ctx.fillStyle = "#080a14";
+  const body = ctx.createLinearGradient(panel.x, panel.y, panel.x, panel.y + panel.h);
+  body.addColorStop(0, "#11172a");
+  body.addColorStop(0.18, "#080b17");
+  body.addColorStop(1, "#04050d");
+  ctx.fillStyle = body;
   ctx.beginPath();
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 10);
   ctx.fill();
-  ctx.fillStyle = "rgba(0,0,0,0.12)";
-  ctx.fillRect(panel.x, panel.y, 8, panel.h);
-  ctx.strokeStyle = "rgba(255,255,255,0.22)";
-  ctx.lineWidth = 2;
+  const headerFill = ctx.createLinearGradient(header.x, header.y, header.x + header.w, header.y);
+  headerFill.addColorStop(0, "rgba(255,255,255,0.06)");
+  headerFill.addColorStop(0.42, "rgba(255,255,255,0.025)");
+  headerFill.addColorStop(1, "rgba(0,0,0,0.16)");
+  ctx.fillStyle = headerFill;
+  ctx.beginPath();
+  ctx.roundRect(header.x, header.y, header.w, header.h, 10);
+  ctx.fill();
+  ctx.fillStyle = accent;
+  ctx.fillRect(panel.x, panel.y + 10, 4, header.h - 20);
+  ctx.strokeStyle = "rgba(255,255,255,0.24)";
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 10);
   ctx.stroke();
-  ctx.textAlign = "center";
+  ctx.strokeStyle = accent;
+  ctx.globalAlpha = 0.72;
+  ctx.beginPath();
+  ctx.moveTo(panel.x + 12, header.y + header.h - 1);
+  ctx.lineTo(panel.x + panel.w - 12, header.y + header.h - 1);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.font = FONT_HUD;
+  ctx.font = FONT_SMALL;
   ctx.fillStyle = "#fff";
-  ctx.fillText(title, panel.x + panel.w / 2, panel.y + 14);
+  ctx.fillText(title, panel.x + 88, panel.y + 13);
+  ctx.font = "900 8px 'Arial Narrow', Arial, sans-serif";
+  ctx.fillStyle = accent;
+  ctx.fillText(subtitle, panel.x + 88, panel.y + 29);
   ctx.restore();
   drawTitleMetaStrip(panel.x + 18, panel.y + 42, panel.w - 36);
 }
@@ -246,7 +269,7 @@ function drawCodexDetail(panel, type) {
 function drawCodexPanel() {
   const r = getCodexRects();
   const panel = r.panel;
-  drawTitlePanelFrame(panel, "CODEX");
+  drawTitlePanelFrame(panel, "CODEX", "rgba(120,255,180,0.66)", "THREAT ARCHIVE");
   drawPanelCloseButton(r.closeRect);
   if (codexDetailType) drawCodexDetail(panel, codexDetailType);
   else drawCodexGrid(panel);
@@ -318,12 +341,16 @@ function drawOnlineActionButton(rect, label, active = true) {
 }
 function drawPanelCloseButton(rect) {
   ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.10)";
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.34)";
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7);
+  ctx.stroke();
   ctx.fillStyle = "#fff";
-  ctx.font = "900 10px 'Arial Narrow', Arial, sans-serif";
+  ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("< BACK", rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
@@ -348,7 +375,7 @@ function drawOnlinePanel() {
   const name = user ? (online.profileCallSign || user.displayName || callSign || "PILOT") : "SIGNED OUT";
   const status = online.lastError || online.lastStatus || (user ? "Runs sync at game over." : "Sign in to sync records.");
   const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
-  drawTitlePanelFrame(panel, "ACCOUNT");
+  drawTitlePanelFrame(panel, "ACCOUNT", "rgba(120,210,255,0.66)", "SYNC AND SETTINGS");
   drawPanelCloseButton(r.closeRect);
 
   ctx.save();
@@ -427,7 +454,7 @@ function drawRecordsPanel() {
   const online = onlineState();
   const user = online.user || null;
   const leaderboard = Array.isArray(online.leaderboard) ? online.leaderboard : [];
-  drawTitlePanelFrame(panel, "WORLD RECORDS");
+  drawTitlePanelFrame(panel, "WORLD RECORDS", "rgba(120,210,255,0.66)", "GLOBAL FLIGHT LADDER");
   drawPanelCloseButton(r.closeRect);
 
   ctx.save();
@@ -490,7 +517,7 @@ function drawAchievementsPanel() {
   const online = onlineState();
   const definitions = typeof getAchievementDefinitions === "function" ? getAchievementDefinitions() : [];
   const earned = new Set((Array.isArray(online.achievements) ? online.achievements : []).map((item) => typeof item === "string" ? item : item.achievementId));
-  drawTitlePanelFrame(panel, "ACHIEVEMENTS");
+  drawTitlePanelFrame(panel, "ACHIEVEMENTS", "rgba(255,230,128,0.72)", "MILESTONE ARCHIVE");
   drawPanelCloseButton(r.closeRect);
 
   ctx.save();

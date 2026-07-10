@@ -100,6 +100,22 @@ test("meta screens reserve header and action zones", () => {
   assert.ok(data.content.y + data.content.h <= data.metrics.actionY);
 });
 
+test("meta screen back target fits every portrait panel", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    JSON.stringify([500, 667, 900].map((height) => {
+      W = 375; H = height;
+      const panel = getTitlePanelRect();
+      return { panel, header: getMetaScreenHeaderRects(panel) };
+    }));
+  `);
+  for (const item of JSON.parse(result)) {
+    assert.ok(item.header.back.x >= item.panel.x);
+    assert.ok(item.header.back.y >= item.panel.y);
+    assert.ok(item.header.back.x + item.header.back.w <= item.panel.x + item.panel.w);
+  }
+});
+
 test("unlocked Season rewards can be claimed once and applied to local meta progress", () => {
   const context = loadGameContext();
   const result = runInGame(context, `
