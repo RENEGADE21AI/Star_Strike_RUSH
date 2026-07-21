@@ -70,6 +70,17 @@ function drawOuterFog() {
     ctx.fill();
   }
 
+  // Sparse extension stars keep tall-phone and desktop gutters feeling like
+  // continuous space instead of letterbox bars. The game rectangle overwrites
+  // these points before the logical scene is drawn.
+  ctx.fillStyle = "rgba(230,240,255,0.48)";
+  for (let i = 0; i < 34; i++) {
+    const px = ((i * 97 + 41) % 997) / 997 * screenW;
+    const py = ((i * 193 + 73) % 991) / 991 * screenH;
+    const size = i % 7 === 0 ? 1.5 : 1;
+    ctx.fillRect(px, py, size, size);
+  }
+
   // Black out the game area
   ctx.fillStyle = "#000";
   ctx.fillRect(gx, gy, gw, gh);
@@ -118,6 +129,9 @@ function draw() {
   ctx.save();
   ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
   ctx.translate(sx, sy);
 
   drawBackground();
@@ -145,6 +159,9 @@ function draw() {
     ctx.save();
     ctx.translate(offsetX, offsetY);
     ctx.scale(scale, scale);
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.clip();
     drawLowHpWarning();
     drawDamageFlash();
     ctx.restore();

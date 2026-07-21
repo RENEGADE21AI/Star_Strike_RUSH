@@ -23,7 +23,7 @@ function spawnAsteroid(kind, x, y, extra = {}) {
     iron_asteroid: { r: 24, hp: 7, vy: 1.45, vx: rand(-0.12, 0.12), damage: 1, color: "#8b9296" },
     comet_shard: { r: 13, hp: 2, vy: 3.7, vx: rand(-0.55, 0.55), damage: 1, color: "#c4eaff", trail: true }
   }[kind] || { r: 16, hp: 2, vy: 2.1, vx: 0, damage: 1, color: "#8f8170" };
-  state.debris.push(Object.assign({
+  const asteroid = Object.assign({
     kind,
     x,
     y,
@@ -37,11 +37,22 @@ function spawnAsteroid(kind, x, y, extra = {}) {
     trail: !!data.trail,
     life: 780,
     rot: rand(0, TAU),
-    vr: rand(-0.035, 0.035)
-  }, extra));
+    vr: rand(-0.035, 0.035),
+    spawnScale: 1,
+    collisionScale: 1,
+    growAge: 0,
+    growFrames: 0
+  }, extra);
+  if (asteroid.growFromZero) {
+    asteroid.spawnScale = 0;
+    asteroid.collisionScale = 0;
+    asteroid.growAge = 0;
+    asteroid.growFrames = Math.max(1, Number(asteroid.growFrames || 30));
+  }
+  state.debris.push(asteroid);
 }
 
-function spawnMeteorWarning(x, delay = 48, kind = "rock_asteroid") {
+function spawnMeteorWarning(x, delay = 48, kind = "rock_asteroid", extra = {}) {
   state.debris.push({
     kind: "meteor_warning",
     x,
@@ -49,7 +60,8 @@ function spawnMeteorWarning(x, delay = 48, kind = "rock_asteroid") {
     r: 22,
     warn: delay,
     targetKind: kind,
-    life: delay + 4
+    life: delay + 4,
+    spawnExtra: { ...extra }
   });
 }
 
@@ -68,7 +80,10 @@ function spawnDebrisWall(gapSlot = 2, opts = {}) {
       vx: 0,
       color: "#7d7067",
       noScore: true,
-      wall: true
+      wall: true,
+      growFromZero: opts.growFromZero !== false,
+      growFrames: opts.growFrames || 32,
+      wardenSpawn: true
     });
   }
 }
@@ -193,10 +208,18 @@ function updateExpansionHazards() {
       d.warn--;
       d.life--;
       if (d.warn <= 0) {
-        spawnAsteroid(d.targetKind || "rock_asteroid", d.x, -38, { vx: 0, vy: d.targetKind === "comet_shard" ? 3.8 : 2.7 });
+        spawnAsteroid(d.targetKind || "rock_asteroid", d.x, -38, Object.assign({
+          vx: 0,
+          vy: d.targetKind === "comet_shard" ? 3.8 : 2.7
+        }, d.spawnExtra || {}));
         state.debris.splice(i, 1);
       }
       continue;
+    }
+    if (d.growFromZero && d.spawnScale < 1) {
+      d.growAge = (d.growAge || 0) + 1;
+      d.spawnScale = debrisSpawnScale(d.growAge, d.growFrames || 30);
+      d.collisionScale = d.spawnScale;
     }
     d.x += d.vx || 0;
     d.y += d.vy || 0;
@@ -208,7 +231,7 @@ function updateExpansionHazards() {
     }
     for (let j = state.bullets.length - 1; j >= 0; j--) {
       const b = state.bullets[j];
-      if (circleHit(b.x, b.y, b.r, d.x, d.y, d.r)) {
+      if (manifestCollision("player_bullet", b.x, b.y, d.kind, d.x, d.y, b.r || 3, d.r || 12, 1, d.collisionScale == null ? 1 : d.collisionScale)) {
         d.hp -= b.damage || 1;
         b.life = 0;
         spawnParticles(b.x, b.y, 4, "#fff", 0.45);
@@ -224,19 +247,19 @@ function updateExpansionHazards() {
       state.debris.splice(i, 1);
       continue;
     }
-    if ((d.kind === "mine" || d.kind === "energy_mine") && d.armed && circleHit(d.x, d.y, d.r, p.x, p.y, 14)) {
+    if ((d.kind === "mine" || d.kind === "energy_mine") && d.armed && manifestCollision(d.kind, d.x, d.y, "player", p.x, p.y, d.r || 12, 14, d.collisionScale == null ? 1 : d.collisionScale, 1)) {
       explodeHazard(d);
       state.debris.splice(i, 1);
       continue;
     }
-    if (d.kind !== "mine" && d.kind !== "energy_mine" && circleHit(d.x, d.y, d.r, p.x, p.y, 14) && p.inv <= 0) {
+    if (d.kind !== "mine" && d.kind !== "energy_mine" && manifestCollision(d.kind, d.x, d.y, "player", p.x, p.y, d.r || 12, 14, d.collisionScale == null ? 1 : d.collisionScale, 1) && p.inv <= 0) {
       damagePlayer(d.damage || 1);
       if (!d.wall) d.hp -= 2;
     }
     if (d.kind !== "mine" && d.kind !== "energy_mine") {
       for (let j = state.enemies.length - 1; j >= 0; j--) {
         const e = state.enemies[j];
-        if (circleHit(d.x, d.y, d.r, e.x, e.y, e.r)) {
+        if (manifestCollision(d.kind, d.x, d.y, e.type, e.x, e.y, d.r || 12, e.r || 12, d.collisionScale == null ? 1 : d.collisionScale, 1)) {
           e.hp -= d.wall ? 2 : 1.5;
           if (!d.wall) d.hp -= 1;
           applyEnemyHitFeedback(e);
@@ -337,7 +360,7 @@ function expansionBossCooldown(b, hpPct) {
 function chooseExpansionBossAttack(b, hpPct) {
   if (b.mode === "siphon_core" && state.player.energy < 16 && b.step % 2 === 0) return "low_energy_pause";
   const seqs = {
-    debris_warden: hpPct > 0.5 ? ["wall", "light", "meteor", "double"] : ["double", "crush", "meteor", "rotate"],
+    debris_warden: debrisWardenAttackSequence(hpPct),
     mothership: hpPct > 0.35 ? ["launch", "escort", "heavy", "launch"] : ["final", "repair", "heavy", "escort"],
     siphon_core: hpPct > 0.45 ? ["drain_beam", "energy_mines", "pulse"] : ["tether", "pulse", "overcharge", "energy_mines"],
     hive_breaker: hpPct > 0.45 ? ["shard_burst", "guards", "light"] : ["panic", "shard_burst", "guards"],
@@ -353,6 +376,31 @@ function beginExpansionBossAttack(b, attack) {
   b.warn = attack === "light" ? 18 : attack === "launch" || attack === "escort" ? 32 : 44;
   if (b.mode === "rail_tyrant") b.warn = attack === "sweep" ? 50 : 44;
   if (b.mode === "debris_warden" && (attack === "wall" || attack === "double" || attack === "crush")) b.warn = 54;
+  if (b.mode === "debris_warden" && attack === "double") {
+    const rowSpeed = debrisWardenRowSpeed(b.hp / b.maxHp, "double");
+    b.safePlan = createDoubleDebrisPlan({
+      width: W,
+      asteroidRadius: collisionCircleFor("boss_wall", 0, 0, 1, 24).r,
+      playerRadius: collisionCircleFor("player", 0, 0, 1, 14).r,
+      playerMaxSpeed: state.player.maxSpeed,
+      playerSteer: 0.22,
+      rowDistance: 96,
+      rowSpeed,
+      margin: 8,
+      routeMargin: 12
+    });
+    state.enemyBullets = [];
+    state.enemies = [];
+    state.debris = state.debris.filter((item) => item.wall);
+    state.safeLanes = [
+      { ...b.safePlan.first.safe, row: 1, expiresAt: state.frame + 430 },
+      { ...b.safePlan.second.safe, row: 2, expiresAt: state.frame + 480 }
+    ];
+    showMessage("DOUBLE GATE  |  TRACK SAFE LANE", 96);
+  } else if (b.mode === "debris_warden") {
+    b.safePlan = null;
+    if (!state.debris.some((item) => item.wall)) state.safeLanes = [];
+  }
   b.warnMax = b.warn;
   b.bayOpen = b.warn;
 }
@@ -361,18 +409,30 @@ function resolveExpansionBossAttack(b, attack) {
   const p = state.player;
   const hpPct = b.hp / b.maxHp;
   if (b.mode === "debris_warden") {
+    const rowSpeed = debrisWardenRowSpeed(hpPct, attack);
     if (attack === "wall") {
-      spawnDebrisWall(Math.floor(rand(0, 6)), { vy: hpPct < 0.35 ? 2.35 : 2.05 });
+      spawnDebrisWall(Math.floor(rand(0, 6)), { vy: rowSpeed });
     } else if (attack === "double") {
-      const first = Math.floor(rand(0, 6));
-      spawnDebrisWall(first, { y: -36, vy: 2.0 });
-      spawnDebrisWall((first + 2 + Math.floor(rand(0, 3))) % 6, { y: -118, vy: 2.1 });
+      const plan = b.safePlan || createDoubleDebrisPlan({ width: W });
+      spawnDebrisWall(plan.first.slot, { slots: plan.slots, y: plan.first.y, vy: plan.first.speed });
+      spawnDebrisWall(plan.second.slot, { slots: plan.slots, y: plan.second.y, vy: plan.second.speed });
     } else if (attack === "crush") {
-      spawnDebrisWall(Math.floor(rand(0, 6)), { slots: 5, y: -44, r: 28, vy: 1.75 });
+      spawnDebrisWall(Math.floor(rand(0, 6)), { slots: 5, y: -44, r: 28, vy: rowSpeed });
     } else if (attack === "meteor") {
-      for (let i = 0; i < 4; i++) spawnMeteorWarning(laneX(i % 3) + rand(-26, 26), 44 + i * 8, i === 3 && state.phase >= 9 ? "comet_shard" : "rock_asteroid");
+      for (let i = 0; i < 4; i++) spawnMeteorWarning(laneX(i % 3) + rand(-26, 26), 44 + i * 8, i === 3 && state.phase >= 9 ? "comet_shard" : "rock_asteroid", {
+        growFromZero: true,
+        growFrames: 32,
+        wardenSpawn: true,
+        vy: rowSpeed * (i === 3 && state.phase >= 9 ? 1.28 : 1.12)
+      });
     } else if (attack === "rotate") {
-      for (let i = 0; i < 5; i++) spawnAsteroid("rock_asteroid", 44 + i * 72, -38 - i * 30, { vx: i % 2 === 0 ? -0.55 : 0.55, vy: 1.85 });
+      for (let i = 0; i < 5; i++) spawnAsteroid("rock_asteroid", 44 + i * 72, -38 - i * 30, {
+        vx: i % 2 === 0 ? -0.55 : 0.55,
+        vy: rowSpeed,
+        growFromZero: true,
+        growFrames: 32,
+        wardenSpawn: true
+      });
     } else {
       fireAimedBurst(b.x, b.y + 24, p.x, p.y, 3, 18, 3.2, "boss");
     }
@@ -479,6 +539,7 @@ function updateExpansionBoss() {
     return true;
   }
   const hpPct = b.hp / b.maxHp;
+  if (state.safeLanes.length) state.safeLanes = state.safeLanes.filter((lane) => lane.expiresAt > state.frame);
   b.x += Math.sin(state.frame * (b.mode === "rail_tyrant" ? 0.018 : 0.024) + b.movePhase) * (b.mode === "mothership" ? 0.55 : 0.78);
   b.x = clamp(b.x, b.w / 2 + 18, W - b.w / 2 - 18);
   b.bayOpen = Math.max(0, (b.bayOpen || 0) - 1);

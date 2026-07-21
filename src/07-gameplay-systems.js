@@ -292,23 +292,16 @@ function collectPowerup(pu) {
 }
 function enemyScoreForType(type) { return (ENEMY_DATA[type] && ENEMY_DATA[type].score) ? ENEMY_DATA[type].score : 20; }
 function applyEnemyHitFeedback(e) { e.hitFlash = 12; e.hitPulse = 1; }
+function bossSpriteKey(mode) { return `boss_${mode || "standard"}`; }
+function playerBulletSpriteKey() { return "player_bullet"; }
+function enemyBulletSpriteKey(kind) { return kind === "drainShot" ? "drainShot" : "enemy_bullet"; }
 function bossCollisionHits(bullet, boss) {
   const origin = { x: boss.x, y: boss.y - ((boss.recoil || 0) * 0.35) };
-  const circles = boss.mode === "wraith" ? [
-    { x: origin.x, y: origin.y, r: 28 },
-    { x: origin.x - 36, y: origin.y + 2, r: 18 },
-    { x: origin.x + 36, y: origin.y + 2, r: 18 },
-    { x: origin.x - 12, y: origin.y - 18, r: 15 },
-    { x: origin.x + 12, y: origin.y - 18, r: 15 }
-  ] : [
-    { x: origin.x, y: origin.y, r: 28 },
-    { x: origin.x - 34, y: origin.y, r: 18 },
-    { x: origin.x + 34, y: origin.y, r: 18 },
-    { x: origin.x, y: origin.y - 14, r: 16 },
-    { x: origin.x, y: origin.y + 12, r: 20 }
-  ];
-  for (const c of circles) if (circleHit(bullet.x, bullet.y, bullet.r, c.x, c.y, c.r)) return true;
-  return false;
+  return manifestCollision(
+    playerBulletSpriteKey(), bullet.x, bullet.y,
+    bossSpriteKey(boss.mode), origin.x, origin.y,
+    bullet.r || 3, Math.max(18, (boss.w || 80) * 0.32)
+  );
 }
 function updateCollisions() {
   const p = state.player;
@@ -425,7 +418,7 @@ function updateCollisions() {
         const phantomIsGhost = e.stateMode === "ghost";
         if (bulletIsGhost !== phantomIsGhost) continue;
       }
-      if (circleHit(b.x, b.y, b.r, e.x, e.y, e.r)) {
+      if (manifestCollision(playerBulletSpriteKey(), b.x, b.y, e.type, e.x, e.y, b.r || 3, e.r || 12)) {
         b.hitIds = b.hitIds || [];
         b.hitIds.push(e.id);
         if (b.pierce > 0) b.pierce--;
@@ -460,7 +453,7 @@ function updateCollisions() {
       let wingmanBlocked = false;
       for (let w = state.wingmen.length - 1; w >= 0; w--) {
         const wm = state.wingmen[w];
-        if (circleHit(b.x, b.y, b.r, wm.x, wm.y, 12)) {
+        if (manifestCollision(enemyBulletSpriteKey(b.kind), b.x, b.y, "wingman", wm.x, wm.y, b.r || 4, 12)) {
           state.enemyBullets.splice(i, 1);
           state.wingmen.splice(w, 1);
           spawnParticles(wm.x, wm.y, 10, "#f6f", 0.8);
@@ -471,7 +464,7 @@ function updateCollisions() {
       if (wingmanBlocked) continue;
     }
     if (b.kind === "drainShot") {
-      if (circleHit(b.x, b.y, b.r, p.x, p.y, 14)) {
+      if (manifestCollision("drainShot", b.x, b.y, "player", p.x, p.y, b.r || 5, 14)) {
         state.enemyBullets.splice(i, 1);
         if (typeof drainPlayerEnergy === "function") drainPlayerEnergy(b.drain || 22, "drainShot");
         spawnParticles(p.x, p.y, 10, "#70ff45", 0.65);
@@ -479,13 +472,13 @@ function updateCollisions() {
       continue;
     }
     if (state.boss && state.boss.mode === "wraith" && (b.kind === "wraithPhysical" || b.kind === "wraithGhost")) {
-      if (circleHit(b.x, b.y, b.r, p.x, p.y, 14) && p.inv <= 0) {
+      if (manifestCollision(enemyBulletSpriteKey(b.kind), b.x, b.y, "player", p.x, p.y, b.r || 4, 14) && p.inv <= 0) {
         state.enemyBullets.splice(i, 1);
         damagePlayer(b.damage || 1);
       }
       continue;
     }
-    if (circleHit(b.x, b.y, b.r, p.x, p.y, 14) && p.inv <= 0) {
+    if (manifestCollision(enemyBulletSpriteKey(b.kind), b.x, b.y, "player", p.x, p.y, b.r || 4, 14) && p.inv <= 0) {
       state.enemyBullets.splice(i, 1);
       damagePlayer(1);
     }
@@ -498,7 +491,7 @@ function updateCollisions() {
       let wingmanHit = false;
       for (let w = state.wingmen.length - 1; w >= 0; w--) {
         const wm = state.wingmen[w];
-        if (circleHit(e.x, e.y, e.r, wm.x, wm.y, 12)) {
+        if (manifestCollision(e.type, e.x, e.y, "wingman", wm.x, wm.y, e.r || 12, 12)) {
           state.wingmen.splice(w, 1);
           if (typeof onEnemyDestroyed === "function") onEnemyDestroyed(e);
           state.enemies.splice(i, 1);
@@ -523,7 +516,7 @@ function updateCollisions() {
     }
     if (e.type === "leech") continue;
 
-    if (circleHit(e.x, e.y, e.r, p.x, p.y, 14) && p.inv <= 0) {
+    if (manifestCollision(e.type, e.x, e.y, "player", p.x, p.y, e.r || 12, 14) && p.inv <= 0) {
       state.enemies.splice(i, 1);
       damagePlayer(1);
     }
@@ -531,7 +524,7 @@ function updateCollisions() {
 
   for (let i = state.powerups.length - 1; i >= 0; i--) {
     const pu = state.powerups[i];
-    if (circleHit(pu.x, pu.y, pu.size, p.x, p.y, 15)) {
+    if (manifestCollision("powerup", pu.x, pu.y, "player", p.x, p.y, pu.size || 16, 15)) {
       collectPowerup(pu);
       state.powerups.splice(i, 1);
     }

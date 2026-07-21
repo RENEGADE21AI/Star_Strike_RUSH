@@ -126,6 +126,20 @@ function drawExpansionEnemyOverlay(e) {
     }
     ctx.restore();
   }
+  if (e.type === "siphon" && e.fireWarn > 0) {
+    const originY = e.y + 11;
+    const shot = createSiphonShot({ x: e.x, y: originY }, state.player, { x: state.player.vx, y: state.player.vy }, { speed: 3.1, extraRange: H * 0.38 });
+    const progress = 1 - e.fireWarn / 22;
+    ctx.save();
+    ctx.globalAlpha = 0.16 + progress * 0.32;
+    ctx.strokeStyle = "#70ff45";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 7]);
+    ctx.beginPath(); ctx.moveTo(e.x, originY); ctx.lineTo(shot.aimX, shot.aimY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(e.x, e.y, 19 + progress * 8, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
   if (e.type === "railgunner" && e.railWarn > 0) {
     ctx.save();
     const a = e.railAngle || Math.PI / 2;
@@ -161,6 +175,12 @@ function drawExpansionHazards() {
     }
     ctx.translate(d.x, d.y);
     ctx.rotate(d.rot || 0);
+    const spawnScale = d.spawnScale == null ? 1 : d.spawnScale;
+    if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, d.kind, 0, 0, { scale: spawnScale })) {
+      ctx.restore();
+      continue;
+    }
+    ctx.scale(spawnScale, spawnScale);
     if (d.trail) {
       ctx.globalAlpha = 0.25;
       ctx.fillStyle = "#c4eaff";
@@ -221,7 +241,9 @@ function drawExpansionBoss(b) {
   ctx.save();
   ctx.translate(b.x, b.y + bob);
   ctx.rotate(Math.sin(state.frame * 0.022 + b.movePhase) * 0.025);
-  drawExpansionBossShip(b.mode, false, 1);
+  if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, `boss_${b.mode}`, 0, 0))) {
+    drawExpansionBossShip(b.mode, false, 1);
+  }
   if (b.warn > 0) {
     ctx.strokeStyle = "rgba(255,255,255,0.72)";
     ctx.lineWidth = 2;

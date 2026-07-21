@@ -1,10 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Star Strike RUSH</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="styles.css">
+<script defer src="src/00-asset-manifest.js"></script>
+<script defer src="src/00-identity.js"></script>
+<script defer src="src/00-competition.js"></script>
+<script defer src="src/00-gameplay-rules.js"></script>
+<script defer src="src/00-input-actions.js"></script>
 <script defer src="src/01-core.js"></script>
 <script defer src="src/02-effects-powerups.js"></script>
 <script defer src="src/03-pacing.js"></script>
@@ -38,5 +44,8 @@
 <input type="text" id="callSignInput"
   style="position:fixed;left:-9999px;top:0;opacity:0;width:1px;height:1px;"
   maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+<input type="text" id="handleInput"
+  style="position:fixed;left:-9999px;top:0;opacity:0;width:1px;height:1px;"
+  maxlength="16" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
 </body>
 </html>

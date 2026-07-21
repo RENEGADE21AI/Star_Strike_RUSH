@@ -84,10 +84,11 @@ function updatePlayer() {
   const input = currentInputVector();
   const desiredVX = input.x * p.maxSpeed;
   const desiredVY = input.y * p.maxSpeed;
-  const steer = p.ghostTimer > 0 ? 0.11 : 0.16;
+  const moving = Math.abs(input.x) + Math.abs(input.y) > 0.02;
+  const steer = p.ghostTimer > 0 || p.dashTimer > 0 ? 0.16 : moving ? 0.22 : 0.20;
   p.vx += (desiredVX - p.vx) * steer;
   p.vy += (desiredVY - p.vy) * steer;
-  const speedCap = p.ghostTimer > 0 ? p.maxSpeed * 1.5 : p.maxSpeed;
+  const speedCap = p.ghostTimer > 0 || p.dashTimer > 0 ? p.maxSpeed * 1.55 : p.maxSpeed;
   const v = Math.hypot(p.vx, p.vy);
   if (v > speedCap) { p.vx = (p.vx / v) * speedCap; p.vy = (p.vy / v) * speedCap; }
   p.x += p.vx; p.y += p.vy;
@@ -101,6 +102,7 @@ function updatePlayer() {
   if (p.spread > 0) p.spread--;
   if (p.rapid > 0) p.rapid--;
   if (p.ghostTimer > 0) p.ghostTimer--;
+  if (p.dashTimer > 0) p.dashTimer--;
   if (p.ghostCooldown > 0) p.ghostCooldown--;
   if (typeof tickExpansionPlayerTimers === "function") tickExpansionPlayerTimers();
   const regen = state.intensityPhase === "cooldown" ? 7.2 / 60 : state.intensityPhase === "surge" ? 4.2 / 60 : 5 / 60;
@@ -157,6 +159,9 @@ function updateBullets() {
       }
     } else if (b.kind === "drainShot") {
       b.age = (b.age || 0) + 1;
+      b.trail = b.trail || [];
+      b.trail.push({ x: b.x, y: b.y });
+      if (b.trail.length > 10) b.trail.shift();
       if (b.curving) {
         const sp = Math.hypot(b.vx || 0, b.vy || 0);
         const ang = Math.atan2(b.vy || 0, b.vx || 0) + b.curving;

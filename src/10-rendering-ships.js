@@ -205,6 +205,10 @@ function drawEnemyGeometry(kind, opts = {}) {
   const phase = opts.phase || 0;
   const chargeTelegraph = opts.chargeTelegraph || 0;
   if (!silhouette) ctx.globalAlpha = alpha;
+  if (!silhouette && typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, kind, 0, 0, { alpha })) {
+    ctx.globalAlpha = 1;
+    return;
+  }
 
   if (kind === "red") drawRedShip(hitMix, silhouette, phase);
   else if (kind === "orange") drawOrangeShip(hitMix, silhouette, phase);

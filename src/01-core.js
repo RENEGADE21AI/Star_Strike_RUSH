@@ -1,6 +1,7 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const callSignInputEl = document.getElementById("callSignInput");
+const handleInputEl = document.getElementById("handleInput");
 
 const GAME_W = 375;
 const GAME_H = 667;
@@ -43,7 +44,16 @@ let lastRunMeta = null;
 
 let callSign = "";
 let callSignEditing = false;
+let callSignDraft = "";
+let callSignStatus = "";
+let callSignStatusTimer = 0;
+let callSignSaveState = "idle";
 let callSignCursorBlink = 0;
+let handleEditing = false;
+let handleDraft = "";
+let handleStatus = "";
+let handleStatusTimer = 0;
+let accountPanelTab = "pilot";
 let titleSubState = "main";
 let titlePanelAnim = 0.0;
 let titlePanelTarget = 0.0;
@@ -71,7 +81,7 @@ let codexDiscovered = {};
 let codexHasNew = false;
 let encounterQueue = [];
 let encounterCard = null;
-const ENCOUNTER_CARD_DURATION = 210;
+const ENCOUNTER_CARD_DURATION = 170;
 let codexDetailType = null;
 let resetProgressConfirm = false;
 
@@ -125,6 +135,7 @@ function mixHex(a, b, t) {
   return `rgb(${r},${g},${bl})`;
 }
 function sanitizeCallSign(s) {
+  if (typeof normalizeCallSign === "function") return normalizeCallSign(s);
   return String(s || "")
     .toUpperCase()
     .replace(/[^A-Z0-9_]/g, "")
@@ -146,6 +157,131 @@ function getLocalHighScore() {
 function saveCallSign() {
   try { localStorage.setItem("star_strike_rush_callsign_v1", callSign); } catch {}
 }
+function getLocalPilotSeed() {
+  const key = "star_strike_rush_pilot_seed_v1";
+  try {
+    let seed = localStorage.getItem(key);
+    if (!seed) {
+      seed = `${Date.now().toString(36)}_${Math.floor(Math.random() * 0xffffff).toString(36)}`;
+      localStorage.setItem(key, seed);
+    }
+    return seed;
+  } catch {
+    return "LOCAL_PILOT";
+  }
+}
+function setCallSignStatus(message, stateName = "idle", frames = 150) {
+  callSignStatus = String(message || "");
+  callSignSaveState = stateName;
+  callSignStatusTimer = Math.max(0, Math.floor(frames || 0));
+}
+function beginCallSignEditing() {
+  callSignEditing = true;
+  callSignDraft = callSign;
+  callSignInputEl.value = callSignDraft;
+  setCallSignStatus("ENTER SAVES  |  ESC CANCELS", "editing", 0);
+  callSignInputEl.focus();
+}
+function cancelCallSignEditing() {
+  callSignEditing = false;
+  callSignDraft = callSign;
+  callSignInputEl.value = callSign;
+  setCallSignStatus("EDIT CANCELLED", "idle", 70);
+  callSignInputEl.blur();
+}
+function commitCallSignDraft() {
+  const result = typeof validateCallSign === "function"
+    ? validateCallSign(callSignDraft)
+    : { ok: !!sanitizeCallSign(callSignDraft), callSign: sanitizeCallSign(callSignDraft), message: "CALL SIGN REQUIRED" };
+  if (!result.ok) {
+    setCallSignStatus(result.message || "INVALID CALL SIGN", "error", 0);
+    callSignEditing = true;
+    callSignInputEl.focus();
+    return false;
+  }
+  callSign = result.callSign;
+  callSignDraft = callSign;
+  callSignInputEl.value = callSign;
+  saveCallSign();
+  callSignEditing = false;
+  setCallSignStatus(result.message || "PILOT ID SAVED", "success", 150);
+  callSignInputEl.blur();
+  const onlineService = window.starStrikeOnline;
+  if (onlineService && typeof onlineService.updateCallSign === "function") {
+    setCallSignStatus("SAVING PILOT ID...", "saving", 0);
+    Promise.resolve(onlineService.updateCallSign(callSign)).then((syncResult) => {
+      if (syncResult && syncResult.localOnly) {
+        setCallSignStatus("SAVED LOCALLY | COMPETITION OFFLINE", "error", 210);
+      } else {
+        setCallSignStatus("PILOT ID SYNCED", "success", 150);
+      }
+    }).catch(() => {
+      setCallSignStatus("SAVED LOCALLY | ONLINE SYNC FAILED", "error", 210);
+    });
+  }
+  return true;
+}
+function setHandleStatus(message, frames = 150) {
+  handleStatus = String(message || "");
+  handleStatusTimer = Math.max(0, Math.floor(frames || 0));
+}
+function beginHandleEditing() {
+  const onlineService = window.starStrikeOnline;
+  const online = onlineService && typeof onlineService.getState === "function" ? onlineService.getState() : {};
+  if (!online.user) {
+    setHandleStatus("SIGN IN TO CLAIM A HANDLE", 150);
+    return false;
+  }
+  if (online.competitionBackend === "unavailable") {
+    setHandleStatus("COMPETITION SERVICES ARE OFFLINE", 180);
+    return false;
+  }
+  if (online.profileHandle) {
+    setHandleStatus("HANDLE IS LOCKED TO THIS ACCOUNT", 150);
+    return false;
+  }
+  handleEditing = true;
+  handleDraft = "";
+  handleInputEl.value = "";
+  setHandleStatus("PUBLIC • CLAIM ONCE", 0);
+  handleInputEl.focus();
+  return true;
+}
+function cancelHandleEditing() {
+  handleEditing = false;
+  handleDraft = "";
+  handleInputEl.value = "";
+  setHandleStatus("HANDLE CLAIM CANCELLED", 70);
+  handleInputEl.blur();
+}
+function commitPublicHandleDraft() {
+  const validation = typeof validatePublicHandle === "function"
+    ? validatePublicHandle(handleDraft)
+    : { ok: false, handle: "", message: "HANDLE VALIDATION UNAVAILABLE" };
+  if (!validation.ok) {
+    setHandleStatus(validation.message || "INVALID HANDLE", 0);
+    handleInputEl.focus();
+    return false;
+  }
+  const onlineService = window.starStrikeOnline;
+  if (!onlineService || typeof onlineService.claimHandle !== "function") {
+    setHandleStatus("ONLINE HANDLE SERVICE UNAVAILABLE", 180);
+    return false;
+  }
+  handleDraft = validation.handle;
+  setHandleStatus("CLAIMING PUBLIC HANDLE...", 0);
+  Promise.resolve(onlineService.claimHandle(validation.handle)).then((result) => {
+    if (!result || !result.ok) throw new Error((result && result.message) || "Handle claim failed.");
+    handleEditing = false;
+    handleInputEl.blur();
+    setHandleStatus(`@${result.handle} IS YOURS`, 180);
+  }).catch((error) => {
+    setHandleStatus(String((error && error.message) || "HANDLE CLAIM FAILED").toUpperCase().slice(0, 42), 210);
+    handleEditing = true;
+    handleInputEl.focus();
+  });
+  return true;
+}
 function saveSettings() {
   try {
     localStorage.setItem("star_strike_rush_settings_v1", JSON.stringify({
@@ -164,6 +300,11 @@ function loadCallSign() {
   } catch {
     callSign = "";
   }
+  if (!callSign) {
+    callSign = typeof neutralPilotCallSign === "function" ? neutralPilotCallSign(getLocalPilotSeed()) : "PILOT_LOCAL";
+    saveCallSign();
+  }
+  callSignDraft = callSign;
 }
 function loadSettings() {
   try {
@@ -573,6 +714,12 @@ const state = {
   },
   keyboard: { up: false, down: false, left: false, right: false },
   joystick: { active: false, id: null, cx: 0, cy: 0, ax: 0, ay: 0, radius: 56 },
+  inputMode: "keyboard",
+  lastTouchAt: -Infinity,
+  inputHintTimer: 240,
+  debugHitboxes: false,
+  debugErrors: [],
+  safeLanes: [],
   playerRealm: 0,
   devStatsVisible: false,
   difficultySamples: [],
@@ -595,12 +742,25 @@ const state = {
 
 callSignInputEl.addEventListener("input", () => {
   if (!callSignEditing) return;
-  callSign = sanitizeCallSign(callSignInputEl.value);
-  callSignInputEl.value = callSign;
-  saveCallSign();
+  callSignDraft = sanitizeCallSign(callSignInputEl.value);
+  callSignInputEl.value = callSignDraft;
+  if (callSignSaveState === "error") setCallSignStatus("ENTER SAVES  •  ESC CANCELS", "editing", 0);
 });
 callSignInputEl.addEventListener("blur", () => {
+  if (callSignEditing && callSignSaveState !== "success") {
+    callSignDraft = callSign;
+    callSignInputEl.value = callSign;
+  }
   callSignEditing = false;
+});
+handleInputEl.addEventListener("input", () => {
+  if (!handleEditing) return;
+  handleDraft = typeof normalizePublicHandle === "function" ? normalizePublicHandle(handleInputEl.value) : "";
+  handleInputEl.value = handleDraft;
+});
+handleInputEl.addEventListener("blur", () => {
+  if (!handleEditing) return;
+  handleInputEl.value = handleDraft;
 });
 
 function makePlayer() {
@@ -618,6 +778,7 @@ function makePlayer() {
     spread: 0,
     rapid: 0,
     ghostTimer: 0,
+    dashTimer: 0,
     ghostCooldown: 0,
     overcharge: 0,
     phaseShield: 0,
@@ -625,7 +786,7 @@ function makePlayer() {
     piercing: 0,
     stabilizer: 0,
     scoreSurge: 0,
-    maxSpeed: 5.2
+    maxSpeed: 5.5
   };
 }
 function refreshMultiplier() {

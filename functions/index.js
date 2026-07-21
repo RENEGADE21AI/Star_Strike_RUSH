@@ -16,6 +16,14 @@ const {
   sanitizeRunReceipt,
   validateRunPlausibility
 } = require("./progression");
+const {
+  divisionName,
+  normalizeHandle,
+  performanceBand,
+  publicLeagueMember,
+  validateHandle,
+  weekWindow
+} = require("./competition");
 
 admin.initializeApp();
 
@@ -27,6 +35,15 @@ function safeEmail(value) {
   return String(value || "")
     .replace(/[^\w.@+-]/g, "")
     .slice(0, 120);
+}
+
+function neutralPilotCallSign(uid) {
+  let hash = 2166136261;
+  for (const char of String(uid || "pilot")) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `PILOT_${(hash >>> 0).toString(36).toUpperCase().slice(0, 5)}`;
 }
 
 function authContext(request) {
@@ -87,11 +104,11 @@ function privatePayloadFor(auth, profile, existing = {}) {
 function publicPayloadFor(auth, profile, callSign, achievementsCount, existing = {}) {
   const rank = rankForGlory(profile.glory);
   const now = FieldValue.serverTimestamp();
+  const sanitizedCallSign = safeCallSign(callSign || existing.callSign || "");
   return {
     uid: auth.uid,
-    displayName: auth.displayName,
-    callSign: safeCallSign(callSign || existing.callSign || ""),
-    photoURL: auth.photoURL,
+    callSign: sanitizedCallSign.length >= 3 ? sanitizedCallSign : neutralPilotCallSign(auth.uid),
+    handle: normalizeHandle(existing.handle || ""),
     bestScore: profile.bestScore,
     phase: profile.phase,
     achievementsCount,
@@ -103,6 +120,141 @@ function publicPayloadFor(auth, profile, callSign, achievementsCount, existing =
     updatedAt: now
   };
 }
+
+async function leagueResponse(leagueId) {
+  const leagueRef = db.doc(`weekly_leagues/${leagueId}`);
+  const [leagueSnap, memberSnaps] = await Promise.all([
+    leagueRef.get(),
+    leagueRef.collection("members").orderBy("weeklyPoints", "desc").limit(30).get()
+  ]);
+  if (!leagueSnap.exists) throw new HttpsError("not-found", "Weekly league not found.");
+  const data = leagueSnap.data();
+  return {
+    id: leagueSnap.id,
+    weekId: data.weekId,
+    weekLabel: String(data.weekLabel || "CURRENT WEEK").slice(0, 40),
+    division: String(data.division || "ROOKIE").slice(0, 20),
+    band: Number(data.band || 0),
+    memberCount: Number(data.memberCount || memberSnaps.size),
+    capacity: Number(data.capacity || 30),
+    closesAtMs: Number(data.closesAtMs || 0),
+    members: memberSnaps.docs.map((snapshot) => publicLeagueMember(snapshot.data()))
+  };
+}
+
+exports.syncPilotProfile = onCall({ region: REGION }, async (request) => {
+  const auth = authContext(request);
+  const requestedCallSign = safeCallSign(request.data && request.data.callSign);
+  const privateRef = db.doc(`players_private/${auth.uid}`);
+  const publicRef = db.doc(`players_public/${auth.uid}`);
+  const leaderboardRef = db.doc(`leaderboard_scores/${auth.uid}`);
+
+  const result = await db.runTransaction(async (tx) => {
+    const [privateSnap, publicSnap, leaderboardSnap] = await Promise.all([
+      tx.get(privateRef), tx.get(publicRef), tx.get(leaderboardRef)
+    ]);
+    const profile = profileFromSnapshots(privateSnap, publicSnap, leaderboardSnap);
+    const privateData = privateSnap.exists ? privateSnap.data() : {};
+    const publicData = publicSnap.exists ? publicSnap.data() : {};
+    const achievementsCount = Math.max(
+      Number(publicData.achievementsCount || 0),
+      Number((leaderboardSnap.exists && leaderboardSnap.data().achievementsCount) || 0)
+    );
+    const publicPayload = publicPayloadFor(auth, profile, requestedCallSign || publicData.callSign, achievementsCount, publicData);
+    tx.set(privateRef, privatePayloadFor(auth, profile, privateData), { merge: true });
+    tx.set(publicRef, publicPayload);
+    tx.set(leaderboardRef, publicPayload);
+    return { callSign: publicPayload.callSign, handle: publicPayload.handle, profile: clientProfile(profile) };
+  });
+
+  return { ok: true, ...result };
+});
+
+exports.claimPilotHandle = onCall({ region: REGION }, async (request) => {
+  const auth = authContext(request);
+  const validation = validateHandle(request.data && request.data.handle);
+  if (!validation.ok) throw new HttpsError("invalid-argument", `Handle is invalid: ${validation.reason}.`);
+  const handle = validation.handle;
+  const registryRef = db.doc(`handle_registry/${handle}`);
+  const publicRef = db.doc(`players_public/${auth.uid}`);
+  const leaderboardRef = db.doc(`leaderboard_scores/${auth.uid}`);
+
+  await db.runTransaction(async (tx) => {
+    const [registrySnap, publicSnap, leaderboardSnap] = await Promise.all([
+      tx.get(registryRef), tx.get(publicRef), tx.get(leaderboardRef)
+    ]);
+    if (!publicSnap.exists) throw new HttpsError("failed-precondition", "Sync your pilot profile before claiming a handle.");
+    const current = normalizeHandle(publicSnap.data().handle || "");
+    if (current && current !== handle) throw new HttpsError("failed-precondition", "Your handle is already locked to this account.");
+    if (registrySnap.exists && registrySnap.data().uid !== auth.uid) throw new HttpsError("already-exists", "That handle is already claimed.");
+    const now = FieldValue.serverTimestamp();
+    tx.set(registryRef, { uid: auth.uid, handle, claimedAt: registrySnap.exists ? registrySnap.data().claimedAt : now, updatedAt: now });
+    tx.update(publicRef, { handle, updatedAt: now });
+    if (leaderboardSnap.exists) tx.update(leaderboardRef, { handle, updatedAt: now });
+  });
+
+  return { ok: true, handle };
+});
+
+exports.joinWeeklyLeague = onCall({ region: REGION }, async (request) => {
+  const auth = authContext(request);
+  const week = weekWindow();
+  const publicRef = db.doc(`players_public/${auth.uid}`);
+  const enrollmentRef = db.doc(`weekly_enrollments/${week.id}_${auth.uid}`);
+
+  const assignment = await db.runTransaction(async (tx) => {
+    const [publicSnap, enrollmentSnap] = await Promise.all([tx.get(publicRef), tx.get(enrollmentRef)]);
+    if (!publicSnap.exists) throw new HttpsError("failed-precondition", "Sync your pilot profile before entering a league.");
+    const publicData = publicSnap.data();
+    const handle = normalizeHandle(publicData.handle || "");
+    if (!handle) throw new HttpsError("failed-precondition", "Claim a unique handle before entering a weekly league.");
+
+    if (enrollmentSnap.exists) return { leagueId: enrollmentSnap.data().leagueId };
+
+    const band = performanceBand(publicData.bestScore);
+    const availableQuery = db.collection("weekly_leagues")
+      .where("weekId", "==", week.id)
+      .where("band", "==", band)
+      .where("memberCount", "<", 30)
+      .orderBy("memberCount", "desc")
+      .limit(1);
+    const available = await tx.get(availableQuery);
+    const leagueRef = available.empty ? db.collection("weekly_leagues").doc() : available.docs[0].ref;
+    const existingLeague = available.empty ? null : available.docs[0].data();
+    const memberRef = leagueRef.collection("members").doc(auth.uid);
+    const now = FieldValue.serverTimestamp();
+    const memberCount = existingLeague ? Number(existingLeague.memberCount || 0) + 1 : 1;
+    if (existingLeague) {
+      tx.update(leagueRef, { memberCount, updatedAt: now });
+    } else {
+      tx.create(leagueRef, {
+        weekId: week.id,
+        weekLabel: "MONDAY — SUNDAY UTC",
+        division: divisionName(band),
+        band,
+        memberCount,
+        capacity: 30,
+        opensAtMs: week.startMs,
+        closesAtMs: week.endMs,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+    tx.create(memberRef, {
+      uid: auth.uid,
+      callSign: safeCallSign(publicData.callSign) || neutralPilotCallSign(auth.uid),
+      handle,
+      weeklyPoints: 0,
+      previousBestScore: Number(publicData.bestScore || 0),
+      joinedAt: now,
+      updatedAt: now
+    });
+    tx.create(enrollmentRef, { uid: auth.uid, weekId: week.id, leagueId: leagueRef.id, joinedAt: now });
+    return { leagueId: leagueRef.id };
+  });
+
+  return { ok: true, league: await leagueResponse(assignment.leagueId) };
+});
 
 function clientProfile(profile) {
   const publicProfile = publicProfileFromPrivate(profile);
@@ -148,17 +300,20 @@ exports.submitRunReceipt = onCall({ region: REGION }, async (request) => {
   const publicRef = db.doc(`players_public/${uid}`);
   const leaderboardRef = db.doc(`leaderboard_scores/${uid}`);
   const receiptRef = db.doc(`run_receipts/${uid}/items/${receiptId}`);
+  const currentWeek = weekWindow();
+  const enrollmentRef = db.doc(`weekly_enrollments/${currentWeek.id}_${uid}`);
   const achievementRefs = ACHIEVEMENTS.map((achievement) => ({
     achievement,
     ref: db.doc(`player_achievements/${uid}/items/${achievement.id}`)
   }));
 
   return db.runTransaction(async (tx) => {
-    const [privateSnap, publicSnap, leaderboardSnap, receiptSnap, ...achievementSnaps] = await Promise.all([
+    const [privateSnap, publicSnap, leaderboardSnap, receiptSnap, enrollmentSnap, ...achievementSnaps] = await Promise.all([
       tx.get(privateRef),
       tx.get(publicRef),
       tx.get(leaderboardRef),
       tx.get(receiptRef),
+      tx.get(enrollmentRef),
       ...achievementRefs.map((item) => tx.get(item.ref))
     ]);
     const baseProfile = profileFromSnapshots(privateSnap, publicSnap, leaderboardSnap);
@@ -188,6 +343,13 @@ exports.submitRunReceipt = onCall({ region: REGION }, async (request) => {
     const privateData = privateSnap.exists ? privateSnap.data() : {};
     const publicPayload = publicPayloadFor(auth, nextProfile, run.callSign, achievementsCount, publicData);
     const privatePayload = privatePayloadFor(auth, nextProfile, privateData);
+    let weeklyMemberRef = null;
+    let weeklyMemberData = null;
+    if (enrollmentSnap.exists && enrollmentSnap.data().leagueId) {
+      weeklyMemberRef = db.doc(`weekly_leagues/${enrollmentSnap.data().leagueId}/members/${uid}`);
+      const weeklyMemberSnap = await tx.get(weeklyMemberRef);
+      if (weeklyMemberSnap.exists) weeklyMemberData = weeklyMemberSnap.data();
+    }
     const receiptPayload = {
       uid,
       receiptId,
@@ -210,8 +372,8 @@ exports.submitRunReceipt = onCall({ region: REGION }, async (request) => {
     };
 
     tx.set(privateRef, privatePayload, { merge: true });
-    tx.set(publicRef, publicPayload, { merge: true });
-    tx.set(leaderboardRef, publicPayload, { merge: true });
+    tx.set(publicRef, publicPayload);
+    tx.set(leaderboardRef, publicPayload);
     tx.create(receiptRef, receiptPayload);
     for (const item of newAchievementRefs) {
       tx.set(item.ref, {
@@ -219,6 +381,14 @@ exports.submitRunReceipt = onCall({ region: REGION }, async (request) => {
         achievementId: item.achievement.id,
         title: achievementTitle(item.achievement.id),
         unlockedAt: FieldValue.serverTimestamp()
+      });
+    }
+    if (weeklyMemberRef && weeklyMemberData) {
+      tx.update(weeklyMemberRef, {
+        callSign: publicPayload.callSign,
+        handle: publicPayload.handle,
+        weeklyPoints: Math.min(999999999, Number(weeklyMemberData.weeklyPoints || 0) + Number(nextProfile.grants.gloryGained || 0)),
+        updatedAt: FieldValue.serverTimestamp()
       });
     }
 
@@ -281,8 +451,8 @@ exports.claimSeasonReward = onCall({ region: REGION }, async (request) => {
     const privatePayload = privatePayloadFor(auth, claim.profile, privateData);
 
     tx.set(privateRef, privatePayload, { merge: true });
-    tx.set(publicRef, publicPayload, { merge: true });
-    tx.set(leaderboardRef, publicPayload, { merge: true });
+    tx.set(publicRef, publicPayload);
+    tx.set(leaderboardRef, publicPayload);
     tx.create(claimRef, {
       uid,
       rewardId,

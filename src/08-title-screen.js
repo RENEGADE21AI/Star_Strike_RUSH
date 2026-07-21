@@ -22,6 +22,7 @@ function makeTitleFormation(lane = 0, dir = 1, spawnAbove = false) {
   const pathType = pickFormationPathType();
   const sway = rand(0, TAU);
   const members = 3 + (Math.random() < 0.25 ? 1 : 0);
+  const depthFactor = rand(0.72, 1.12);
 
   let x = 0, y = 0, vx = 0, vy = 0, baseY = laneYs[lane] + rand(-8, 8);
   let pathDuration = 180, speed = rand(0.8, 1.0);
@@ -90,6 +91,8 @@ function makeTitleFormation(lane = 0, dir = 1, spawnAbove = false) {
     depth: rand(H * 0.35, H * 0.50),
     reversed: false,
     members,
+    renderScale: 0.52 + (depthFactor - 0.72) * 0.62,
+    renderAlpha: 0.40 + (depthFactor - 0.72) * 1.15,
     age: 0,
     sway,
     rot: rand(-0.03, 0.03),
@@ -263,18 +266,22 @@ function updateRespawnHold() {
 }
 
 function setCallSignFromInputKey(e) {
-  if (e.key === "Enter" || e.key === "Escape") {
-    callSignEditing = false;
-    callSignInputEl.blur();
-  } else if (e.key === "Backspace") {
-    callSign = callSign.slice(0, -1);
-    callSignInputEl.value = callSign;
-    saveCallSign();
-  } else if (e.key.length === 1 && callSign.length < 12) {
-    const ch = e.key.toUpperCase();
-    if (/^[A-Z0-9_]$/.test(ch)) { callSign += ch; callSignInputEl.value = callSign; saveCallSign(); }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    commitCallSignDraft();
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    cancelCallSignEditing();
   }
-  e.preventDefault();
+}
+function setHandleFromInputKey(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    commitPublicHandleDraft();
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    cancelHandleEditing();
+  }
 }
 function getCallSignRect() {
   return { x: W / 2 - 120, y: H * 0.355 - 20, w: 240, h: 40 };
@@ -330,16 +337,25 @@ function getOnlineRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
   const innerX = panel.x + 20;
-  const signIn = { x: innerX, y: panel.y + 112, w: panel.w - 40, h: 34 };
-  const signOut = { x: innerX, y: panel.y + 152, w: panel.w - 40, h: 30 };
-  const btnW = 64, btnH = 28, gap = 10, btnY = panel.y + 286;
+  const tabY = panel.y + 50;
+  const tabGap = 6;
+  const tabW = Math.floor((panel.w - 40 - tabGap * 2) / 3);
+  const pilotTab = { x: innerX, y: tabY, w: tabW, h: 28 };
+  const leagueTab = { x: pilotTab.x + tabW + tabGap, y: tabY, w: tabW, h: 28 };
+  const settingsTab = { x: leagueTab.x + tabW + tabGap, y: tabY, w: tabW, h: 28 };
+  const editCallSign = { x: innerX, y: panel.y + 278, w: panel.w - 40, h: 32 };
+  const claimHandle = { x: innerX, y: panel.y + 318, w: panel.w - 40, h: 32 };
+  const signIn = { x: innerX, y: panel.y + 366, w: panel.w - 40, h: 34 };
+  const signOut = { x: innerX, y: panel.y + 408, w: panel.w - 40, h: 30 };
+  const joinLeague = { x: innerX, y: panel.y + panel.h - 92, w: panel.w - 40, h: 34 };
+  const btnW = 64, btnH = 28, gap = 10, btnY = panel.y + 150;
   const low = { x: innerX, y: btnY, w: btnW, h: btnH };
   const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
   const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
   const shake = { x: innerX, y: btnY + 50, w: 134, h: 30 };
   const reset = { x: panel.x + panel.w - 180, y: btnY + 50, w: 160, h: 30 };
   const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
-  return { panel, closeRect, signIn, signOut, low, med, high, shake, reset, refresh };
+  return { panel, closeRect, pilotTab, leagueTab, settingsTab, editCallSign, claimHandle, signIn, signOut, joinLeague, low, med, high, shake, reset, refresh };
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();

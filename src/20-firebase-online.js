@@ -27,7 +27,10 @@ const online = {
   ready: false,
   user: null,
   profileCallSign: "",
+  profileHandle: "",
   profileMeta: null,
+  weeklyLeague: null,
+  competitionBackend: "unknown",
   leaderboard: [],
   achievements: [],
   lastStatus: "Connecting Firebase...",
@@ -36,11 +39,7 @@ const online = {
 
 function clonePublicUser(user) {
   if (!user) return null;
-  return {
-    uid: user.uid,
-    displayName: user.displayName || "",
-    photoURL: user.photoURL || ""
-  };
+  return { uid: user.uid };
 }
 
 function getState() {
@@ -48,7 +47,13 @@ function getState() {
     ready: online.ready,
     user: clonePublicUser(online.user),
     profileCallSign: online.profileCallSign,
+    profileHandle: online.profileHandle,
     profileMeta: online.profileMeta ? { ...online.profileMeta } : null,
+    weeklyLeague: online.weeklyLeague ? {
+      ...online.weeklyLeague,
+      members: Array.isArray(online.weeklyLeague.members) ? online.weeklyLeague.members.map((member) => ({ ...member })) : []
+    } : null,
+    competitionBackend: online.competitionBackend,
     leaderboard: online.leaderboard.map((row) => ({ ...row })),
     achievements: online.achievements.slice(),
     lastStatus: online.lastStatus,
@@ -64,6 +69,11 @@ function setStatus(message) {
 function setError(error, fallback = "Firebase sync failed.") {
   const message = error && error.message ? error.message : fallback;
   online.lastError = String(message).replace(/^Firebase:\s*/i, "").slice(0, 120);
+}
+
+function setCompetitionBackendUnavailable(_error, fallback = "Competition services are unavailable.") {
+  online.competitionBackend = "unavailable";
+  online.lastError = String(fallback).slice(0, 120);
 }
 
 function notify(message) {
@@ -100,6 +110,12 @@ function safeCallSign(value) {
     .toUpperCase()
     .replace(/[^A-Z0-9_]/g, "")
     .slice(0, 12);
+}
+
+function safeHandle(value) {
+  return typeof window.normalizePublicHandle === "function"
+    ? window.normalizePublicHandle(value || "")
+    : String(value || "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 16);
 }
 
 function safeUrl(value) {
@@ -255,105 +271,31 @@ function normalizeRun(run) {
 }
 
 async function syncProfile(callSignOverride = "") {
-  if (!auth || !db || !auth.currentUser) return;
-  const { doc, getDoc, serverTimestamp, setDoc } = window.starStrikeFirebaseApi;
-  const user = auth.currentUser;
-  const uid = user.uid;
-  const publicRef = doc(db, "players_public", uid);
-  const privateRef = doc(db, "players_private", uid);
-  const [publicSnap, privateSnap] = await Promise.all([
-    getDoc(publicRef),
-    getDoc(privateRef)
-  ]);
-  const publicData = publicSnap.exists() ? publicSnap.data() : {};
-  const privateData = privateSnap.exists() ? privateSnap.data() : {};
-  const localMeta = normalizeMetaSnapshot(localMetaSnapshot());
-  const requestedCallSign = safeCallSign(callSignOverride || online.profileCallSign || publicData.callSign || "");
-  const displayName = safeText(user.displayName || requestedCallSign, "Pilot", 60);
-  const photoURL = safeUrl(user.photoURL);
-  const totalGlory = Math.max(localMeta.totalGlory, numberOrZero(publicData.glory), numberOrZero(privateData.glory));
-  const gloryRankIndex = Math.max(localMeta.gloryRankIndex, numberOrZero(publicData.gloryRankIndex), numberOrZero(privateData.gloryRankIndex));
-  const remoteRank = safeGloryRank(privateData.gloryRank || publicData.gloryRank || gloryRankNameForIndex(gloryRankIndex));
-  const gloryRank = localMeta.totalGlory >= totalGlory ? localMeta.gloryRank : (remoteRank === GLORY_RANK_NAMES[0] && gloryRankIndex > 0 ? gloryRankNameForIndex(gloryRankIndex) : remoteRank);
-  const currentSeasonXP = Math.max(localMeta.seasonXP, numberOrZero(privateData.currentSeasonXP));
-  const currentSeasonTier = Math.max(localMeta.seasonTier, numberOrZero(publicData.seasonTier), numberOrZero(privateData.currentSeasonTier), 1);
-  const remoteClaimed = Array.isArray(privateData.seasonClaimedRewardIds) ? privateData.seasonClaimedRewardIds.map((id) => safeId(id, "")).filter(Boolean) : [];
-  const seasonClaimedRewardIds = Array.from(new Set([...remoteClaimed, ...localMeta.seasonClaimedRewardIds])).slice(0, 220);
-  const credits = Math.max(localMeta.credits, numberOrZero(privateData.credits));
-  const timestamp = serverTimestamp();
-
-  const privatePayload = {
-    uid,
-    email: safeEmail(user.email),
-    displayName,
-    photoURL,
-    glory: totalGlory,
-    gloryRank,
-    gloryRankIndex,
-    currentSeasonId: localMeta.seasonId,
-    currentSeasonXP,
-    currentSeasonTier,
-    credits,
-    lifetimeRuns: Math.max(localMeta.lifetime.runs, numberOrZero(privateData.lifetimeRuns)),
-    lifetimeScore: Math.max(localMeta.lifetime.score, numberOrZero(privateData.lifetimeScore)),
-    lifetimeKills: Math.max(localMeta.lifetime.kills, numberOrZero(privateData.lifetimeKills)),
-    lifetimePowerups: Math.max(localMeta.lifetime.powerups, numberOrZero(privateData.lifetimePowerups)),
-    lifetimeGhostUses: Math.max(localMeta.lifetime.ghostUses, numberOrZero(privateData.lifetimeGhostUses)),
-    lifetimeBosses: Math.max(localMeta.lifetime.bosses, numberOrZero(privateData.lifetimeBosses)),
-    lifetimeDamageTaken: Math.max(localMeta.lifetime.damageTaken, numberOrZero(privateData.lifetimeDamageTaken)),
-    highestCombo: Math.max(localMeta.lifetime.highestCombo, numberOrZero(privateData.highestCombo)),
-    seasonClaimedRewardIds,
-    lastSeenAt: timestamp,
-    updatedAt: timestamp
-  };
-  const publicPayload = {
-    uid,
-    displayName,
-    callSign: requestedCallSign,
-    photoURL,
-    bestScore: Math.max(
-      numberOrZero(publicData.bestScore),
-      localMeta.lifetime.bestScore,
-      typeof window.getLocalHighScore === "function" ? window.getLocalHighScore() : 0
-    ),
-    phase: Math.max(1, numberOrZero(publicData.phase), localMeta.lifetime.bestPhase || 1),
-    achievementsCount: numberOrZero(publicData.achievementsCount),
-    glory: totalGlory,
-    gloryRank,
-    gloryRankIndex,
-    seasonTier: currentSeasonTier,
-    updatedAt: timestamp
-  };
-
-  if (!publicSnap.exists()) publicPayload.createdAt = timestamp;
-  if (!privateSnap.exists()) privatePayload.createdAt = timestamp;
-
-  await Promise.all([
-    setDoc(privateRef, privatePayload, { merge: true }),
-    setDoc(publicRef, publicPayload, { merge: true })
-  ]);
-
-  online.profileCallSign = requestedCallSign;
-  online.profileMeta = {
-    totalGlory,
-    gloryRank,
-    gloryRankIndex,
-    currentSeasonXP,
-    currentSeasonTier,
-    seasonClaimedRewardIds,
-    credits
-  };
-  setStatus("Profile synced.");
+  if (!auth || !auth.currentUser || !functionsApi || !window.starStrikeFirebaseApi) return null;
+  try {
+    const syncPilotProfile = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "syncPilotProfile");
+    const response = await syncPilotProfile({ callSign: safeCallSign(callSignOverride || online.profileCallSign) });
+    const result = response && response.data ? response.data : {};
+    online.profileCallSign = safeCallSign(result.callSign || callSignOverride || online.profileCallSign);
+    online.profileHandle = safeHandle(result.handle || "");
+    online.competitionBackend = "ready";
+    applyServerProfile(result.profile);
+    setStatus("Profile synced.");
+    return result;
+  } catch (error) {
+    online.profileCallSign = safeCallSign(callSignOverride || online.profileCallSign);
+    setCompetitionBackendUnavailable(error, "Competition services are awaiting deployment. Local play remains available.");
+    return { ok: false, unavailable: true, callSign: online.profileCallSign };
+  }
 }
 
 function applyLeaderboardSnapshot(snapshot) {
   online.leaderboard = snapshot.docs.map((docSnapshot) => {
     const data = docSnapshot.data();
-    return {
+    const candidate = {
       uid: data.uid || docSnapshot.id,
       callSign: safeCallSign(data.callSign || ""),
-      displayName: safeText(data.displayName, "Pilot", 60),
-      photoURL: safeUrl(data.photoURL),
+      handle: safeHandle(data.handle || ""),
       bestScore: numberOrZero(data.bestScore),
       phase: Math.max(1, numberOrZero(data.phase) || 1),
       achievementsCount: numberOrZero(data.achievementsCount),
@@ -362,7 +304,70 @@ function applyLeaderboardSnapshot(snapshot) {
       gloryRankIndex: safeGloryRankIndex(data.gloryRankIndex, data.gloryRank),
       seasonTier: Math.max(1, numberOrZero(data.seasonTier) || 1)
     };
+    return typeof window.publicPilotRecord === "function" ? window.publicPilotRecord(candidate) : candidate;
   });
+}
+
+async function updateCallSign(callSign) {
+  const validation = typeof window.validateCallSign === "function"
+    ? window.validateCallSign(callSign)
+    : { ok: safeCallSign(callSign).length >= 3, callSign: safeCallSign(callSign) };
+  if (!validation.ok) throw new Error(validation.message || "Call sign must be 3-12 characters.");
+  const normalized = validation.callSign;
+  online.profileCallSign = normalized;
+  if (!online.ready || !auth || !auth.currentUser) {
+    setStatus("Call sign saved locally. Sign in to sync it.");
+    return { ok: true, localOnly: true, callSign: normalized };
+  }
+  const syncResult = await syncProfile(normalized);
+  subscribeLeaderboard();
+  return { ok: true, localOnly: !!(syncResult && syncResult.unavailable), callSign: normalized };
+}
+
+async function joinWeeklyLeague() {
+  if (!online.ready || !auth || !auth.currentUser || !functionsApi || !window.starStrikeFirebaseApi) {
+    setStatus("Sign in to enter a weekly league.");
+    return { ok: false, reason: "signed_out" };
+  }
+  if (online.competitionBackend === "unavailable") {
+    setStatus("Competition services are awaiting deployment.");
+    return { ok: false, reason: "unavailable", message: online.lastStatus };
+  }
+  try {
+    const join = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "joinWeeklyLeague");
+    const response = await join({});
+    const result = response && response.data ? response.data : {};
+    online.competitionBackend = "ready";
+    online.weeklyLeague = result.league || null;
+    setStatus(online.weeklyLeague ? "Weekly standings refreshed." : "Weekly league unavailable.");
+    return result;
+  } catch (error) {
+    setCompetitionBackendUnavailable(error, "Competition services are awaiting deployment.");
+    return { ok: false, reason: "unavailable", message: online.lastError };
+  }
+}
+
+async function claimHandle(handle) {
+  const validation = typeof window.validatePublicHandle === "function"
+    ? window.validatePublicHandle(handle)
+    : { ok: false, handle: "", message: "Handle validation unavailable." };
+  if (!validation.ok) throw new Error(validation.message || "Invalid handle.");
+  if (!online.ready || !auth || !auth.currentUser || !functionsApi || !window.starStrikeFirebaseApi) throw new Error("Sign in to claim a handle.");
+  if (online.competitionBackend === "unavailable") throw new Error("Competition services are awaiting deployment.");
+  try {
+    const claim = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "claimPilotHandle");
+    const response = await claim({ handle: validation.handle });
+    const result = response && response.data ? response.data : {};
+    online.profileHandle = safeHandle(result.handle);
+    online.competitionBackend = "ready";
+    setStatus(`@${online.profileHandle} is account-bound.`);
+    await joinWeeklyLeague();
+    subscribeLeaderboard();
+    return { ok: true, handle: online.profileHandle };
+  } catch (error) {
+    setCompetitionBackendUnavailable(error, "Competition services are awaiting deployment.");
+    throw new Error(online.lastError);
+  }
 }
 
 function subscribeLeaderboard() {
@@ -409,6 +414,7 @@ async function refresh() {
   }
   try {
     await syncProfile(online.profileCallSign);
+    if (online.profileHandle) await joinWeeklyLeague();
     await loadAchievements();
     subscribeLeaderboard();
     notify("ONLINE REFRESHED");
@@ -431,6 +437,7 @@ async function signIn(callSignOverride = "") {
       await signInWithPopup(auth, provider);
     }
     await syncProfile(online.profileCallSign);
+    if (online.profileHandle) await joinWeeklyLeague();
     await loadAchievements();
     subscribeLeaderboard();
     notify("SIGNED IN");
@@ -450,7 +457,10 @@ async function signOutOnline() {
     const { signOut } = window.starStrikeFirebaseApi;
     await signOut(auth);
     online.user = null;
+    online.profileHandle = "";
     online.profileMeta = null;
+    online.weeklyLeague = null;
+    online.competitionBackend = "unknown";
     online.achievements = [];
     online.leaderboard = [];
     setStatus("Signed out.");
@@ -512,6 +522,7 @@ async function submitRun(rawRun) {
     });
     const result = response && response.data ? response.data : {};
     applyServerProfile(result.profile);
+    if (online.weeklyLeague) await joinWeeklyLeague();
     await loadAchievements();
     subscribeLeaderboard();
     const newAchievementIds = Array.isArray(result.newAchievementIds) ? result.newAchievementIds : [];
@@ -560,6 +571,9 @@ window.starStrikeOnline = {
   signIn,
   signOut: signOutOnline,
   refresh,
+  updateCallSign,
+  claimHandle,
+  joinWeeklyLeague,
   submitRun,
   claimSeasonReward: claimSeasonRewardOnline
 };
@@ -581,8 +595,6 @@ async function bootFirebase() {
     window.starStrikeFirebaseApi = {
       GoogleAuthProvider: authModule.GoogleAuthProvider,
       collection: firestoreModule.collection,
-      doc: firestoreModule.doc,
-      getDoc: firestoreModule.getDoc,
       getDocs: firestoreModule.getDocs,
       getFirestore: firestoreModule.getFirestore,
       getFunctions: functionsModule.getFunctions,
@@ -592,8 +604,6 @@ async function bootFirebase() {
       onSnapshot: firestoreModule.onSnapshot,
       orderBy: firestoreModule.orderBy,
       query: firestoreModule.query,
-      serverTimestamp: firestoreModule.serverTimestamp,
-      setDoc: firestoreModule.setDoc,
       signInWithPopup: authModule.signInWithPopup,
       signOut: authModule.signOut
     };
@@ -609,12 +619,16 @@ async function bootFirebase() {
       if (!user) {
         online.achievements = [];
         online.leaderboard = [];
+        online.profileHandle = "";
         online.profileMeta = null;
+        online.weeklyLeague = null;
+        online.competitionBackend = "unknown";
         setStatus("Sign in to sync records.");
         return;
       }
       try {
         await syncProfile(online.profileCallSign || "");
+        if (online.profileHandle) await joinWeeklyLeague();
         await loadAchievements();
         subscribeLeaderboard();
       } catch (error) {

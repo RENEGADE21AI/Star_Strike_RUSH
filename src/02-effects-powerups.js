@@ -155,8 +155,9 @@ function currentInputVector() {
 function attemptGhost() {
   if (state.gameState !== "playing") return;
   const p = state.player;
+  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST", cost: 35, cooldown: 20, burst: 4.6, phaseThroughDebris: true };
   if (isWraithActive()) {
-    const cost = 18;
+    const cost = profile.cost;
     if (p.energy < cost) return;
     p.energy -= cost;
     state.playerRealm = 1 - state.playerRealm;
@@ -165,22 +166,27 @@ function attemptGhost() {
     spawnParticles(p.x, p.y, 10, state.playerRealm === 0 ? "#bfe8ff" : "#d9b6ff", 0.9);
     return;
   }
-  if (p.energy < 35 || p.ghostCooldown > 0) return;
+  if (p.energy < profile.cost || p.ghostCooldown > 0) return;
   const input = currentInputVector();
   let dx = input.x, dy = input.y;
   const vMag = Math.hypot(p.vx, p.vy);
   if (Math.abs(dx) + Math.abs(dy) < 0.1 && vMag > 0.2) { dx = p.vx / vMag; dy = p.vy / vMag; }
   if (Math.abs(dx) + Math.abs(dy) < 0.1) { dx = 0; dy = -1; }
-  p.vx += dx * 4.6;
-  p.vy += dy * 4.6;
-  p.ghostTimer = 18;
-  p.inv = 24;
-  p.ghostCooldown = 20;
-  p.energy -= 35;
+  p.vx += dx * profile.burst;
+  p.vy += dy * profile.burst;
+  if (profile.phaseThroughDebris) {
+    p.ghostTimer = 18;
+    p.inv = 24;
+  } else {
+    p.dashTimer = 12;
+    p.inv = 0;
+  }
+  p.ghostCooldown = profile.cooldown;
+  p.energy -= profile.cost;
   state.runStats.ghostUses++;
-  state.difficulty.ghostGrace = 60;
+  state.difficulty.ghostGrace = profile.phaseThroughDebris ? 60 : 24;
   state.fx.flash = Math.max(state.fx.flash, 6);
-  spawnParticles(p.x, p.y, 10, "#fff", 1.05);
+  spawnParticles(p.x, p.y, profile.label === "DASH" ? 16 : 10, profile.label === "DASH" ? "#ffcc78" : "#fff", profile.label === "DASH" ? 1.35 : 1.05);
 }
 
 function updateStars() {
