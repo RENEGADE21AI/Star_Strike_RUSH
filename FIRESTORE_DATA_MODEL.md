@@ -54,12 +54,12 @@ Owner-only account profile. This is not queryable.
 ### `players_public/{uid}`
 
 Authenticated players can read public player profiles. Only the owner can write
-their own document.
+their own document. Public identity is deliberately game-only: Google provider
+names, email addresses, avatars, and authentication fields are not permitted by
+the client serializer, callable writer, or Firestore field whitelist.
 
 - `uid`
-- `displayName`
 - `callSign`
-- `photoURL`
 - `bestScore`: non-decreasing integer.
 - `phase`: non-decreasing integer.
 - `achievementsCount`: non-decreasing integer.
@@ -75,7 +75,9 @@ their own document.
 One public best-score record per player for the world-record list. Authenticated
 reads are limited by rules to queries with `limit <= 25`. Only the owner can
 create or update their record, and best score, phase, achievement count, Glory,
-rank index, and season tier cannot decrease.
+rank index, and season tier cannot decrease. It uses the same game-only fields
+as `players_public`; legacy provider fields are discarded when records are next
+written.
 
 ### `run_receipts/{uid}/items/{receiptId}`
 

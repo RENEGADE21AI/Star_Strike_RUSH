@@ -3,6 +3,14 @@
 The game still runs as ordered browser scripts. Keep new files loaded in `index.html`
 after the files they depend on, because the current code intentionally shares globals.
 
+- `00-asset-manifest.js`: sprite render metadata, anchors, projectile origins,
+  tuned collision circles, preload state, and procedural fallback bridge.
+- `00-identity.js`: call-sign validation, neutral identity generation, and the
+  public-profile field whitelist.
+- `00-gameplay-rules.js`: deterministic Debris Warden route generation, Siphon
+  aim/range calculations, and boss-specific action profiles.
+- `00-input-actions.js`: explicit gameplay actions and meaningful-input mode
+  switching for keyboard, mouse, touch, and pen.
 - `01-core.js`: canvas handles, constants, persistent settings, global state, scoring.
 - `02-effects-powerups.js`: particles, drops, wingmen, ghost action, star updates.
 - `03-pacing.js`: phase timing, pressure, difficulty, bullet budget, dev skip.
@@ -36,6 +44,8 @@ after the files they depend on, because the current code intentionally shares gl
   progress-road drag/claim input, and reset-progress confirmation.
 - `18-session-input-loop.js`: session setup, resize, input events, update loop,
   and the hidden `#debugSnapshot` smoke-test state when loaded with `?debug=1`.
+  Debug-only `scenario=siphon` and `scenario=debris` URLs create deterministic
+  QA encounters; `H` toggles hitboxes, anchors, origins, and safe lanes.
 - `19-game-achievements.js`: run stat payloads, achievement definitions, and
   online sync hooks called by the game loop.
 - `20-firebase-online.js`: Firebase Auth and Firestore integration for accounts,

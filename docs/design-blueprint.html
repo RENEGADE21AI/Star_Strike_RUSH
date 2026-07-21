@@ -1089,6 +1089,7 @@
           <li><a href="#gameplay">Gameplay HUD</a></li>
           <li><a href="#boss">Boss/Warning HUD</a></li>
           <li><a href="#wraith">Wraith Realm</a></li>
+          <li><a href="#build-week-contract">Build Week Runtime Contract</a></li>
           <li><a href="#gameover">Game Over</a></li>
           <li><a href="#future">Future Meta Screens</a></li>
         </ol>
@@ -1128,6 +1129,7 @@
           <li>The icon row should read as a small Pilot Meta dock so players understand these are secondary progression/profile surfaces.</li>
           <li>The account chip should be labelled as Account so sync/profile is not confused with the call sign field.</li>
           <li>High score and Glory rank stay below the icon row as a compact status strip.</li>
+          <li>Space traffic uses varied scale, opacity, speed, and paths; it fades behind primary UI and is clipped to the central scene.</li>
         </ul>
         <div class="notes">Anti-pattern: do not add a large dashboard, news carousel, or monetization callout to this screen.</div>
       </div>
@@ -1160,6 +1162,8 @@
           <li>Opens from the small account chip, not the main icon row.</li>
           <li>Status and errors live above buttons and never overlap actions.</li>
           <li>Shows local rank/Glory/Tier/Credits even when signed out.</li>
+          <li>An explicit Edit/Save Call Sign action owns the public pilot identity and shows validation and sync status.</li>
+          <li>Provider name, avatar, and email are private account utility only and never appear in public records.</li>
           <li>Settings live here: particle count, screen shake, and reset progress.</li>
           <li>Refresh remains available but should not feel like a required pre-run step.</li>
         </ul>
@@ -1239,11 +1243,12 @@
       <div class="screen-copy">
         <span class="status current expandable">Current, expandable</span>
         <h2>Glory Road</h2>
-        <p>Glory Road is lifetime identity. It should feel like a classic scrollable progression road: a long rail, big rank milestones, smaller checkpoints, and visible distance to the next prestige moment.</p>
+        <p>Glory Road is lifetime identity. It climbs upward through a winding space route with big rank milestones, smaller checkpoints, and visible distance to the next prestige moment.</p>
         <ul>
           <li>Top tabs switch Glory Road and Season Road.</li>
           <li>Current rank is the headline, with next rank and progress bar pinned near the top.</li>
-          <li>The road itself is long, with alternating rank cards on a central rail.</li>
+          <li>Progress begins low and winds upward around restrained planets and star systems.</li>
+          <li>Completed segments are solid; future segments are dotted; future nodes are outlined.</li>
           <li>Major ranks get larger glowing nodes; minor checkpoints preview the climb between ranks.</li>
           <li>Opening the Road should auto-position near the player's current rank, with a little space above it.</li>
           <li>The current node should have extra energy: pulse, glow, and a small ship marker on the rail.</li>
@@ -1295,7 +1300,7 @@
       <div class="screen-copy">
         <span class="status current expandable">Current, expandable</span>
         <h2>Season Road</h2>
-        <p>Season Road is the temporary 8-week progress surface. It should feel like a classic long progression road: lots of tiers, a central spine, frequent small resource rewards, and bigger milestone rewards every few steps.</p>
+        <p>Season Road is the temporary 8-week progress surface. It climbs upward on a subtle winding spine with frequent small resource rewards and larger milestone rewards every few steps.</p>
         <ul>
           <li>Use green/cyan instead of gold so it does not compete with lifetime Glory.</li>
           <li>Tier rows become a long scroll track, not a compact list.</li>
@@ -1303,6 +1308,7 @@
           <li>Reward cards use real reward data: tier, reward type, amount/name, detail text, and claimed/unclaimed/locked state.</li>
           <li>Opening the Season Road should auto-position near the player's current tier.</li>
           <li>Every fifth tier should feel like a larger milestone node.</li>
+          <li>Completed segments are solid and future segments are dotted without changing reward economy.</li>
           <li>Reward claiming happens here through the selected reward detail panel, not directly on the title screen.</li>
         </ul>
       </div>
@@ -1628,6 +1634,36 @@
           <div class="button" style="left:78px;right:78px;top:430px;height:44px;">Respawn</div>
           <div class="button secondary" style="left:78px;right:78px;top:486px;height:44px;">View Road</div>
           <div class="button secondary" style="left:78px;right:78px;top:542px;height:44px;">Title Screen</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="build-week-contract" class="screen-spec">
+      <div class="screen-copy">
+        <span class="status current">Current runtime contract</span>
+        <h2>Build Week Runtime Contract</h2>
+        <p>Presentation changes must preserve collision fairness, public identity privacy, and meaningful-input behavior inside the existing Canvas architecture.</p>
+        <ul>
+          <li>Sprite metadata owns visual size, anchor, projectile origin, and tuned collision circles; procedural art remains the fallback.</li>
+          <li>The player hitbox follows the central hull. Bosses may use multiple circles. Asteroid padding and projectile glow are not dangerous mass.</li>
+          <li>Debug query mode may show hitboxes, anchors, origins, and safe lanes; ordinary production play never does.</li>
+          <li>Debris Warden double gates must have a reachability-checked route and use non-phasing DASH presentation.</li>
+          <li>Siphon aim uses restrained lead, visible warning/trail, and enough lifetime to cross the playfield.</li>
+          <li>Touch controls follow meaningful touch or pen gameplay input, not screen width.</li>
+          <li>Public profile surfaces use only call sign and game statistics.</li>
+        </ul>
+      </div>
+      <div class="screen-frame">
+        <div class="phone">
+          <div class="panel">
+            <div class="panel-title">Competition Runtime</div>
+            <div class="row active"><span>Identity</span><span>Call sign only</span></div>
+            <div class="row gold"><span>Collision</span><span>Manifest circles</span></div>
+            <div class="row"><span>Debris Warden</span><span>DASH / safe route</span></div>
+            <div class="row"><span>Siphon</span><span>Lead / range / trail</span></div>
+            <div class="row"><span>Input</span><span>Meaningful mode</span></div>
+            <div class="row"><span>Assets</span><span>Preload + fallback</span></div>
+          </div>
         </div>
       </div>
     </section>
