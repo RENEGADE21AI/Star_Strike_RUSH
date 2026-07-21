@@ -1,4 +1,5 @@
 function drawControls() {
+  if (typeof touchControlsVisible === "function" && !touchControlsVisible(state.inputMode, state.gameState)) return;
   const joyCx = 76, joyCy = H - 76, joyR = 56;
   const actCx = W - 76, actCy = H - 76, actR = 42;
   ctx.fillStyle = "rgba(255,255,255,0.08)";
@@ -11,7 +12,8 @@ function drawControls() {
   ctx.fillStyle = "rgba(255,255,255,0.22)";
   ctx.beginPath(); ctx.arc(knobX, knobY, 18, 0, TAU); ctx.fill();
   const wraith = isWraithActive();
-  const ready = state.player && state.player.energy >= (wraith ? 18 : 35) && (wraith ? true : state.player.ghostCooldown <= 0);
+  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: wraith ? "HOP" : "GHOST", cost: wraith ? 18 : 35 };
+  const ready = state.player && state.player.energy >= profile.cost && (wraith ? true : state.player.ghostCooldown <= 0);
   const buttonFill = wraith ? (state.playerRealm === 0 ? "rgba(170,220,255,0.26)" : "rgba(210,170,255,0.26)") : (ready ? "rgba(100,255,180,0.22)" : "rgba(255,255,255,0.10)");
   ctx.fillStyle = buttonFill;
   ctx.beginPath(); ctx.arc(actCx, actCy, actR, 0, TAU); ctx.fill();
@@ -21,8 +23,25 @@ function drawControls() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = wraith ? FONT_BUTTON : FONT_SMALL;
-  const label = wraith ? "HOP" : "GHOST";
+  const label = profile.label;
   ctx.fillText(label, actCx, actCy + 2);
+}
+function drawDesktopControlHint() {
+  if (state.inputMode === "touch" || state.gameState !== "playing" || state.inputHintTimer <= 0) return;
+  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
+  const text = `MOVE  WASD / ARROWS    ${profile.label}  SPACE / SHIFT`;
+  ctx.save();
+  ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const width = Math.min(W - 32, ctx.measureText(text).width + 22);
+  ctx.fillStyle = "rgba(4,8,18,0.72)";
+  ctx.fillRect(W / 2 - width / 2, H - 30, width, 20);
+  ctx.strokeStyle = "rgba(120,210,255,0.24)";
+  ctx.strokeRect(W / 2 - width / 2, H - 30, width, 20);
+  ctx.fillStyle = "rgba(220,240,255,0.78)";
+  ctx.fillText(text, W / 2, H - 20);
+  ctx.restore();
 }
 function drawTopLeftHUD() {
   const p = state.player;
@@ -37,7 +56,8 @@ function drawTopLeftHUD() {
   ctx.strokeStyle = "rgba(255,255,255,0.28)";
   ctx.strokeRect(x - 1, y - 1, barW + 2, barH + 2);
   const energyY = y + 20;
-  const actionCost = isWraithActive() ? 18 : 35;
+  const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: isWraithActive() ? "HOP" : "GHOST", cost: isWraithActive() ? 18 : 35 };
+  const actionCost = actionProfile.cost;
   const enough = p.energy >= actionCost;
   ctx.fillStyle = "rgba(255,255,255,0.16)";
   ctx.fillRect(x, energyY, barW, 8);
@@ -45,6 +65,11 @@ function drawTopLeftHUD() {
   ctx.fillRect(x, energyY, barW * (p.energy / p.maxEnergy), 8);
   ctx.strokeStyle = "rgba(255,255,255,0.45)";
   ctx.strokeRect(x, energyY, barW, 8);
+  ctx.font = "900 8px 'Arial Narrow', Arial, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = enough && p.ghostCooldown <= 0 ? "rgba(120,255,180,0.82)" : "rgba(255,255,255,0.48)";
+  ctx.fillText(`${actionProfile.label} ${enough && p.ghostCooldown <= 0 ? "READY" : "CHARGING"}`, x, energyY + 11);
   if (state.devStatsVisible) {
     const lines = [
       `Phase: ${state.phase}`,
@@ -124,7 +149,37 @@ function drawAnnouncements() {
   ctx.fillText(state.message, W / 2, baseY + slide + 1);
   ctx.restore();
 }
-function drawHUD() { drawTopLeftHUD(); drawTopRightHUD(); drawAnnouncements(); }
+function drawDebugHitboxes() {
+  if (!state.debugHitboxes || typeof collisionCirclesFor !== "function") return;
+  const drawCircles = (key, entity, fallback, color) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    for (const circle of collisionCirclesFor(key, entity.x, entity.y, 1, fallback)) {
+      ctx.beginPath(); ctx.arc(circle.x, circle.y, circle.r, 0, TAU); ctx.stroke();
+    }
+    const origin = spriteMeta(key) && spriteMeta(key).projectileOrigin;
+    if (origin) {
+      ctx.fillStyle = "#ffdf6b";
+      ctx.fillRect(entity.x + origin.offsetX - 2, entity.y + origin.offsetY - 2, 4, 4);
+    }
+  };
+  ctx.save();
+  ctx.globalAlpha = 0.82;
+  for (const lane of state.safeLanes || []) {
+    ctx.fillStyle = lane.row === 1 ? "rgba(76,255,196,0.07)" : "rgba(115,188,255,0.07)";
+    ctx.fillRect(lane.minX, 0, lane.width, H);
+    ctx.strokeStyle = lane.row === 1 ? "#4cffc4" : "#73bcff";
+    ctx.strokeRect(lane.minX, 0, lane.width, H);
+  }
+  drawCircles("player", state.player, 14, "#4cffc4");
+  for (const enemy of state.enemies) drawCircles(enemy.type, enemy, enemy.r || 12, "#ff6e8b");
+  for (const bullet of state.bullets) drawCircles("player_bullet", bullet, bullet.r || 3, "#fff38a");
+  for (const bullet of state.enemyBullets) drawCircles(bullet.kind === "drainShot" ? "drainShot" : "enemy_bullet", bullet, bullet.r || 4, "#ff9d48");
+  for (const debris of state.debris) if (debris.kind !== "meteor_warning") drawCircles(debris.kind, debris, debris.r || 12, "#b6a18c");
+  if (state.boss) drawCircles(`boss_${state.boss.mode}`, state.boss, 28, "#d7a7ff");
+  ctx.restore();
+}
+function drawHUD() { drawTopLeftHUD(); drawTopRightHUD(); drawAnnouncements(); drawDesktopControlHint(); drawDebugHitboxes(); }
 function drawLowHpWarning() {
   if (!state.player || state.player.hp !== 1) return;
   const pulse = 0.5 + 0.5 * Math.sin(state.frame * 0.08);

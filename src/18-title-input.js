@@ -162,6 +162,11 @@ function handleCodexPanelPointerDown(x, y) {
 function handleOnlinePanelPointerDown(x, y) {
   const r = getOnlineRects();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
+  if (hitRect(r.editCallSign, x, y)) {
+    if (callSignEditing) commitCallSignDraft();
+    else beginCallSignEditing();
+    return true;
+  }
   if (hitRect(r.signIn, x, y)) { requestOnlineSignIn(); return true; }
   if (hitRect(r.signOut, x, y)) { requestOnlineSignOut(); return true; }
   if (hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
@@ -228,14 +233,11 @@ function handleTitlePointerDown(x, y, pointerId = null) {
   const iconRects = getTitleIconRects();
 
   if (hitRect(callRect, x, y)) {
-    callSignEditing = true;
-    callSignInputEl.value = callSign;
-    callSignInputEl.focus();
+    beginCallSignEditing();
     return true;
   }
   if (callSignEditing) {
-    callSignEditing = false;
-    callSignInputEl.blur();
+    cancelCallSignEditing();
   }
 
   if (hitRect(playRect, x, y)) {

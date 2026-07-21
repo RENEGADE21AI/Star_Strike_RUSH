@@ -4,17 +4,18 @@ function buildGloryRoadLayout(rect, meta) {
   const activeIndex = currentRoadIndexForThresholds(nodes, total);
   const roadX = Math.round(rect.x + rect.w / 2);
   return nodes.map((node, index) => {
-    const y = rect.y + ROAD_GLORY_START_Y + index * ROAD_GLORY_GAP;
-    const side = index % 2 === 0 ? -1 : 1;
+    const y = rect.y + ROAD_GLORY_START_Y + (nodes.length - 1 - index) * ROAD_GLORY_GAP;
+    const dotX = roadX + Math.sin(index * 1.08 + 0.35) * Math.min(38, rect.w * 0.12);
+    const side = dotX >= roadX ? -1 : 1;
     const cardW = node.major ? 116 : 96;
     const cardH = node.major ? 52 : 40;
-    const cardX = side < 0 ? roadX - 24 - cardW : roadX + 24;
+    const cardX = side < 0 ? dotX - 20 - cardW : dotX + 20;
     const cardY = y - cardH / 2;
     return {
       node,
       index,
       roadX,
-      dotX: roadX,
+      dotX,
       dotY: y,
       radius: node.major ? 12 : 8,
       side,
@@ -37,11 +38,12 @@ function buildSeasonRoadLayout(rect, meta) {
   for (let i = 1; i <= ROAD_SEASON_TIERS; i++) {
     const reward = getSeasonRewardForTier(i);
     const y = rect.y + ROAD_SEASON_START_Y + (ROAD_SEASON_TIERS - i) * ROAD_SEASON_GAP;
+    const dotX = roadX + Math.sin(i * 0.72) * Math.min(13, rect.w * 0.035);
     rows.push({
       tier: i,
       reward,
       roadX,
-      dotX: roadX,
+      dotX,
       dotY: y,
       radius: i % 5 === 0 ? 11 : 8,
       reached: i <= tier,
@@ -71,11 +73,11 @@ function focusTitleProgressOnCurrent() {
   } else {
     const nodes = makeGloryRoadNodes();
     const index = currentRoadIndexForThresholds(nodes, Math.max(0, Math.floor(meta.totalGlory || 0)));
-    targetY = r.contentRect.y + ROAD_GLORY_START_Y + index * ROAD_GLORY_GAP;
+    targetY = r.contentRect.y + ROAD_GLORY_START_Y + (nodes.length - 1 - index) * ROAD_GLORY_GAP;
   }
   const focusAnchor = titleProgressTab === "season"
     ? r.contentRect.y + r.contentRect.h * 0.64
-    : r.contentRect.y + Math.min(118, r.contentRect.h * 0.38);
+    : r.contentRect.y + r.contentRect.h * 0.64;
   titleProgressScroll = targetY - focusAnchor;
   clampTitleProgressScroll();
 }
@@ -218,8 +220,6 @@ function drawRoadShipMarker(x, y, color) {
 function drawGloryRoadContent(rect, meta) {
   const layout = buildGloryRoadLayout(rect, meta);
   const roadX = Math.round(rect.x + rect.w / 2);
-  const startY = rect.y + ROAD_GLORY_START_Y;
-  const endY = layout.length ? layout[layout.length - 1].dotY : startY;
   const color = {
     fillActive: "rgba(255,230,128,0.18)",
     fillReached: "rgba(120,255,180,0.09)",
@@ -235,21 +235,30 @@ function drawGloryRoadContent(rect, meta) {
     flame: "rgba(120,255,180,0.78)"
   };
   ctx.save();
-  ctx.strokeStyle = "rgba(255,255,255,0.10)";
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(roadX, startY - 34);
-  ctx.lineTo(roadX, endY + 34);
-  ctx.stroke();
   const active = layout.find((item) => item.active) || layout[0];
-  ctx.strokeStyle = "rgba(255,230,128,0.24)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([10, 8]);
-  ctx.beginPath();
-  ctx.moveTo(roadX, startY - 34);
-  ctx.lineTo(roadX, active ? active.dotY : startY);
-  ctx.stroke();
+  for (let i = 1; i < layout.length; i++) {
+    const previous = layout[i - 1];
+    const item = layout[i];
+    const reachedSegment = item.reached;
+    ctx.strokeStyle = reachedSegment ? "rgba(120,255,180,0.34)" : "rgba(255,255,255,0.12)";
+    ctx.lineWidth = reachedSegment ? 4 : 3;
+    ctx.setLineDash(reachedSegment ? [] : [8, 9]);
+    ctx.beginPath();
+    ctx.moveTo(previous.dotX, previous.dotY);
+    const midY = (previous.dotY + item.dotY) / 2;
+    ctx.bezierCurveTo(previous.dotX, midY, item.dotX, midY, item.dotX, item.dotY);
+    ctx.stroke();
+  }
   ctx.setLineDash([]);
+  for (let i = 0; i < 6; i++) {
+    const planetY = rect.y + 130 + i * 235;
+    const planetX = i % 2 ? rect.x + rect.w - 22 : rect.x + 20;
+    const gradient = ctx.createRadialGradient(planetX - 3, planetY - 4, 1, planetX, planetY, 18 + i % 3 * 4);
+    gradient.addColorStop(0, i % 2 ? "rgba(255,225,145,0.24)" : "rgba(115,180,255,0.22)");
+    gradient.addColorStop(1, "rgba(40,45,90,0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath(); ctx.arc(planetX, planetY, 22 + i % 3 * 4, 0, TAU); ctx.fill();
+  }
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   ctx.font = FONT_TINY;
@@ -261,7 +270,7 @@ function drawGloryRoadContent(rect, meta) {
     ctx.strokeStyle = item.active ? "rgba(255,230,128,0.48)" : item.reached ? "rgba(120,255,180,0.24)" : "rgba(255,255,255,0.10)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(item.roadX, item.dotY);
+    ctx.moveTo(item.dotX, item.dotY);
     ctx.lineTo(item.side < 0 ? card.x + card.w : card.x, item.dotY);
     ctx.stroke();
     drawProgressRailDot(item.dotX, item.dotY, item.radius, item.reached, item.active, color);
@@ -323,20 +332,19 @@ function drawSeasonRoadContent(rect, meta) {
   ctx.fillText("SUPPLY", rightX + rightW / 2, rect.y + 12);
   ctx.fillStyle = "rgba(120,255,180,0.58)";
   ctx.fillText("TIER", roadX, rect.y + 12);
-  ctx.strokeStyle = "rgba(255,255,255,0.10)";
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(roadX, topY - 34);
-  ctx.lineTo(roadX, bottomY + 34);
-  ctx.stroke();
   const active = layout.find((item) => item.active) || layout[0];
-  ctx.strokeStyle = "rgba(120,255,180,0.24)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 9]);
-  ctx.beginPath();
-  ctx.moveTo(roadX, bottomY + 34);
-  ctx.lineTo(roadX, active ? active.dotY : bottomY);
-  ctx.stroke();
+  for (let i = 1; i < layout.length; i++) {
+    const previous = layout[i - 1];
+    const item = layout[i];
+    ctx.strokeStyle = item.reached ? "rgba(120,210,255,0.32)" : "rgba(255,255,255,0.11)";
+    ctx.lineWidth = item.reached ? 4 : 3;
+    ctx.setLineDash(item.reached ? [] : [8, 9]);
+    ctx.beginPath();
+    ctx.moveTo(previous.dotX, previous.dotY);
+    const midY = (previous.dotY + item.dotY) / 2;
+    ctx.bezierCurveTo(previous.dotX, midY, item.dotX, midY, item.dotX, item.dotY);
+    ctx.stroke();
+  }
   ctx.setLineDash([]);
   ctx.fillStyle = "rgba(120,255,180,0.55)";
   ctx.beginPath();
@@ -511,6 +519,6 @@ function drawProgressPanel() {
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.50)";
   ctx.textAlign = "center";
-  ctx.fillText(atEnd ? "END OF ROAD" : titleProgressDragActive ? "DRAGGING ROAD" : titleProgressSelectedNode ? "NODE SELECTED" : "DRAG, WHEEL, OR TAP NODES", panel.x + panel.w / 2, panel.y + panel.h - 26);
+  ctx.fillText(atEnd ? "ROAD START" : titleProgressDragActive ? "DRAGGING ROAD" : titleProgressSelectedNode ? "NODE SELECTED" : "DRAG, WHEEL, OR TAP NODES", panel.x + panel.w / 2, panel.y + panel.h - 26);
   ctx.restore();
 }

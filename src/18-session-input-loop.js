@@ -107,6 +107,10 @@ function setupSession(mode = "start") {
   titleMetaScreenTransition = 1;
   codexDetailType = null;
   resetProgressConfirm = false;
+  callSignEditing = false;
+  callSignDraft = callSign;
+  callSignStatusTimer = 0;
+  callSignSaveState = "idle";
   highScoreDirty = false;
   state.stars = [];
   for (let i = 0; i < 110; i++) {
@@ -183,8 +187,19 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
   if (state.gameState === "playing") {
+    if (DEBUG_SNAPSHOT_ENABLED && (k === "h" || k === "H") && !e.repeat) {
+      e.preventDefault();
+      state.debugHitboxes = !state.debugHitboxes;
+      showMessage(state.debugHitboxes ? "DEBUG HITBOXES ON" : "DEBUG HITBOXES OFF", 70);
+      return;
+    }
     if (inDevSkipZone(x, y)) { triggerPhaseSkip(); return; }
     if (onDevToggleZone(x, y)) { state.devStatsVisible = !state.devStatsVisible; return; }
+    const pointerKind = e.pointerType === "touch" || e.pointerType === "pen" ? e.pointerType : "mouse_down";
+    const nextMode = nextGameplayInputMode(state.inputMode, pointerKind, Date.now(), state.lastTouchAt, e.buttons || 1);
+    state.inputMode = nextMode.mode;
+    state.lastTouchAt = nextMode.lastTouchAt;
+    state.inputHintTimer = 210;
   }
   if (state.gameState !== "playing") {
     if (handleTitlePointerDown(x, y, e.pointerId)) return;
@@ -219,6 +234,12 @@ canvas.addEventListener("pointermove", (e) => {
     }
     return;
   }
+  if (e.pointerType === "touch" || e.pointerType === "pen" || (e.pointerType === "mouse" && e.buttons)) {
+    const pointerKind = e.pointerType === "touch" || e.pointerType === "pen" ? e.pointerType : "mouse_move";
+    const nextMode = nextGameplayInputMode(state.inputMode, pointerKind, Date.now(), state.lastTouchAt, e.buttons || 0);
+    state.inputMode = nextMode.mode;
+    state.lastTouchAt = nextMode.lastTouchAt;
+  }
   if (state.joystick.active && state.joystick.id === e.pointerId) {
     updateJoystickFromPointer(e);
     const mag = Math.hypot(state.joystick.ax, state.joystick.ay);
@@ -237,8 +258,20 @@ function updateJoystickFromPointer(e) {
   const d = Math.hypot(dx, dy);
   const r = state.joystick.radius;
   const s = d > r ? r / d : 1;
-  state.joystick.ax = (dx * s) / r;
-  state.joystick.ay = (dy * s) / r;
+  let ax = (dx * s) / r;
+  let ay = (dy * s) / r;
+  const magnitude = Math.hypot(ax, ay);
+  const deadZone = 0.10;
+  if (magnitude <= deadZone) {
+    ax = 0;
+    ay = 0;
+  } else {
+    const normalized = (magnitude - deadZone) / (1 - deadZone);
+    ax = ax / magnitude * normalized;
+    ay = ay / magnitude * normalized;
+  }
+  state.joystick.ax = ax;
+  state.joystick.ay = ay;
 }
 function endPointer(e) {
   endTitleProgressDrag(e.pointerId);
@@ -317,7 +350,14 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (state.gameState === "playing") {
-    if (isMoveKey(k)) {
+    const action = typeof gameplayActionForKey === "function" ? gameplayActionForKey(k) : (isMoveKey(k) ? "move" : null);
+    if (action) {
+      const nextMode = nextGameplayInputMode(state.inputMode, "keyboard", Date.now(), state.lastTouchAt, 0);
+      state.inputMode = nextMode.mode;
+      state.lastTouchAt = nextMode.lastTouchAt;
+      state.inputHintTimer = 210;
+    }
+    if (action && (action.startsWith("move_") || action === "move")) {
       e.preventDefault();
       if (k === "ArrowUp" || k === "w" || k === "W") state.keyboard.up = true;
       if (k === "ArrowDown" || k === "s" || k === "S") state.keyboard.down = true;
@@ -325,7 +365,7 @@ window.addEventListener("keydown", (e) => {
       if (k === "ArrowRight" || k === "d" || k === "D") state.keyboard.right = true;
       return;
     }
-    if (!e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); attemptGhost(); }
+    if (action === "ability" && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); attemptGhost(); }
   }
 });
 window.addEventListener("keyup", (e) => {
@@ -345,6 +385,13 @@ window.addEventListener("beforeunload", () => {
 
 function update() {
   if (devSkipCooldown > 0) devSkipCooldown--;
+  if (callSignStatusTimer > 0) {
+    callSignStatusTimer--;
+    if (callSignStatusTimer <= 0 && !callSignEditing) {
+      callSignStatus = "";
+      callSignSaveState = "idle";
+    }
+  }
   state.frame++;
 
   if (state.gameState === "start") {
@@ -370,6 +417,7 @@ function update() {
   }
 
   state.framesSinceLastDrop++;
+  state.inputHintTimer = Math.max(0, (state.inputHintTimer || 0) - 1);
   if (state.powerupDropCooldown > 0) state.powerupDropCooldown--;
   state.comboPulse = Math.max(0, state.comboPulse - 1);
 
@@ -406,8 +454,19 @@ function update() {
 
 const DEBUG_SNAPSHOT_ENABLED = new URLSearchParams(window.location.search).has("debug");
 let debugSnapshotEl = null;
+if (DEBUG_SNAPSHOT_ENABLED) {
+  window.addEventListener("error", (event) => {
+    state.debugErrors.push(String(event && (event.message || (event.error && event.error.message)) || "Runtime error").slice(0, 180));
+    state.debugErrors = state.debugErrors.slice(-12);
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    state.debugErrors.push(String(event && event.reason && (event.reason.message || event.reason) || "Unhandled rejection").slice(0, 180));
+    state.debugErrors = state.debugErrors.slice(-12);
+  });
+}
 
 function getDebugSnapshot() {
+  const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
   return {
     gameState: state.gameState,
     frame: state.frame,
@@ -421,7 +480,8 @@ function getDebugSnapshot() {
       energy: state.player.energy,
       inv: state.player.inv,
       ghostTimer: state.player.ghostTimer,
-      ghostCooldown: state.player.ghostCooldown
+      ghostCooldown: state.player.ghostCooldown,
+      dashTimer: state.player.dashTimer
     } : null,
     counts: {
       bullets: state.bullets.length,
@@ -456,6 +516,19 @@ function getDebugSnapshot() {
       } : null,
       resetProgressConfirm
     },
+    input: {
+      mode: state.inputMode,
+      action: actionProfile.label,
+      hintTimer: state.inputHintTimer,
+      touchControlsVisible: typeof touchControlsVisible === "function" ? touchControlsVisible(state.inputMode, state.gameState) : null
+    },
+    encounter: {
+      bossMode: state.boss ? state.boss.mode : null,
+      enemyTypes: Array.from(new Set(state.enemies.map((enemy) => enemy.type))),
+      safeLanes: (state.safeLanes || []).map((lane) => ({ row: lane.row, minX: lane.minX, maxX: lane.maxX, width: lane.width })),
+      debugHitboxes: state.debugHitboxes
+    },
+    runtimeErrors: state.debugErrors.slice(),
     difficulty: {
       latestSample: state.difficultySamples && state.difficultySamples.length
         ? state.difficultySamples[state.difficultySamples.length - 1]
@@ -479,6 +552,37 @@ function updateDebugSnapshot() {
 
 function loop() { update(); draw(); updateDebugSnapshot(); requestAnimationFrame(loop); }
 
+function applyDebugScenario() {
+  if (!DEBUG_SNAPSHOT_ENABLED) return;
+  const params = new URLSearchParams(window.location.search);
+  const scenario = params.get("scenario");
+  const requestedInput = params.get("input");
+  if (!scenario) {
+    if (requestedInput === "touch") state.inputMode = "touch";
+    return;
+  }
+  setupSession("playing");
+  state.player.hp = state.player.maxHp;
+  state.player.energy = state.player.maxEnergy;
+  state.waveRest = 999999;
+  state.phaseTimer = -999999;
+  if (scenario === "siphon") {
+    state.phase = 5;
+    spawnEnemy("siphon", W / 2, 128, { forceSpawn: true });
+    const siphon = state.enemies.find((enemy) => enemy.type === "siphon");
+    if (siphon) { siphon.entryFrames = 0; siphon.fireTimer = 48; siphon.fireWarn = 0; }
+    showMessage("DEBUG  SIPHON AIM TEST", 120);
+  } else if (scenario === "debris") {
+    state.phase = 12;
+    spawnExpansionBoss("debris_warden");
+    state.boss.y = state.boss.targetY;
+    state.boss.entered = true;
+    beginExpansionBossAttack(state.boss, "double");
+    showMessage("DEBUG  DOUBLE GATE", 120);
+  }
+  if (requestedInput === "touch") state.inputMode = "touch";
+}
+
 loadHighScore();
 loadCallSign();
 loadSettings();
@@ -486,5 +590,6 @@ loadCodexDiscovered();
 loadMetaProgress();
 resize();
 setupSession("start");
+applyDebugScenario();
 window.addEventListener("resize", resize);
-loop();
+Promise.resolve(typeof preloadGameAssets === "function" ? preloadGameAssets() : null).then(loop);

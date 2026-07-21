@@ -16,6 +16,10 @@ function drawPlayer() {
   if (state.gameState !== "playing" && state.gameState !== "gameover") return;
   const tilt = clamp(p.vx / 80, -0.06, 0.06);
   const bob = Math.sin(state.frame * 0.18 + p.x * 0.02) * 0.6;
+  if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "player", p.x, p.y + bob, {
+    rotation: tilt,
+    alpha: p.inv > 0 && state.frame % 6 < 3 ? 0.42 : 1
+  })) return;
 
   function drawCockpit(styleMode, sx = 1, sy = 1) {
     const c1 = styleMode === "normal" ? "rgba(255,255,255,0.95)" : styleMode === "ghost" ? "rgba(235,215,255,0.95)" : "rgba(235,250,255,0.95)";

@@ -135,6 +135,19 @@ function drawStatBar(x, y, label, value, max = 5) {
   ctx.strokeRect(barX, barY, barW, barH);
   ctx.restore();
 }
+function codexTacticalLines(type, meta) {
+  const notes = {
+    red: ["Break the formation before it crowds the lower lanes.", "Low durability; movement pressure is the real threat."],
+    orange: ["Watch the first lateral snap, then cross behind it.", "Erratic movement, but no armored core."],
+    purple: ["The warning ring marks a charged aimed shot.", "Change lanes after the aim locks."],
+    phantom: ["Only matching-realm fire can damage it.", "Read the flicker before committing to a lane."],
+    siphon: ["A green warning line shows the restrained lead aim.", "Dodge the visible drain core; its trail is not dangerous."],
+    boss_debris_warden: ["Track the marked safe opening through both rows.", "DASH boosts movement here but cannot phase through rock."],
+    boss_wraith: ["Realm Hop changes which threats can touch you.", "Match the boss realm before firing."],
+    boss_standard: ["Clear lanes during the warning cycle.", "Concentrate fire between heavy volleys."]
+  };
+  return notes[type] || [String(meta.trait || "Study its movement and warning state."), "Keep the lower screen clear before it attacks."];
+}
 function drawCodexDetail(panel, type) {
   const stats = codexTypeStats(type);
   const meta = typeof getCodexMeta === "function" ? getCodexMeta(type) : { color: "#fff" };
@@ -174,6 +187,22 @@ function drawCodexDetail(panel, type) {
   drawStatBar(card.x + 88, card.y + 86, "Speed", stats.speed);
   drawStatBar(card.x + 88, card.y + 108, "Aggression", stats.aggression);
   drawStatBar(card.x + 88, card.y + 130, "Fire Rate", stats.fire);
+  const tactics = codexTacticalLines(type, meta);
+  const briefY = card.y + 184;
+  ctx.fillStyle = "rgba(255,255,255,0.045)";
+  ctx.fillRect(card.x + 14, briefY, card.w - 28, 116);
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.strokeRect(card.x + 14, briefY, card.w - 28, 116);
+  ctx.fillStyle = meta.color || "#fff";
+  ctx.font = FONT_TINY;
+  ctx.fillText(type.startsWith("boss") ? "BOSS TACTICAL BRIEF" : "TACTICAL BRIEF", card.x + 26, briefY + 14);
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  ctx.font = FONT_SMALL;
+  ctx.fillText(String(meta.trait || "Unknown combat pattern").slice(0, 42), card.x + 26, briefY + 36);
+  ctx.fillStyle = "rgba(255,255,255,0.62)";
+  ctx.font = FONT_TINY;
+  ctx.fillText(`1  ${tactics[0]}`.slice(0, 48), card.x + 26, briefY + 64);
+  ctx.fillText(`2  ${tactics[1]}`.slice(0, 48), card.x + 26, briefY + 84);
   ctx.restore();
 }
 function drawCodexPanel() {
@@ -278,7 +307,7 @@ function drawOnlinePanel() {
   const panel = r.panel;
   const online = onlineState();
   const user = online.user || null;
-  const name = user ? (online.profileCallSign || user.displayName || callSign || "PILOT") : "SIGNED OUT";
+  const name = user ? (online.profileCallSign || callSign || "PILOT") : callSign;
   const status = online.lastError || online.lastStatus || (user ? "Runs sync at game over." : "Sign in to sync records.");
   const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
   drawTitlePanelFrame(panel, "ACCOUNT");
@@ -291,11 +320,11 @@ function drawOnlinePanel() {
   ctx.textBaseline = "top";
   ctx.font = FONT_SMALL;
   ctx.fillStyle = user ? "#78ffb4" : "rgba(255,255,255,0.70)";
-  ctx.fillText(user ? `ACCOUNT: ${String(name).slice(0, 22)}` : "ACCOUNT: SIGNED OUT", innerX, y);
+  ctx.fillText(user ? `PILOT: ${String(name).slice(0, 18)}` : `LOCAL PILOT: ${String(name).slice(0, 14)}`, innerX, y);
   y += 18;
   ctx.fillStyle = online.lastError ? "#ffb0b0" : "rgba(255,255,255,0.72)";
   ctx.fillText(String(status).slice(0, 42), innerX, y);
-  y = panel.y + 198;
+  y = panel.y + 234;
   if (meta) {
     ctx.font = FONT_HUD;
     ctx.fillStyle = "rgba(255,230,128,0.88)";
@@ -309,6 +338,7 @@ function drawOnlinePanel() {
   }
   ctx.restore();
 
+  drawOnlineActionButton(r.editCallSign, callSignEditing ? "SAVE CALL SIGN" : "EDIT CALL SIGN", true);
   drawOnlineActionButton(r.signIn, user ? "SYNC PROFILE" : "SIGN IN WITH GOOGLE", true);
   drawOnlineActionButton(r.signOut, "SIGN OUT", !!user);
 
@@ -374,7 +404,7 @@ function drawRecordsPanel() {
   ctx.font = FONT_TINY;
   if (leaderboard.length) {
     leaderboard.slice(0, 10).forEach((row, index) => {
-      const who = String(row.callSign || row.displayName || "PILOT").slice(0, 12);
+      const who = String(row.callSign || "PILOT").slice(0, 12);
       const score = Number(row.bestScore || 0).toLocaleString();
       const rank = row.gloryRank ? ` ${String(row.gloryRank).slice(0, 14)}` : "";
       ctx.fillStyle = index === 0 ? "#ffe680" : "rgba(255,255,255,0.82)";

@@ -66,6 +66,14 @@ function drawBullets() {
       ctx.fillStyle = "#0ff"; ctx.fillRect(b.x - 3, b.y, 6, 10);
     } else if (b.kind === "drainShot") {
       ctx.save();
+      if (b.trail && b.trail.length > 1) {
+        ctx.strokeStyle = "rgba(112,255,69,0.28)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(b.trail[0].x, b.trail[0].y);
+        for (let trailIndex = 1; trailIndex < b.trail.length; trailIndex++) ctx.lineTo(b.trail[trailIndex].x, b.trail[trailIndex].y);
+        ctx.stroke();
+      }
       ctx.shadowColor = "rgba(112,255,69,0.9)";
       ctx.shadowBlur = 10;
       ctx.fillStyle = "rgba(112,255,69,0.92)";

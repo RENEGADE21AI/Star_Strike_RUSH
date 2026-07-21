@@ -36,11 +36,7 @@ const online = {
 
 function clonePublicUser(user) {
   if (!user) return null;
-  return {
-    uid: user.uid,
-    displayName: user.displayName || "",
-    photoURL: user.photoURL || ""
-  };
+  return { uid: user.uid };
 }
 
 function getState() {
@@ -268,7 +264,10 @@ async function syncProfile(callSignOverride = "") {
   const publicData = publicSnap.exists() ? publicSnap.data() : {};
   const privateData = privateSnap.exists() ? privateSnap.data() : {};
   const localMeta = normalizeMetaSnapshot(localMetaSnapshot());
-  const requestedCallSign = safeCallSign(callSignOverride || online.profileCallSign || publicData.callSign || "");
+  const rawCallSign = safeCallSign(callSignOverride || online.profileCallSign || publicData.callSign || "");
+  const requestedCallSign = rawCallSign.length >= 3
+    ? rawCallSign
+    : (typeof window.neutralPilotCallSign === "function" ? window.neutralPilotCallSign(uid) : `PILOT_${uid.slice(0, 6).toUpperCase()}`.slice(0, 12));
   const displayName = safeText(user.displayName || requestedCallSign, "Pilot", 60);
   const photoURL = safeUrl(user.photoURL);
   const totalGlory = Math.max(localMeta.totalGlory, numberOrZero(publicData.glory), numberOrZero(privateData.glory));
@@ -308,9 +307,7 @@ async function syncProfile(callSignOverride = "") {
   };
   const publicPayload = {
     uid,
-    displayName,
     callSign: requestedCallSign,
-    photoURL,
     bestScore: Math.max(
       numberOrZero(publicData.bestScore),
       localMeta.lifetime.bestScore,
@@ -322,15 +319,15 @@ async function syncProfile(callSignOverride = "") {
     gloryRank,
     gloryRankIndex,
     seasonTier: currentSeasonTier,
+    createdAt: publicData.createdAt || timestamp,
     updatedAt: timestamp
   };
 
-  if (!publicSnap.exists()) publicPayload.createdAt = timestamp;
   if (!privateSnap.exists()) privatePayload.createdAt = timestamp;
 
   await Promise.all([
     setDoc(privateRef, privatePayload, { merge: true }),
-    setDoc(publicRef, publicPayload, { merge: true })
+    setDoc(publicRef, publicPayload)
   ]);
 
   online.profileCallSign = requestedCallSign;
@@ -349,11 +346,9 @@ async function syncProfile(callSignOverride = "") {
 function applyLeaderboardSnapshot(snapshot) {
   online.leaderboard = snapshot.docs.map((docSnapshot) => {
     const data = docSnapshot.data();
-    return {
+    const candidate = {
       uid: data.uid || docSnapshot.id,
       callSign: safeCallSign(data.callSign || ""),
-      displayName: safeText(data.displayName, "Pilot", 60),
-      photoURL: safeUrl(data.photoURL),
       bestScore: numberOrZero(data.bestScore),
       phase: Math.max(1, numberOrZero(data.phase) || 1),
       achievementsCount: numberOrZero(data.achievementsCount),
@@ -362,7 +357,24 @@ function applyLeaderboardSnapshot(snapshot) {
       gloryRankIndex: safeGloryRankIndex(data.gloryRankIndex, data.gloryRank),
       seasonTier: Math.max(1, numberOrZero(data.seasonTier) || 1)
     };
+    return typeof window.publicPilotRecord === "function" ? window.publicPilotRecord(candidate) : candidate;
   });
+}
+
+async function updateCallSign(callSign) {
+  const validation = typeof window.validateCallSign === "function"
+    ? window.validateCallSign(callSign)
+    : { ok: safeCallSign(callSign).length >= 3, callSign: safeCallSign(callSign) };
+  if (!validation.ok) throw new Error(validation.message || "Call sign must be 3-12 characters.");
+  const normalized = validation.callSign;
+  online.profileCallSign = normalized;
+  if (!online.ready || !auth || !auth.currentUser) {
+    setStatus("Call sign saved locally. Sign in to sync it.");
+    return { ok: true, localOnly: true, callSign: normalized };
+  }
+  await syncProfile(normalized);
+  subscribeLeaderboard();
+  return { ok: true, localOnly: false, callSign: normalized };
 }
 
 function subscribeLeaderboard() {
@@ -560,6 +572,7 @@ window.starStrikeOnline = {
   signIn,
   signOut: signOutOnline,
   refresh,
+  updateCallSign,
   submitRun,
   claimSeasonReward: claimSeasonRewardOnline
 };

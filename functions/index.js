@@ -29,6 +29,15 @@ function safeEmail(value) {
     .slice(0, 120);
 }
 
+function neutralPilotCallSign(uid) {
+  let hash = 2166136261;
+  for (const char of String(uid || "pilot")) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `PILOT_${(hash >>> 0).toString(36).toUpperCase().slice(0, 5)}`;
+}
+
 function authContext(request) {
   if (!request.auth || !request.auth.uid) {
     throw new HttpsError("unauthenticated", "Sign in is required.");
@@ -87,11 +96,10 @@ function privatePayloadFor(auth, profile, existing = {}) {
 function publicPayloadFor(auth, profile, callSign, achievementsCount, existing = {}) {
   const rank = rankForGlory(profile.glory);
   const now = FieldValue.serverTimestamp();
+  const sanitizedCallSign = safeCallSign(callSign || existing.callSign || "");
   return {
     uid: auth.uid,
-    displayName: auth.displayName,
-    callSign: safeCallSign(callSign || existing.callSign || ""),
-    photoURL: auth.photoURL,
+    callSign: sanitizedCallSign.length >= 3 ? sanitizedCallSign : neutralPilotCallSign(auth.uid),
     bestScore: profile.bestScore,
     phase: profile.phase,
     achievementsCount,
@@ -210,8 +218,8 @@ exports.submitRunReceipt = onCall({ region: REGION }, async (request) => {
     };
 
     tx.set(privateRef, privatePayload, { merge: true });
-    tx.set(publicRef, publicPayload, { merge: true });
-    tx.set(leaderboardRef, publicPayload, { merge: true });
+    tx.set(publicRef, publicPayload);
+    tx.set(leaderboardRef, publicPayload);
     tx.create(receiptRef, receiptPayload);
     for (const item of newAchievementRefs) {
       tx.set(item.ref, {
@@ -281,8 +289,8 @@ exports.claimSeasonReward = onCall({ region: REGION }, async (request) => {
     const privatePayload = privatePayloadFor(auth, claim.profile, privateData);
 
     tx.set(privateRef, privatePayload, { merge: true });
-    tx.set(publicRef, publicPayload, { merge: true });
-    tx.set(leaderboardRef, publicPayload, { merge: true });
+    tx.set(publicRef, publicPayload);
+    tx.set(leaderboardRef, publicPayload);
     tx.create(claimRef, {
       uid,
       rewardId,

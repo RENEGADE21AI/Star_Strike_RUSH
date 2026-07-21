@@ -166,6 +166,7 @@ function configureExpansionEnemy(e, type, extra = {}, phaseBoost = 0) {
     e.r = 14;
     e.hp = e.maxHp = 3;
     e.fireTimer = extra.fireTimer || Math.floor(rand(58, 98));
+    e.fireWarn = 0;
   } else if (type === "leech") {
     e.vy = 0.70 + phaseBoost * 0.05;
     e.r = 16;

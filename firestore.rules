@@ -170,9 +170,7 @@ service cloud.firestore {
     function validPublicProfile(data, userId) {
       return hasRequired(data, [
           'uid',
-          'displayName',
           'callSign',
-          'photoURL',
           'bestScore',
           'phase',
           'achievementsCount',
@@ -185,9 +183,7 @@ service cloud.firestore {
         ])
         && hasOnly(data, [
           'uid',
-          'displayName',
           'callSign',
-          'photoURL',
           'bestScore',
           'phase',
           'achievementsCount',
@@ -199,9 +195,7 @@ service cloud.firestore {
           'updatedAt'
         ])
         && data.uid == userId
-        && validText(data.displayName, 60)
         && validCallSign(data.callSign)
-        && validUrl(data.photoURL)
         && validScore(data.bestScore)
         && validPhase(data.phase)
         && validCounter(data.achievementsCount)
@@ -215,9 +209,7 @@ service cloud.firestore {
     function validLeaderboardRecord(data, userId) {
       return hasRequired(data, [
           'uid',
-          'displayName',
           'callSign',
-          'photoURL',
           'bestScore',
           'phase',
           'achievementsCount',
@@ -229,9 +221,7 @@ service cloud.firestore {
         ])
         && hasOnly(data, [
           'uid',
-          'displayName',
           'callSign',
-          'photoURL',
           'bestScore',
           'phase',
           'achievementsCount',
@@ -242,9 +232,7 @@ service cloud.firestore {
           'updatedAt'
         ])
         && data.uid == userId
-        && validText(data.displayName, 60)
         && validCallSign(data.callSign)
-        && validUrl(data.photoURL)
         && validScore(data.bestScore)
         && validPhase(data.phase)
         && validCounter(data.achievementsCount)

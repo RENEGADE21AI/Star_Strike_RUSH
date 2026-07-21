@@ -50,18 +50,23 @@ function updateExpansionEnemy(e, p, threat, moveScale, margin) {
     e.x += Math.sign(p.x - e.x) * 0.22 + Math.sin(e.t * 0.035 + e.loopPhase) * 0.18;
     e.y += e.vy * moveScale;
     e.fireTimer--;
+    e.fireWarn = e.fireTimer > 0 && e.fireTimer <= 22 ? e.fireTimer : 0;
     if (e.fireTimer <= 0 && phantomFrontArcOK({ x: e.x, y: e.y, vx: 0, vy: 1 }, p.x, p.y)) {
-      const dx = p.x - e.x, dy = p.y - e.y, d = Math.max(1, Math.hypot(dx, dy));
-      const speed = 2.85 + state.phase * 0.025;
-      fireEnemyBullet(e.x, e.y + 10, (dx / d) * speed, (dy / d) * speed, "drainShot", {
+      const origin = { x: e.x, y: e.y + 11 };
+      const shot = createSiphonShot(origin, p, { x: p.vx, y: p.vy }, { speed: 3.05 + state.phase * 0.025, extraRange: H * 0.38 });
+      fireEnemyBullet(origin.x, origin.y, shot.vx, shot.vy, "drainShot", {
         r: 5.5,
         damage: 0,
         drain: 22,
-        life: 260,
-        curving: Math.random() < 0.5 ? -0.015 : 0.015,
+        life: shot.life,
+        curving: 0,
+        targetX: shot.aimX,
+        targetY: shot.aimY,
+        intendedRange: shot.range,
         maxSpeed: 4.8
       });
       e.fireTimer = Math.floor(112 + rand(-20, 28) - state.phase * 1.5);
+      e.fireWarn = 0;
     }
   } else if (e.type === "leech") {
     const targetY = H * 0.30 + Math.sin(e.t * 0.025 + e.loopPhase) * 28;

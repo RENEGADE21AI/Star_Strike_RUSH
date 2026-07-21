@@ -41,15 +41,16 @@ function drawTitleAndButtons() {
   ctx.textBaseline = "middle";
   let txt;
   if (callSignEditing) {
-    txt = callSign + (Math.floor(callSignCursorBlink / 28) % 2 === 0 ? "|" : " ");
+    txt = callSignDraft + (Math.floor(callSignCursorBlink / 28) % 2 === 0 ? "|" : " ");
   } else {
     txt = callSign || "ENTER CALL SIGN";
   }
   ctx.fillStyle = callSign ? "#fff" : "rgba(255,255,255,0.30)";
   ctx.fillText(txt, callRect.x + callRect.w / 2, callRect.y + callRect.h / 2 + 1);
   ctx.font = "900 8px 'Arial Narrow', Arial, sans-serif";
-  ctx.fillStyle = callSignEditing ? "#78ffb4" : "rgba(255,255,255,0.48)";
-  ctx.fillText(callSignEditing ? "ENTER SAVES" : "TAP TO EDIT", callRect.x + callRect.w / 2, callRect.y + callRect.h - 7);
+  ctx.fillStyle = callSignSaveState === "error" ? "#ff8a8a" : callSignSaveState === "success" ? "#78ffb4" : callSignEditing ? "#78ffb4" : "rgba(255,255,255,0.48)";
+  const pilotHint = callSignStatusTimer > 0 || callSignEditing ? (callSignStatus || "ENTER SAVES") : "TAP TO EDIT";
+  ctx.fillText(pilotHint.slice(0, 34), callRect.x + callRect.w / 2, callRect.y + callRect.h - 7);
   ctx.restore();
 
   const iconRects = getTitleIconRects();
@@ -127,6 +128,10 @@ function drawTitleAndButtons() {
     ctx.textAlign = "center";
     ctx.fillText(rankLine, W / 2, H * 0.747);
   }
+  ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
+  ctx.fillStyle = "rgba(170,205,230,0.56)";
+  ctx.textAlign = "center";
+  ctx.fillText("TOUCH OR KEYBOARD  |  INPUT AUTO-DETECTS", W / 2, H * 0.81);
   ctx.restore();
 }
 function drawStartScreen() {
