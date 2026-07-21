@@ -1,13 +1,37 @@
 rules_version = '2';
 
+// Assumed data model:
+// - players_private/{uid}: owner-only account and progression data, including PII.
+// - players_public/{uid}, leaderboard_scores/{uid}: authenticated-readable game identity
+//   (callSign, handle) and bounded game statistics; never provider identity or email.
+// - player_achievements/{uid}/items/{id}, run_receipts/{uid}/items/{id},
+//   season_reward_claims/{uid}/items/{id}: owner-readable server records.
+// - handle_registry/{handle}: server-only immutable uniqueness registry.
+// - weekly_enrollments/{week_uid}: server-only assignment lookup.
+// - weekly_leagues/{leagueId}/members/{uid}: server-only competition data returned
+//   through authenticated callable functions as a sanitized payload.
+// All writes are performed by trusted Cloud Functions with the Admin SDK.
+
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
       return request.auth != null;
     }
 
+    function isAuthenticated() {
+      return signedIn();
+    }
+
     function isOwner(userId) {
       return signedIn() && request.auth.uid == userId;
+    }
+
+    function uidUnchanged() {
+      return signedIn() && request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return request.resource.data.uid == resource.data.uid;
     }
 
     function hasRequired(data, fields) {
@@ -34,6 +58,12 @@ service cloud.firestore {
       return value is string
         && value.size() <= 12
         && value.matches("^[A-Z0-9_]*$");
+    }
+
+    function validHandle(value) {
+      return value is string
+        && value.size() <= 16
+        && (value == "" || value.matches("^[a-z][a-z0-9_]{2,15}$"));
     }
 
     function validUrl(value) {
@@ -171,6 +201,7 @@ service cloud.firestore {
       return hasRequired(data, [
           'uid',
           'callSign',
+          'handle',
           'bestScore',
           'phase',
           'achievementsCount',
@@ -184,6 +215,7 @@ service cloud.firestore {
         && hasOnly(data, [
           'uid',
           'callSign',
+          'handle',
           'bestScore',
           'phase',
           'achievementsCount',
@@ -196,6 +228,7 @@ service cloud.firestore {
         ])
         && data.uid == userId
         && validCallSign(data.callSign)
+        && validHandle(data.handle)
         && validScore(data.bestScore)
         && validPhase(data.phase)
         && validCounter(data.achievementsCount)
@@ -210,6 +243,7 @@ service cloud.firestore {
       return hasRequired(data, [
           'uid',
           'callSign',
+          'handle',
           'bestScore',
           'phase',
           'achievementsCount',
@@ -222,6 +256,7 @@ service cloud.firestore {
         && hasOnly(data, [
           'uid',
           'callSign',
+          'handle',
           'bestScore',
           'phase',
           'achievementsCount',
@@ -233,6 +268,7 @@ service cloud.firestore {
         ])
         && data.uid == userId
         && validCallSign(data.callSign)
+        && validHandle(data.handle)
         && validScore(data.bestScore)
         && validPhase(data.phase)
         && validCounter(data.achievementsCount)
@@ -348,75 +384,51 @@ service cloud.firestore {
     match /players_private/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId)
-        && validPrivateAccount(request.resource.data, userId)
-        && request.resource.data.createdAt == request.time;
-      allow update: if isOwner(userId)
-        && validPrivateAccount(request.resource.data, userId)
-        && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.glory >= resource.data.get('glory', 0)
-        && request.resource.data.gloryRankIndex >= resource.data.get('gloryRankIndex', 0)
-        && request.resource.data.currentSeasonXP >= resource.data.get('currentSeasonXP', 0)
-        && request.resource.data.currentSeasonTier >= resource.data.get('currentSeasonTier', 1)
-        && request.resource.data.credits >= resource.data.get('credits', 0)
-        && request.resource.data.lifetimeRuns >= resource.data.get('lifetimeRuns', 0)
-        && request.resource.data.lifetimeScore >= resource.data.get('lifetimeScore', 0)
-        && request.resource.data.lifetimeKills >= resource.data.get('lifetimeKills', 0)
-        && request.resource.data.lifetimePowerups >= resource.data.get('lifetimePowerups', 0)
-        && request.resource.data.lifetimeGhostUses >= resource.data.get('lifetimeGhostUses', 0)
-        && request.resource.data.lifetimeBosses >= resource.data.get('lifetimeBosses', 0)
-        && request.resource.data.lifetimeDamageTaken >= resource.data.get('lifetimeDamageTaken', 0)
-        && request.resource.data.highestCombo >= resource.data.get('highestCombo', 0);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /players_public/{userId} {
       allow get: if signedIn();
       allow list: if signedIn() && request.query.limit <= 25;
-      allow create: if isOwner(userId)
-        && validPublicProfile(request.resource.data, userId)
-        && request.resource.data.createdAt == request.time;
-      allow update: if isOwner(userId)
-        && validPublicProfile(request.resource.data, userId)
-        && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.bestScore >= resource.data.bestScore
-        && request.resource.data.phase >= resource.data.phase
-        && request.resource.data.achievementsCount >= resource.data.achievementsCount
-        && request.resource.data.glory >= resource.data.get('glory', 0)
-        && request.resource.data.gloryRankIndex >= resource.data.get('gloryRankIndex', 0)
-        && request.resource.data.seasonTier >= resource.data.get('seasonTier', 1);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /leaderboard_scores/{userId} {
       allow get: if signedIn();
       allow list: if signedIn() && request.query.limit <= 25;
-      allow create: if isOwner(userId)
-        && validLeaderboardRecord(request.resource.data, userId);
-      allow update: if isOwner(userId)
-        && validLeaderboardRecord(request.resource.data, userId)
-        && request.resource.data.bestScore >= resource.data.bestScore
-        && request.resource.data.phase >= resource.data.phase
-        && request.resource.data.achievementsCount >= resource.data.achievementsCount
-        && request.resource.data.glory >= resource.data.get('glory', 0)
-        && request.resource.data.gloryRankIndex >= resource.data.get('gloryRankIndex', 0)
-        && request.resource.data.seasonTier >= resource.data.get('seasonTier', 1);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /player_achievements/{userId}/items/{achievementId} {
       allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId)
-        && validAchievement(request.resource.data, userId, achievementId);
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /run_receipts/{userId}/items/{receiptId} {
       allow get: if isOwner(userId);
       allow list: if isOwner(userId) && request.query.limit <= 50;
-      allow create: if isOwner(userId)
-        && validRunReceipt(request.resource.data, userId, receiptId);
-      allow update, delete: if false;
+      allow create, update, delete: if false;
+    }
+
+    match /season_reward_claims/{userId}/items/{rewardId} {
+      allow get, list: if isOwner(userId);
+      allow create, update, delete: if false;
+    }
+
+    match /handle_registry/{handle} {
+      allow read, write: if false;
+    }
+
+    match /weekly_enrollments/{enrollmentId} {
+      allow read, write: if false;
+    }
+
+    match /weekly_leagues/{leagueId} {
+      allow read, write: if false;
+
+      match /members/{userId} {
+        allow read, write: if false;
+      }
     }
 
     match /{document=**} {

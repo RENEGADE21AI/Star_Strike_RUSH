@@ -67,6 +67,26 @@ function validateDoubleDebrisPlan(plan, options = {}) {
   return { ok: true, reason: "reachable" };
 }
 
+function debrisWardenAttackSequence(hpPct) {
+  const ratio = Math.max(0, Math.min(1, Number(hpPct == null ? 1 : hpPct)));
+  if (ratio > 0.62) return ["wall", "light", "wall", "meteor", "wall", "double", "rotate"];
+  if (ratio > 0.30) return ["wall", "meteor", "wall", "crush", "rotate", "wall", "double", "light"];
+  return ["wall", "crush", "meteor", "wall", "rotate", "wall", "double", "meteor"];
+}
+
+function debrisWardenRowSpeed(hpPct, attack = "wall") {
+  const ratio = Math.max(0, Math.min(1, Number(hpPct == null ? 1 : hpPct)));
+  const pressure = 1 - ratio;
+  const base = 1.82 + pressure * 1.28;
+  const multiplier = attack === "double" ? 0.88 : attack === "crush" ? 0.84 : 1;
+  return Math.round(base * multiplier * 100) / 100;
+}
+
+function debrisSpawnScale(age, duration = 30) {
+  const t = Math.max(0, Math.min(1, Number(age || 0) / Math.max(1, Number(duration || 1))));
+  return t * t * (3 - 2 * t);
+}
+
 function createSiphonShot(origin, target, targetVelocity = {}, options = {}) {
   const speed = options.speed || 3.15;
   const dx = Number(target.x || 0) - Number(origin.x || 0);
@@ -101,6 +121,8 @@ globalThis.simulateReachableDistance = simulateReachableDistance;
 globalThis.debrisSafeGap = debrisSafeGap;
 globalThis.createDoubleDebrisPlan = createDoubleDebrisPlan;
 globalThis.validateDoubleDebrisPlan = validateDoubleDebrisPlan;
+globalThis.debrisWardenAttackSequence = debrisWardenAttackSequence;
+globalThis.debrisWardenRowSpeed = debrisWardenRowSpeed;
+globalThis.debrisSpawnScale = debrisSpawnScale;
 globalThis.createSiphonShot = createSiphonShot;
 globalThis.ghostActionProfile = ghostActionProfile;
-

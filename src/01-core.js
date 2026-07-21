@@ -1,6 +1,7 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const callSignInputEl = document.getElementById("callSignInput");
+const handleInputEl = document.getElementById("handleInput");
 
 const GAME_W = 375;
 const GAME_H = 667;
@@ -48,6 +49,11 @@ let callSignStatus = "";
 let callSignStatusTimer = 0;
 let callSignSaveState = "idle";
 let callSignCursorBlink = 0;
+let handleEditing = false;
+let handleDraft = "";
+let handleStatus = "";
+let handleStatusTimer = 0;
+let accountPanelTab = "pilot";
 let titleSubState = "main";
 let titlePanelAnim = 0.0;
 let titlePanelTarget = 0.0;
@@ -203,12 +209,77 @@ function commitCallSignDraft() {
   const onlineService = window.starStrikeOnline;
   if (onlineService && typeof onlineService.updateCallSign === "function") {
     setCallSignStatus("SAVING PILOT ID...", "saving", 0);
-    Promise.resolve(onlineService.updateCallSign(callSign)).then(() => {
-      setCallSignStatus("PILOT ID SYNCED", "success", 150);
+    Promise.resolve(onlineService.updateCallSign(callSign)).then((syncResult) => {
+      if (syncResult && syncResult.localOnly) {
+        setCallSignStatus("SAVED LOCALLY | COMPETITION OFFLINE", "error", 210);
+      } else {
+        setCallSignStatus("PILOT ID SYNCED", "success", 150);
+      }
     }).catch(() => {
       setCallSignStatus("SAVED LOCALLY | ONLINE SYNC FAILED", "error", 210);
     });
   }
+  return true;
+}
+function setHandleStatus(message, frames = 150) {
+  handleStatus = String(message || "");
+  handleStatusTimer = Math.max(0, Math.floor(frames || 0));
+}
+function beginHandleEditing() {
+  const onlineService = window.starStrikeOnline;
+  const online = onlineService && typeof onlineService.getState === "function" ? onlineService.getState() : {};
+  if (!online.user) {
+    setHandleStatus("SIGN IN TO CLAIM A HANDLE", 150);
+    return false;
+  }
+  if (online.competitionBackend === "unavailable") {
+    setHandleStatus("COMPETITION SERVICES ARE OFFLINE", 180);
+    return false;
+  }
+  if (online.profileHandle) {
+    setHandleStatus("HANDLE IS LOCKED TO THIS ACCOUNT", 150);
+    return false;
+  }
+  handleEditing = true;
+  handleDraft = "";
+  handleInputEl.value = "";
+  setHandleStatus("PUBLIC • CLAIM ONCE", 0);
+  handleInputEl.focus();
+  return true;
+}
+function cancelHandleEditing() {
+  handleEditing = false;
+  handleDraft = "";
+  handleInputEl.value = "";
+  setHandleStatus("HANDLE CLAIM CANCELLED", 70);
+  handleInputEl.blur();
+}
+function commitPublicHandleDraft() {
+  const validation = typeof validatePublicHandle === "function"
+    ? validatePublicHandle(handleDraft)
+    : { ok: false, handle: "", message: "HANDLE VALIDATION UNAVAILABLE" };
+  if (!validation.ok) {
+    setHandleStatus(validation.message || "INVALID HANDLE", 0);
+    handleInputEl.focus();
+    return false;
+  }
+  const onlineService = window.starStrikeOnline;
+  if (!onlineService || typeof onlineService.claimHandle !== "function") {
+    setHandleStatus("ONLINE HANDLE SERVICE UNAVAILABLE", 180);
+    return false;
+  }
+  handleDraft = validation.handle;
+  setHandleStatus("CLAIMING PUBLIC HANDLE...", 0);
+  Promise.resolve(onlineService.claimHandle(validation.handle)).then((result) => {
+    if (!result || !result.ok) throw new Error((result && result.message) || "Handle claim failed.");
+    handleEditing = false;
+    handleInputEl.blur();
+    setHandleStatus(`@${result.handle} IS YOURS`, 180);
+  }).catch((error) => {
+    setHandleStatus(String((error && error.message) || "HANDLE CLAIM FAILED").toUpperCase().slice(0, 42), 210);
+    handleEditing = true;
+    handleInputEl.focus();
+  });
   return true;
 }
 function saveSettings() {
@@ -681,6 +752,15 @@ callSignInputEl.addEventListener("blur", () => {
     callSignInputEl.value = callSign;
   }
   callSignEditing = false;
+});
+handleInputEl.addEventListener("input", () => {
+  if (!handleEditing) return;
+  handleDraft = typeof normalizePublicHandle === "function" ? normalizePublicHandle(handleInputEl.value) : "";
+  handleInputEl.value = handleDraft;
+});
+handleInputEl.addEventListener("blur", () => {
+  if (!handleEditing) return;
+  handleInputEl.value = handleDraft;
 });
 
 function makePlayer() {

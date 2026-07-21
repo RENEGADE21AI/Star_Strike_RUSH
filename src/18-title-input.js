@@ -162,18 +162,27 @@ function handleCodexPanelPointerDown(x, y) {
 function handleOnlinePanelPointerDown(x, y) {
   const r = getOnlineRects();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
-  if (hitRect(r.editCallSign, x, y)) {
+  if (hitRect(r.pilotTab, x, y)) { accountPanelTab = "pilot"; return true; }
+  if (hitRect(r.leagueTab, x, y)) { accountPanelTab = "league"; return true; }
+  if (hitRect(r.settingsTab, x, y)) { accountPanelTab = "settings"; return true; }
+  if (accountPanelTab === "pilot" && hitRect(r.claimHandle, x, y)) {
+    if (handleEditing) commitPublicHandleDraft();
+    else beginHandleEditing();
+    return true;
+  }
+  if (accountPanelTab === "league" && hitRect(r.joinLeague, x, y)) { requestWeeklyLeague(); return true; }
+  if (accountPanelTab === "pilot" && hitRect(r.signIn, x, y)) { requestOnlineSignIn(); return true; }
+  if (accountPanelTab === "pilot" && hitRect(r.signOut, x, y)) { requestOnlineSignOut(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.med, x, y)) { settingMaxParticles = 600; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.high, x, y)) { settingMaxParticles = 900; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.shake, x, y)) { settingScreenShake = !settingScreenShake; saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.reset, x, y)) { resetProgressConfirm = true; return true; }
+  if (accountPanelTab === "pilot" && hitRect(r.editCallSign, x, y)) {
     if (callSignEditing) commitCallSignDraft();
     else beginCallSignEditing();
     return true;
   }
-  if (hitRect(r.signIn, x, y)) { requestOnlineSignIn(); return true; }
-  if (hitRect(r.signOut, x, y)) { requestOnlineSignOut(); return true; }
-  if (hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-  if (hitRect(r.med, x, y)) { settingMaxParticles = 600; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-  if (hitRect(r.high, x, y)) { settingMaxParticles = 900; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
-  if (hitRect(r.shake, x, y)) { settingScreenShake = !settingScreenShake; saveSettings(); return true; }
-  if (hitRect(r.reset, x, y)) { resetProgressConfirm = true; return true; }
   if (hitRect(r.refresh, x, y)) { requestOnlineRefresh(); return true; }
   return true;
 }

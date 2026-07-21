@@ -103,3 +103,7 @@ function requestOnlineSignOut() {
 function requestOnlineRefresh() {
   callOnlineService("refresh", "ONLINE NOT READY");
 }
+
+function requestWeeklyLeague() {
+  callOnlineService("joinWeeklyLeague", "WEEKLY LEAGUES NOT READY");
+}

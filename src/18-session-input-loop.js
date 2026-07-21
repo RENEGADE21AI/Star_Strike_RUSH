@@ -330,6 +330,10 @@ function isMoveKey(key) {
          key === "W" || key === "A" || key === "S" || key === "D";
 }
 window.addEventListener("keydown", (e) => {
+  if (handleEditing) {
+    setHandleFromInputKey(e);
+    return;
+  }
   if (callSignEditing) {
     setCallSignFromInputKey(e);
     return;
@@ -391,6 +395,10 @@ function update() {
       callSignStatus = "";
       callSignSaveState = "idle";
     }
+  }
+  if (handleStatusTimer > 0) {
+    handleStatusTimer--;
+    if (handleStatusTimer <= 0 && !handleEditing) handleStatus = "";
   }
   state.frame++;
 
@@ -526,6 +534,11 @@ function getDebugSnapshot() {
       bossMode: state.boss ? state.boss.mode : null,
       enemyTypes: Array.from(new Set(state.enemies.map((enemy) => enemy.type))),
       safeLanes: (state.safeLanes || []).map((lane) => ({ row: lane.row, minX: lane.minX, maxX: lane.maxX, width: lane.width })),
+      debrisScales: (state.debris || []).slice(0, 16).map((rock) => ({
+        spawnScale: Number((rock.spawnScale == null ? 1 : rock.spawnScale).toFixed(3)),
+        collisionScale: Number((rock.collisionScale == null ? 1 : rock.collisionScale).toFixed(3)),
+        row: rock.row || 0
+      })),
       debugHitboxes: state.debugHitboxes
     },
     runtimeErrors: state.debugErrors.slice(),

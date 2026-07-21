@@ -27,7 +27,7 @@ function drawTitleMetaStrip(x, y, w) {
   }
   ctx.restore();
 }
-function drawTitlePanelFrame(panel, title) {
+function drawTitlePanelFrame(panel, title, showMetaStrip = true) {
   ctx.save();
   ctx.fillStyle = "#080a14";
   ctx.beginPath();
@@ -46,7 +46,7 @@ function drawTitlePanelFrame(panel, title) {
   ctx.fillStyle = "#fff";
   ctx.fillText(title, panel.x + panel.w / 2, panel.y + 14);
   ctx.restore();
-  drawTitleMetaStrip(panel.x + 18, panel.y + 42, panel.w - 36);
+  if (showMetaStrip) drawTitleMetaStrip(panel.x + 18, panel.y + 42, panel.w - 36);
 }
 function drawCodexSilhouetteLockIcon(x, y) {
   ctx.save();
@@ -302,85 +302,170 @@ function drawMetaBar(x, y, w, ratio, color) {
   ctx.strokeRect(x, y, w, 8);
   ctx.restore();
 }
+function drawAccountTab(rect, label, active) {
+  ctx.save();
+  ctx.fillStyle = active ? "rgba(92,238,255,0.16)" : "rgba(255,255,255,0.045)";
+  ctx.beginPath(); ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7); ctx.fill();
+  ctx.strokeStyle = active ? "rgba(92,238,255,0.72)" : "rgba(255,255,255,0.14)";
+  ctx.stroke();
+  ctx.fillStyle = active ? "#d9fbff" : "rgba(255,255,255,0.58)";
+  ctx.font = FONT_TINY;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
+  ctx.restore();
+}
+function drawDossierCard(rect, accent = "#5ceeff") {
+  ctx.save();
+  const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+  gradient.addColorStop(0, "rgba(35,48,70,0.78)");
+  gradient.addColorStop(0.52, "rgba(10,14,25,0.92)");
+  gradient.addColorStop(1, "rgba(18,20,38,0.84)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath(); ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 12); ctx.fill();
+  ctx.strokeStyle = accent;
+  ctx.globalAlpha = 0.42;
+  ctx.stroke();
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.arc(rect.x + 48, rect.y + rect.h / 2, 60, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+function drawPilotHologram(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = "rgba(92,238,255,0.34)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 7]);
+  ctx.rotate(state.frame * 0.006);
+  ctx.beginPath(); ctx.ellipse(0, 0, 48, 24, 0, 0, TAU); ctx.stroke();
+  ctx.rotate(-state.frame * 0.012);
+  ctx.beginPath(); ctx.ellipse(0, 0, 35, 50, 0, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.rotate(state.frame * 0.006);
+  if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "player", 0, 0, { scale: 1.32 }))) {
+    ctx.fillStyle = "#d8fbff";
+    ctx.beginPath(); ctx.moveTo(0, -28); ctx.lineTo(-22, 22); ctx.lineTo(0, 12); ctx.lineTo(22, 22); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
 function drawOnlinePanel() {
   const r = getOnlineRects();
   const panel = r.panel;
   const online = onlineState();
   const user = online.user || null;
-  const name = user ? (online.profileCallSign || callSign || "PILOT") : callSign;
-  const status = online.lastError || online.lastStatus || (user ? "Runs sync at game over." : "Sign in to sync records.");
+  const name = callSignEditing ? callSignDraft : (user ? (online.profileCallSign || callSign || "PILOT") : callSign);
+  const handle = handleEditing ? handleDraft : String(online.profileHandle || "");
   const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
-  drawTitlePanelFrame(panel, "ACCOUNT");
+  drawTitlePanelFrame(panel, "PILOT DOSSIER", false);
   drawPanelCloseButton(r.closeRect);
+  drawAccountTab(r.pilotTab, "PILOT", accountPanelTab === "pilot");
+  drawAccountTab(r.leagueTab, "WEEKLY", accountPanelTab === "league");
+  drawAccountTab(r.settingsTab, "SETTINGS", accountPanelTab === "settings");
 
-  ctx.save();
-  const innerX = panel.x + 20;
-  let y = panel.y + 76;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.font = FONT_SMALL;
-  ctx.fillStyle = user ? "#78ffb4" : "rgba(255,255,255,0.70)";
-  ctx.fillText(user ? `PILOT: ${String(name).slice(0, 18)}` : `LOCAL PILOT: ${String(name).slice(0, 14)}`, innerX, y);
-  y += 18;
-  ctx.fillStyle = online.lastError ? "#ffb0b0" : "rgba(255,255,255,0.72)";
-  ctx.fillText(String(status).slice(0, 42), innerX, y);
-  y = panel.y + 234;
-  if (meta) {
-    ctx.font = FONT_HUD;
-    ctx.fillStyle = "rgba(255,230,128,0.88)";
-    ctx.fillText(meta.gloryRank.toUpperCase(), innerX, y);
-    y += 22;
+  if (accountPanelTab === "pilot") {
+    const card = { x: panel.x + 20, y: panel.y + 90, w: panel.w - 40, h: 172 };
+    drawDossierCard(card, user ? "#5ceeff" : "#8e9aac");
+    drawPilotHologram(card.x + 72, card.y + 84);
+    ctx.save();
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "rgba(255,255,255,0.48)";
     ctx.font = FONT_TINY;
-    ctx.fillStyle = "rgba(255,255,255,0.66)";
-    ctx.fillText(`GLORY ${Number(meta.totalGlory || 0).toLocaleString()}  |  TIER ${meta.seasonTier || 1}`, innerX, y);
-    y += 18;
-    ctx.fillText(`CREDITS ${Number(meta.credits || 0).toLocaleString()}  |  BEST ${Number((meta.lifetime && meta.lifetime.bestScore) || highScore || 0).toLocaleString()}`, innerX, y);
-  }
-  ctx.restore();
-
-  drawOnlineActionButton(r.editCallSign, callSignEditing ? "SAVE CALL SIGN" : "EDIT CALL SIGN", true);
-  drawOnlineActionButton(r.signIn, user ? "SYNC PROFILE" : "SIGN IN WITH GOOGLE", true);
-  drawOnlineActionButton(r.signOut, "SIGN OUT", !!user);
-
-  ctx.save();
-  const labels = [
-    { rect: r.low, value: 300, label: "LOW" },
-    { rect: r.med, value: 600, label: "MED" },
-    { rect: r.high, value: 900, label: "HIGH" }
-  ];
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.font = FONT_SMALL;
-  ctx.fillStyle = "rgba(255,255,255,0.84)";
-  ctx.fillText("SETTINGS", panel.x + 20, r.low.y - 28);
-  ctx.font = FONT_TINY;
-  ctx.fillStyle = "rgba(255,255,255,0.58)";
-  ctx.fillText("PARTICLES", panel.x + 20, r.low.y - 13);
-  for (const item of labels) {
-    const active = settingMaxParticles === item.value;
-    ctx.fillStyle = active ? "rgba(120,255,180,0.16)" : "rgba(255,255,255,0.07)";
-    ctx.fillRect(item.rect.x, item.rect.y, item.rect.w, item.rect.h);
-    ctx.strokeStyle = active ? "rgba(120,255,180,0.70)" : "rgba(255,255,255,0.20)";
-    ctx.strokeRect(item.rect.x, item.rect.y, item.rect.w, item.rect.h);
+    ctx.fillText(user ? "VERIFIED PILOT" : "LOCAL PILOT", card.x + 132, card.y + 22);
     ctx.fillStyle = "#fff";
+    ctx.font = "900 22px 'Arial Narrow', Arial, sans-serif";
+    ctx.fillText(String(name || "PILOT").slice(0, 14), card.x + 132, card.y + 40);
+    ctx.fillStyle = handle ? "#73efff" : "rgba(255,255,255,0.38)";
+    ctx.font = FONT_SMALL;
+    ctx.fillText(handle ? `@${handle}${handleEditing ? "_" : ""}` : "@handle unclaimed", card.x + 132, card.y + 70);
+    ctx.fillStyle = "rgba(255,224,115,0.88)";
+    ctx.font = FONT_TINY;
+    ctx.fillText(String((meta && meta.gloryRank) || "Rookie Pilot").toUpperCase(), card.x + 132, card.y + 100);
+    ctx.fillStyle = "rgba(255,255,255,0.62)";
+    ctx.fillText(`GLORY ${Number((meta && meta.totalGlory) || 0).toLocaleString()}  •  BEST ${Number((meta && meta.lifetime && meta.lifetime.bestScore) || highScore || 0).toLocaleString()}`, card.x + 132, card.y + 121);
+    ctx.fillStyle = "rgba(255,184,108,0.86)";
+    ctx.fillText("PUBLIC: CALL SIGN + @HANDLE APPEAR TO OTHER PLAYERS", card.x + 14, card.y + 151);
+    ctx.restore();
+    drawOnlineActionButton(r.editCallSign, callSignEditing ? "SAVE EDITABLE CALL SIGN" : "EDIT CALL SIGN", true);
+    const handleLabel = online.profileHandle ? `@${online.profileHandle}  •  ACCOUNT-BOUND` : (handleEditing ? `CLAIM @${handleDraft || "handle"}` : "CLAIM UNIQUE @HANDLE");
+    const competitionAvailable = online.competitionBackend !== "unavailable";
+    drawOnlineActionButton(r.claimHandle, competitionAvailable ? handleLabel : "COMPETITION SERVICES OFFLINE", !!user && !online.profileHandle && competitionAvailable);
+    drawOnlineActionButton(r.signIn, user ? "SYNC PILOT" : "SIGN IN WITH GOOGLE", true);
+    drawOnlineActionButton(r.signOut, "SIGN OUT", !!user);
+    ctx.save();
+    ctx.font = FONT_TINY;
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(item.label, item.rect.x + item.rect.w / 2, item.rect.y + item.rect.h / 2 + 1);
+    ctx.fillStyle = handleStatus ? "#ffd27a" : (online.lastError ? "#ff9f9f" : "rgba(255,255,255,0.48)");
+    ctx.fillText(String(handleStatus || online.lastError || online.lastStatus || "").slice(0, 48), panel.x + panel.w / 2, panel.y + 454);
+    ctx.restore();
+  } else if (accountPanelTab === "league") {
+    const league = online.weeklyLeague || null;
+    const card = { x: panel.x + 20, y: panel.y + 96, w: panel.w - 40, h: 116 };
+    drawDossierCard(card, "#ffd65c");
+    ctx.save();
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = "rgba(255,255,255,0.52)";
+    ctx.fillText("SEVEN-DAY FLIGHT LEAGUE", card.x + 16, card.y + 16);
+    ctx.font = "900 24px 'Arial Narrow', Arial, sans-serif";
+    ctx.fillStyle = "#ffe67a";
+    ctx.fillText(league ? `${String(league.division || "ROOKIE")} LEAGUE` : "WEEKLY LEAGUES", card.x + 16, card.y + 38);
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = "rgba(255,255,255,0.64)";
+    ctx.fillText(league ? `${league.memberCount || 0}/${league.capacity || 30} PILOTS  •  PRIOR PERFORMANCE MATCHED` : "GROUPS OF UP TO 30 • MATCHED BY PRIOR BEST SCORE", card.x + 16, card.y + 76);
+    ctx.fillText(league ? String(league.weekLabel || "CURRENT WEEK") : "CLAIM A HANDLE, THEN ENTER THIS WEEK'S GROUP", card.x + 16, card.y + 94);
+    let listY = panel.y + 232;
+    const members = league && Array.isArray(league.members) ? league.members.slice(0, 10) : [];
+    if (members.length) {
+      members.forEach((member, index) => {
+        const mine = user && member.uid === user.uid;
+        ctx.fillStyle = mine ? "rgba(92,238,255,0.13)" : (index % 2 ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.05)");
+        ctx.fillRect(panel.x + 20, listY - 5, panel.w - 40, 28);
+        ctx.fillStyle = index < 3 ? "#ffe67a" : "rgba(255,255,255,0.75)";
+        ctx.fillText(`${index + 1}. ${String(member.callSign || "PILOT").slice(0, 12)}`, panel.x + 30, listY);
+        ctx.fillStyle = "rgba(92,238,255,0.68)";
+        ctx.fillText(member.handle ? `@${String(member.handle).slice(0, 16)}` : "", panel.x + 142, listY);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#fff";
+        ctx.fillText(`${Number(member.weeklyPoints || 0).toLocaleString()} FP`, panel.x + panel.w - 30, listY);
+        ctx.textAlign = "left";
+        listY += 31;
+      });
+    } else {
+      ctx.fillStyle = "rgba(255,255,255,0.52)";
+      ctx.fillText(!user ? "SIGN IN TO ENTER A WEEKLY LEAGUE." : (!online.profileHandle ? "CLAIM YOUR @HANDLE IN THE PILOT TAB FIRST." : "ENTER TO FIND YOUR WEEKLY GROUP."), panel.x + 24, listY);
+    }
+    ctx.restore();
+    const competitionAvailable = online.competitionBackend !== "unavailable";
+    drawOnlineActionButton(r.joinLeague, competitionAvailable ? (league ? "REFRESH WEEKLY STANDINGS" : "ENTER THIS WEEK'S LEAGUE") : "COMPETITION SERVICES OFFLINE", !!user && !!online.profileHandle && competitionAvailable);
+  } else {
+    ctx.save();
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = FONT_SMALL;
+    ctx.fillStyle = "rgba(255,255,255,0.84)";
+    ctx.fillText("VISUAL DENSITY", panel.x + 20, panel.y + 112);
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = "rgba(255,255,255,0.52)";
+    ctx.fillText("PARTICLE LIMIT", panel.x + 20, r.low.y - 17);
+    const labels = [{ rect: r.low, value: 300, label: "LOW" }, { rect: r.med, value: 600, label: "MED" }, { rect: r.high, value: 900, label: "HIGH" }];
+    for (const item of labels) {
+      const active = settingMaxParticles === item.value;
+      ctx.fillStyle = active ? "rgba(92,238,255,0.16)" : "rgba(255,255,255,0.06)";
+      ctx.fillRect(item.rect.x, item.rect.y, item.rect.w, item.rect.h);
+      ctx.strokeStyle = active ? "rgba(92,238,255,0.72)" : "rgba(255,255,255,0.18)";
+      ctx.strokeRect(item.rect.x, item.rect.y, item.rect.w, item.rect.h);
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(item.label, item.rect.x + item.rect.w / 2, item.rect.y + item.rect.h / 2 + 1);
+    }
+    ctx.restore();
+    drawOnlineActionButton(r.shake, `SHAKE: ${settingScreenShake ? "ON" : "OFF"}`, true);
+    drawOnlineActionButton(r.reset, "RESET PROGRESS", true);
   }
-  ctx.fillStyle = settingScreenShake ? "rgba(120,255,180,0.14)" : "rgba(255,255,255,0.07)";
-  ctx.fillRect(r.shake.x, r.shake.y, r.shake.w, r.shake.h);
-  ctx.strokeStyle = settingScreenShake ? "rgba(120,255,180,0.68)" : "rgba(255,255,255,0.20)";
-  ctx.strokeRect(r.shake.x, r.shake.y, r.shake.w, r.shake.h);
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "center";
-  ctx.fillText(`SHAKE: ${settingScreenShake ? "ON" : "OFF"}`, r.shake.x + r.shake.w / 2, r.shake.y + r.shake.h / 2 + 1);
-  ctx.fillStyle = "rgba(255,80,80,0.12)";
-  ctx.fillRect(r.reset.x, r.reset.y, r.reset.w, r.reset.h);
-  ctx.strokeStyle = "rgba(255,120,120,0.58)";
-  ctx.strokeRect(r.reset.x, r.reset.y, r.reset.w, r.reset.h);
-  ctx.fillStyle = "#fff";
-  ctx.fillText("RESET PROGRESS", r.reset.x + r.reset.w / 2, r.reset.y + r.reset.h / 2 + 1);
-  ctx.restore();
 
   drawOnlineActionButton(r.refresh, "REFRESH ONLINE DATA", true);
 }
@@ -405,10 +490,11 @@ function drawRecordsPanel() {
   if (leaderboard.length) {
     leaderboard.slice(0, 10).forEach((row, index) => {
       const who = String(row.callSign || "PILOT").slice(0, 12);
+      const handle = row.handle ? ` @${String(row.handle).slice(0, 16)}` : "";
       const score = Number(row.bestScore || 0).toLocaleString();
       const rank = row.gloryRank ? ` ${String(row.gloryRank).slice(0, 14)}` : "";
       ctx.fillStyle = index === 0 ? "#ffe680" : "rgba(255,255,255,0.82)";
-      ctx.fillText(`${index + 1}. ${who}${rank}`, panel.x + 22, listY);
+      ctx.fillText(`${index + 1}. ${who}${handle}${rank}`, panel.x + 22, listY);
       ctx.textAlign = "right";
       ctx.fillText(score, panel.x + panel.w - 22, listY);
       ctx.textAlign = "left";

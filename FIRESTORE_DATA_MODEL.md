@@ -6,9 +6,10 @@ Firebase Hosting live URL: `https://star-strike-rush.web.app`
 
 The game uses Firebase Auth for Google accounts, Cloud Firestore for public
 records plus private player data, and Cloud Functions for server-side
-progression validation. Firestore rules protect ownership, field shape, read
-scope, immutable run receipts, and write monotonicity. The repo includes
-callable Functions for authoritative run receipts and Season reward claims, but
+progression validation. The proposed rules make all browser writes read-only and
+reserve profile, competition, receipt, leaderboard, and reward mutations for the
+Admin SDK in callable Functions. The repo includes callables for authoritative
+profile sync, atomic handle claims, weekly leagues, run receipts, and Season reward claims, but
 they require the Firebase project to be on the Blaze plan before deployment.
 
 Firebase web config is loaded at runtime. Real API keys must not be committed to
@@ -53,13 +54,14 @@ Owner-only account profile. This is not queryable.
 
 ### `players_public/{uid}`
 
-Authenticated players can read public player profiles. Only the owner can write
-their own document. Public identity is deliberately game-only: Google provider
+Authenticated players can read public player profiles. Browser writes are denied.
+Public identity is deliberately game-only: Google provider
 names, email addresses, avatars, and authentication fields are not permitted by
 the client serializer, callable writer, or Firestore field whitelist.
 
 - `uid`
 - `callSign`
+- `handle`: normalized unique account-bound public handle.
 - `bestScore`: non-decreasing integer.
 - `phase`: non-decreasing integer.
 - `achievementsCount`: non-decreasing integer.
@@ -73,9 +75,8 @@ the client serializer, callable writer, or Firestore field whitelist.
 ### `leaderboard_scores/{uid}`
 
 One public best-score record per player for the world-record list. Authenticated
-reads are limited by rules to queries with `limit <= 25`. Only the owner can
-create or update their record, and best score, phase, achievement count, Glory,
-rank index, and season tier cannot decrease. It uses the same game-only fields
+reads are limited by rules to queries with `limit <= 25`. Browser writes are
+denied and server callables preserve monotonic score and progression. It uses the same game-only fields
 as `players_public`; legacy provider fields are discarded when records are next
 written.
 
@@ -120,8 +121,20 @@ claimed before applying Credits, Glory cache, or Season XP cache.
 
 ### `player_achievements/{uid}/items/{achievementId}`
 
-Owner-only achievement records. Clients can create a known achievement id once;
-updates and deletes are denied.
+Owner-only achievement records. Browser writes are denied; accepted run receipts
+create known achievements through the Admin SDK.
+
+### Competition collections
+
+- `handle_registry/{handle}`: server-only unique-handle ownership registry.
+- `weekly_leagues/{leagueId}`: server-only allocation document keyed by UTC week
+  and prior-performance band.
+- `weekly_leagues/{leagueId}/members/{uid}`: server-only standings rows with
+  call sign, handle, and verified Flight Points.
+- `weekly_enrollments/{uid}`: server-only pointer to a pilot's current league.
+
+The client receives a sanitized league payload from `joinWeeklyLeague()`; these
+collections have no direct browser reads or writes.
 
 Current achievement ids:
 
@@ -145,15 +158,18 @@ Current achievement ids:
 ## Client Flow
 
 1. The player opens the Online panel and signs in with Google.
-2. The game syncs private and public profile documents.
-3. On game over, `submitOnlineRun()` builds a score and achievement payload.
-4. Signed-in clients submit the receipt to `submitRunReceipt()`.
-5. The server validates plausibility and computes Glory, Season XP, Credits, and
+2. The game calls `syncPilotProfile()` to sync private and public documents.
+3. A pilot can atomically claim one immutable public handle and join the current
+   UTC weekly league matched to their prior best-score band.
+4. On game over, `submitOnlineRun()` builds a score and achievement payload.
+5. Signed-in clients submit the receipt to `submitRunReceipt()`.
+6. The server validates plausibility and computes Glory, Season XP, Credits, and
    achievements.
-6. Firebase stores an immutable owner-scoped run receipt.
-7. Firebase updates the player's public profile and best leaderboard record.
-8. Newly earned achievement documents are created under the player's account.
-9. Season reward claims use `claimSeasonReward()` when signed in, or local
+7. Firebase stores an immutable owner-scoped run receipt and credits verified
+   weekly Flight Points exactly once.
+8. Firebase updates the player's public profile and best leaderboard record.
+9. Newly earned achievement documents are created under the player's account.
+10. Season reward claims use `claimSeasonReward()` when signed in, or local
    fallback when signed out.
 
 ## Meta Layer Scope
@@ -167,6 +183,7 @@ Implemented now:
 - Run receipts.
 - Public player-card fields on profiles and leaderboard rows.
 - Cloud Function source for `submitRunReceipt()` and `claimSeasonReward()`.
+- Cloud Function source for profile sync, handle claiming, and weekly leagues.
 
 Explicitly not implemented yet:
 
@@ -177,7 +194,8 @@ Explicitly not implemented yet:
 
 ## Production Note
 
-For a serious competitive leaderboard, deploy the included Cloud Functions and
-then tighten Firestore rules so browser clients can no longer write progression
-or leaderboard documents directly. Firestore rules cannot independently verify
-gameplay from a browser client.
+For a serious competitive leaderboard, upgrade the project, deploy the included
+Cloud Functions first, then deploy the proposed server-authoritative Firestore
+rules and composite index. Do not deploy the new rules alone: the current live
+client still needs its existing backend contract. Firestore rules cannot
+independently verify gameplay from a browser client.

@@ -1,6 +1,6 @@
 const SPRITE_MANIFEST = Object.freeze({
   player: {
-    source: null,
+    source: "assets/sprites/player.png",
     render: { width: 40, height: 48, anchorX: 0.5, anchorY: 0.5, rotationOriginX: 0.5, rotationOriginY: 0.5, glow: "#78f6ff" },
     collision: [{ offsetX: 0, offsetY: 1, radius: 9 }],
     projectileOrigin: { offsetX: 0, offsetY: -18 }
@@ -11,41 +11,41 @@ const SPRITE_MANIFEST = Object.freeze({
     collision: [{ offsetX: 0, offsetY: 1, radius: 9 }],
     projectileOrigin: { offsetX: 0, offsetY: -13 }
   },
-  red: { source: null, render: { width: 34, height: 32, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 10 }] },
-  orange: { source: null, render: { width: 31, height: 30, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 8.5 }] },
-  purple: { source: null, render: { width: 43, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 14 }] },
-  phantom: { source: null, render: { width: 39, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 11.5 }] },
-  splitter: { source: null, render: { width: 34, height: 34, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 12 }] },
-  splitter_shard: { source: null, render: { width: 18, height: 20, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 6 }] },
+  red: { source: "assets/sprites/enemy-red.png", render: { width: 36, height: 32, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 10 }] },
+  orange: { source: "assets/sprites/enemy-orange.png", render: { width: 33, height: 29, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 8.5 }] },
+  purple: { source: "assets/sprites/enemy-purple.png", render: { width: 43, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 14 }] },
+  phantom: { source: "assets/sprites/enemy-phantom.png", render: { width: 37, height: 39, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 11.5 }] },
+  splitter: { source: "assets/sprites/enemy-splitter.png", render: { width: 36, height: 37, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 12 }] },
+  splitter_shard: { source: "assets/sprites/enemy-splitter-shard.png", render: { width: 15, height: 20, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 6 }] },
   carrier: { source: null, render: { width: 56, height: 39, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 20 }] },
-  siphon: { source: null, render: { width: 40, height: 36, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 11 }] , projectileOrigin: { offsetX: 0, offsetY: 11 } },
+  siphon: { source: "assets/sprites/enemy-siphon.png", render: { width: 27, height: 40, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 11 }] , projectileOrigin: { offsetX: 0, offsetY: 11 } },
   leech: { source: null, render: { width: 39, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 13 }] },
-  minecaster: { source: null, render: { width: 34, height: 32, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 12 }] },
-  shieldbearer: { source: null, render: { width: 39, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 13 }] },
-  railgunner: { source: null, render: { width: 29, height: 48, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 2, radius: 11 }] , projectileOrigin: { offsetX: 0, offsetY: 14 } },
-  repair_drone: { source: null, render: { width: 28, height: 27, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 9 }] },
+  minecaster: { source: "assets/sprites/enemy-minecaster.png", render: { width: 36, height: 32, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 12 }] },
+  shieldbearer: { source: "assets/sprites/enemy-shieldbearer.png", render: { width: 42, height: 39, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 13 }] },
+  railgunner: { source: "assets/sprites/enemy-railgunner.png", render: { width: 30, height: 42, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 2, radius: 11 }] , projectileOrigin: { offsetX: 0, offsetY: 14 } },
+  repair_drone: { source: "assets/sprites/enemy-repair-drone.png", render: { width: 29, height: 29, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 9 }] },
   boss_standard: {
-    source: null,
-    render: { width: 144, height: 82, anchorX: 0.5, anchorY: 0.5, glow: "#78efff" },
+    source: "assets/sprites/boss-standard.png",
+    render: { width: 154, height: 69, anchorX: 0.5, anchorY: 0.5, glow: "#ff3d55" },
     collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -34, offsetY: 1, radius: 16 }, { offsetX: 34, offsetY: 1, radius: 16 }, { offsetX: 0, offsetY: 15, radius: 17 }],
     healthBarOffset: { offsetY: -62 }
   },
   boss_wraith: {
-    source: null,
-    render: { width: 150, height: 86, anchorX: 0.5, anchorY: 0.5, glow: "#d9b6ff" },
+    source: "assets/sprites/boss-wraith.png",
+    render: { width: 158, height: 70, anchorX: 0.5, anchorY: 0.5, glow: "#5cf6ff" },
     collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 16 }, { offsetX: 36, offsetY: 2, radius: 16 }, { offsetX: 0, offsetY: -18, radius: 14 }],
     healthBarOffset: { offsetY: -64 }
   },
-  boss_debris_warden: { source: null, render: { width: 158, height: 86, anchorX: 0.5, anchorY: 0.5, glow: "#b68a60" }, collision: [{ offsetX: 0, offsetY: 0, radius: 28 }, { offsetX: -45, offsetY: 3, radius: 19 }, { offsetX: 45, offsetY: 3, radius: 19 }] },
-  boss_mothership: { source: null, render: { width: 174, height: 76, anchorX: 0.5, anchorY: 0.5, glow: "#d6a246" }, collision: [{ offsetX: 0, offsetY: 0, radius: 30 }, { offsetX: -52, offsetY: 1, radius: 20 }, { offsetX: 52, offsetY: 1, radius: 20 }] },
-  boss_siphon_core: { source: null, render: { width: 138, height: 86, anchorX: 0.5, anchorY: 0.5, glow: "#61ff72" }, collision: [{ offsetX: 0, offsetY: -2, radius: 33 }, { offsetX: -39, offsetY: -2, radius: 18 }, { offsetX: 39, offsetY: -2, radius: 18 }] },
-  boss_hive_breaker: { source: null, render: { width: 142, height: 91, anchorX: 0.5, anchorY: 0.5, glow: "#c9f246" }, collision: [{ offsetX: 0, offsetY: 0, radius: 29 }, { offsetX: -37, offsetY: 3, radius: 18 }, { offsetX: 37, offsetY: 3, radius: 18 }] },
-  boss_rail_tyrant: { source: null, render: { width: 126, height: 104, anchorX: 0.5, anchorY: 0.5, glow: "#ff3046" }, collision: [{ offsetX: 0, offsetY: 0, radius: 29 }, { offsetX: -30, offsetY: 5, radius: 17 }, { offsetX: 30, offsetY: 5, radius: 17 }] },
-  boss_gravity_well: { source: null, render: { width: 148, height: 86, anchorX: 0.5, anchorY: 0.5, glow: "#a45cff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 32 }, { offsetX: -41, offsetY: 0, radius: 17 }, { offsetX: 41, offsetY: 0, radius: 17 }] },
-  small_debris: { source: null, render: { width: 25, height: 25, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 9.5 }] },
-  rock_asteroid: { source: null, render: { width: 40, height: 40, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 15.5 }] },
-  iron_asteroid: { source: null, render: { width: 53, height: 53, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 20.5 }] },
-  boss_wall: { source: null, render: { width: 53, height: 53, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 20.5 }] },
+  boss_debris_warden: { source: "assets/sprites/boss-debris-warden.png", render: { width: 158, height: 96, anchorX: 0.5, anchorY: 0.5, glow: "#f2a33b" }, collision: [{ offsetX: 0, offsetY: 0, radius: 28 }, { offsetX: -45, offsetY: 3, radius: 19 }, { offsetX: 45, offsetY: 3, radius: 19 }] },
+  boss_mothership: { source: "assets/sprites/boss-mothership.png", render: { width: 174, height: 116, anchorX: 0.5, anchorY: 0.5, glow: "#4cf5ff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 30 }, { offsetX: -52, offsetY: 1, radius: 20 }, { offsetX: 52, offsetY: 1, radius: 20 }] },
+  boss_siphon_core: { source: "assets/sprites/boss-siphon-core.png", render: { width: 144, height: 91, anchorX: 0.5, anchorY: 0.5, glow: "#61ff72" }, collision: [{ offsetX: 0, offsetY: -2, radius: 33 }, { offsetX: -39, offsetY: -2, radius: 18 }, { offsetX: 39, offsetY: -2, radius: 18 }] },
+  boss_hive_breaker: { source: "assets/sprites/boss-hive-breaker.png", render: { width: 148, height: 90, anchorX: 0.5, anchorY: 0.5, glow: "#77ff65" }, collision: [{ offsetX: 0, offsetY: 0, radius: 29 }, { offsetX: -37, offsetY: 3, radius: 18 }, { offsetX: 37, offsetY: 3, radius: 18 }] },
+  boss_rail_tyrant: { source: "assets/sprites/boss-rail-tyrant.png", render: { width: 158, height: 86, anchorX: 0.5, anchorY: 0.5, glow: "#ff3046" }, collision: [{ offsetX: 0, offsetY: 0, radius: 29 }, { offsetX: -30, offsetY: 5, radius: 17 }, { offsetX: 30, offsetY: 5, radius: 17 }] },
+  boss_gravity_well: { source: "assets/sprites/boss-gravity-well.png", render: { width: 150, height: 81, anchorX: 0.5, anchorY: 0.5, glow: "#a45cff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 32 }, { offsetX: -41, offsetY: 0, radius: 17 }, { offsetX: 41, offsetY: 0, radius: 17 }] },
+  small_debris: { source: "assets/sprites/asteroid-rock-3.png", render: { width: 25, height: 25, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 9.5 }] },
+  rock_asteroid: { source: "assets/sprites/asteroid-rock-1.png", render: { width: 40, height: 40, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 15.5 }] },
+  iron_asteroid: { source: "assets/sprites/asteroid-rock-2.png", render: { width: 53, height: 53, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 20.5 }] },
+  boss_wall: { source: "assets/sprites/asteroid-rock-3.png", render: { width: 53, height: 53, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 20.5 }] },
   comet_shard: { source: null, render: { width: 29, height: 29, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 11 }] },
   mine: { source: null, render: { width: 27, height: 27, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 10 }] },
   energy_mine: { source: null, render: { width: 29, height: 29, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 10.5 }] },
@@ -81,9 +81,9 @@ function hitCirclesOverlap(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r;
 }
 
-function manifestCollision(keyA, xA, yA, fallbackA, keyB, xB, yB, fallbackB) {
-  const a = collisionCirclesFor(keyA, xA, yA, 1, fallbackA);
-  const b = collisionCirclesFor(keyB, xB, yB, 1, fallbackB);
+function manifestCollision(keyA, xA, yA, fallbackA, keyB, xB, yB, fallbackB, scaleA = 1, scaleB = 1) {
+  const a = collisionCirclesFor(keyA, xA, yA, scaleA, fallbackA);
+  const b = collisionCirclesFor(keyB, xB, yB, scaleB, fallbackB);
   return a.some((left) => b.some((right) => hitCirclesOverlap(left, right)));
 }
 
@@ -116,7 +116,7 @@ function drawSpriteAsset(targetContext, key, x, y, options = {}) {
   const meta = spriteMeta(key);
   if (!image || !meta) return false;
   const render = meta.render;
-  const drawScale = Number(options.scale || 1);
+  const drawScale = options.scale == null ? 1 : Math.max(0, Number(options.scale));
   const width = render.width * drawScale;
   const height = render.height * drawScale;
   targetContext.save();
@@ -141,4 +141,3 @@ globalThis.manifestCollision = manifestCollision;
 globalThis.validateSpriteManifest = validateSpriteManifest;
 globalThis.preloadGameAssets = preloadGameAssets;
 globalThis.drawSpriteAsset = drawSpriteAsset;
-

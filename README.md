@@ -41,7 +41,7 @@ callable code lives in `functions/` and uses Node 20.
 
 The game remains a lightweight ordered-script Canvas application. Pure runtime
 contracts are isolated in `src/00-*.js`: asset metadata and hitboxes, public
-identity, boss fairness/Siphon rules, and input actions. Stateful systems remain
+identity and weekly competition rules, boss fairness/Siphon rules, and input actions. Stateful systems remain
 split by responsibility across entity, collision, boss, rendering, title, and
 online modules. See `src/README.md` and `docs/ASSET_MANIFEST.md`.
 
@@ -57,9 +57,12 @@ hitbox/safe-lane overlay, or `&hitboxes=1` opens directly with it visible.
   when Firebase configuration is missing.
 - Public records contain only call sign and game statistics; provider identity
   remains private.
-- The asset runtime is ready for per-entity sprites, but this repository
-  currently contains no image assets. Procedural Canvas art is the truthful
-  shipping fallback.
+- Optimized transparent player, enemy, boss, and asteroid sprites live in
+  `assets/sprites/`; procedural Canvas art remains a resilient fallback.
+- Editable call signs are local-first. Unique account-bound `@handles` and
+  prior-performance weekly leagues are implemented behind server callables.
+- Competition callables are not live until the Firebase project is upgraded to
+  Blaze. The client reports this honestly and keeps local play available.
 - The game is rule-based; no AI model runs inside the game.
 
 See `BUILD_WEEK_2026.md` for the competition transformation and verification

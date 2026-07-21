@@ -175,10 +175,12 @@ function drawExpansionHazards() {
     }
     ctx.translate(d.x, d.y);
     ctx.rotate(d.rot || 0);
-    if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, d.kind, 0, 0)) {
+    const spawnScale = d.spawnScale == null ? 1 : d.spawnScale;
+    if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, d.kind, 0, 0, { scale: spawnScale })) {
       ctx.restore();
       continue;
     }
+    ctx.scale(spawnScale, spawnScale);
     if (d.trail) {
       ctx.globalAlpha = 0.25;
       ctx.fillStyle = "#c4eaff";

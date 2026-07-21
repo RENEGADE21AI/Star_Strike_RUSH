@@ -31,9 +31,11 @@ function neutralPilotCallSign(seed = "LOCAL") {
 
 function publicPilotRecord(raw = {}, fallbackSeed = "PUBLIC") {
   const validation = validateCallSign(raw.callSign);
+  const handle = typeof normalizePublicHandle === "function" ? normalizePublicHandle(raw.handle) : "";
   return {
     uid: String(raw.uid || "").slice(0, 128),
     callSign: validation.ok ? validation.callSign : neutralPilotCallSign(raw.uid || fallbackSeed),
+    handle,
     bestScore: Math.max(0, Math.floor(Number(raw.bestScore) || 0)),
     phase: Math.max(1, Math.floor(Number(raw.phase) || 1)),
     achievementsCount: Math.max(0, Math.floor(Number(raw.achievementsCount) || 0)),
@@ -48,4 +50,3 @@ globalThis.normalizeCallSign = normalizeCallSign;
 globalThis.validateCallSign = validateCallSign;
 globalThis.neutralPilotCallSign = neutralPilotCallSign;
 globalThis.publicPilotRecord = publicPilotRecord;
-

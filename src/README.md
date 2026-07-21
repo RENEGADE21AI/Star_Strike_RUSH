@@ -5,6 +5,8 @@ after the files they depend on, because the current code intentionally shares gl
 
 - `00-asset-manifest.js`: sprite render metadata, anchors, projectile origins,
   tuned collision circles, preload state, and procedural fallback bridge.
+- `00-competition.js`: public-handle normalization, UTC weekly windows,
+  performance bands, and league labels shared by client UI rules.
 - `00-identity.js`: call-sign validation, neutral identity generation, and the
   public-profile field whitelist.
 - `00-gameplay-rules.js`: deterministic Debris Warden route generation, Siphon
@@ -48,8 +50,8 @@ after the files they depend on, because the current code intentionally shares gl
   QA encounters; `H` toggles hitboxes, anchors, origins, and safe lanes.
 - `19-game-achievements.js`: run stat payloads, achievement definitions, and
   online sync hooks called by the game loop.
-- `20-firebase-online.js`: Firebase Auth and Firestore integration for accounts,
-  global best-score records, and earned achievements. It intentionally does not
+- `20-firebase-online.js`: Firebase Auth, callable competition services, graceful
+  backend-unavailable state, global best-score records, and earned achievements. It intentionally does not
   commit Firebase API keys; it loads config from Firebase Hosting
   `/__/firebase/init.json` or ignored `src/firebase-config.local.json`.
 

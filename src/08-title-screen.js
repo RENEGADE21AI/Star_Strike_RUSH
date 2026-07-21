@@ -274,6 +274,15 @@ function setCallSignFromInputKey(e) {
     cancelCallSignEditing();
   }
 }
+function setHandleFromInputKey(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    commitPublicHandleDraft();
+  } else if (e.key === "Escape") {
+    e.preventDefault();
+    cancelHandleEditing();
+  }
+}
 function getCallSignRect() {
   return { x: W / 2 - 120, y: H * 0.355 - 20, w: 240, h: 40 };
 }
@@ -328,17 +337,25 @@ function getOnlineRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
   const innerX = panel.x + 20;
-  const editCallSign = { x: innerX, y: panel.y + 108, w: panel.w - 40, h: 32 };
-  const signIn = { x: innerX, y: panel.y + 148, w: panel.w - 40, h: 34 };
-  const signOut = { x: innerX, y: panel.y + 188, w: panel.w - 40, h: 30 };
-  const btnW = 64, btnH = 28, gap = 10, btnY = panel.y + 330;
+  const tabY = panel.y + 50;
+  const tabGap = 6;
+  const tabW = Math.floor((panel.w - 40 - tabGap * 2) / 3);
+  const pilotTab = { x: innerX, y: tabY, w: tabW, h: 28 };
+  const leagueTab = { x: pilotTab.x + tabW + tabGap, y: tabY, w: tabW, h: 28 };
+  const settingsTab = { x: leagueTab.x + tabW + tabGap, y: tabY, w: tabW, h: 28 };
+  const editCallSign = { x: innerX, y: panel.y + 278, w: panel.w - 40, h: 32 };
+  const claimHandle = { x: innerX, y: panel.y + 318, w: panel.w - 40, h: 32 };
+  const signIn = { x: innerX, y: panel.y + 366, w: panel.w - 40, h: 34 };
+  const signOut = { x: innerX, y: panel.y + 408, w: panel.w - 40, h: 30 };
+  const joinLeague = { x: innerX, y: panel.y + panel.h - 92, w: panel.w - 40, h: 34 };
+  const btnW = 64, btnH = 28, gap = 10, btnY = panel.y + 150;
   const low = { x: innerX, y: btnY, w: btnW, h: btnH };
   const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
   const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
   const shake = { x: innerX, y: btnY + 50, w: 134, h: 30 };
   const reset = { x: panel.x + panel.w - 180, y: btnY + 50, w: 160, h: 30 };
   const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
-  return { panel, closeRect, editCallSign, signIn, signOut, low, med, high, shake, reset, refresh };
+  return { panel, closeRect, pilotTab, leagueTab, settingsTab, editCallSign, claimHandle, signIn, signOut, joinLeague, low, med, high, shake, reset, refresh };
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();

@@ -3,6 +3,7 @@
 ## Baseline
 
 - Preserved pre-change commit: `529aca1`
+- Published comparison branch: `pre-competition` at `529aca1`
 - Working branch: `codex/build-week-polish`
 - Before this pass the prototype was playable and already had bosses, adaptive
   pressure, Glory/Season progression, achievements, a Codex, and Firebase
@@ -17,6 +18,9 @@
 
 - Added per-entity sprite metadata, tuned single/multi-circle hitboxes,
   projectile origins, preload gating, safe fallbacks, and a debug-only overlay.
+- Imported 23 supplied artwork files into a reproducible transparent-sprite
+  pipeline without modifying the originals in Downloads. The player, enemy
+  roster, bosses, and asteroid hazards now use optimized artwork.
 - Added validated call-sign edit/save states with signed-out persistence and
   signed-in synchronization.
 - Reduced public Firestore and leaderboard records to call sign plus game stats;
@@ -28,6 +32,9 @@
 - Made every Debris Warden double gate reachability-checked against actual
   player/asteroid collision radii and movement capability; simultaneous threats
   are cleared and safe lanes are telegraphed.
+- Rebalanced the Debris Warden so single rows dominate its attack sequence,
+  doubles are rare, every row accelerates continuously as health falls, and
+  spawned asteroids ease from zero to their final visual and collision scale.
 - Replaced Ghost with a boss-specific non-phasing `DASH` profile for Debris
   Warden only.
 - Added restrained predictive Siphon aim, full-playfield range, a fire telegraph,
@@ -39,6 +46,12 @@
   and dotted future segments, an upward fighter marker, and restrained space
   landmarks.
 - Added a UTF-8 declaration after visual QA exposed corrupted UI symbols.
+- Rebuilt Account as a tabbed Pilot Dossier with a restrained animated ship
+  hologram, editable call sign, small public `@handle`, visibility warning,
+  simplified settings, and weekly Flight League standings.
+- Added server-authoritative atomic handle claims and weekly grouping by prior
+  best-score band. Verified Flight Points are credited from accepted run
+  receipts, not arbitrary browser writes.
 
 ## Verification
 
@@ -65,8 +78,11 @@ embedded in or called by the game at runtime.
   invented.
 - Google authentication cannot be exercised locally without a Firebase web
   config and test account.
-- Cloud Functions still require the Firebase project prerequisites described in
-  `FIRESTORE_DATA_MODEL.md` before authoritative progression can be deployed.
+- Cloud Functions deployment is blocked by the Firebase Spark plan because
+  Cloud Build and Artifact Registry require Blaze. The current hosted release
+  and its rules were deliberately left unchanged to avoid publishing a
+  half-connected account system. The competition branch degrades to local play
+  with an explicit offline service state until the project is upgraded.
 
 Playable URL: https://star-strike-rush.web.app
 

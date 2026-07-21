@@ -31,7 +31,7 @@ function test(name, fn) {
   }
 }
 
-const context = loadPureScripts("00-asset-manifest.js", "00-identity.js", "00-gameplay-rules.js", "00-input-actions.js");
+const context = loadPureScripts("00-asset-manifest.js", "00-competition.js", "00-identity.js", "00-gameplay-rules.js", "00-input-actions.js");
 
 test("sprite manifest has render and collision metadata for every registered entity", () => {
   const result = context.validateSpriteManifest();
@@ -39,6 +39,10 @@ test("sprite manifest has render and collision metadata for every registered ent
   assert.ok(Object.keys(context.SPRITE_MANIFEST).length >= 30);
   assert.ok(context.SPRITE_MANIFEST.player.projectileOrigin);
   assert.ok(context.SPRITE_MANIFEST.boss_debris_warden.collision.length > 1);
+  for (const [id, entry] of Object.entries(context.SPRITE_MANIFEST)) {
+    if (!entry.source) continue;
+    assert.equal(fs.existsSync(path.join(repoRoot, entry.source)), true, `${id} is missing ${entry.source}`);
+  }
 });
 
 test("1500 seeded Debris Warden double gates remain reachable", () => {
@@ -59,6 +63,22 @@ test("1500 seeded Debris Warden double gates remain reachable", () => {
     assert.equal(validation.ok, true, `seed ${seed}: ${validation.reason}`);
     assert.ok(plan.travelRequired <= plan.reachable - 12, `seed ${seed} exceeded reach`);
   }
+});
+
+test("Debris Warden favors single rows and speeds them up as health falls", () => {
+  for (const hpPct of [1, 0.55, 0.15]) {
+    const sequence = context.debrisWardenAttackSequence(hpPct);
+    assert.ok(sequence.filter((attack) => attack === "wall").length >= 2);
+    assert.ok(sequence.filter((attack) => attack === "double").length <= 1);
+  }
+  assert.ok(context.debrisWardenRowSpeed(0.15, "wall") > context.debrisWardenRowSpeed(0.9, "wall"));
+  assert.ok(context.debrisWardenRowSpeed(0.15, "double") < context.debrisWardenRowSpeed(0.15, "wall"));
+});
+
+test("Debris Warden rocks grow smoothly from zero to their collision size", () => {
+  assert.equal(context.debrisSpawnScale(0, 30), 0);
+  assert.ok(context.debrisSpawnScale(15, 30) > 0.45);
+  assert.equal(context.debrisSpawnScale(30, 30), 1);
 });
 
 test("Siphon shot aims toward predicted player position with bounded range", () => {
@@ -102,6 +122,7 @@ test("public pilot records whitelist call sign and game stats only", () => {
   const record = context.publicPilotRecord({
     uid: "abc123",
     callSign: "nova-7",
+    handle: "Nova-Pilot",
     displayName: "Private Person",
     photoURL: "https://example.test/private.jpg",
     email: "private@example.test",
@@ -109,10 +130,21 @@ test("public pilot records whitelist call sign and game stats only", () => {
     phase: 8
   });
   assert.equal(record.callSign, "NOVA_7");
+  assert.equal(record.handle, "nova_pilot");
   assert.equal(record.bestScore, 9200);
   assert.equal("displayName" in record, false);
   assert.equal("photoURL" in record, false);
   assert.equal("email" in record, false);
+});
+
+test("public handles and weekly performance bands are deterministic", () => {
+  const validation = context.validatePublicHandle("@Nova-Pilot");
+  assert.equal(validation.ok, true);
+  assert.equal(validation.handle, "nova_pilot");
+  assert.equal(validation.message, "HANDLE READY");
+  assert.equal(context.validatePublicHandle("@admin").ok, false);
+  assert.equal(context.weeklyCompetitionId(Date.UTC(2026, 6, 21)), "week_2026_07_20");
+  assert.equal(context.leagueDivisionName(context.leagueBandForPerformance(75000)), "GOLD");
 });
 
 test("public Firebase writers and rules exclude provider identity fields", () => {
@@ -126,11 +158,11 @@ test("public Firebase writers and rules exclude provider identity fields", () =>
   assert.match(functionsSource, /tx\.set\(leaderboardRef, publicPayload\);/);
 
   const clientSource = fs.readFileSync(path.join(repoRoot, "src", "20-firebase-online.js"), "utf8");
-  const clientPublicBuilder = clientSource.slice(
-    clientSource.indexOf("const publicPayload = {"),
-    clientSource.indexOf("if (!privateSnap.exists())")
-  );
-  assert.doesNotMatch(clientPublicBuilder, /displayName|photoURL|email/);
+  assert.doesNotMatch(clientSource, /setDoc\(/);
+  assert.match(clientSource, /httpsCallable\(functionsApi, "syncPilotProfile"\)/);
+  assert.match(clientSource, /httpsCallable\(functionsApi, "claimPilotHandle"\)/);
+  assert.match(clientSource, /competitionBackend:\s*"unknown"/);
+  assert.match(clientSource, /Local play remains available/);
   const leaderboardReader = clientSource.slice(
     clientSource.indexOf("function applyLeaderboardSnapshot"),
     clientSource.indexOf("function subscribeLeaderboard")
