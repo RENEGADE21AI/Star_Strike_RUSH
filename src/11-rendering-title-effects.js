@@ -17,8 +17,8 @@ function drawMenuFlights() {
     const offsets = TITLE_PATTERNS[f.pattern] || TITLE_PATTERNS.vee;
     const shipAngle = f.angle;
     const shipScale = f.renderScale || 0.68;
-    const overPrimaryUi = f.x > 38 && f.x < W - 38 && f.y > H * 0.14 && f.y < H * 0.66;
-    const formationAlpha = (f.renderAlpha || 0.72) * (overPrimaryUi ? 0.28 : 1);
+    const overPrimaryUi = f.x > 10 && f.x < W - 10 && f.y > H * 0.12 && f.y < H * 0.72;
+    const formationAlpha = (f.renderAlpha || 0.72) * (overPrimaryUi ? 0.03 : 1);
     ctx.save();
     ctx.globalAlpha = formationAlpha;
     for (let i = 0; i < offsets.length; i++) {
