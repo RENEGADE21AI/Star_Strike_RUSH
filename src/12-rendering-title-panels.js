@@ -141,8 +141,8 @@ function codexTacticalLines(type, meta) {
     orange: ["Watch the first lateral snap, then cross behind it.", "Erratic movement, but no armored core."],
     purple: ["The warning ring marks a charged aimed shot.", "Change lanes after the aim locks."],
     phantom: ["Only matching-realm fire can damage it.", "Read the flicker before committing to a lane."],
-    siphon: ["A green warning line shows the restrained lead aim.", "Dodge the visible drain core; its trail is not dangerous."],
-    boss_debris_warden: ["Track the marked safe opening through both rows.", "DASH boosts movement here but cannot phase through rock."],
+    siphon: ["Warning line shows restrained lead aim.", "Dodge green core; trail is harmless."],
+    boss_debris_warden: ["Track the marked opening through both rows.", "DASH boosts movement but cannot phase rock."],
     boss_wraith: ["Realm Hop changes which threats can touch you.", "Match the boss realm before firing."],
     boss_standard: ["Clear lanes during the warning cycle.", "Concentrate fire between heavy volleys."]
   };
@@ -201,8 +201,8 @@ function drawCodexDetail(panel, type) {
   ctx.fillText(String(meta.trait || "Unknown combat pattern").slice(0, 42), card.x + 26, briefY + 36);
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.font = FONT_TINY;
-  ctx.fillText(`1  ${tactics[0]}`.slice(0, 48), card.x + 26, briefY + 64);
-  ctx.fillText(`2  ${tactics[1]}`.slice(0, 48), card.x + 26, briefY + 84);
+  ctx.fillText(`1  ${tactics[0]}`.slice(0, 42), card.x + 26, briefY + 64);
+  ctx.fillText(`2  ${tactics[1]}`.slice(0, 42), card.x + 26, briefY + 84);
   ctx.restore();
 }
 function drawCodexPanel() {

@@ -31,7 +31,7 @@ failed noncritical image, and the renderer automatically falls back to Canvas.
 3. Set only that entity's `source` and tune its manifest render metadata.
 4. Keep collision geometry based on visible solid mass, not the image rectangle.
 5. Run `node --test` over every file in `tests/` and inspect the hitbox overlay
-   at `?debug=1` with `H`.
+   at `?debug=1&hitboxes=1` or toggle it with `H`.
 
 No user-provided images were deleted or replaced during this work because none
 were present.

@@ -559,6 +559,7 @@ function applyDebugScenario() {
   const requestedInput = params.get("input");
   if (!scenario) {
     if (requestedInput === "touch") state.inputMode = "touch";
+    if (params.get("hitboxes") === "1") state.debugHitboxes = true;
     return;
   }
   setupSession("playing");
@@ -581,6 +582,7 @@ function applyDebugScenario() {
     showMessage("DEBUG  DOUBLE GATE", 120);
   }
   if (requestedInput === "touch") state.inputMode = "touch";
+  if (params.get("hitboxes") === "1") state.debugHitboxes = true;
 }
 
 loadHighScore();

@@ -46,8 +46,8 @@ split by responsibility across entity, collision, boss, rendering, title, and
 online modules. See `src/README.md` and `docs/ASSET_MANIFEST.md`.
 
 Debug URLs are development-only behavior: `?debug=1&scenario=siphon` and
-`?debug=1&scenario=debris` create deterministic encounters, while `H` toggles
-the hitbox/safe-lane overlay.
+`?debug=1&scenario=debris` create deterministic encounters. `H` toggles the
+hitbox/safe-lane overlay, or `&hitboxes=1` opens directly with it visible.
 
 ## Current feature status
 
