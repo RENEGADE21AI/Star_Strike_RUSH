@@ -314,12 +314,12 @@ function updateExpansionHazards() {
 
 function spawnExpansionBoss(mode) {
   const cfg = {
-    debris_warden: { w: 148, h: 88, hp: 112 + state.phase * 15, y: 90, message: "DEBRIS WARDEN INCOMING" },
-    mothership: { w: 170, h: 92, hp: 118 + state.phase * 16, y: 92, message: "MOTHERSHIP INCOMING" },
-    siphon_core: { w: 142, h: 92, hp: 120 + state.phase * 16, y: 90, message: "SIPHON CORE INCOMING" },
-    hive_breaker: { w: 146, h: 90, hp: 124 + state.phase * 16, y: 92, message: "HIVE BREAKER INCOMING" },
-    rail_tyrant: { w: 152, h: 88, hp: 128 + state.phase * 16, y: 90, message: "RAIL TYRANT INCOMING" },
-    gravity_well: { w: 150, h: 90, hp: 132 + state.phase * 16, y: 90, message: "GRAVITY WELL INCOMING" }
+    debris_warden: { w: 148, h: 88, hp: 112 + state.phase * 15, y: 90 },
+    mothership: { w: 170, h: 92, hp: 118 + state.phase * 16, y: 92 },
+    siphon_core: { w: 142, h: 92, hp: 120 + state.phase * 16, y: 90 },
+    hive_breaker: { w: 146, h: 90, hp: 124 + state.phase * 16, y: 92 },
+    rail_tyrant: { w: 152, h: 88, hp: 128 + state.phase * 16, y: 90 },
+    gravity_well: { w: 150, h: 90, hp: 132 + state.phase * 16, y: 90 }
   }[mode];
   if (!cfg) return false;
   state.boss = {
@@ -332,6 +332,7 @@ function spawnExpansionBoss(mode) {
     maxHp: cfg.hp,
     targetY: cfg.y,
     entered: false,
+    combatActive: false,
     attackTimer: 86,
     warn: 0,
     warnMax: 0,
@@ -347,7 +348,6 @@ function spawnExpansionBoss(mode) {
   state.waveMood = "boss";
   state.waveMoodTimer = 0;
   state.lastWaveTemplateName = null;
-  showMessage(cfg.message, 130);
   discoverCodex(bossCodexType(mode));
   return true;
 }
@@ -372,6 +372,7 @@ function chooseExpansionBossAttack(b, hpPct) {
 }
 
 function beginExpansionBossAttack(b, attack) {
+  b.combatActive = true;
   b.pending = attack;
   b.warn = attack === "light" ? 18 : attack === "launch" || attack === "escort" ? 32 : 44;
   if (b.mode === "rail_tyrant") b.warn = attack === "sweep" ? 50 : 44;
@@ -396,7 +397,6 @@ function beginExpansionBossAttack(b, attack) {
       { ...b.safePlan.first.safe, row: 1, expiresAt: state.frame + 430 },
       { ...b.safePlan.second.safe, row: 2, expiresAt: state.frame + 480 }
     ];
-    showMessage("DOUBLE GATE  |  TRACK SAFE LANE", 96);
   } else if (b.mode === "debris_warden") {
     b.safePlan = null;
     if (!state.debris.some((item) => item.wall)) state.safeLanes = [];
@@ -557,11 +557,14 @@ function updateExpansionBoss() {
     }
     return true;
   }
-  if (b.mode === "debris_warden" && state.frame % 140 === 0 && state.debris.filter((d) => d.wall).length === 0) {
+  if (b.combatActive && b.mode === "debris_warden" && state.frame % 140 === 0 && state.debris.filter((d) => d.wall).length === 0) {
     fireAimedBurst(b.x, b.y + 24, state.player.x, state.player.y, 2, 16, 3.0, "boss");
   }
   b.attackTimer--;
-  if (b.attackTimer <= 0) beginExpansionBossAttack(b, chooseExpansionBossAttack(b, hpPct));
+  if (b.attackTimer <= 0) {
+    b.combatActive = true;
+    beginExpansionBossAttack(b, chooseExpansionBossAttack(b, hpPct));
+  }
   return true;
 }
 

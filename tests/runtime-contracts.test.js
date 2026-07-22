@@ -81,6 +81,21 @@ test("Debris Warden rocks grow smoothly from zero to their collision size", () =
   assert.equal(context.debrisSpawnScale(30, 30), 1);
 });
 
+test("bosses stay invulnerable until their first attack begins", () => {
+  assert.equal(context.bossCanTakeDamage({ entered: false, combatActive: false }), false);
+  assert.equal(context.bossCanTakeDamage({ entered: true, combatActive: false }), false);
+  assert.equal(context.bossCanTakeDamage({ entered: true, combatActive: true }), true);
+  const collisionSource = fs.readFileSync(path.join(repoRoot, "src", "07-gameplay-systems.js"), "utf8");
+  assert.match(collisionSource, /state\.boss && bossCanTakeDamage\(state\.boss\)/);
+});
+
+test("gameplay renders compact HUD without announcement popups", () => {
+  const sceneSource = fs.readFileSync(path.join(repoRoot, "src", "17-rendering-scene.js"), "utf8");
+  const hudSource = fs.readFileSync(path.join(repoRoot, "src", "16-rendering-hud.js"), "utf8");
+  assert.doesNotMatch(sceneSource, /drawEncounterCard\(\);/);
+  assert.match(hudSource, /function drawHUD\(\) \{ drawTopLeftHUD\(\); drawTopRightHUD\(\); drawDesktopControlHint\(\); drawDebugHitboxes\(\); \}/);
+});
+
 test("Siphon shot aims toward predicted player position with bounded range", () => {
   const origin = { x: 188, y: 110 };
   const target = { x: 250, y: 580 };
@@ -170,6 +185,8 @@ test("public Firebase writers and rules exclude provider identity fields", () =>
   assert.doesNotMatch(leaderboardReader, /displayName|photoURL|email/);
 
   const rules = fs.readFileSync(path.join(repoRoot, "firestore.rules"), "utf8");
-  const publicRules = rules.slice(rules.indexOf("function validPublicProfile"), rules.indexOf("function validAchievementId"));
-  assert.doesNotMatch(publicRules, /displayName|photoURL|email/);
+  assert.match(rules, /match \/players_private\/\{userId\}[\s\S]*allow get: if isOwner\(userId\);/);
+  assert.match(rules, /match \/players_public\/\{userId\}[\s\S]*allow list: if signedIn\(\) && request\.query\.limit <= 25;/);
+  assert.match(rules, /match \/leaderboard_scores\/\{userId\}[\s\S]*allow create, update, delete: if false;/);
+  assert.doesNotMatch(rules, /displayName|photoURL|email/);
 });

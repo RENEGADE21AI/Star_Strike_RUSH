@@ -35,7 +35,8 @@ node --test $testFiles
 ```
 
 Syntax-check all browser scripts with `node --check src/<file>.js`. Firebase
-callable code lives in `functions/` and uses Node 20.
+callable code lives in `functions/` and uses Node 22. GitHub Actions runs the
+complete test and syntax suite on every push and pull request.
 
 ## Architecture
 
@@ -45,9 +46,11 @@ identity and weekly competition rules, boss fairness/Siphon rules, and input act
 split by responsibility across entity, collision, boss, rendering, title, and
 online modules. See `src/README.md` and `docs/ASSET_MANIFEST.md`.
 
-Debug URLs are development-only behavior: `?debug=1&scenario=siphon` and
-`?debug=1&scenario=debris` create deterministic encounters. `H` toggles the
-hitbox/safe-lane overlay, or `&hitboxes=1` opens directly with it visible.
+Debug URLs are development-only behavior: `?debug=1&scenario=siphon`,
+`?debug=1&scenario=debris`, and `?debug=1&scenario=debris-incoming` create
+deterministic encounters. The last scenario verifies that staging bosses remain
+invulnerable. `H` toggles the hitbox/safe-lane overlay, or `&hitboxes=1` opens
+directly with it visible.
 
 ## Current feature status
 
@@ -57,12 +60,14 @@ hitbox/safe-lane overlay, or `&hitboxes=1` opens directly with it visible.
   when Firebase configuration is missing.
 - Public records contain only call sign and game statistics; provider identity
   remains private.
-- Optimized transparent player, enemy, boss, and asteroid sprites live in
-  `assets/sprites/`; procedural Canvas art remains a resilient fallback.
+- Optimized transparent player, enemy, boss, asteroid, menu, and favicon assets
+  live in `assets/`; the original source art is preserved outside the deployed
+  payload in `source-art/`. Procedural Canvas art remains a resilient fallback.
 - Editable call signs are local-first. Unique account-bound `@handles` and
   prior-performance weekly leagues are implemented behind server callables.
-- Competition callables are not live until the Firebase project is upgraded to
-  Blaze. The client reports this honestly and keeps local play available.
+- Server-authoritative competition callables are deployed on Blaze. The client
+  still reports configuration/network failures honestly and keeps local play
+  available.
 - The game is rule-based; no AI model runs inside the game.
 
 See `BUILD_WEEK_2026.md` for the competition transformation and verification

@@ -7,6 +7,7 @@ and oversized source art is reduced to a practical browser-game resolution.
 
 from __future__ import annotations
 
+import argparse
 from collections import deque
 from pathlib import Path
 
@@ -14,7 +15,10 @@ from PIL import Image, ImageFilter
 
 
 DOWNLOADS = Path(r"C:\Users\alyss\Downloads")
-OUTPUT = Path(__file__).resolve().parents[1] / "assets" / "sprites"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+OUTPUT = REPO_ROOT / "assets" / "sprites"
+UI_OUTPUT = REPO_ROOT / "assets" / "ui"
+SOURCE_ART = REPO_ROOT / "source-art"
 
 ASSETS = {
     "player.png": ("WhitePlayerShip.png", 512),
@@ -29,6 +33,8 @@ ASSETS = {
     "enemy-shieldbearer.png": ("DarkBlueShieldbearerFighter.png", 448),
     "enemy-railgunner.png": ("RedBlackRailgunnerFighter.png", 448),
     "enemy-repair-drone.png": ("WhiteRepairEnemy.png", 448),
+    "enemy-leech.png": ("GreenLeechFighter.png", 448),
+    "enemy-carrier.png": ("OrangeCarbonCarrierFighter.png", 448),
     "boss-standard.png": ("StandardBoss.png", 640),
     "boss-wraith.png": ("WraithBoss.png", 640),
     "boss-debris-warden.png": ("DebrisWardenBoss.png", 640),
@@ -41,6 +47,20 @@ ASSETS = {
     "asteroid-rock-2.png": ("AsteroidNumber2.png", 320),
     "asteroid-rock-3.png": ("AsteroidNumber3.png", 320),
 }
+
+UI_ASSETS = {
+    "menu-codex.png": ("Codex Book Icon.png", 256),
+    "menu-road.png": ("Progression Road Icon.png", 256),
+    "menu-world.png": ("World Icon.png", 256),
+    "menu-trophy.png": ("Trophy Icon.png", 256),
+}
+
+
+def find_source(source_name: str) -> Path:
+    for candidate in (SOURCE_ART / source_name, REPO_ROOT / source_name, DOWNLOADS / source_name):
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(source_name)
 
 
 def is_checker_background(pixel: tuple[int, int, int, int]) -> bool:
@@ -112,16 +132,49 @@ def trim_and_resize(image: Image.Image, max_dimension: int) -> Image.Image:
     return cropped
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Build optimized game artwork derivatives.")
+    parser.add_argument("--force", action="store_true", help="Rebuild sprite files that already exist.")
+    parser.add_argument("--ui-only", action="store_true", help="Only rebuild favicon and touch-icon assets.")
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    for output_name, (source_name, max_dimension) in ASSETS.items():
-        source = DOWNLOADS / source_name
-        if not source.exists():
-            raise FileNotFoundError(source)
-        with Image.open(source) as opened:
-            processed = trim_and_resize(replace_connected_checkerboard(opened), max_dimension)
-            processed.save(OUTPUT / output_name, optimize=True, compress_level=9)
-            print(f"{source.name} -> {output_name} {processed.width}x{processed.height}")
+    if not args.ui_only:
+        for output_name, (source_name, max_dimension) in ASSETS.items():
+            destination = OUTPUT / output_name
+            if destination.exists() and not args.force:
+                print(f"skip {output_name} (use --force to rebuild)")
+                continue
+            source = find_source(source_name)
+            with Image.open(source) as opened:
+                processed = trim_and_resize(replace_connected_checkerboard(opened), max_dimension)
+                processed.save(destination, optimize=True, compress_level=9)
+                print(f"{source.name} -> {output_name} {processed.width}x{processed.height}")
+
+        UI_OUTPUT.mkdir(parents=True, exist_ok=True)
+        for output_name, (source_name, max_dimension) in UI_ASSETS.items():
+            destination = UI_OUTPUT / output_name
+            if destination.exists() and not args.force:
+                print(f"skip {output_name} (use --force to rebuild)")
+                continue
+            source = find_source(source_name)
+            with Image.open(source) as opened:
+                processed = trim_and_resize(replace_connected_checkerboard(opened), max_dimension)
+                processed.save(destination, optimize=True, compress_level=9)
+                print(f"{source.name} -> {output_name} {processed.width}x{processed.height}")
+
+    favicon_source = find_source("StarStrikeRUSHFavicon.png")
+    if favicon_source.exists():
+        UI_OUTPUT.mkdir(parents=True, exist_ok=True)
+        with Image.open(favicon_source) as opened:
+            icon = opened.convert("RGB")
+            for size, name in ((512, "icon-512.png"), (192, "icon-192.png"), (180, "apple-touch-icon.png")):
+                resized = icon.resize((size, size), Image.Resampling.LANCZOS)
+                resized.save(UI_OUTPUT / name, optimize=True, compress_level=9)
+                print(f"{favicon_source.name} -> {name} {size}x{size}")
 
 
 if __name__ == "__main__":

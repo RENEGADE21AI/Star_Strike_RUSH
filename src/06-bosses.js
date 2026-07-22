@@ -140,7 +140,7 @@ function spawnWraithBoss() {
   state.boss = {
     mode: "wraith",
     x: W / 2, y: -120, w: 152, h: 96,
-    hp, maxHp: hp, entered: false, realm: 0, nextRealm: 1,
+    hp, maxHp: hp, entered: false, combatActive: false, realm: 0, nextRealm: 1,
     shiftTelegraph: 0, shiftReason: "", hitsSinceShift: 0, nextShiftHits: 6 + Math.floor(rand(0, 3)),
     passiveTimer: 0, shift60Triggered: false, shift30Triggered: false,
     attackTimer: 54, chargeTelegraph: 0, chargeStartRealm: 0, chargeDodged: false,
@@ -153,7 +153,6 @@ function spawnWraithBoss() {
   state.waveMood = "boss";
   state.waveMoodTimer = 0;
   state.lastWaveTemplateName = null;
-  showMessage("WRAITH BOSS INCOMING... REALM HOP ACTIVATED", 150);
   discoverCodex("boss_wraith");
 }
 function chooseBossAttackType(b, hpPct) {
@@ -189,14 +188,13 @@ function spawnBoss() {
   state.boss = {
     mode: "standard",
     x: W / 2, y: -100, w: 130, h: 82,
-    hp: maxHp, maxHp, entered: false, cooldown: 72, warn: 0, warnMax: 0,
+    hp: maxHp, maxHp, entered: false, combatActive: false, cooldown: 72, warn: 0, warnMax: 0,
     pending: null, step: 0, bay: 0, mouthOpen: 0
   };
   state.playerRealm = 0;
   state.waveMood = "boss";
   state.waveMoodTimer = 0;
   state.lastWaveTemplateName = null;
-  showMessage("BOSS INCOMING", 120);
   discoverCodex("boss_standard");
 }
 function spawnBossDeath(boss) {
@@ -271,6 +269,7 @@ function updateBossStandard() {
   b.mouthOpen = Math.max(0, b.mouthOpen - 0.04);
   b.cooldown--;
   if (b.cooldown <= 0) {
+    b.combatActive = true;
     b.pending = chooseBossAttackType(b, hpPct);
     b.warn = b.pending === "spawn" ? (hpPct < 0.35 ? 24 : 28) : (hpPct < 0.35 ? 14 : 18);
     b.warnMax = b.warn;
@@ -332,6 +331,7 @@ function updateBossWraith() {
   if (b.passiveTimer >= 540) startWraithShift(b, "passive");
   b.attackTimer--;
   if (b.attackTimer <= 0) {
+    b.combatActive = true;
     const chargeChance = hpPct < 0.2 ? 0.60 : (hpPct < 0.4 ? 0.45 : hpPct < 0.7 ? 0.28 : 0.18);
     if (Math.random() < chargeChance && b.chargeRecovery <= 0) {
       b.chargeTelegraph = hpPct < 0.4 ? 48 : 42;

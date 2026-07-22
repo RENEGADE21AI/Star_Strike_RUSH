@@ -81,7 +81,7 @@ let codexDiscovered = {};
 let codexHasNew = false;
 let encounterQueue = [];
 let encounterCard = null;
-const ENCOUNTER_CARD_DURATION = 170;
+const ENCOUNTER_CARD_DURATION = 132;
 let codexDetailType = null;
 let resetProgressConfirm = false;
 
@@ -716,7 +716,7 @@ const state = {
   joystick: { active: false, id: null, cx: 0, cy: 0, ax: 0, ay: 0, radius: 56 },
   inputMode: "keyboard",
   lastTouchAt: -Infinity,
-  inputHintTimer: 240,
+  inputHintTimer: 144,
   debugHitboxes: false,
   debugErrors: [],
   safeLanes: [],

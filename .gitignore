@@ -6,3 +6,5 @@ firestore-debug.log
 ui-debug.log
 test-artifacts/
 functions/node_modules/
+__pycache__/
+*.pyc

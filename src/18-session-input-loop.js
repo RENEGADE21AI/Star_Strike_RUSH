@@ -199,7 +199,7 @@ canvas.addEventListener("pointerdown", (e) => {
     const nextMode = nextGameplayInputMode(state.inputMode, pointerKind, Date.now(), state.lastTouchAt, e.buttons || 1);
     state.inputMode = nextMode.mode;
     state.lastTouchAt = nextMode.lastTouchAt;
-    state.inputHintTimer = 210;
+    state.inputHintTimer = 144;
   }
   if (state.gameState !== "playing") {
     if (handleTitlePointerDown(x, y, e.pointerId)) return;
@@ -359,7 +359,7 @@ window.addEventListener("keydown", (e) => {
       const nextMode = nextGameplayInputMode(state.inputMode, "keyboard", Date.now(), state.lastTouchAt, 0);
       state.inputMode = nextMode.mode;
       state.lastTouchAt = nextMode.lastTouchAt;
-      state.inputHintTimer = 210;
+      state.inputHintTimer = 144;
     }
     if (action && (action.startsWith("move_") || action === "move")) {
       e.preventDefault();
@@ -532,6 +532,13 @@ function getDebugSnapshot() {
     },
     encounter: {
       bossMode: state.boss ? state.boss.mode : null,
+      boss: state.boss ? {
+        hp: state.boss.hp,
+        maxHp: state.boss.maxHp,
+        entered: state.boss.entered === true,
+        combatActive: state.boss.combatActive === true,
+        damageable: typeof bossCanTakeDamage === "function" ? bossCanTakeDamage(state.boss) : true
+      } : null,
       enemyTypes: Array.from(new Set(state.enemies.map((enemy) => enemy.type))),
       safeLanes: (state.safeLanes || []).map((lane) => ({ row: lane.row, minX: lane.minX, maxX: lane.maxX, width: lane.width })),
       debrisScales: (state.debris || []).slice(0, 16).map((rock) => ({
@@ -586,13 +593,18 @@ function applyDebugScenario() {
     const siphon = state.enemies.find((enemy) => enemy.type === "siphon");
     if (siphon) { siphon.entryFrames = 0; siphon.fireTimer = 48; siphon.fireWarn = 0; }
     showMessage("DEBUG  SIPHON AIM TEST", 120);
-  } else if (scenario === "debris") {
+  } else if (scenario === "debris" || scenario === "debris-incoming") {
     state.phase = 12;
     spawnExpansionBoss("debris_warden");
-    state.boss.y = state.boss.targetY;
-    state.boss.entered = true;
-    beginExpansionBossAttack(state.boss, "double");
-    showMessage("DEBUG  DOUBLE GATE", 120);
+    if (scenario === "debris") {
+      state.boss.y = state.boss.targetY;
+      state.boss.entered = true;
+      beginExpansionBossAttack(state.boss, "double");
+      showMessage("DEBUG  DOUBLE GATE", 120);
+    } else {
+      state.boss.y = state.boss.targetY - 20;
+      showMessage("DEBUG  BOSS STAGING", 72);
+    }
   }
   if (requestedInput === "touch") state.inputMode = "touch";
   if (params.get("hitboxes") === "1") state.debugHitboxes = true;

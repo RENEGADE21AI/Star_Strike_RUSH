@@ -308,7 +308,7 @@ function updateCollisions() {
   for (let i = state.bullets.length - 1; i >= 0; i--) {
     const b = state.bullets[i], dmg = b.damage ?? 1;
     if (b.life <= 0) continue;
-    if (state.boss) {
+    if (state.boss && bossCanTakeDamage(state.boss)) {
       if (state.boss.mode === "wraith") {
         if ((b.realm == null || b.realm === state.playerRealm) && b.kind === (state.boss.realm === 0 ? "physical" : "ghost") && bossCollisionHits(b, state.boss)) {
           state.boss.hp -= dmg;

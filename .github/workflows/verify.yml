@@ -1,0 +1,27 @@
+name: Verify competition build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci --prefix functions
+      - name: Syntax check browser and Function scripts
+        run: |
+          find src -name '*.js' -print0 | xargs -0 -n1 node --check
+          find functions -maxdepth 1 -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Run all tests
+        run: node --test tests/*.test.js
+      - name: Load Function module and validate Firebase config
+        run: |
+          node -e "require('./functions/index.js'); console.log('functions loaded')"
+          node -e "JSON.parse(require('fs').readFileSync('firestore.indexes.json')); JSON.parse(require('fs').readFileSync('firebase.json')); console.log('firebase json valid')"

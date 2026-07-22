@@ -52,18 +52,17 @@ function drawBullets() {
       ctx.fill();
       ctx.restore();
     } else {
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(b.x - 2, b.y, 4, 10);
-      ctx.fillRect(b.x - 1, b.y - 2, 2, 2);
+      if (typeof drawLaserBolt === "function") drawLaserBolt(b.x, b.y + 4, { width: 4, length: 14, color: "112,238,255", direction: -1, glow: 7 });
+      else { ctx.fillStyle = "#fff"; ctx.fillRect(b.x - 2, b.y, 4, 10); }
     }
   }
   for (const b of state.enemyBullets) {
     if (b.kind === "boss") {
-      ctx.fillStyle = "#ff5"; ctx.fillRect(b.x - 3, b.y, 6, 10);
+      if (typeof drawLaserBolt === "function") drawLaserBolt(b.x, b.y + 4, { width: 6, length: 15, color: "255,220,76", glow: 9 });
     } else if (b.kind === "aimed") {
-      ctx.fillStyle = "#f9f"; ctx.fillRect(b.x - 3, b.y, 6, 10);
+      if (typeof drawLaserBolt === "function") drawLaserBolt(b.x, b.y + 4, { width: 6, length: 15, color: "255,104,222", glow: 9 });
     } else if (b.kind === "phantomShot") {
-      ctx.fillStyle = "#0ff"; ctx.fillRect(b.x - 3, b.y, 6, 10);
+      if (typeof drawLaserBolt === "function") drawLaserBolt(b.x, b.y + 4, { width: 6, length: 15, color: "72,238,255", glow: 10 });
     } else if (b.kind === "drainShot") {
       ctx.save();
       if (b.trail && b.trail.length > 1) {
@@ -82,7 +81,7 @@ function drawBullets() {
       ctx.beginPath(); ctx.arc(b.x - 1.5, b.y - 1.5, 2, 0, TAU); ctx.fill();
       ctx.restore();
     } else if (b.kind === "purple") {
-      ctx.fillStyle = "#fc5"; ctx.fillRect(b.x - 3, b.y, 6, 10);
+      if (typeof drawLaserBolt === "function") drawLaserBolt(b.x, b.y + 4, { width: 6, length: 15, color: "194,118,255", glow: 9 });
     } else if (b.kind === "wraithPhysical" || b.kind === "wraithGhost") {
       ctx.save();
       if (b.trail && b.trail.length > 1) {
@@ -115,8 +114,7 @@ function drawBullets() {
         ctx.restore();
       }
     } else {
-      ctx.fillStyle = "#fc5";
-      ctx.fillRect(b.x - 3, b.y, 6, 10);
+      if (typeof drawLaserBolt === "function") drawLaserBolt(b.x, b.y + 4, { width: 6, length: 15, color: "255,186,78", glow: 8 });
     }
   }
 }
@@ -190,13 +188,7 @@ function drawBoss() {
       ctx.beginPath(); ctx.arc(px, py, 5 + (i % 2) * 2, 0, TAU); ctx.stroke();
       ctx.restore();
     }
-    const barW = Math.min(320, W - 40), barX = (W - barW) / 2, barY = 16;
-    ctx.fillStyle = "rgba(255,255,255,0.16)";
-    ctx.fillRect(barX, barY, barW, 10);
-    ctx.fillStyle = "#f44";
-    ctx.fillRect(barX, barY, barW * hpPct, 10);
-    ctx.strokeStyle = "#fff";
-    ctx.strokeRect(barX, barY, barW, 10);
+    if (typeof drawBossHealthBar === "function") drawBossHealthBar(b, "#d9b6ff");
     if (b.shiftTelegraph > 0) {
       ctx.save();
       ctx.globalAlpha = 0.9;
@@ -228,13 +220,7 @@ function drawBoss() {
     ctx.beginPath(); ctx.arc(px, py, 5 + (i % 2) * 2, 0, TAU); ctx.stroke();
     ctx.restore();
   }
-  const barW = Math.min(320, W - 40), barX = (W - barW) / 2, barY = 16;
-  ctx.fillStyle = "rgba(255,255,255,0.16)";
-  ctx.fillRect(barX, barY, barW, 10);
-  ctx.fillStyle = "#f44";
-  ctx.fillRect(barX, barY, barW * hpPct, 10);
-  ctx.strokeStyle = "#fff";
-  ctx.strokeRect(barX, barY, barW, 10);
+  if (typeof drawBossHealthBar === "function") drawBossHealthBar(b, "#63efff");
 }
 function drawBossDeath() {
   const d = state.bossDeath; if (!d) return;
@@ -275,25 +261,40 @@ function drawPowerups() {
   for (const p of state.powerups) {
     const bob = Math.sin(state.frame * 0.12 + p.x * 0.03) * 1.4;
     const spin = state.frame * 0.04;
+    const visual = typeof expansionPowerupVisual === "function" ? expansionPowerupVisual(p.type) : null;
+    const color = p.type === "spread" ? "#55ff72" : p.type === "rapid" ? "#ffe65c" : p.type === "repair" ? "#58adff" : p.type === "wingman" || p.type === "dual" ? "#ff72ee" : visual ? visual.color : "#ff72ee";
+    const label = p.type === "spread" ? "S" : p.type === "rapid" ? "R" : p.type === "repair" ? "+" : p.type === "wingman" ? "W" : p.type === "dual" ? "2" : visual ? visual.label : "?";
     ctx.save();
     ctx.translate(p.x, p.y + bob);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.16 + (0.5 + 0.5 * Math.sin(state.frame * 0.12 + p.x)) * 0.10;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.arc(0, 0, p.size + 10, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 5]);
+    ctx.rotate(-spin * 0.55);
+    ctx.beginPath(); ctx.arc(0, 0, p.size + 7, 0, TAU); ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = color;
     ctx.rotate(spin);
-    if (p.type === "spread") ctx.fillStyle = "#4f4";
-    else if (p.type === "rapid") ctx.fillStyle = "#ff4";
-    else if (p.type === "repair") ctx.fillStyle = "#4af";
-    else if (p.type === "wingman") ctx.fillStyle = "#f6f";
-    else {
-      const visual = typeof expansionPowerupVisual === "function" ? expansionPowerupVisual(p.type) : null;
-      ctx.fillStyle = visual ? visual.color : "#f6f";
-    }
     ctx.beginPath();
     ctx.moveTo(0, -p.size); ctx.lineTo(p.size, 0); ctx.lineTo(0, p.size); ctx.lineTo(-p.size, 0); ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "#000";
+    ctx.restore();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(3,6,14,0.92)";
     ctx.font = FONT_TINY;
-    ctx.textAlign = "left";
-    const visual = typeof expansionPowerupVisual === "function" ? expansionPowerupVisual(p.type) : null;
-    ctx.fillText(p.type === "spread" ? "S" : p.type === "rapid" ? "R" : p.type === "repair" ? "+" : p.type === "wingman" ? "W" : p.type === "dual" ? "2" : visual ? visual.label : "?", -3, 4);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, 0, 1);
     ctx.restore();
   }
 }

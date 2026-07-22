@@ -354,7 +354,8 @@ function getOnlineRects() {
   const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
   const shake = { x: innerX, y: btnY + 50, w: 134, h: 30 };
   const reset = { x: panel.x + panel.w - 180, y: btnY + 50, w: 160, h: 30 };
-  const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
+  const refreshY = accountPanelTab === "pilot" ? panel.y + 472 : panel.y + panel.h - 48;
+  const refresh = { x: panel.x + 20, y: refreshY, w: panel.w - 40, h: 30 };
   return { panel, closeRect, pilotTab, leagueTab, settingsTab, editCallSign, claimHandle, signIn, signOut, joinLeague, low, med, high, shake, reset, refresh };
 }
 function getRecordsRects() {

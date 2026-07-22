@@ -48,7 +48,7 @@ function drawEncounterCard() {
   const cardW = 230, cardH = 68;
   const settledX = W - cardW - 10;
   const cardX = settledX + (1 - easeOutCubic(enter)) * (cardW + 18);
-  const cardY = 108;
+  const cardY = encounterCard.type.startsWith("boss") ? 150 : 108;
   const typeColors = { red:"#e44", orange:"#f93", purple:"#b4f", phantom:"#0ff", boss_standard:"#6ff", boss_wraith:"#d9b6ff" };
   const meta = typeof getCodexMeta === "function" ? getCodexMeta(encounterCard.type) : { color: "#fff", name: encounterCard.type.toUpperCase(), trait: "" };
   const borderColor = meta.color || "#fff";

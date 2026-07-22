@@ -8,7 +8,7 @@ function drawOuterFog() {
 
   // No letterbox on this device — skip entirely
   if (gx < 1 && gy < 1) {
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = "#020611";
     ctx.fillRect(0, 0, screenW, screenH);
     return;
   }
@@ -16,19 +16,17 @@ function drawOuterFog() {
   const t = state.frame;
 
   // Deep space base
-  ctx.fillStyle = "#030209";
+  ctx.fillStyle = "#020611";
   ctx.fillRect(0, 0, screenW, screenH);
 
   // 8 large cloud masses anchored to screen edges and corners
   const blobs = [
-    { x: 0,        y: 0,        r: screenW * 0.60, a: 0.78, p: 0.0 },
-    { x: screenW,  y: 0,        r: screenW * 0.58, a: 0.72, p: 1.6 },
-    { x: 0,        y: screenH,  r: screenW * 0.58, a: 0.74, p: 3.1 },
-    { x: screenW,  y: screenH,  r: screenW * 0.60, a: 0.76, p: 4.7 },
-    { x: screenW * 0.5, y: 0,        r: screenW * 0.48, a: 0.62, p: 0.9 },
-    { x: screenW * 0.5, y: screenH,  r: screenW * 0.48, a: 0.62, p: 2.4 },
-    { x: 0,        y: screenH * 0.5, r: screenH * 0.42, a: 0.66, p: 1.3 },
-    { x: screenW,  y: screenH * 0.5, r: screenH * 0.42, a: 0.66, p: 3.8 },
+    { x: -screenW * 0.08, y: 0,              r: screenW * 0.76, a: 0.30, p: 0.0 },
+    { x: screenW * 1.08,  y: screenH * 0.08, r: screenW * 0.72, a: 0.27, p: 1.6 },
+    { x: -screenW * 0.06, y: screenH,        r: screenW * 0.70, a: 0.26, p: 3.1 },
+    { x: screenW * 1.06,  y: screenH,        r: screenW * 0.76, a: 0.28, p: 4.7 },
+    { x: 0, y: screenH * 0.42, r: screenH * 0.50, a: 0.24, p: 1.3 },
+    { x: screenW, y: screenH * 0.62, r: screenH * 0.52, a: 0.24, p: 3.8 },
   ];
 
   for (const b of blobs) {
@@ -37,9 +35,9 @@ function drawOuterFog() {
     const cx = b.x + dx;
     const cy = b.y + dy;
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, b.r);
-    grad.addColorStop(0,    `rgba(30,20,54,${b.a})`);
-    grad.addColorStop(0.28, `rgba(22,14,40,${b.a * 0.72})`);
-    grad.addColorStop(0.58, `rgba(14,9,26,${b.a * 0.38})`);
+    grad.addColorStop(0,    `rgba(20,82,112,${b.a})`);
+    grad.addColorStop(0.32, `rgba(13,47,74,${b.a * 0.70})`);
+    grad.addColorStop(0.68, `rgba(7,21,39,${b.a * 0.34})`);
     grad.addColorStop(1,    "rgba(0,0,0,0)");
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -49,10 +47,10 @@ function drawOuterFog() {
 
   // 4 secondary drifting wisps
   const wisps = [
-    { x: screenW * 0.25, y: screenH * 0.18, r: screenW * 0.30, a: 0.42, p: 2.2 },
-    { x: screenW * 0.75, y: screenH * 0.28, r: screenW * 0.28, a: 0.38, p: 0.5 },
-    { x: screenW * 0.20, y: screenH * 0.75, r: screenW * 0.30, a: 0.40, p: 3.4 },
-    { x: screenW * 0.78, y: screenH * 0.72, r: screenW * 0.28, a: 0.38, p: 1.8 },
+    { x: screenW * 0.12, y: screenH * 0.18, r: screenW * 0.38, a: 0.18, p: 2.2 },
+    { x: screenW * 0.88, y: screenH * 0.34, r: screenW * 0.36, a: 0.16, p: 0.5 },
+    { x: screenW * 0.16, y: screenH * 0.78, r: screenW * 0.38, a: 0.17, p: 3.4 },
+    { x: screenW * 0.86, y: screenH * 0.74, r: screenW * 0.36, a: 0.16, p: 1.8 },
   ];
 
   for (const w of wisps) {
@@ -61,8 +59,8 @@ function drawOuterFog() {
     const cx = w.x + dx;
     const cy = w.y + dy;
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, w.r);
-    grad.addColorStop(0,    `rgba(38,24,62,${w.a})`);
-    grad.addColorStop(0.45, `rgba(24,15,42,${w.a * 0.50})`);
+    grad.addColorStop(0,    `rgba(34,116,142,${w.a})`);
+    grad.addColorStop(0.45, `rgba(15,55,82,${w.a * 0.48})`);
     grad.addColorStop(1,    "rgba(0,0,0,0)");
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -81,40 +79,82 @@ function drawOuterFog() {
     ctx.fillRect(px, py, size, size);
   }
 
-  // Black out the game area
-  ctx.fillStyle = "#000";
-  ctx.fillRect(gx, gy, gw, gh);
+  // Darken the outer gas as it approaches the logical playfield. The matching
+  // in-playfield blend below finishes the transition and lets ships disappear
+  // into fog quickly without revealing a rectangular canvas edge.
+  const seam = Math.min(190, Math.max(70, screenW * 0.16));
+  if (gx > 1) {
+    const leftSeam = ctx.createLinearGradient(Math.max(0, gx - seam), 0, gx, 0);
+    leftSeam.addColorStop(0, "rgba(2,6,17,0)");
+    leftSeam.addColorStop(0.62, "rgba(2,6,17,0.34)");
+    leftSeam.addColorStop(1, "rgba(2,6,17,0.92)");
+    ctx.fillStyle = leftSeam;
+    ctx.fillRect(Math.max(0, gx - seam), gy, Math.min(seam, gx), gh);
+  }
+  if (gx + gw < screenW - 1) {
+    const rightSeam = ctx.createLinearGradient(gx + gw, 0, Math.min(screenW, gx + gw + seam), 0);
+    rightSeam.addColorStop(0, "rgba(2,6,17,0.92)");
+    rightSeam.addColorStop(0.38, "rgba(2,6,17,0.34)");
+    rightSeam.addColorStop(1, "rgba(2,6,17,0)");
+    ctx.fillStyle = rightSeam;
+    ctx.fillRect(gx + gw, gy, Math.min(seam, screenW - gx - gw), gh);
+  }
 
-  // Feather game edges back into fog (only where there's actual letterbox gap)
-  const fade = 40;
-  if (gy > 0) {
-    const g = ctx.createLinearGradient(0, gy, 0, gy + fade);
-    g.addColorStop(0, "rgba(0,0,0,1)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(gx, gy, gw, Math.min(fade, gh));
+}
+function drawPlayfieldFogBlend() {
+  const edge = 34;
+  const pulse = 0.78 + Math.sin(state.frame * 0.008) * 0.08;
+  ctx.save();
+  const left = ctx.createLinearGradient(0, 0, edge, 0);
+  left.addColorStop(0, `rgba(5,28,46,${0.62 * pulse})`);
+  left.addColorStop(0.38, `rgba(8,37,55,${0.25 * pulse})`);
+  left.addColorStop(1, "rgba(3,12,24,0)");
+  ctx.fillStyle = left;
+  ctx.fillRect(0, 0, edge, H);
+  const right = ctx.createLinearGradient(W - edge, 0, W, 0);
+  right.addColorStop(0, "rgba(3,12,24,0)");
+  right.addColorStop(0.62, `rgba(8,37,55,${0.25 * pulse})`);
+  right.addColorStop(1, `rgba(5,28,46,${0.62 * pulse})`);
+  ctx.fillStyle = right;
+  ctx.fillRect(W - edge, 0, edge, H);
+  ctx.restore();
+}
+function drawScreenFogBlend() {
+  if (offsetX < 2 || state.gameState !== "playing") return;
+  const gx = offsetX;
+  const gy = offsetY;
+  const gw = GAME_W * scale;
+  const gh = GAME_H * scale;
+  const outer = Math.min(150, Math.max(70, gx * 0.42));
+  const inner = 52 * scale;
+  const safeTop = gy + 126 * scale;
+  ctx.save();
+  const left = ctx.createLinearGradient(gx - outer, 0, gx + inner, 0);
+  left.addColorStop(0, "rgba(3,12,24,0)");
+  left.addColorStop(0.56, "rgba(4,18,31,0.18)");
+  left.addColorStop(0.74, "rgba(7,38,55,0.58)");
+  left.addColorStop(1, "rgba(4,18,31,0)");
+  const right = ctx.createLinearGradient(gx + gw - inner, 0, gx + gw + outer, 0);
+  right.addColorStop(0, "rgba(4,18,31,0)");
+  right.addColorStop(0.26, "rgba(7,38,55,0.58)");
+  right.addColorStop(0.44, "rgba(4,18,31,0.18)");
+  right.addColorStop(1, "rgba(3,12,24,0)");
+  const drawSeams = (y, height, alpha) => {
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = left;
+    ctx.fillRect(gx - outer, y, outer + inner, height);
+    ctx.fillStyle = right;
+    ctx.fillRect(gx + gw - inner, y, outer + inner, height);
+  };
+  const fadeHeight = Math.min(76 * scale, Math.max(0, gy + gh - safeTop));
+  const slices = 8;
+  for (let index = 0; index < slices; index++) {
+    const y = safeTop + fadeHeight * index / slices;
+    const nextY = safeTop + fadeHeight * (index + 1) / slices;
+    drawSeams(y, nextY - y + 0.5, easeOutCubic((index + 1) / slices));
   }
-  if (gy + gh < screenH) {
-    const g = ctx.createLinearGradient(0, gy + gh - fade, 0, gy + gh);
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, "rgba(0,0,0,1)");
-    ctx.fillStyle = g;
-    ctx.fillRect(gx, Math.max(gy, gy + gh - fade), gw, Math.min(fade, gh));
-  }
-  if (gx > 0) {
-    const g = ctx.createLinearGradient(gx, 0, gx + fade, 0);
-    g.addColorStop(0, "rgba(0,0,0,1)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(gx, gy, Math.min(fade, gw), gh);
-  }
-  if (gx + gw < screenW) {
-    const g = ctx.createLinearGradient(gx + gw - fade, 0, gx + gw, 0);
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, "rgba(0,0,0,1)");
-    ctx.fillStyle = g;
-    ctx.fillRect(Math.max(gx, gx + gw - fade), gy, Math.min(fade, gw), gh);
-  }
+  drawSeams(safeTop + fadeHeight, Math.max(0, gy + gh - safeTop - fadeHeight), 1);
+  ctx.restore();
 }
 function draw() {
   drawOuterFog();
@@ -145,8 +185,8 @@ function draw() {
     drawWingmen();
     drawPlayer();
     drawParticles();
+    drawPlayfieldFogBlend();
     drawControls();
-    drawEncounterCard();
     drawHUD();
   } else if (state.gameState === "start") {
     drawStartScreen();
@@ -154,6 +194,7 @@ function draw() {
     drawGameOverScreen();
   }
   ctx.restore();
+  drawScreenFogBlend();
 
   if (state.gameState === "playing" || state.gameState === "gameover") {
     ctx.save();

@@ -58,14 +58,6 @@ function drawTitleAndButtons() {
   drawSimpleButton(iconRects.account, "", accountOnline ? "rgba(120,255,180,0.62)" : "rgba(255,255,255,0.24)");
   drawAccountIcon(iconRects.account, titleSubState === "online" && titlePanelTarget === 1);
 
-  ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.font = FONT_TINY;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-  ctx.fillText("CALL SIGN", W / 2, H * 0.355 - 20 - 4);
-  ctx.restore();
-
   const playRect = getPlayButtonRect();
   drawHoldButton(playRect, "PLAY", playBtnHold, 45, "rgba(0,180,100,0.18)", 0.45, 0.90);
 
@@ -80,11 +72,6 @@ function drawTitleAndButtons() {
   ctx.roundRect(dockX, dockY, dockW, dockH, 8);
   ctx.fill();
   ctx.stroke();
-  ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillStyle = "rgba(120,210,255,0.66)";
-  ctx.fillText("PILOT META", dockX + dockW / 2, dockY + 5);
   ctx.restore();
 
   drawSimpleButton(iconRects.achievements, "");
@@ -128,10 +115,6 @@ function drawTitleAndButtons() {
     ctx.textAlign = "center";
     ctx.fillText(rankLine, W / 2, H * 0.747);
   }
-  ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
-  ctx.fillStyle = "rgba(170,205,230,0.56)";
-  ctx.textAlign = "center";
-  ctx.fillText("TOUCH OR KEYBOARD  |  INPUT AUTO-DETECTS", W / 2, H * 0.81);
   ctx.restore();
 }
 function drawStartScreen() {

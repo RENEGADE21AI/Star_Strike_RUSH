@@ -1,10 +1,36 @@
 function drawBackground() {
-  ctx.fillStyle = "#000";
+  const backdrop = ctx.createLinearGradient(0, 0, 0, H);
+  backdrop.addColorStop(0, "#07101d");
+  backdrop.addColorStop(0.45, "#020611");
+  backdrop.addColorStop(1, "#000208");
+  ctx.fillStyle = backdrop;
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  for (const s of state.stars) ctx.fillRect(s.x, s.y, s.s, s.s);
-  ctx.fillStyle = "rgba(255,255,255,0.04)";
-  for (let y = 0; y < H; y += 36) ctx.fillRect(0, y, W, 1);
+
+  const drift = state.frame * 0.055;
+  const cyanX = W * 0.16 + Math.sin(state.frame * 0.0018) * 28;
+  const amberX = W * 0.88 + Math.cos(state.frame * 0.0014) * 22;
+  const cyan = ctx.createRadialGradient(cyanX, H * 0.30 + drift % 90, 0, cyanX, H * 0.30 + drift % 90, 190);
+  cyan.addColorStop(0, "rgba(20,126,164,0.13)");
+  cyan.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = cyan; ctx.fillRect(0, 0, W, H);
+  const amber = ctx.createRadialGradient(amberX, H * 0.08, 0, amberX, H * 0.08, 170);
+  amber.addColorStop(0, "rgba(194,104,35,0.10)");
+  amber.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = amber; ctx.fillRect(0, 0, W, H);
+
+  for (let index = 0; index < state.stars.length; index++) {
+    const s = state.stars[index];
+    const twinkle = 0.48 + 0.42 * (0.5 + 0.5 * Math.sin(state.frame * 0.035 + index * 1.73));
+    ctx.fillStyle = `rgba(${index % 9 === 0 ? "170,226,255" : "255,255,255"},${twinkle})`;
+    const streak = state.gameState === "playing" && s.spd > 0.9 ? 1.6 + s.spd * 1.4 : s.s;
+    ctx.fillRect(s.x, s.y, Math.max(0.6, s.s * 0.75), streak);
+  }
+  ctx.fillStyle = "rgba(135,190,225,0.035)";
+  for (let y = 0; y < H; y += 42) ctx.fillRect(0, y, W, 1);
+  const vignette = ctx.createRadialGradient(W / 2, H * 0.48, W * 0.18, W / 2, H * 0.48, W * 0.72);
+  vignette.addColorStop(0, "rgba(0,0,0,0)");
+  vignette.addColorStop(1, "rgba(0,0,0,0.42)");
+  ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H);
   if (isWraithActive()) {
     const tint = state.playerRealm === 0 ? "rgba(170,210,255,0.10)" : "rgba(125,70,200,0.16)";
     ctx.fillStyle = tint;
@@ -16,10 +42,40 @@ function drawPlayer() {
   if (state.gameState !== "playing" && state.gameState !== "gameover") return;
   const tilt = clamp(p.vx / 80, -0.06, 0.06);
   const bob = Math.sin(state.frame * 0.18 + p.x * 0.02) * 0.6;
-  if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "player", p.x, p.y + bob, {
-    rotation: tilt,
-    alpha: p.inv > 0 && state.frame % 6 < 3 ? 0.42 : 1
-  })) return;
+  if (typeof drawSpriteAsset === "function") {
+    const realmActive = isWraithActive();
+    const ghostActive = p.ghostTimer > 0;
+    const dashActive = p.dashTimer > 0;
+    const blinkAlpha = p.inv > 0 && state.frame % 6 < 3 ? 0.34 : 1;
+    const plumeColor = dashActive ? "255,196,100" : realmActive && state.playerRealm === 1 ? "201,154,255" : "92,238,255";
+    if (typeof drawEnginePlume === "function") {
+      drawEnginePlume(p.x, p.y + bob + 17, { scale: dashActive ? 1.5 : 1.05, alpha: blinkAlpha, color: plumeColor, phase: p.x * 0.03 });
+    }
+    if (ghostActive || dashActive) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const aura = ctx.createRadialGradient(p.x, p.y + bob, 3, p.x, p.y + bob, dashActive ? 38 : 30);
+      aura.addColorStop(0, dashActive ? "rgba(255,205,110,0.22)" : "rgba(92,238,255,0.20)");
+      aura.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = aura;
+      ctx.beginPath(); ctx.arc(p.x, p.y + bob, dashActive ? 38 : 30, 0, TAU); ctx.fill();
+      ctx.restore();
+      for (let echo = 3; echo >= 1; echo--) {
+        drawSpriteAsset(ctx, "player", p.x - p.vx * echo * 1.8, p.y + bob + echo * (dashActive ? 5 : 2), {
+          rotation: tilt + Math.PI,
+          alpha: (dashActive ? 0.12 : 0.08) * echo,
+          glow: false,
+          filter: dashActive ? "sepia(1) saturate(2)" : "hue-rotate(18deg) saturate(1.4)"
+        });
+      }
+    }
+    const realmFilter = realmActive && state.playerRealm === 1 ? "hue-rotate(48deg) saturate(1.35)" : "";
+    if (drawSpriteAsset(ctx, "player", p.x, p.y + bob, {
+      rotation: tilt + Math.PI,
+      alpha: blinkAlpha,
+      filter: realmFilter
+    })) return;
+  }
 
   function drawCockpit(styleMode, sx = 1, sy = 1) {
     const c1 = styleMode === "normal" ? "rgba(255,255,255,0.95)" : styleMode === "ghost" ? "rgba(235,215,255,0.95)" : "rgba(235,250,255,0.95)";

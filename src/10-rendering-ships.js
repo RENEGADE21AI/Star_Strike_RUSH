@@ -205,7 +205,28 @@ function drawEnemyGeometry(kind, opts = {}) {
   const phase = opts.phase || 0;
   const chargeTelegraph = opts.chargeTelegraph || 0;
   if (!silhouette) ctx.globalAlpha = alpha;
-  if (!silhouette && typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, kind, 0, 0, { alpha })) {
+  const sprite = typeof spriteMeta === "function" ? spriteMeta(kind) : null;
+  if (!silhouette && sprite && sprite.source && !String(kind).startsWith("boss_") && typeof drawEnginePlume === "function") {
+    const plumeColors = {
+      orange: "255,168,72",
+      purple: "190,120,255",
+      phantom: "82,238,255",
+      siphon: "112,255,69",
+      minecaster: "255,106,45",
+      shieldbearer: "255,228,92",
+      railgunner: "255,60,78",
+      repair_drone: "159,255,192",
+      splitter: "186,255,54",
+      splitter_shard: "186,255,54"
+    };
+    drawEnginePlume(0, sprite.render.height * 0.30, {
+      scale: Math.max(0.42, sprite.render.width / 44),
+      alpha: alpha * 0.62,
+      color: plumeColors[kind] || "120,210,255",
+      phase
+    });
+  }
+  if (!silhouette && typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, kind, 0, 0, { alpha, hitFlash: hitMix })) {
     ctx.globalAlpha = 1;
     return;
   }

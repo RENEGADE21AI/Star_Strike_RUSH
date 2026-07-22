@@ -87,6 +87,10 @@ function debrisSpawnScale(age, duration = 30) {
   return t * t * (3 - 2 * t);
 }
 
+function bossCanTakeDamage(boss) {
+  return !!boss && boss.entered === true && boss.combatActive === true;
+}
+
 function createSiphonShot(origin, target, targetVelocity = {}, options = {}) {
   const speed = options.speed || 3.15;
   const dx = Number(target.x || 0) - Number(origin.x || 0);
@@ -124,5 +128,6 @@ globalThis.validateDoubleDebrisPlan = validateDoubleDebrisPlan;
 globalThis.debrisWardenAttackSequence = debrisWardenAttackSequence;
 globalThis.debrisWardenRowSpeed = debrisWardenRowSpeed;
 globalThis.debrisSpawnScale = debrisSpawnScale;
+globalThis.bossCanTakeDamage = bossCanTakeDamage;
 globalThis.createSiphonShot = createSiphonShot;
 globalThis.ghostActionProfile = ghostActionProfile;

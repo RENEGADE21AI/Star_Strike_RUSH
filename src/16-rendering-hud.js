@@ -30,7 +30,9 @@ function drawDesktopControlHint() {
   if (state.inputMode === "touch" || state.gameState !== "playing" || state.inputHintTimer <= 0) return;
   const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
   const text = `MOVE  WASD / ARROWS    ${profile.label}  SPACE / SHIFT`;
+  const fade = clamp(state.inputHintTimer / 42, 0, 1);
   ctx.save();
+  ctx.globalAlpha = fade;
   ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -179,7 +181,7 @@ function drawDebugHitboxes() {
   if (state.boss) drawCircles(`boss_${state.boss.mode}`, state.boss, 28, "#d7a7ff");
   ctx.restore();
 }
-function drawHUD() { drawTopLeftHUD(); drawTopRightHUD(); drawAnnouncements(); drawDesktopControlHint(); drawDebugHitboxes(); }
+function drawHUD() { drawTopLeftHUD(); drawTopRightHUD(); drawDesktopControlHint(); drawDebugHitboxes(); }
 function drawLowHpWarning() {
   if (!state.player || state.player.hp !== 1) return;
   const pulse = 0.5 + 0.5 * Math.sin(state.frame * 0.08);

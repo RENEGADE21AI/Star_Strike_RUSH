@@ -343,10 +343,51 @@ function drawPilotHologram(x, y) {
   ctx.beginPath(); ctx.ellipse(0, 0, 35, 50, 0, 0, TAU); ctx.stroke();
   ctx.setLineDash([]);
   ctx.rotate(state.frame * 0.006);
-  if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "player", 0, 0, { scale: 1.32 }))) {
+  if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "player", 0, 0, { scale: 1.32, rotation: Math.PI }))) {
     ctx.fillStyle = "#d8fbff";
     ctx.beginPath(); ctx.moveTo(0, -28); ctx.lineTo(-22, 22); ctx.lineTo(0, 12); ctx.lineTo(22, 22); ctx.closePath(); ctx.fill();
   }
+  ctx.restore();
+}
+function drawFlightNetworkCard(rect, online, user) {
+  const connected = !!(online && online.ready && user);
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 10); ctx.clip();
+  const background = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+  background.addColorStop(0, "rgba(8,22,34,0.94)");
+  background.addColorStop(1, "rgba(8,10,22,0.96)");
+  ctx.fillStyle = background; ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = "rgba(92,238,255,0.07)";
+  ctx.lineWidth = 1;
+  for (let x = rect.x; x < rect.x + rect.w; x += 22) { ctx.beginPath(); ctx.moveTo(x, rect.y); ctx.lineTo(x, rect.y + rect.h); ctx.stroke(); }
+  for (let y = rect.y; y < rect.y + rect.h; y += 18) { ctx.beginPath(); ctx.moveTo(rect.x, y); ctx.lineTo(rect.x + rect.w, y); ctx.stroke(); }
+  const radarX = rect.x + 58, radarY = rect.y + rect.h / 2;
+  ctx.strokeStyle = connected ? "rgba(120,255,180,0.34)" : "rgba(92,238,255,0.25)";
+  for (const radius of [14, 28, 42]) { ctx.beginPath(); ctx.arc(radarX, radarY, radius, 0, TAU); ctx.stroke(); }
+  const sweep = state.frame * 0.025;
+  ctx.strokeStyle = connected ? "rgba(120,255,180,0.82)" : "rgba(92,238,255,0.65)";
+  ctx.shadowColor = connected ? "#78ffb4" : "#5ceeff";
+  ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.moveTo(radarX, radarY); ctx.lineTo(radarX + Math.cos(sweep) * 42, radarY + Math.sin(sweep) * 42); ctx.stroke();
+  ctx.shadowBlur = 0;
+  for (let index = 0; index < 4; index++) {
+    const angle = index * 1.61 + 0.4;
+    const distance = 12 + index * 8;
+    ctx.fillStyle = index === 0 && connected ? "#78ffb4" : "rgba(92,238,255,0.70)";
+    ctx.beginPath(); ctx.arc(radarX + Math.cos(angle) * distance, radarY + Math.sin(angle) * distance, index === 0 ? 2.5 : 1.5, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  ctx.save();
+  ctx.strokeStyle = connected ? "rgba(120,255,180,0.38)" : "rgba(92,238,255,0.26)";
+  ctx.beginPath(); ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 10); ctx.stroke();
+  ctx.textAlign = "left"; ctx.textBaseline = "top";
+  ctx.font = FONT_TINY; ctx.fillStyle = "rgba(255,255,255,0.46)";
+  ctx.fillText("FLIGHT NETWORK", rect.x + 116, rect.y + 22);
+  ctx.font = "900 18px 'Arial Narrow', Arial, sans-serif";
+  ctx.fillStyle = connected ? "#78ffb4" : "#d8fbff";
+  ctx.fillText(connected ? "CONNECTED" : "LOCAL MODE", rect.x + 116, rect.y + 40);
+  ctx.font = FONT_TINY; ctx.fillStyle = "rgba(255,255,255,0.52)";
+  ctx.fillText(connected ? "PROFILE + LEAGUE SYNC ACTIVE" : "PLAY READY  /  SIGN IN TO SYNC", rect.x + 116, rect.y + 69);
   ctx.restore();
 }
 function drawOnlinePanel() {
@@ -399,6 +440,7 @@ function drawOnlinePanel() {
     ctx.fillStyle = handleStatus ? "#ffd27a" : (online.lastError ? "#ff9f9f" : "rgba(255,255,255,0.48)");
     ctx.fillText(String(handleStatus || online.lastError || online.lastStatus || "").slice(0, 48), panel.x + panel.w / 2, panel.y + 454);
     ctx.restore();
+    drawFlightNetworkCard({ x: panel.x + 20, y: panel.y + 514, w: panel.w - 40, h: 112 }, online, user);
   } else if (accountPanelTab === "league") {
     const league = online.weeklyLeague || null;
     const card = { x: panel.x + 20, y: panel.y + 96, w: panel.w - 40, h: 116 };

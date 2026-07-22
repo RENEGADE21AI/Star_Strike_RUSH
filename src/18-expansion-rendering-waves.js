@@ -151,6 +151,27 @@ function drawExpansionEnemyOverlay(e) {
 }
 
 function drawExpansionHazards() {
+  for (const lane of state.safeLanes || []) {
+    const rowColor = lane.row === 1 ? "76,255,196" : "115,188,255";
+    const pulse = 0.55 + 0.45 * Math.sin(state.frame * 0.08 + lane.row * 1.7);
+    const guide = ctx.createLinearGradient(lane.minX, 0, lane.maxX, 0);
+    guide.addColorStop(0, `rgba(${rowColor},0)`);
+    guide.addColorStop(0.25, `rgba(${rowColor},${0.025 + pulse * 0.018})`);
+    guide.addColorStop(0.75, `rgba(${rowColor},${0.025 + pulse * 0.018})`);
+    guide.addColorStop(1, `rgba(${rowColor},0)`);
+    ctx.save();
+    ctx.fillStyle = guide;
+    ctx.fillRect(lane.minX, 54, lane.width, H - 108);
+    ctx.strokeStyle = `rgba(${rowColor},${0.10 + pulse * 0.08})`;
+    ctx.setLineDash([3, 12]);
+    ctx.beginPath();
+    ctx.moveTo(lane.minX + lane.width * 0.16, 70);
+    ctx.lineTo(lane.minX + lane.width * 0.16, H - 54);
+    ctx.moveTo(lane.maxX - lane.width * 0.16, 70);
+    ctx.lineTo(lane.maxX - lane.width * 0.16, H - 54);
+    ctx.stroke();
+    ctx.restore();
+  }
   for (const g of state.gravityWells) {
     ctx.save();
     const alpha = g.warn > 0 ? 0.26 + Math.sin(state.frame * 0.24) * 0.10 : 0.34;
@@ -238,6 +259,8 @@ function drawExpansionBoss(b) {
   if (!b || !isExpansionBossMode(b.mode)) return false;
   const hpPct = b.hp / b.maxHp;
   const bob = Math.sin(state.frame * 0.04 + b.movePhase) * 1.5;
+  const bossMeta = typeof getCodexMeta === "function" ? getCodexMeta("boss_" + b.mode) : { color: "#fff" };
+  if (typeof drawBossAura === "function") drawBossAura(b.x, b.y + bob, b.w, bossMeta.color || "#ffffff");
   ctx.save();
   ctx.translate(b.x, b.y + bob);
   ctx.rotate(Math.sin(state.frame * 0.022 + b.movePhase) * 0.025);
@@ -250,13 +273,7 @@ function drawExpansionBoss(b) {
     ctx.beginPath(); ctx.arc(0, 0, Math.max(b.w, b.h) * 0.34 + Math.sin(state.frame * 0.22) * 4, 0, TAU); ctx.stroke();
   }
   ctx.restore();
-  const barW = Math.min(320, W - 40), barX = (W - barW) / 2, barY = 16;
-  ctx.fillStyle = "rgba(255,255,255,0.16)";
-  ctx.fillRect(barX, barY, barW, 10);
-  ctx.fillStyle = getCodexMeta("boss_" + b.mode).color;
-  ctx.fillRect(barX, barY, barW * hpPct, 10);
-  ctx.strokeStyle = "#fff";
-  ctx.strokeRect(barX, barY, barW, 10);
+  if (typeof drawBossHealthBar === "function") drawBossHealthBar(b, bossMeta.color || "#ff455c");
   return true;
 }
 

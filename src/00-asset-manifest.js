@@ -17,9 +17,9 @@ const SPRITE_MANIFEST = Object.freeze({
   phantom: { source: "assets/sprites/enemy-phantom.png", render: { width: 37, height: 39, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 11.5 }] },
   splitter: { source: "assets/sprites/enemy-splitter.png", render: { width: 36, height: 37, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 12 }] },
   splitter_shard: { source: "assets/sprites/enemy-splitter-shard.png", render: { width: 15, height: 20, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 6 }] },
-  carrier: { source: null, render: { width: 56, height: 39, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 20 }] },
+  carrier: { source: "assets/sprites/enemy-carrier.png", render: { width: 58, height: 55, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 18 }, { offsetX: -17, offsetY: 4, radius: 9 }, { offsetX: 17, offsetY: 4, radius: 9 }] },
   siphon: { source: "assets/sprites/enemy-siphon.png", render: { width: 27, height: 40, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 11 }] , projectileOrigin: { offsetX: 0, offsetY: 11 } },
-  leech: { source: null, render: { width: 39, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 13 }] },
+  leech: { source: "assets/sprites/enemy-leech.png", render: { width: 43, height: 39, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 13 }] },
   minecaster: { source: "assets/sprites/enemy-minecaster.png", render: { width: 36, height: 32, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 12 }] },
   shieldbearer: { source: "assets/sprites/enemy-shieldbearer.png", render: { width: 42, height: 39, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 13 }] },
   railgunner: { source: "assets/sprites/enemy-railgunner.png", render: { width: 30, height: 42, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 2, radius: 11 }] , projectileOrigin: { offsetX: 0, offsetY: 14 } },
@@ -52,7 +52,11 @@ const SPRITE_MANIFEST = Object.freeze({
   player_bullet: { source: null, render: { width: 4, height: 12, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 2, radius: 2.4 }] },
   enemy_bullet: { source: null, render: { width: 7, height: 11, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 3.4 }] },
   drainShot: { source: null, render: { width: 13, height: 13, anchorX: 0.5, anchorY: 0.5, glow: "#70ff45" }, collision: [{ offsetX: 0, offsetY: 0, radius: 4.3 }] },
-  powerup: { source: null, render: { width: 25, height: 25, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 17 }] }
+  powerup: { source: null, render: { width: 25, height: 25, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 17 }] },
+  ui_trophy: { source: "assets/ui/menu-trophy.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
+  ui_road: { source: "assets/ui/menu-road.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
+  ui_world: { source: "assets/ui/menu-world.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
+  ui_codex: { source: "assets/ui/menu-codex.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] }
 });
 
 const spriteAssetRuntime = { ready: false, images: new Map(), failed: new Set() };
@@ -121,6 +125,11 @@ function drawSpriteAsset(targetContext, key, x, y, options = {}) {
   const height = render.height * drawScale;
   targetContext.save();
   targetContext.globalAlpha = options.alpha == null ? 1 : options.alpha;
+  if (options.filter) targetContext.filter = String(options.filter);
+  else if (options.hitFlash > 0) {
+    const flash = Math.max(0, Math.min(1, Number(options.hitFlash)));
+    targetContext.filter = `brightness(${1 + flash * 1.25}) saturate(${1 - flash * 0.35})`;
+  }
   if (render.glow && options.glow !== false) {
     targetContext.shadowColor = render.glow;
     targetContext.shadowBlur = 10 * drawScale;
