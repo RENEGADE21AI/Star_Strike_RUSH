@@ -13,8 +13,11 @@ after the files they depend on, because the current code intentionally shares gl
   aim/range calculations, and boss-specific action profiles.
 - `00-input-actions.js`: explicit gameplay actions and meaningful-input mode
   switching for keyboard, mouse, touch, and pen.
+- `00-runtime.js`: deterministic fixed-step simulation clock, render-rate
+  independence, and long-background-gap clamping.
 - `01-core.js`: canvas handles, constants, persistent settings, global state, scoring.
-- `02-effects-powerups.js`: particles, drops, wingmen, ghost action, star updates.
+- `02-effects-powerups.js`: particles, rotating artwork-backed drops, wingmen,
+  ghost action, and star updates.
 - `03-pacing.js`: phase timing, pressure, difficulty, bullet budget, dev skip.
 - `04-waves.js`: wave templates, wave selection, codex discovery, wave spawning.
 - `05-entities.js`: enemy spawning, player shots, bullet and wingman updates.
@@ -46,13 +49,16 @@ after the files they depend on, because the current code intentionally shares gl
   progress-road drag/claim input, and reset-progress confirmation.
 - `18-session-input-loop.js`: session setup, resize, input events, update loop,
   and the hidden `#debugSnapshot` smoke-test state when loaded with `?debug=1`.
-  Debug-only `scenario=siphon` and `scenario=debris` URLs create deterministic
+  Local debug-only `scenario=siphon`, `scenario=debris`,
+  `scenario=debris-incoming`, and `scenario=powerups` URLs create deterministic
   QA encounters; `H` toggles hitboxes, anchors, origins, and safe lanes.
 - `19-game-achievements.js`: run stat payloads, achievement definitions, and
   online sync hooks called by the game loop.
-- `20-firebase-online.js`: Firebase Auth, callable competition services, graceful
-  backend-unavailable state, global best-score records, and earned achievements. It intentionally does not
-  commit Firebase API keys; it loads config from Firebase Hosting
+- `20-firebase-online.js`: Firebase Auth, callable profile/handle services,
+  graceful backend-unavailable state, and the explicit recovery competition
+  gate. Public score/league submission and leaderboard subscription remain
+  disabled until server-issued run verification ships. It intentionally does
+  not commit Firebase API keys; it loads config from Firebase Hosting
   `/__/firebase/init.json` or ignored `src/firebase-config.local.json`.
 
 ## Firebase Config

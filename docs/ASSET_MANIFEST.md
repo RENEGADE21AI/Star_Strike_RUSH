@@ -1,37 +1,64 @@
 # Asset Manifest
 
-Audited against repository commit `529aca1` and its reachable Git history on
-2026-07-21.
+Audited on 2026-07-22 against the stabilization recovery branch.
 
-## Inventory result
+## Inventory
 
-No PNG, JPEG, WebP, GIF, SVG, or Git LFS image objects are present in this
-checkout or its reachable history. There are therefore no file dimensions,
-alpha channels, subjects, authors, or provenance claims to record. Star Strike
-RUSH currently renders its ships, hazards, icons, backgrounds, particles, and
-interface with Canvas primitives.
+The project owner supplied 43 original PNG files. They are preserved unchanged
+under `source-art/` alongside a short archive README and are excluded from the
+Firebase Hosting payload.
 
-The runtime registry in `src/00-asset-manifest.js` is the authoritative asset
-contract. Every registered gameplay entity has:
+The public runtime contains 45 optimized PNG derivatives:
 
-- a nullable source path;
-- intended render width, height, anchor, and optional glow;
-- one or more collision circles that exclude decorative mass;
-- optional projectile origin and health-bar metadata.
+- `assets/sprites/`: 25 player, enemy, boss, and asteroid sprites.
+- `assets/powerups/`: 13 powerup icons.
+- `assets/ui/`: 7 menu, favicon, and PWA icons.
 
-All current `source` fields are intentionally `null`. The procedural art is the
-verified fallback and remains the primary renderer until actual image files are
-added. The preload gate completes before the animation loop begins, tolerates a
-failed noncritical image, and the renderer automatically falls back to Canvas.
+The derivative count is larger because the supplied favicon generates multiple
+PWA sizes. No authorship or third-party-license claim is inferred from a file
+name; these files are documented only as artwork supplied by the project owner.
 
-## Adding future art safely
+## Runtime contract
 
-1. Add the file using a lowercase, case-safe path such as `assets/ships/red.png`.
-2. Visually inspect its subject, transparent padding, and orientation.
-3. Set only that entity's `source` and tune its manifest render metadata.
-4. Keep collision geometry based on visible solid mass, not the image rectangle.
-5. Run `node --test` over every file in `tests/` and inspect the hitbox overlay
-   at `?debug=1&hitboxes=1` or toggle it with `H`.
+`src/00-asset-manifest.js` is authoritative. Every registered entity defines:
 
-No user-provided images were deleted or replaced during this work because none
-were present.
+- a case-safe deployed source path;
+- intended render size, anchor, and optional glow;
+- explicit art orientation and gameplay forward direction;
+- one or more collision circles that exclude transparent padding and
+  decorative silhouette mass;
+- optional projectile and exhaust origins.
+
+Powerup images render at 28 logical pixels—smaller than primary ship art—while
+pickup collision stays at an independent 18-pixel radius. Each drop advances a
+simulation-owned rotation while falling. The renderer intentionally has no
+dotted energy orbit behind powerup art.
+
+## Import pipeline
+
+Run `scripts/import_user_art.py` with Pillow available to rebuild derivatives.
+The script:
+
+1. loads originals from the configured source-art/Downloads locations;
+2. converts baked light checkerboards to transparency;
+3. trims excess transparent space around the visible subject;
+4. adds consistent safe padding;
+5. creates browser-sized PNGs in `assets/`.
+
+The originals are never rewritten. Collision geometry must be tuned in the
+manifest after visual inspection; it is never inferred from the full image
+rectangle.
+
+## Validation
+
+- `tests/powerup-art.test.js` verifies every gameplay powerup source, size,
+  collision metadata, falling rotation, and removal of the dotted ring.
+- `tests/sprite-orientation.test.js` verifies forward, weapon, and exhaust
+  orientation contracts.
+- `tests/collision-contract.test.js` verifies object-only collision calls,
+  boss circles, and asteroid spawn-scale collision growth.
+- Local `?debug=1&scenario=powerups` renders all 13 supplied powerups together.
+- Local `?debug=1&hitboxes=1` shows hit circles, anchors, origins, and safe lanes.
+
+Procedural Canvas drawings remain decode-failure fallbacks; the normal runtime
+path uses the optimized supplied artwork.
