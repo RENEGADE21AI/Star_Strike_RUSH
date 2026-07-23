@@ -27,6 +27,11 @@ test("friendly and hostile artwork have coherent forward, weapon, and exhaust di
   assert.equal(player.orientation.forwardY, -1);
   assert.ok(player.projectileOrigin.offsetY < 0);
   assert.ok(player.exhaustOrigin.offsetY > 0);
+  const wingman = context.SPRITE_MANIFEST.wingman;
+  assert.equal(wingman.orientation.forwardY, -1);
+  assert.equal(wingman.orientation.baseRotation, Math.PI);
+  assert.ok(wingman.projectileOrigin.offsetY < 0);
+  assert.ok(wingman.exhaustOrigin.offsetY > 0);
 
   for (const key of ["red", "orange", "siphon", "leech", "carrier", "boss_debris_warden"]) {
     const meta = context.SPRITE_MANIFEST[key];

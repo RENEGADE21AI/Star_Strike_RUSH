@@ -26,58 +26,58 @@ function makeTitleFormation(lane = 0, dir = 1, spawnAbove = false) {
   const layerRoll = Math.random();
   const depthLayer = layerRoll < 0.38 ? "distant" : layerRoll < 0.82 ? "midground" : "foreground";
   const layerProfile = depthLayer === "distant"
-    ? { scale: rand(0.34, 0.46), alpha: rand(0.25, 0.42), speed: 0.72, blur: 1.2, order: 0 }
+    ? { scale: rand(0.50, 0.66), alpha: rand(0.24, 0.38), speed: 0.78, blur: 1.4, order: 0 }
     : depthLayer === "foreground"
-      ? { scale: rand(0.78, 0.98), alpha: rand(0.72, 0.92), speed: 1.18, blur: 0, order: 2 }
-      : { scale: rand(0.52, 0.70), alpha: rand(0.48, 0.70), speed: 0.92, blur: 0.35, order: 1 };
+      ? { scale: rand(1.12, 1.42), alpha: rand(0.72, 0.90), speed: 1.12, blur: 0, order: 2 }
+      : { scale: rand(0.76, 0.98), alpha: rand(0.46, 0.66), speed: 0.94, blur: 0.35, order: 1 };
 
   let x = 0, y = 0, vx = 0, vy = 0, baseY = laneYs[lane] + rand(-8, 8);
-  let pathDuration = 180, speed = rand(0.8, 1.0);
+  const traversalFrames = Math.round(rand(270, 510) / layerProfile.speed);
+  let pathDuration = traversalFrames, speed = (W + 160) / traversalFrames;
   let startX = 0, startY = 0;
 
   if (pathType === "horizontal") {
     dir = Math.random() < 0.5 ? 1 : -1;
-    startX = dir > 0 ? -rand(180, 320) : W + rand(180, 320);
+    startX = dir > 0 ? -80 : W + 80;
     x = startX;
     y = baseY;
-    vx = dir * rand(0.55, 0.82);
+    vx = dir * speed;
     vy = 0;
-    pathDuration = Math.ceil((W + 420) / Math.max(0.55, Math.abs(vx))) + 120;
+    pathDuration = traversalFrames;
   } else if (pathType === "diagonal") {
     const corners = [
-      [-120, -120, 1, 1],
-      [W + 120, -120, -1, 1],
-      [-120, H + 120, 1, -1],
-      [W + 120, H + 120, -1, -1]
+      [-70, -70, 1, 1],
+      [W + 70, -70, -1, 1],
+      [-70, H + 70, 1, -1],
+      [W + 70, H + 70, -1, -1]
     ];
     const c = corners[Math.floor(Math.random() * corners.length)];
     x = startX = c[0];
     y = startY = c[1];
-    vx = c[2] * rand(0.55, 0.78);
-    vy = c[3] * rand(0.55, 0.78);
-    pathDuration = Math.ceil(Math.max(W, H) / 0.85) + 120;
+    vx = c[2] * Math.max(0.75, (W + 140) / traversalFrames);
+    vy = c[3] * Math.max(0.75, (H + 140) / traversalFrames);
+    pathDuration = traversalFrames;
   } else if (pathType === "sweep") {
     dir = Math.random() < 0.5 ? 1 : -1;
-    startX = dir > 0 ? -rand(180, 280) : W + rand(180, 280);
+    startX = dir > 0 ? -80 : W + 80;
     x = startX;
     baseY = H * rand(0.15, 0.30);
     y = baseY;
-    vx = dir * rand(0.50, 0.78);
+    vx = dir * speed;
     vy = 0;
-    pathDuration = Math.ceil((W + 420) / Math.max(0.55, Math.abs(vx))) + 140;
+    pathDuration = traversalFrames;
   } else if (pathType === "figure_pass") {
     x = startX = W * rand(0.22, 0.78);
     y = startY = -120;
-    pathDuration = 240;
-    speed = rand(0.55, 0.70);
+    pathDuration = traversalFrames;
   } else if (pathType === "strafe") {
     dir = Math.random() < 0.5 ? 1 : -1;
-    startX = dir > 0 ? -rand(200, 300) : W + rand(200, 300);
+    startX = dir > 0 ? -90 : W + 90;
     x = startX;
     y = startY = H * rand(0.40, 0.70);
-    vx = dir * rand(0.90, 1.10);
+    vx = dir * speed * 1.15;
     vy = rand(0.15, 0.25) * (Math.random() < 0.5 ? -1 : 1);
-    pathDuration = Math.ceil((W + 420) / Math.max(0.90, Math.abs(vx))) + 120;
+    pathDuration = traversalFrames;
   }
   speed *= layerProfile.speed;
   vx *= layerProfile.speed;
@@ -92,6 +92,7 @@ function makeTitleFormation(lane = 0, dir = 1, spawnAbove = false) {
     pathType,
     pathT: 0,
     pathDuration,
+    traversalFrames,
     startX,
     startY,
     enterX: x,
@@ -131,12 +132,28 @@ function initTitleFormations() {
     const lane = i % titleLaneYs().length;
     const dir = lane % 2 === 0 ? 1 : -1;
     const f = makeTitleFormation(lane, dir, true);
-    if (f.pathType === "horizontal") {
-      f.x = dir > 0 ? -rand(200, 360) : W + rand(200, 360);
-    }
+    f.pathType = "horizontal";
+    f.dir = dir;
+    f.speed = (W + 160) / f.traversalFrames;
+    f.vx = dir * f.speed;
+    f.vy = 0;
+    f.x = i === 0 ? W * 0.18 : W * 0.82;
+    f.y = f.baseY = i === 0 ? H * 0.82 : H * 0.28;
+    f.renderScale = i === 0 ? 1.35 : 0.92;
+    f.renderAlpha = i === 0 ? 0.86 : 0.62;
+    f.renderBlur = 0;
+    f.drawOrder = i === 0 ? 2 : 1;
+    f.pathT = Math.round(f.traversalFrames * (i === 0 ? 0.28 : 0.58));
     state.titleFormations.push(f);
     state.titleLaneCooldowns[lane] = 90 + lane * 12;
   }
+}
+function titlePathReservationConflict(newF, other, futureFrames) {
+  const newX = newF.x + (newF.vx || newF.dir * newF.speed || 0) * futureFrames;
+  const newY = newF.y + (newF.vy || 0) * futureFrames;
+  const otherX = other.x + (other.vx || other.dir * other.speed || 0) * futureFrames;
+  const otherY = other.y + (other.vy || 0) * futureFrames;
+  return Math.hypot(otherX - newX, otherY - newY) < 150;
 }
 function formationSpawnWouldOverlap(newF) {
   for (const other of state.titleFormations) {
@@ -146,6 +163,7 @@ function formationSpawnWouldOverlap(newF) {
     const closeX = Math.abs(other.x - newF.x) < 200;
     if (yOverlap && sameDir && closeX) return true;
     if (Math.hypot(other.x - newF.x, other.y - newF.baseY) < 140) return true;
+    if ([45, 90, 135].some((frames) => titlePathReservationConflict(newF, other, frames))) return true;
   }
   return false;
 }

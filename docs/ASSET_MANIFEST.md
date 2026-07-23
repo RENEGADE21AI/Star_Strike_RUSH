@@ -1,16 +1,16 @@
 # Asset Manifest
 
-Audited on 2026-07-22 against the stabilization recovery branch.
+Audited on 2026-07-23 against the final polish branch.
 
 ## Inventory
 
-The project owner supplied 43 original PNG files. They are preserved unchanged
+The project owner supplied 44 original PNG files. They are preserved unchanged
 under `source-art/` alongside a short archive README and are excluded from the
 Firebase Hosting payload.
 
-The public runtime contains 45 optimized PNG derivatives:
+The public runtime contains 46 optimized PNG derivatives:
 
-- `assets/sprites/`: 25 player, enemy, boss, and asteroid sprites.
+- `assets/sprites/`: 26 player, wingman, enemy, boss, and asteroid sprites.
 - `assets/powerups/`: 13 powerup icons.
 - `assets/ui/`: 7 menu, favicon, and PWA icons.
 
@@ -58,6 +58,8 @@ rectangle.
 - `tests/collision-contract.test.js` verifies object-only collision calls,
   boss circles, and asteroid spawn-scale collision growth.
 - Local `?debug=1&scenario=powerups` renders all 13 supplied powerups together.
+- Local `?debug=1&scenario=wingman` renders two compact supplied-art wingmen
+  beside the player and confirms all three friendly craft face forward/up.
 - Local `?debug=1&hitboxes=1` shows hit circles, anchors, origins, and safe lanes.
 
 Procedural Canvas drawings remain decode-failure fallbacks; the normal runtime

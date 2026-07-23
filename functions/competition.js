@@ -1,3 +1,6 @@
+const { HttpsError } = require("firebase-functions/v2/https");
+
+const COMPETITIVE_MODE_ENABLED = false;
 const HANDLE_MIN_LENGTH = 3;
 const HANDLE_MAX_LENGTH = 16;
 const RESERVED_HANDLES = new Set([
@@ -60,13 +63,26 @@ function publicLeagueMember(raw = {}) {
   };
 }
 
+function requireCompetitionEnabled() {
+  if (!COMPETITIVE_MODE_ENABLED) {
+    throw new HttpsError("failed-precondition", "Public competition is paused during preseason hardening.");
+  }
+}
+
+function competitionWritesEnabled() {
+  return COMPETITIVE_MODE_ENABLED;
+}
+
 module.exports = {
+  COMPETITIVE_MODE_ENABLED,
   HANDLE_MAX_LENGTH,
   HANDLE_MIN_LENGTH,
   divisionName,
+  competitionWritesEnabled,
   normalizeHandle,
   performanceBand,
   publicLeagueMember,
+  requireCompetitionEnabled,
   validateHandle,
   weekWindow
 };

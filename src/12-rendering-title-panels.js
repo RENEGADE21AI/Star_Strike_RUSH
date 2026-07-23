@@ -475,7 +475,7 @@ function drawOnlinePanel() {
   const panel = r.panel;
   const online = onlineState();
   const user = online.user || null;
-  const name = callSignEditing ? callSignDraft : (user ? (online.profileCallSign || callSign || "PILOT") : callSign);
+  const name = callSignEditing ? callSignDraft : (user ? (online.profileCallSign || "PILOT") : callSign);
   const handle = handleEditing ? handleDraft : String(online.profileHandle || "");
   const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
   drawTitlePanelFrame(panel, "PILOT DOSSIER", false);
@@ -608,8 +608,7 @@ function drawRecordsPanel() {
   const panel = r.panel;
   const online = onlineState();
   const user = online.user || null;
-  const competitionEnabled = globalThis.COMPETITIVE_MODE_ENABLED === true;
-  const leaderboard = competitionEnabled && Array.isArray(online.leaderboard) ? online.leaderboard : [];
+  const leaderboard = Array.isArray(online.leaderboard) ? online.leaderboard : [];
   drawTitlePanelFrame(panel, "WORLD RECORDS");
   drawPanelCloseButton(r.closeRect);
 
@@ -619,7 +618,7 @@ function drawRecordsPanel() {
   let listY = panel.y + 82;
   ctx.font = FONT_SMALL;
   ctx.fillStyle = "rgba(255,255,255,0.70)";
-  ctx.fillText(competitionEnabled ? (user ? "GLOBAL BEST-SCORE LADDER" : "SIGN IN TO LOAD GLOBAL SCORES") : "PUBLIC SCORING PAUSED FOR FAIR-PLAY HARDENING", panel.x + 20, listY);
+  ctx.fillText(user ? "GLOBAL BEST-SCORE LADDER" : "SIGN IN TO LOAD GLOBAL SCORES", panel.x + 20, listY);
   listY += 30;
   ctx.font = FONT_TINY;
   if (leaderboard.length) {
@@ -637,7 +636,7 @@ function drawRecordsPanel() {
     });
   } else {
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText(competitionEnabled ? (user ? "No synced records yet." : "Use the account chip to sign in.") : `LOCAL BEST  ${Number(highScore || 0).toLocaleString()}`, panel.x + 22, listY);
+    ctx.fillText(user ? "No synced records yet." : `LOCAL BEST  ${Number(highScore || 0).toLocaleString()}  •  SIGN IN FOR WORLD RECORDS`, panel.x + 22, listY);
   }
   ctx.restore();
 }
@@ -646,7 +645,12 @@ function drawAchievementsPanel() {
   const panel = r.panel;
   const online = onlineState();
   const definitions = typeof getAchievementDefinitions === "function" ? getAchievementDefinitions() : [];
-  const earned = new Set((Array.isArray(online.achievements) ? online.achievements : []).map((item) => typeof item === "string" ? item : item.achievementId));
+  const onlineEarned = (Array.isArray(online.achievements) ? online.achievements : [])
+    .map((item) => typeof item === "string" ? item : item.achievementId);
+  const earnedIds = typeof mergedAchievementIds === "function"
+    ? mergedAchievementIds(onlineEarned)
+    : onlineEarned;
+  const earned = new Set(earnedIds);
   drawTitlePanelFrame(panel, "ACHIEVEMENTS");
   drawPanelCloseButton(r.closeRect);
 
@@ -661,7 +665,7 @@ function drawAchievementsPanel() {
   drawMetaBar(panel.x + 20, y + 20, panel.w - 40, earned.size / total, "rgba(120,255,180,0.68)");
   y += 42;
   ctx.font = FONT_TINY;
-  for (const achievement of definitions.slice(0, 12)) {
+  for (const achievement of definitions) {
     const unlocked = earned.has(achievement.id);
     ctx.fillStyle = unlocked ? "rgba(120,255,180,0.13)" : "rgba(255,255,255,0.05)";
     ctx.fillRect(panel.x + 20, y - 3, panel.w - 40, 23);
@@ -675,7 +679,7 @@ function drawAchievementsPanel() {
   }
   if (!online.user) {
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText("SIGN IN FROM ACCOUNT TO SYNC BADGES.", panel.x + 20, panel.y + panel.h - 28);
+    ctx.fillText("UNLOCKS SAVE LOCALLY • SIGN IN TO SYNC", panel.x + 20, panel.y + panel.h - 20);
   }
   ctx.restore();
 }

@@ -185,18 +185,26 @@ function setCallSignStatus(message, stateName = "idle", frames = 150) {
   callSignSaveState = stateName;
   callSignStatusTimer = Math.max(0, Math.floor(frames || 0));
 }
+function accountIdentitySnapshot() {
+  const service = window.starStrikeOnline;
+  return service && typeof service.getState === "function" ? service.getState() : {};
+}
+function editableCallSign() {
+  const online = accountIdentitySnapshot();
+  return online.user ? sanitizeCallSign(online.profileCallSign || "") : callSign;
+}
 function beginCallSignEditing() {
   callSignEditing = true;
-  callSignDraft = callSign;
+  callSignDraft = editableCallSign();
   callSignInputEl.value = callSignDraft;
-  setCallSignStatus("ENTER SAVES  |  ESC CANCELS", "editing", 0);
+  setCallSignStatus("", "editing", 0);
   callSignInputEl.focus();
 }
 function cancelCallSignEditing() {
   callSignEditing = false;
-  callSignDraft = callSign;
-  callSignInputEl.value = callSign;
-  setCallSignStatus("EDIT CANCELLED", "idle", 70);
+  callSignDraft = editableCallSign();
+  callSignInputEl.value = callSignDraft;
+  setCallSignStatus("", "idle", 0);
   callSignInputEl.blur();
 }
 function commitCallSignDraft(fromBlur = false) {
@@ -206,8 +214,8 @@ function commitCallSignDraft(fromBlur = false) {
   if (!result.ok) {
     if (fromBlur) {
       callSignEditing = false;
-      callSignDraft = callSign;
-      callSignInputEl.value = callSign;
+      callSignDraft = editableCallSign();
+      callSignInputEl.value = callSignDraft;
       setCallSignStatus(result.message || "INVALID CALL SIGN", "error", 150);
       return false;
     }
@@ -216,26 +224,30 @@ function commitCallSignDraft(fromBlur = false) {
     callSignInputEl.focus();
     return false;
   }
-  callSign = result.callSign;
-  callSignDraft = callSign;
-  callSignInputEl.value = callSign;
-  saveCallSign();
+  const onlineBeforeSave = accountIdentitySnapshot();
+  const savingAccountIdentity = !!onlineBeforeSave.user;
+  callSignDraft = result.callSign;
+  callSignInputEl.value = callSignDraft;
+  if (!savingAccountIdentity) {
+    callSign = result.callSign;
+    saveCallSign();
+  }
   callSignEditing = false;
   setCallSignStatus(result.message || "PILOT ID SAVED", "success", 150);
   callSignInputEl.blur();
   const onlineService = window.starStrikeOnline;
-  if (onlineService && typeof onlineService.updateCallSign === "function") {
+  if (savingAccountIdentity && onlineService && typeof onlineService.updateCallSign === "function") {
     setCallSignStatus("SAVING PILOT ID...", "saving", 0);
-    Promise.resolve(onlineService.updateCallSign(callSign)).then((syncResult) => {
+    Promise.resolve(onlineService.updateCallSign(result.callSign)).then((syncResult) => {
       if (syncResult && syncResult.localOnly) {
-        setCallSignStatus("SAVED LOCALLY | COMPETITION OFFLINE", "error", 210);
+        setCallSignStatus("ACCOUNT SAVE UNAVAILABLE", "error", 210);
       } else {
         setCallSignStatus("PILOT ID SYNCED", "success", 150);
       }
     }).catch(() => {
       setCallSignStatus("SAVED LOCALLY | ONLINE SYNC FAILED", "error", 210);
     });
-  }
+  } else if (!savingAccountIdentity) setCallSignStatus("LOCAL CALL SIGN SAVED", "success", 120);
   return true;
 }
 function setHandleStatus(message, frames = 150) {
@@ -634,7 +646,10 @@ function showNextMessage() {
   }
 }
 function showMessage(text, frames = 90) {
-  if (state.gameState === "playing" || state.gameState === "paused" || state.gameState === "resuming") return;
+  if (state.gameState === "playing" || state.gameState === "paused" || state.gameState === "resuming") {
+    pushGameNotice(text);
+    return;
+  }
   const item = { text, frames };
   if (state.messageTimer > 0 || state.messageQueue.length > 0) state.messageQueue.push(item);
   else {
@@ -642,6 +657,11 @@ function showMessage(text, frames = 90) {
     state.messageTimer = frames;
     state.messageMax = frames;
   }
+}
+function pushGameNotice(text, category = "") {
+  if (!text || typeof createGameNotice !== "function") return;
+  state.notices.push(createGameNotice(text, category));
+  state.notices = state.notices.slice(-3);
 }
 function circleHit(ax, ay, ar, bx, by, br) { return Math.hypot(ax - bx, ay - by) < ar + br; }
 function laneCenters() { return [W * 0.22, W * 0.50, W * 0.78]; }
@@ -706,6 +726,8 @@ const state = {
   titleLaneCursor: 0,
   titleSpawnTimer: 0,
   score: 0,
+  runStartingHighScore: 0,
+  newHighScore: false,
   multiplier: 1,
   comboKills: 0,
   comboPulse: 0,
@@ -724,6 +746,7 @@ const state = {
   messageTimer: 0,
   messageMax: 0,
   messageQueue: [],
+  notices: [],
   fx: { shake: 0, flash: 0 },
   gameOverShake: 0,
   gameOverShakeTimer: 0,

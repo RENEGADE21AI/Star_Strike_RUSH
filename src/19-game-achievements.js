@@ -16,6 +16,10 @@ const ACHIEVEMENT_DEFINITIONS = [
   { id: "power_hungry", name: "Power Hungry", description: "Collect 8 powerups.", minPowerups: 8 },
   { id: "swarm_clearer", name: "Swarm Clearer", description: "Destroy 25 enemies.", minKills: 25 }
 ];
+const LOCAL_ACHIEVEMENT_IDS = ACHIEVEMENT_DEFINITIONS.map((achievement) => achievement.id);
+let localAchievementIds = typeof loadLocalAchievementIds === "function"
+  ? loadLocalAchievementIds(localStorage, LOCAL_ACHIEVEMENT_IDS)
+  : [];
 
 function getAchievementDefinitions() {
   return ACHIEVEMENT_DEFINITIONS.map((item) => ({ ...item }));
@@ -33,6 +37,26 @@ function runMeetsAchievement(run, achievement) {
 
 function earnedAchievementsForRun(run) {
   return ACHIEVEMENT_DEFINITIONS.filter((achievement) => runMeetsAchievement(run, achievement));
+}
+
+function getLocalAchievementIds() {
+  return localAchievementIds.slice();
+}
+
+function mergedAchievementIds(onlineIds = []) {
+  return typeof mergeAchievementIds === "function"
+    ? mergeAchievementIds(localAchievementIds, onlineIds, LOCAL_ACHIEVEMENT_IDS)
+    : Array.from(new Set([...localAchievementIds, ...onlineIds]));
+}
+
+function unlockLocalAchievementsForRun(run) {
+  const before = new Set(localAchievementIds);
+  const earned = earnedAchievementsForRun(run).map((achievement) => achievement.id);
+  localAchievementIds = mergedAchievementIds(earned);
+  if (typeof saveLocalAchievementIds === "function") {
+    localAchievementIds = saveLocalAchievementIds(localStorage, localAchievementIds, LOCAL_ACHIEVEMENT_IDS);
+  }
+  return localAchievementIds.filter((id) => !before.has(id));
 }
 
 function currentRunStatsSnapshot() {
@@ -92,11 +116,13 @@ function callOnlineService(method, fallbackMessage, ...args) {
 }
 
 function submitOnlineRun() {
-  callOnlineService("submitRun", "SIGN IN TO SYNC", buildOnlineRunPayload());
+  const run = buildOnlineRunPayload();
+  unlockLocalAchievementsForRun(run);
+  callOnlineService("submitRun", "SIGN IN TO SYNC", run);
 }
 
 function requestOnlineSignIn() {
-  callOnlineService("signIn", "ONLINE NOT READY", sanitizeCallSign(callSign || ""));
+  callOnlineService("signIn", "ONLINE NOT READY");
 }
 
 function requestOnlineSignOut() {

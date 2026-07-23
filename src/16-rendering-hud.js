@@ -187,6 +187,39 @@ function drawDebugHitboxes() {
   if (state.boss) drawCircles(`boss_${state.boss.mode}`, state.boss, 28, "#d7a7ff");
   ctx.restore();
 }
+function drawGameNotices() {
+  const notices = Array.isArray(state.notices) ? state.notices : [];
+  if (!notices.length || state.gameState !== "playing") return;
+  const colors = {
+    discovery: "#86f7ff",
+    phase: "#ffe889",
+    powerup: "#9dffb0",
+    boss: "#ff9ed8",
+    warning: "#ffad78",
+    system: "#c7d9ef"
+  };
+  ctx.save();
+  ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
+  ctx.textBaseline = "middle";
+  for (let index = 0; index < notices.length; index++) {
+    const notice = notices[index];
+    const progress = clamp(notice.age / Math.max(1, notice.duration), 0, 1);
+    const edgeFade = Math.min(1, notice.age / 10, (notice.duration - notice.age) / 18);
+    ctx.globalAlpha = clamp(edgeFade, 0, 1) * 0.82;
+    ctx.fillStyle = colors[notice.category] || colors.system;
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = settingReducedFlash ? 0 : 7;
+    if (notice.rail === "traverse") {
+      const x = settingReducedMotion ? 12 : 10 + (W - 20) * progress;
+      ctx.textAlign = settingReducedMotion ? "left" : (progress > 0.72 ? "right" : "left");
+      ctx.fillText(notice.text, x, H * 0.52 + index * 14);
+    } else {
+      ctx.textAlign = "right";
+      ctx.fillText(notice.text, W - 10, H * 0.37 + index * 15);
+    }
+  }
+  ctx.restore();
+}
 function getPauseButtonRect() { return { x: W / 2 - 18, y: 12, w: 36, h: 28 }; }
 function getPauseOverlayRects() {
   return {
@@ -240,7 +273,7 @@ function drawPauseOverlay() {
   }
   ctx.restore();
 }
-function drawHUD() { drawTopLeftHUD(); drawTopRightHUD(); drawPauseButton(); drawDesktopControlHint(); drawDebugHitboxes(); }
+function drawHUD() { drawTopLeftHUD(); drawTopRightHUD(); drawGameNotices(); drawPauseButton(); drawDesktopControlHint(); drawDebugHitboxes(); }
 function drawLowHpWarning() {
   if (!state.player || state.player.hp !== 1) return;
   const pulse = settingReducedFlash ? 0.35 : 0.5 + 0.5 * Math.sin(state.frame * 0.08);

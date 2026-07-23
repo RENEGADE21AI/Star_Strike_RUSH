@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 from collections import deque
 from pathlib import Path
+import shutil
 
 from PIL import Image, ImageFilter
 
@@ -23,6 +24,7 @@ SOURCE_ART = REPO_ROOT / "source-art"
 
 ASSETS = {
     "player.png": ("WhitePlayerShip.png", 512),
+    "wingman.png": ("wingmanfriend.png.png", 384),
     "enemy-red.png": ("RedStandardFighter.png", 448),
     "enemy-orange.png": ("OrangeWeakFastFighter.png", 448),
     "enemy-purple.png": ("PurpleTankFighter.png", 448),
@@ -78,6 +80,14 @@ def find_source(source_name: str) -> Path:
         if candidate.exists():
             return candidate
     raise FileNotFoundError(source_name)
+
+
+def archive_source(source: Path) -> None:
+    SOURCE_ART.mkdir(parents=True, exist_ok=True)
+    destination = SOURCE_ART / source.name
+    if source.resolve() != destination.resolve() and not destination.exists():
+        shutil.copy2(source, destination)
+        print(f"{source.name} -> source-art/{source.name}")
 
 
 def is_checker_background(pixel: tuple[int, int, int, int]) -> bool:
@@ -166,6 +176,7 @@ def main() -> None:
                 print(f"skip {output_name} (use --force to rebuild)")
                 continue
             source = find_source(source_name)
+            archive_source(source)
             with Image.open(source) as opened:
                 processed = trim_and_resize(replace_connected_checkerboard(opened), max_dimension)
                 processed.save(destination, optimize=True, compress_level=9)
@@ -178,6 +189,7 @@ def main() -> None:
                 print(f"skip {output_name} (use --force to rebuild)")
                 continue
             source = find_source(source_name)
+            archive_source(source)
             with Image.open(source) as opened:
                 processed = trim_and_resize(replace_connected_checkerboard(opened), max_dimension)
                 processed.save(destination, optimize=True, compress_level=9)
@@ -190,6 +202,7 @@ def main() -> None:
                 print(f"skip {output_name} (use --force to rebuild)")
                 continue
             source = find_source(source_name)
+            archive_source(source)
             with Image.open(source) as opened:
                 processed = trim_and_resize(replace_connected_checkerboard(opened), max_dimension)
                 processed.save(destination, optimize=True, compress_level=9)

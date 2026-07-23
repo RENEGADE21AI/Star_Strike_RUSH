@@ -5,7 +5,7 @@
 - Preserved commit: `529aca1`.
 - Published comparison branch: `pre-competition`.
 - Competition branch reconciled into `main` before this recovery pass.
-- Stabilization branch: `codex/stabilization-recovery`.
+- Final polish branch: `codex/post-recovery-polish`.
 
 The baseline already had a playable shooter, bosses, adaptive pressure,
 achievements, Glory/Season progression, a Codex, and Firebase scaffolding. Its
@@ -26,9 +26,12 @@ visual/UI inconsistency.
 - Added explicit sprite orientation, weapon origins, exhaust origins, and
   anchors. The player ship now always faces forward/up; hostile ships face into
   the playfield.
-- Imported 43 supplied source images through a reproducible transparency,
-  trim, padding, and browser-size pipeline. Hosting ships 45 optimized
-  derivatives: 25 sprites, 13 powerups, and 7 menu/PWA icons.
+- Imported 44 supplied source images through a reproducible transparency,
+  trim, padding, and browser-size pipeline. Hosting ships 46 optimized
+  derivatives: 26 sprites, 13 powerups, and 7 menu/PWA icons.
+- Added the supplied wingman as a compact, independently trimmed sprite with
+  its own collision radius. Player and wingmen are rotated into forward/up
+  flight; hostile fighters remain oriented into the playfield.
 - Added the supplied powerup art at ship-safe scale. Drops rotate as they fall,
   retain compact pickup hitboxes, and no longer render the old dotted orbital
   ring behind them.
@@ -51,22 +54,26 @@ visual/UI inconsistency.
 - Reworked the Codex into categorized two-column cards with scrolling, discovery
   state, and wrapped tactical detail.
 - Kept provider email, name, and avatar out of public game identity payloads.
-- Deliberately gated public score and weekly league submission until the server
-  can attest gameplay rather than merely validate browser-reported totals.
+- Kept authenticated leaderboard reads available while deliberately gating new
+  public score and weekly league writes. The callable Functions now enforce the
+  fair-play pause before authentication or payload handling, so an old or
+  modified client cannot bypass the recovery client's UI.
 
 ## Verification evidence
 
-- `npm test`: 30/30 Node and Chromium tests passing on the recovery branch.
+- `npm test`: 45/45 Node and Chromium tests passing on the recovery branch.
 - Browser coverage starts a run, moves, pauses/resumes, verifies frozen pause
   time, exercises touch joystick/ability input, edits and autosaves a call sign,
-  and checks that gameplay announcements remain absent.
+  checks that gameplay announcements remain absent, and verifies persisted
+  reduced-motion, reduced-flash, and high-contrast behavior.
 - Contract coverage includes collision overlap/misses, collision spawn scale,
   sprite orientation, fixed-step equivalence at 30/60/90/120 Hz, long-gap
   clamping, boss staging invulnerability, 1,500 seeded debris patterns, ability
   accounting, public identity whitelists, and the competition gate.
-- Visual QA captures 11 mobile/desktop states: title, Pilot Dossier, settings,
-  progression, Codex, powerup gallery, Siphon, active/incoming Debris Warden,
-  and desktop title/gameplay. The incoming-boss capture asserts full HP and
+- Visual QA captures 15 mobile/desktop states, including the title at
+  375×667, 390×844, 430×932, and 1440×900; Pilot Dossier; settings;
+  achievements; progression; Codex; powerup gallery; wingmen; Siphon; and
+  active/incoming Debris Warden. The incoming-boss capture asserts full HP and
   `damageable=false` under automatic fire.
 - `npm run build` creates an allowlisted `dist/` payload. Firebase Hosting serves
   that directory without an SPA catch-all and applies CSP, MIME-sniffing,

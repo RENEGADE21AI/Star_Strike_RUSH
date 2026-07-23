@@ -6,9 +6,10 @@ const RAW_SPRITE_MANIFEST = {
     projectileOrigin: { offsetX: 0, offsetY: -18 }
   },
   wingman: {
-    source: null,
-    render: { width: 24, height: 30, anchorX: 0.5, anchorY: 0.5, glow: "#ff78ef" },
-    collision: [{ offsetX: 0, offsetY: 1, radius: 9 }],
+    source: "assets/sprites/wingman.png",
+    render: { width: 27, height: 31, anchorX: 0.5, anchorY: 0.5, glow: "#ff78ef" },
+    orientation: { baseRotation: Math.PI },
+    collision: [{ offsetX: 0, offsetY: 1, radius: 8.5 }],
     projectileOrigin: { offsetX: 0, offsetY: -13 }
   },
   red: { source: "assets/sprites/enemy-red.png", render: { width: 36, height: 32, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 10 }] },
@@ -112,7 +113,14 @@ const SPRITE_MANIFEST = Object.freeze(Object.fromEntries(
   Object.entries(RAW_SPRITE_MANIFEST).map(([key, entry]) => [key, normalizeSpriteEntry(key, entry)])
 ));
 
-const spriteAssetRuntime = { ready: false, images: new Map(), failed: new Set() };
+const spriteAssetRuntime = {
+  ready: false,
+  status: "idle",
+  total: 0,
+  completed: 0,
+  images: new Map(),
+  failed: new Set()
+};
 
 function spriteMeta(key) {
   return SPRITE_MANIFEST[key] || null;
@@ -179,17 +187,68 @@ function validateSpriteManifest(manifest = SPRITE_MANIFEST) {
   return { ok: errors.length === 0, errors };
 }
 
-async function preloadGameAssets() {
-  const entries = Object.entries(SPRITE_MANIFEST).filter(([, meta]) => meta.source);
-  await Promise.all(entries.map(([key, meta]) => new Promise((resolve) => {
-    const image = new Image();
+function assetLoadSnapshot() {
+  return {
+    ready: spriteAssetRuntime.ready,
+    status: spriteAssetRuntime.status,
+    total: spriteAssetRuntime.total,
+    completed: spriteAssetRuntime.completed,
+    failed: Array.from(spriteAssetRuntime.failed)
+  };
+}
+
+function loadSpriteAttempt(key, meta, ImageCtor, timeoutMs) {
+  return new Promise((resolve) => {
+    const image = new ImageCtor();
     image.decoding = "async";
-    image.onload = () => { spriteAssetRuntime.images.set(key, image); resolve(); };
-    image.onerror = () => { spriteAssetRuntime.failed.add(key); resolve(); };
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      image.onload = null;
+      image.onerror = null;
+      if (ok) spriteAssetRuntime.images.set(key, image);
+      resolve(ok);
+    };
+    const timer = setTimeout(() => finish(false), Math.max(1, timeoutMs));
+    image.onload = () => finish(true);
+    image.onerror = () => finish(false);
     image.src = meta.source;
-  })));
+  });
+}
+
+async function preloadGameAssets(options = {}) {
+  const ImageCtor = options.ImageCtor || Image;
+  const timeoutMs = Math.max(1, Number(options.timeoutMs) || 6500);
+  const retries = Math.max(0, Math.floor(Number(options.retries == null ? 1 : options.retries)));
+  const onProgress = typeof options.onProgress === "function" ? options.onProgress : () => {};
+  const onlyKeys = options.onlyKeys ? new Set(options.onlyKeys) : null;
+  const entries = Object.entries(SPRITE_MANIFEST).filter(([key, meta]) => meta.source && (!onlyKeys || onlyKeys.has(key)));
+  spriteAssetRuntime.ready = false;
+  spriteAssetRuntime.status = "loading";
+  spriteAssetRuntime.total = entries.length;
+  spriteAssetRuntime.completed = 0;
+  onProgress(assetLoadSnapshot());
+  await Promise.all(entries.map(async ([key, meta]) => {
+    let loaded = false;
+    for (let attempt = 0; attempt <= retries && !loaded; attempt++) {
+      loaded = await loadSpriteAttempt(key, meta, ImageCtor, timeoutMs);
+    }
+    if (loaded) spriteAssetRuntime.failed.delete(key);
+    else spriteAssetRuntime.failed.add(key);
+    spriteAssetRuntime.completed++;
+    onProgress(assetLoadSnapshot());
+  }));
   spriteAssetRuntime.ready = true;
-  return { ready: true, failed: Array.from(spriteAssetRuntime.failed) };
+  spriteAssetRuntime.status = spriteAssetRuntime.failed.size ? "fallback" : "ready";
+  const result = assetLoadSnapshot();
+  onProgress(result);
+  return result;
+}
+
+async function retryFailedAssets(options = {}) {
+  return preloadGameAssets({ ...options, onlyKeys: Array.from(spriteAssetRuntime.failed) });
 }
 
 function drawSpriteAsset(targetContext, key, x, y, options = {}) {
@@ -233,4 +292,6 @@ globalThis.hitCirclesOverlap = hitCirclesOverlap;
 globalThis.manifestCollision = manifestCollision;
 globalThis.validateSpriteManifest = validateSpriteManifest;
 globalThis.preloadGameAssets = preloadGameAssets;
+globalThis.retryFailedAssets = retryFailedAssets;
+globalThis.getAssetLoadState = assetLoadSnapshot;
 globalThis.drawSpriteAsset = drawSpriteAsset;

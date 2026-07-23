@@ -101,7 +101,7 @@ test("gameplay renders compact HUD without announcement popups", () => {
   const sceneSource = fs.readFileSync(path.join(repoRoot, "src", "17-rendering-scene.js"), "utf8");
   const hudSource = fs.readFileSync(path.join(repoRoot, "src", "16-rendering-hud.js"), "utf8");
   assert.doesNotMatch(sceneSource, /drawEncounterCard\(\);/);
-  assert.match(hudSource, /function drawHUD\(\) \{ drawTopLeftHUD\(\); drawTopRightHUD\(\); drawPauseButton\(\); drawDesktopControlHint\(\); drawDebugHitboxes\(\); \}/);
+  assert.match(hudSource, /function drawHUD\(\) \{ drawTopLeftHUD\(\); drawTopRightHUD\(\); drawGameNotices\(\); drawPauseButton\(\); drawDesktopControlHint\(\); drawDebugHitboxes\(\); \}/);
   assert.doesNotMatch(hudSource.match(/function drawHUD\(\).*$/m)[0], /drawAnnouncements/);
 });
 

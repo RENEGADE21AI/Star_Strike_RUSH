@@ -154,6 +154,43 @@ test("call sign autosaves on blur and gameplay announcements stay out of the pla
   }
 });
 
+test("accessibility settings persist, reduce transition motion, and apply high contrast", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 375, height: 667 } });
+  const { page, errors } = await openGame(context);
+  try {
+    await page.mouse.click(38, 237);
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).ui.titlePanelAnim > 0.8);
+    await page.mouse.click(295, 78);
+    await page.mouse.click(187, 275);
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).ui.settingReducedMotion === true);
+    await page.mouse.click(187, 313);
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).ui.settingReducedFlash === true);
+    await page.mouse.click(187, 351);
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).ui.settingHighContrast === true);
+
+    let snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.ui.settingReducedMotion, true);
+    assert.equal(snapshot.ui.settingReducedFlash, true);
+    assert.equal(snapshot.ui.settingHighContrast, true);
+    assert.match(await page.locator("canvas").evaluate((canvas) => canvas.style.filter), /contrast/);
+
+    await page.reload({ waitUntil: "commit" });
+    await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent);
+    snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.ui.settingReducedMotion, true);
+    assert.equal(snapshot.ui.settingReducedFlash, true);
+    assert.equal(snapshot.ui.settingHighContrast, true);
+
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
+    snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.transition.duration, 1);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 after(async () => {
   if (browser) await browser.close();
   if (server) await new Promise((resolve) => server.close(resolve));

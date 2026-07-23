@@ -1,6 +1,10 @@
 function drawWingmen() {
   const alpha = state.player && state.player.ghostTimer > 0 ? 0.42 : 1;
   for (const w of state.wingmen) {
+    if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "wingman", w.x, w.y, {
+      alpha,
+      filter: state.player && state.player.ghostTimer > 0 ? "hue-rotate(22deg) saturate(1.35)" : ""
+    })) continue;
     ctx.save();
     ctx.translate(w.x, w.y);
     ctx.globalAlpha = alpha;
