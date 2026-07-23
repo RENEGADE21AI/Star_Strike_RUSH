@@ -22,3 +22,11 @@ test("ambient title traffic is visible, depth-calibrated, and path-reserved", ()
   assert.doesNotMatch(render, /overPrimaryUi \? 0\.03/);
   assert.match(render, /overPrimaryUi \? 0\.22/);
 });
+
+test("signed-out Pilot Dossier hides irrelevant account actions", () => {
+  const panel = fs.readFileSync(path.join(repoRoot, "src", "12-rendering-title-panels.js"), "utf8");
+  const onlinePanel = panel.slice(panel.indexOf("function drawOnlinePanel"), panel.indexOf("function drawRecordsPanel"));
+  assert.match(onlinePanel, /if \(!user\) drawOnlineActionButton\(r\.signIn/);
+  assert.match(onlinePanel, /if \(user\) drawOnlineActionButton\(r\.signOut/);
+  assert.doesNotMatch(onlinePanel, /drawOnlineActionButton\(r\.signOut, "SIGN OUT", !!user\)/);
+});

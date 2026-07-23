@@ -520,15 +520,15 @@ function drawOnlinePanel() {
     const identityAvailable = online.competitionBackend !== "unavailable";
     drawOnlineActionButton(r.claimHandle, identityAvailable ? handleLabel : "IDENTITY SERVICE OFFLINE", !!user && !online.profileHandle && identityAvailable);
     if (!user) drawOnlineActionButton(r.signIn, "CONNECT GOOGLE ACCOUNT", true);
-    drawOnlineActionButton(r.signOut, "SIGN OUT", !!user);
+    if (user) drawOnlineActionButton(r.signOut, "SIGN OUT", true);
     ctx.save();
     ctx.font = FONT_TINY;
     ctx.textAlign = "center";
     ctx.fillStyle = handleStatus ? "#ffd27a" : (online.lastError ? "#ff9f9f" : "rgba(255,255,255,0.48)");
     const quietStatus = handleStatus || online.lastError || (!user ? "LOCAL PLAY IS READY" : "ACCOUNT CONNECTED");
-    ctx.fillText(String(quietStatus).slice(0, 48), panel.x + panel.w / 2, panel.y + 426);
+    ctx.fillText(String(quietStatus).slice(0, 48), panel.x + panel.w / 2, panel.y + (user ? 426 : 386));
     ctx.restore();
-    drawFlightNetworkCard({ x: panel.x + 20, y: panel.y + 452, w: panel.w - 40, h: 112 }, online, user);
+    drawFlightNetworkCard({ x: panel.x + 20, y: panel.y + (user ? 452 : 412), w: panel.w - 40, h: 112 }, online, user);
   } else if (accountPanelTab === "league") {
     const competitionEnabled = globalThis.COMPETITIVE_MODE_ENABLED === true;
     const league = competitionEnabled ? (online.weeklyLeague || null) : null;

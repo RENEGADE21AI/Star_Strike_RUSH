@@ -26,4 +26,9 @@ test("game notices are categorized and stay on edge rails instead of center card
   const hud = fs.readFileSync(path.join(repoRoot, "src", "16-rendering-hud.js"), "utf8");
   assert.match(hud, /function drawGameNotices/);
   assert.doesNotMatch(hud.match(/function drawGameNotices[\s\S]*?^}/m)[0], /fillRect|roundRect/);
+
+  const waves = fs.readFileSync(path.join(repoRoot, "src", "04-waves.js"), "utf8");
+  const discovery = waves.slice(waves.indexOf("function discoverCodex"), waves.indexOf("function spawnWave"));
+  assert.doesNotMatch(discovery, /pushGameNotice|showMessage/);
+  assert.match(discovery, /codexHasNew = true/);
 });

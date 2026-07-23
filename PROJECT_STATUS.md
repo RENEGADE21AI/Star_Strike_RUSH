@@ -20,6 +20,8 @@ must not be described elsewhere as production-ready.
 | Local profile/meta | Stable | Call-sign autosave, achievements, Glory/Season roads, local settings |
 | Accessibility toggles | Stable/local | Persisted reduced motion, reduced flash, high contrast; Chromium regression coverage |
 | Existing leaderboard reads | Stable/authenticated | Authenticated users can read the existing public leaderboard |
+| Firestore authorization | Stable | 4 emulator suites prove anonymous denial, owner privacy, bounded public reads, and browser-write denial |
+| Callable resource policy | Stable | Five Functions share explicit timeout, concurrency, memory, and maximum-instance ceilings |
 | Deployment payload | Stable | Allowlisted `dist/`; originals, tests, docs, backend, and local config excluded |
 
 ## Functional when Firebase is configured
@@ -31,7 +33,8 @@ must not be described elsewhere as production-ready.
 | Unique `@handle` claim | Configuration-dependent | Atomic callable claim; immutable/account-bound by current UI contract |
 | Season reward sync | Configuration-dependent | Callable source and Firestore model exist; signed-out claims remain local |
 
-Provider display name, avatar, and email are private. Public payload builders and
+Provider display name, avatar, and email remain in Firebase Authentication only;
+game profile documents no longer duplicate them. Public payload builders and
 rules whitelist game identity and game stats only.
 
 ## Intentionally disabled
@@ -69,8 +72,9 @@ npm audit --omit=dev --audit-level=high
 npm audit --prefix functions --omit=dev --audit-level=high
 ```
 
-Current local recovery evidence: 45/45 tests pass, 15 browser visual states pass,
-the root dependency audit has zero findings, and the Function audit has no
+Current local hardening evidence: 48/48 core tests and 4/4 Firestore emulator
+authorization suites pass, while 15 browser visual states pass. The shipped root
+dependency audit has zero production findings, and the Function audit has no
 high/critical finding. Eight moderate transitive findings remain in the Function
 tree; npm's suggested forced resolution is breaking, so they were not hidden by
 an unsafe downgrade.
