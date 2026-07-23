@@ -165,6 +165,22 @@ function drawEnemies() {
     if (typeof drawExpansionEnemyOverlay === "function") drawExpansionEnemyOverlay(e);
   }
 }
+function drawBossImpactFeedback(boss, yOffset = 0) {
+  const flash = clamp((boss && boss.hitFlash || 0) / 10, 0, 1);
+  if (flash <= 0) return;
+  const pulse = 1 - flash;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = flash * 0.58;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5 + flash * 2;
+  ctx.shadowColor = "#9ff6ff";
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.ellipse(boss.x, boss.y + yOffset, 34 + pulse * 22, 18 + pulse * 12, 0, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+}
 function drawBoss() {
   const b = state.boss;
   if (!b) return;
@@ -181,6 +197,7 @@ function drawBoss() {
     ctx.rotate(tilt);
     drawBossWraithShip(false, visibleAlpha, b.realm, b.chargeTelegraph);
     ctx.restore();
+    drawBossImpactFeedback(b, wobble);
     for (let i = 0; i < 4; i++) {
       const ang = state.frame * 0.05 + i * 1.5;
       const r = 62 + Math.sin(state.frame * 0.04 + i) * 4;
@@ -213,6 +230,7 @@ function drawBoss() {
   ctx.rotate(tilt);
   drawBossStandardShip(false, 1);
   ctx.restore();
+  drawBossImpactFeedback(b, bob);
   for (let i = 0; i < 4; i++) {
     const ang = state.frame * 0.05 + i * 1.5;
     const r = 62 + Math.sin(state.frame * 0.04 + i) * 4;
@@ -271,7 +289,18 @@ function drawPowerups() {
     ctx.save();
     ctx.translate(p.x, p.y + bob);
     const spriteKey = typeof powerupSpriteKey === "function" ? powerupSpriteKey(p.type) : "powerup";
-    const pulse = 0.96 + Math.sin(state.frame * 0.09 + p.x * 0.02) * 0.025;
+    const pulseWave = 0.5 + 0.5 * Math.sin(state.frame * 0.09 + p.x * 0.02);
+    const pulse = 0.93 + pulseWave * 0.08;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.07 + pulseWave * 0.11;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10 + pulseWave * 12;
+    ctx.beginPath();
+    ctx.arc(0, 0, 7 + pulseWave * 3, 0, TAU);
+    ctx.fill();
+    ctx.restore();
     const rendered = spriteKey !== "powerup" && drawSpriteAsset(ctx, spriteKey, 0, 0, { scale: pulse, rotation: spin });
     if (!rendered) {
       ctx.save();
@@ -295,6 +324,22 @@ function drawPowerups() {
 }
 function drawParticles() {
   for (const p of state.particles) {
+    if (p.kind === "ring") {
+      const maxLife = Math.max(1, p.maxLife || 24);
+      const progress = 1 - p.life / maxLife;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = Math.max(0, 1 - progress) * 0.72;
+      ctx.strokeStyle = p.color || "#fff";
+      ctx.lineWidth = p.lineWidth || 2;
+      ctx.shadowColor = p.color || "#fff";
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size + progress * 28, 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
     ctx.fillStyle = p.color || "#fff";
     ctx.globalAlpha = Math.max(0, p.life / 32);
     ctx.fillRect(p.x, p.y, p.size, p.size);

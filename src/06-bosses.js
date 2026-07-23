@@ -219,6 +219,7 @@ function spawnBossDeath(boss) {
   state.lastWaveTemplateName = null;
   spawnParticles(boss.x, boss.y, 50, "#fff", 1.1);
   spawnParticles(boss.x, boss.y, 24, "#9ff", 1.0);
+  if (typeof playGameSound === "function") playGameSound("boss_destroy", 1.2);
   kickShake(14);
   state.fx.flash = 14;
 }
@@ -348,6 +349,8 @@ function updateBossWraith() {
 }
 function updateBoss() {
   if (!state.boss) return;
+  state.boss.hitFlash = Math.max(0, (state.boss.hitFlash || 0) - 1);
+  state.boss.hitPulse = Math.max(0, (state.boss.hitPulse || 0) * 0.78);
   if (typeof isExpansionBossMode === "function" && isExpansionBossMode(state.boss.mode) && typeof updateExpansionBoss === "function") {
     updateExpansionBoss();
     return;

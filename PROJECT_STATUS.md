@@ -60,7 +60,8 @@ security work below must ship first.
 - Real-account auth, cross-device, reconnect, concurrency, and abuse testing.
 - Account migration and handle recovery UX.
 - Synced accessibility settings.
-- Audio, music, and haptics with independent accessible controls.
+- Music and haptics. Procedural gameplay/UI sound effects now ship with an
+  independent persisted on/off control.
 
 ## Verification commands
 
@@ -72,7 +73,7 @@ npm audit --omit=dev --audit-level=high
 npm audit --prefix functions --omit=dev --audit-level=high
 ```
 
-Current local hardening evidence: 48/48 core tests and 4/4 Firestore emulator
+Current local hardening evidence: 56/56 core tests and 4/4 Firestore emulator
 authorization suites pass, while 15 browser visual states pass. The shipped root
 dependency audit has zero production findings, and the Function audit has no
 high/critical finding. Eight moderate transitive findings remain in the Function

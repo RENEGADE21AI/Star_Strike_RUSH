@@ -45,6 +45,40 @@ function spawnRapidFireMuzzleParticles(x, y) {
   }
   enforceParticleCap();
 }
+function powerupFeedbackColor(type) {
+  const base = {
+    spread: "#64ff56",
+    rapid: "#ffd64a",
+    repair: "#4f8fff",
+    wingman: "#ff52e8",
+    dual: "#ff52e8"
+  }[type];
+  const expansion = typeof expansionPowerupVisual === "function" ? expansionPowerupVisual(type) : null;
+  return base || (expansion && expansion.color) || "#8ff5ff";
+}
+function spawnPowerupCollectBurst(pu) {
+  if (!pu) return;
+  const color = powerupFeedbackColor(pu.type);
+  spawnParticles(pu.x, pu.y, 22, color, 1.05);
+  for (let index = 0; index < 2; index++) {
+    state.particles.push({
+      kind: "ring",
+      x: pu.x,
+      y: pu.y,
+      vx: 0,
+      vy: 0,
+      life: 24 - index * 5,
+      maxLife: 24 - index * 5,
+      size: 7 + index * 5,
+      color,
+      lineWidth: 2 - index * 0.4
+    });
+  }
+  state.comboPulse = Math.max(state.comboPulse, 7);
+  state.fx.flash = Math.max(state.fx.flash, settingReducedFlash ? 0 : 2);
+  enforceParticleCap();
+  if (typeof playGameSound === "function") playGameSound("powerup", 0.9);
+}
 function spawnPowerupAt(x, y, type) {
   state.powerups.push({
     x, y, type, vy: 1.9, size: 11, life: 900,
@@ -120,13 +154,32 @@ function chooseLane(exclude = []) {
   return best[Math.floor(Math.random() * best.length)];
 }
 function laneX(lane) { return laneCenters()[lane]; }
+const WINGMAN_FORMATION_OFFSET_X = 42;
+const WINGMAN_FORMATION_OFFSET_Y = 6;
+const WINGMAN_MIN_PLAYER_DISTANCE = 31;
+function wingmanFormationTarget(player, side) {
+  let x = clamp(player.x + side * WINGMAN_FORMATION_OFFSET_X, 18, W - 18);
+  let y = clamp(player.y + WINGMAN_FORMATION_OFFSET_Y, 28, H - 24);
+  const dx = x - player.x;
+  const distance = Math.hypot(dx, y - player.y);
+  if (distance < WINGMAN_MIN_PLAYER_DISTANCE) {
+    const verticalGap = Math.sqrt(Math.max(0, WINGMAN_MIN_PLAYER_DISTANCE ** 2 - dx ** 2));
+    const minimumY = 28;
+    const maximumY = H - 18;
+    const trailingY = player.y + Math.max(26, verticalGap);
+    const leadingY = player.y - Math.max(26, verticalGap);
+    y = trailingY <= maximumY ? trailingY : clamp(leadingY, minimumY, maximumY);
+  }
+  return { x, y };
+}
 function getWingman(side) { return state.wingmen.find(w => w.side === side) || null; }
 function refreshWingmen(timer = 1500) { for (const w of state.wingmen) w.timer = Math.max(w.timer, timer); }
 function addWingmanSide(side, timer = 1500) {
   const existing = getWingman(side);
   if (existing) { existing.timer = Math.max(existing.timer, timer); return existing; }
   const p = state.player;
-  const w = { x: p.x + side * 30, y: p.y + 4, side, timer, fire: 0 };
+  const target = wingmanFormationTarget(p, side);
+  const w = { x: target.x, y: target.y, side, timer, fire: 0 };
   state.wingmen.push(w);
   return w;
 }
@@ -144,6 +197,7 @@ function spawnWingmen(count) {
 function fireWingman(w) {
   if (w.fire > 0) return;
   state.bullets.push({ x: w.x, y: w.y - 12, vx: 0, vy: -8.2, life: 80, r: 3, kind: getPlayerShotKind(), realm: state.playerRealm, damage: 0.75 });
+  if (typeof playGameSound === "function") playGameSound("player_fire", 0.18);
   w.fire = 18;
 }
 function currentInputVector() {
@@ -172,6 +226,7 @@ function attemptGhost() {
     state.fx.flash = Math.max(state.fx.flash, 4);
     state.comboPulse = Math.max(state.comboPulse, 6);
     spawnParticles(p.x, p.y, 10, state.playerRealm === 0 ? "#bfe8ff" : "#d9b6ff", 0.9);
+    if (typeof playGameSound === "function") playGameSound("ability", 0.86);
     return;
   }
   if (p.energy < profile.cost || p.ghostCooldown > 0) return;
@@ -197,6 +252,7 @@ function attemptGhost() {
   state.difficulty.ghostGrace = profile.phaseThroughDebris ? 60 : 24;
   state.fx.flash = Math.max(state.fx.flash, 6);
   spawnParticles(p.x, p.y, profile.label === "DASH" ? 16 : 10, profile.label === "DASH" ? "#ffcc78" : "#fff", profile.label === "DASH" ? 1.35 : 1.05);
+  if (typeof playGameSound === "function") playGameSound("ability", profile.label === "DASH" ? 1.0 : 0.84);
 }
 
 function updateStars() {

@@ -64,14 +64,15 @@ visual/UI inconsistency.
 
 ## Verification evidence
 
-- `npm test`: 48/48 Node and Chromium tests passing on the hardening branch.
+- `npm test`: 56/56 Node and Chromium tests passing on the hardening branch.
 - `npm run test:rules`: 4/4 Firestore emulator authorization suites passing,
   covering anonymous denial, bounded authenticated public reads, owner-only
   private reads, browser-write denial, and callable-only identity/league data.
 - Browser coverage starts a run, moves, pauses/resumes, verifies frozen pause
   time, exercises touch joystick/ability input, edits and autosaves a call sign,
-  checks that gameplay announcements remain absent, and verifies persisted
-  reduced-motion, reduced-flash, and high-contrast behavior.
+  collects an artwork-backed powerup with a rendered pickup burst, checks that
+  gameplay announcements remain absent, and verifies persisted reduced-motion,
+  reduced-flash, high-contrast, and sound preferences.
 - Contract coverage includes collision overlap/misses, collision spawn scale,
   sprite orientation, fixed-step equivalence at 30/60/90/120 Hz, long-gap
   clamping, boss staging invulnerability, 1,500 seeded debris patterns, ability
@@ -104,7 +105,7 @@ Playable URL: https://star-strike-rush.web.app
   App Check, replay or telemetry verification, rate limits, and abuse review.
 - Real Google sign-in and cross-device persistence require a human account smoke
   test against the configured Firebase project.
-- Audio, haptics, account migration UX, offline sync/outbox behavior, and synced
+- Music, haptics, account migration UX, offline sync/outbox behavior, and synced
   accessibility settings are deferred.
 - Procedural rendering remains a fallback if an image fails to decode.
 - The Function dependency tree currently has no high/critical audit finding;

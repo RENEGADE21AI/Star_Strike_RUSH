@@ -15,11 +15,16 @@ function drawTitleSun() {
 function drawMenuFlights() {
   const flights = state.titleFormations.slice().sort((a, b) => (a.drawOrder || 0) - (b.drawOrder || 0));
   for (const f of flights) {
-    const offsets = (TITLE_PATTERNS[f.pattern] || TITLE_PATTERNS.solo).slice(0, f.members || 1);
-    const shipAngle = f.angle;
     const shipScale = f.renderScale || 0.68;
-    const overPrimaryUi = f.x > 10 && f.x < W - 10 && f.y > H * 0.12 && f.y < H * 0.72;
-    const edgeDistance = Math.min(f.x + 42, W + 42 - f.x, f.y + 72, H + 72 - f.y);
+    const memberSpacingScale = Math.max(1, shipScale * 1.25);
+    const offsets = (TITLE_PATTERNS[f.pattern] || TITLE_PATTERNS.solo)
+      .slice(0, f.members || 1)
+      .map(([x, y]) => [x * memberSpacingScale, y * memberSpacingScale]);
+    const shipAngle = f.angle;
+    const visualX = f.x + (f.avoidX || 0);
+    const visualY = f.y + (f.avoidY || 0);
+    const overPrimaryUi = visualX > 10 && visualX < W - 10 && visualY > H * 0.12 && visualY < H * 0.72;
+    const edgeDistance = Math.min(visualX + 42, W + 42 - visualX, visualY + 72, H + 72 - visualY);
     const fogFade = clamp(edgeDistance / 72, 0, 1);
     const formationAlpha = (f.renderAlpha || 0.72) * fogFade * (overPrimaryUi ? 0.22 : 1);
     ctx.save();
@@ -28,7 +33,10 @@ function drawMenuFlights() {
     for (let i = 0; i < offsets.length; i++) {
       const [ox, oy] = offsets[i];
       const histIndex = Math.max(0, f.leaderHistory.length - 6 - i * 2);
-      const histPos = i === 0 ? { x: f.x, y: f.y } : (f.leaderHistory[histIndex] || { x: f.x, y: f.y });
+      const history = f.leaderHistory[histIndex] || { x: f.x, y: f.y };
+      const histPos = i === 0
+        ? { x: visualX, y: visualY }
+        : { x: history.x + (f.avoidX || 0), y: history.y + (f.avoidY || 0) };
       const wobble = Math.sin(state.frame * 0.055 + i * 2.1 + f.sway) * 2.8;
       drawFormationShip(
         f.kind,

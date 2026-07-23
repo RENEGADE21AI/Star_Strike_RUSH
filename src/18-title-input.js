@@ -19,6 +19,7 @@ function titlePanelHit(x, y) {
 }
 
 function openTitleMetaScreen(screen) {
+  if (typeof playGameSound === "function") playGameSound("ui", 0.65);
   if (titleSubState !== screen || titlePanelTarget < 1) titleMetaScreenTransition = 0;
   const icons = getTitleIconRects();
   const source = screen === "online" ? icons.account
@@ -33,6 +34,7 @@ function openTitleMetaScreen(screen) {
 }
 
 function closeTitleMetaScreen() {
+  if (typeof playGameSound === "function") playGameSound("ui", 0.52);
   titlePanelTarget = 0;
   codexDetailType = null;
   resetProgressConfirm = false;
@@ -194,6 +196,7 @@ function handleOnlinePanelPointerDown(x, y) {
   if (accountPanelTab === "settings" && hitRect(r.motion, x, y)) { settingReducedMotion = !settingReducedMotion; saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.flash, x, y)) { settingReducedFlash = !settingReducedFlash; saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.contrast, x, y)) { settingHighContrast = !settingHighContrast; applyAccessibilitySettings(); saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.sound, x, y)) { setSoundEffectsEnabled(!settingSoundEffects); saveSettings(); return true; }
   if (accountPanelTab === "pilot" && hitRect(r.editCallSign, x, y)) {
     if (callSignEditing) commitCallSignDraft();
     else beginCallSignEditing();

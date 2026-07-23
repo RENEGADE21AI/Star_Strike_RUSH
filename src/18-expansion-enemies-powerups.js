@@ -233,6 +233,7 @@ function finishEnemyDestroyed(e, index, allowDrop = true) {
   if (!e || index < 0) return;
   noteKill(e.reward || enemyScoreForType(e.type));
   spawnDeathBurst(e.x, e.y, e.type === "purple" ? 22 : e.type === "phantom" ? 18 : e.type === "carrier" ? 24 : 14);
+  if (typeof playGameSound === "function") playGameSound("destroy", e.type === "carrier" ? 1.1 : 0.72);
   onEnemyDestroyed(e);
   if (allowDrop && !enemyDropsBlocked(e)) {
     if (shouldDropPowerupNow()) { dropPowerup(e.x, e.y); registerPowerupDrop(240, 360); }
@@ -341,7 +342,6 @@ function applyExpansionPowerup(pu) {
   } else {
     return false;
   }
-  spawnParticles(pu.x, pu.y, 16, expansionPowerupVisual(pu.type).color, 0.8);
   return true;
 }
 

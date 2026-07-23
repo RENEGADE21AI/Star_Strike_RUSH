@@ -598,6 +598,7 @@ function handleExpansionBossSpecialHit(bullet, boss) {
       boss.attackTimer = Math.max(boss.attackTimer || 0, 72);
       addFlatScore(25);
       spawnParticles(boss.x + off, bayY, 18, "#ffd47a", 0.75);
+      applyBossHitFeedback(boss, boss.x + off, bayY);
       showMessage("BAY DISABLED", 50);
       return true;
     }
