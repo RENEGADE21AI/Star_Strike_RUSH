@@ -16,8 +16,10 @@ after the files they depend on, because the current code intentionally shares gl
 - `00-runtime.js`: deterministic fixed-step simulation clock, render-rate
   independence, and long-background-gap clamping.
 - `01-core.js`: canvas handles, constants, persistent settings, global state, scoring.
+- `02-audio.js`: throttled procedural Web Audio effects and the persisted sound
+  preference, with a silent fallback for unsupported or blocked audio contexts.
 - `02-effects-powerups.js`: particles, rotating artwork-backed drops, wingmen,
-  ghost action, and star updates.
+  pickup bursts, ghost action, and star updates.
 - `03-pacing.js`: phase timing, pressure, difficulty, bullet budget, dev skip.
 - `04-waves.js`: wave templates, wave selection, codex discovery, wave spawning.
 - `05-entities.js`: enemy spawning, player shots, bullet and wingman updates.

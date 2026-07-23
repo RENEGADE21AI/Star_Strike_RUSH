@@ -1,11 +1,13 @@
 const TITLE_PATTERNS = {
   solo: [[0,0]],
-  vee: [[0,0],[-26,16],[26,16]],
-  line: [[-34,0],[0,0],[34,0]],
-  arrow: [[0,0],[-24,18],[24,18],[0,34]],
-  diamond: [[0,0],[-24,16],[24,16],[0,32]],
-  escort: [[0,0],[-18,12],[18,12]]
+  vee: [[0,0],[-38,30],[38,30]],
+  line: [[-48,0],[0,0],[48,0]],
+  arrow: [[0,0],[-40,32],[40,32],[0,62]],
+  diamond: [[0,0],[-40,30],[40,30],[0,60]],
+  escort: [[0,0],[-38,24],[38,24]]
 };
+const TITLE_MAX_FORMATIONS = 2;
+const TITLE_FORMATION_MIN_GAP = 18;
 
 function pickFormationPathType() {
   const r = Math.random();
@@ -119,7 +121,9 @@ function makeTitleFormation(lane = 0, dir = 1, spawnAbove = false) {
     vy_this_frame: 0,
     angle: Math.PI / 2,
     removed: false,
-    spawnBlockedFrames: 0
+    spawnBlockedFrames: 0,
+    avoidX: 0,
+    avoidY: 0
   };
 }
 function initTitleFormations() {
@@ -153,7 +157,47 @@ function titlePathReservationConflict(newF, other, futureFrames) {
   const newY = newF.y + (newF.vy || 0) * futureFrames;
   const otherX = other.x + (other.vx || other.dir * other.speed || 0) * futureFrames;
   const otherY = other.y + (other.vy || 0) * futureFrames;
-  return Math.hypot(otherX - newX, otherY - newY) < 150;
+  const reservedDistance = titleFormationVisualRadius(newF) + titleFormationVisualRadius(other) + TITLE_FORMATION_MIN_GAP;
+  return Math.hypot(otherX - newX, otherY - newY) < reservedDistance;
+}
+function titleFormationVisualRadius(formation) {
+  const memberSpread = 1 + Math.max(0, Number(formation.members || 1) - 1) * 0.44;
+  return (32 * Math.max(0.5, Number(formation.renderScale || 1))) * memberSpread + 12;
+}
+function separateTitleFormations() {
+  const formations = state.titleFormations.filter((formation) => formation && !formation.removed);
+  for (const formation of formations) {
+    formation.avoidX = (formation.avoidX || 0) * 0.90;
+    formation.avoidY = (formation.avoidY || 0) * 0.90;
+  }
+  for (let firstIndex = 0; firstIndex < formations.length; firstIndex++) {
+    for (let secondIndex = firstIndex + 1; secondIndex < formations.length; secondIndex++) {
+      const first = formations[firstIndex];
+      const second = formations[secondIndex];
+      const firstX = first.x + first.avoidX;
+      const firstY = first.y + first.avoidY;
+      const secondX = second.x + second.avoidX;
+      const secondY = second.y + second.avoidY;
+      let dx = secondX - firstX;
+      let dy = secondY - firstY;
+      let distance = Math.hypot(dx, dy);
+      const minimumDistance = titleFormationVisualRadius(first) + titleFormationVisualRadius(second) + TITLE_FORMATION_MIN_GAP;
+      if (distance >= minimumDistance) continue;
+      const overlapDistance = distance;
+      if (distance < 0.001) {
+        dx = firstIndex % 2 === 0 ? 1 : -1;
+        dy = 0.35;
+        distance = Math.hypot(dx, dy);
+      }
+      const push = (minimumDistance - overlapDistance) * 0.5;
+      const nx = dx / distance;
+      const ny = dy / distance;
+      first.avoidX -= nx * push;
+      first.avoidY -= ny * push;
+      second.avoidX += nx * push;
+      second.avoidY += ny * push;
+    }
+  }
 }
 function formationSpawnWouldOverlap(newF) {
   for (const other of state.titleFormations) {
@@ -162,7 +206,8 @@ function formationSpawnWouldOverlap(newF) {
     const sameDir = other.dir === newF.dir;
     const closeX = Math.abs(other.x - newF.x) < 200;
     if (yOverlap && sameDir && closeX) return true;
-    if (Math.hypot(other.x - newF.x, other.y - newF.baseY) < 140) return true;
+    const minimumDistance = titleFormationVisualRadius(newF) + titleFormationVisualRadius(other) + TITLE_FORMATION_MIN_GAP;
+    if (Math.hypot(other.x - newF.x, other.y - newF.baseY) < minimumDistance) return true;
     if ([45, 90, 135].some((frames) => titlePathReservationConflict(newF, other, frames))) return true;
   }
   return false;
@@ -247,8 +292,9 @@ function updateTitleFormations() {
     }
   }
 
+  separateTitleFormations();
   state.titleSpawnTimer--;
-  if (state.titleSpawnTimer <= 0 && state.titleFormations.length < 3) {
+  if (state.titleSpawnTimer <= 0 && state.titleFormations.length < TITLE_MAX_FORMATIONS) {
     if (!spawnTitleFormationIfPossible()) {
       state.titleSpawnTimer = 1;
     } else {
@@ -256,7 +302,7 @@ function updateTitleFormations() {
     }
   }
 
-  if (state.titleFormations.length > 3) state.titleFormations.length = 3;
+  if (state.titleFormations.length > TITLE_MAX_FORMATIONS) state.titleFormations.length = TITLE_MAX_FORMATIONS;
 }
 function updateTitleScreen() {
   if (state.sceneTransition.mode === "title_launch") {
@@ -391,7 +437,8 @@ function getOnlineRects() {
   const motion = { x: innerX, y: btnY + 96, w: panel.w - 40, h: 30 };
   const flash = { x: innerX, y: btnY + 134, w: panel.w - 40, h: 30 };
   const contrast = { x: innerX, y: btnY + 172, w: panel.w - 40, h: 30 };
-  return { panel, closeRect, pilotTab, leagueTab, settingsTab, editCallSign, claimHandle, signIn, signOut, joinLeague, low, med, high, shake, reset, motion, flash, contrast };
+  const sound = { x: innerX, y: btnY + 210, w: panel.w - 40, h: 30 };
+  return { panel, closeRect, pilotTab, leagueTab, settingsTab, editCallSign, claimHandle, signIn, signOut, joinLeague, low, med, high, shake, reset, motion, flash, contrast, sound };
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();

@@ -45,10 +45,13 @@ Debug snapshots, scenarios, hitboxes, and developer shortcuts are gated to
 
 ```powershell
 npm test
+npm run test:rules
 npm run build
 ```
 
 `npm test` runs the Node contract tests and real Chromium gameplay tests.
+`npm run test:rules` starts the Firestore emulator and verifies the deployed
+read/write authorization boundary with authenticated and unauthenticated users.
 `npm run build` creates a deployment-only `dist/` directory containing the
 runtime, optimized assets, manifest, and styles. It excludes original artwork,
 tests, documentation, local Firebase configuration, and backend source.

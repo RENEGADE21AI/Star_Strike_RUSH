@@ -5,6 +5,7 @@ function startPlayingSession() {
   showMessage("PHASE 1", 90);
 }
 function beginGame() {
+  if (typeof playGameSound === "function") playGameSound("launch", 0.9);
   if (state.gameState === "start") {
     if (state.sceneTransition.mode !== "idle") return;
     titlePanelTarget = 0;
@@ -631,6 +632,7 @@ function getDebugSnapshot() {
       settingReducedMotion,
       settingReducedFlash,
       settingHighContrast,
+      settingSoundEffects,
       codexHasNew,
       codexDetailType,
       codexCategory,

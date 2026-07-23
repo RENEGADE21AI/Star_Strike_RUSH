@@ -128,6 +128,7 @@ function firePlayer() {
     state.difficulty.shotsFired += 1;
   }
   if (p.rapid > 0) spawnRapidFireMuzzleParticles(tipX, tipY);
+  if (typeof playGameSound === "function") playGameSound("player_fire", p.rapid > 0 ? 0.20 : 0.27);
   p.fire = cooldown;
 }
 function updateWingmen() {
@@ -136,8 +137,22 @@ function updateWingmen() {
   for (let i = state.wingmen.length - 1; i >= 0; i--) {
     const w = state.wingmen[i];
     w.timer--; w.fire--;
-    w.x += (p.x + w.side * 30 - w.x) * 0.22;
-    w.y += (p.y + 2 - w.y) * 0.22;
+    const target = wingmanFormationTarget(p, w.side);
+    w.x += (target.x - w.x) * 0.22;
+    w.y += (target.y - w.y) * 0.22;
+    const dx = w.x - p.x;
+    const dy = w.y - p.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < WINGMAN_MIN_PLAYER_DISTANCE) {
+      const nx = distance > 0.001 ? dx / distance : w.side;
+      const ny = distance > 0.001 ? dy / distance : 0;
+      w.x = clamp(p.x + nx * WINGMAN_MIN_PLAYER_DISTANCE, 18, W - 18);
+      w.y = clamp(p.y + ny * WINGMAN_MIN_PLAYER_DISTANCE, 24, H - 18);
+      if (Math.hypot(w.x - p.x, w.y - p.y) < WINGMAN_MIN_PLAYER_DISTANCE - 0.5) {
+        w.x = target.x;
+        w.y = target.y;
+      }
+    }
     if (w.timer <= 0) { state.wingmen.splice(i, 1); continue; }
     fireWingman(w);
   }

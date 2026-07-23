@@ -54,6 +54,9 @@ visual/UI inconsistency.
 - Reworked the Codex into categorized two-column cards with scrolling, discovery
   state, and wrapped tactical detail.
 - Kept provider email, name, and avatar out of public game identity payloads.
+- Minimized private profile storage to game-owned fields only. Callable
+  Functions no longer duplicate provider email, display name, or avatar URL,
+  and remove legacy copies during the next legitimate profile write.
 - Kept authenticated leaderboard reads available while deliberately gating new
   public score and weekly league writes. The callable Functions now enforce the
   fair-play pause before authentication or payload handling, so an old or
@@ -61,11 +64,15 @@ visual/UI inconsistency.
 
 ## Verification evidence
 
-- `npm test`: 45/45 Node and Chromium tests passing on the recovery branch.
+- `npm test`: 56/56 Node and Chromium tests passing on the hardening branch.
+- `npm run test:rules`: 4/4 Firestore emulator authorization suites passing,
+  covering anonymous denial, bounded authenticated public reads, owner-only
+  private reads, browser-write denial, and callable-only identity/league data.
 - Browser coverage starts a run, moves, pauses/resumes, verifies frozen pause
   time, exercises touch joystick/ability input, edits and autosaves a call sign,
-  checks that gameplay announcements remain absent, and verifies persisted
-  reduced-motion, reduced-flash, and high-contrast behavior.
+  collects an artwork-backed powerup with a rendered pickup burst, checks that
+  gameplay announcements remain absent, and verifies persisted reduced-motion,
+  reduced-flash, high-contrast, and sound preferences.
 - Contract coverage includes collision overlap/misses, collision spawn scale,
   sprite orientation, fixed-step equivalence at 30/60/90/120 Hz, long-gap
   clamping, boss staging invulnerability, 1,500 seeded debris patterns, ability
@@ -79,8 +86,9 @@ visual/UI inconsistency.
   that directory without an SPA catch-all and applies CSP, MIME-sniffing,
   referrer, permissions, and cache headers.
 - GitHub Actions installs Chromium, syntax-checks browser/Function JavaScript,
-  runs all tests, audits dependencies at high severity, builds `dist/`, loads
-  the Function module, validates Firebase JSON, and performs a secret scan.
+  runs all tests plus the Firestore emulator authorization suite, audits
+  production dependencies at high severity, builds `dist/`, loads the Function
+  module, validates Firebase JSON, and performs a secret scan.
 
 ## Codex evidence
 
@@ -97,7 +105,7 @@ Playable URL: https://star-strike-rush.web.app
   App Check, replay or telemetry verification, rate limits, and abuse review.
 - Real Google sign-in and cross-device persistence require a human account smoke
   test against the configured Firebase project.
-- Audio, haptics, account migration UX, offline sync/outbox behavior, and synced
+- Music, haptics, account migration UX, offline sync/outbox behavior, and synced
   accessibility settings are deferred.
 - Procedural rendering remains a fallback if an image fails to decode.
 - The Function dependency tree currently has no high/critical audit finding;

@@ -406,23 +406,32 @@ function drawDossierCard(rect, accent = "#5ceeff") {
   ctx.strokeStyle = accent;
   ctx.globalAlpha = 0.42;
   ctx.stroke();
-  ctx.globalAlpha = 0.12;
-  ctx.fillStyle = accent;
-  ctx.beginPath(); ctx.arc(rect.x + 48, rect.y + rect.h / 2, 60, 0, TAU); ctx.fill();
   ctx.restore();
 }
 function drawPilotHologram(x, y) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.strokeStyle = "rgba(92,238,255,0.34)";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 7]);
-  ctx.rotate(state.frame * 0.006);
-  ctx.beginPath(); ctx.ellipse(0, 0, 48, 24, 0, 0, TAU); ctx.stroke();
-  ctx.rotate(-state.frame * 0.012);
-  ctx.beginPath(); ctx.ellipse(0, 0, 35, 50, 0, 0, TAU); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.rotate(state.frame * 0.006);
+  const bracketPulse = 0.46 + Math.sin(state.frame * 0.045) * 0.10;
+  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 38);
+  glow.addColorStop(0, `rgba(92,238,255,${bracketPulse * 0.24})`);
+  glow.addColorStop(0.46, `rgba(35,110,145,${bracketPulse * 0.10})`);
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(-42, -48, 84, 96);
+  ctx.strokeStyle = `rgba(92,238,255,${bracketPulse})`;
+  ctx.lineWidth = 1.2;
+  const bracketX = 31;
+  const bracketY = 39;
+  const bracketLength = 9;
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(sx * (bracketX - bracketLength), sy * bracketY);
+      ctx.lineTo(sx * bracketX, sy * bracketY);
+      ctx.lineTo(sx * bracketX, sy * (bracketY - bracketLength));
+      ctx.stroke();
+    }
+  }
   if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "player", 0, 0, { scale: 1.32, orientationContext: "title" }))) {
     ctx.fillStyle = "#d8fbff";
     ctx.beginPath(); ctx.moveTo(0, -28); ctx.lineTo(-22, 22); ctx.lineTo(0, 12); ctx.lineTo(22, 22); ctx.closePath(); ctx.fill();
@@ -520,15 +529,15 @@ function drawOnlinePanel() {
     const identityAvailable = online.competitionBackend !== "unavailable";
     drawOnlineActionButton(r.claimHandle, identityAvailable ? handleLabel : "IDENTITY SERVICE OFFLINE", !!user && !online.profileHandle && identityAvailable);
     if (!user) drawOnlineActionButton(r.signIn, "CONNECT GOOGLE ACCOUNT", true);
-    drawOnlineActionButton(r.signOut, "SIGN OUT", !!user);
+    if (user) drawOnlineActionButton(r.signOut, "SIGN OUT", true);
     ctx.save();
     ctx.font = FONT_TINY;
     ctx.textAlign = "center";
     ctx.fillStyle = handleStatus ? "#ffd27a" : (online.lastError ? "#ff9f9f" : "rgba(255,255,255,0.48)");
     const quietStatus = handleStatus || online.lastError || (!user ? "LOCAL PLAY IS READY" : "ACCOUNT CONNECTED");
-    ctx.fillText(String(quietStatus).slice(0, 48), panel.x + panel.w / 2, panel.y + 426);
+    ctx.fillText(String(quietStatus).slice(0, 48), panel.x + panel.w / 2, panel.y + (user ? 426 : 386));
     ctx.restore();
-    drawFlightNetworkCard({ x: panel.x + 20, y: panel.y + 452, w: panel.w - 40, h: 112 }, online, user);
+    drawFlightNetworkCard({ x: panel.x + 20, y: panel.y + (user ? 452 : 412), w: panel.w - 40, h: 112 }, online, user);
   } else if (accountPanelTab === "league") {
     const competitionEnabled = globalThis.COMPETITIVE_MODE_ENABLED === true;
     const league = competitionEnabled ? (online.weeklyLeague || null) : null;
@@ -601,6 +610,7 @@ function drawOnlinePanel() {
     drawOnlineActionButton(r.motion, `REDUCED MOTION: ${settingReducedMotion ? "ON" : "OFF"}`, true);
     drawOnlineActionButton(r.flash, `REDUCED FLASH: ${settingReducedFlash ? "ON" : "OFF"}`, true);
     drawOnlineActionButton(r.contrast, `HIGH CONTRAST: ${settingHighContrast ? "ON" : "OFF"}`, true);
+    drawOnlineActionButton(r.sound, `SOUND EFFECTS: ${settingSoundEffects ? "ON" : "OFF"}`, true);
   }
 }
 function drawRecordsPanel() {

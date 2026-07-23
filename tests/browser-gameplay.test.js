@@ -257,3 +257,38 @@ test("touch can start a run, move with the joystick, and activate the ability wi
     await context.close();
   }
 });
+
+test("collecting a powerup applies its effect and emits visible pickup feedback", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 375, height: 667 } });
+  const { page, errors } = await openGame(context);
+  try {
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
+    await page.evaluate(() => {
+      state.player.rapid = 0;
+      state.particles = [];
+      state.powerups = [{
+        x: state.player.x,
+        y: state.player.y,
+        type: "rapid",
+        vy: 0,
+        size: 11,
+        life: 900,
+        rotation: 0,
+        spinSpeed: 0.02
+      }];
+    });
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).counts.powerups === 0);
+    const feedback = await page.evaluate(() => ({
+      rapid: state.player.rapid,
+      rings: state.particles.filter((particle) => particle.kind === "ring").length,
+      particles: state.particles.length
+    }));
+    assert.ok(feedback.rapid > 0);
+    assert.ok(feedback.rings >= 1);
+    assert.ok(feedback.particles >= 20);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});

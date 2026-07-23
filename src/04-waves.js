@@ -91,8 +91,6 @@ function discoverCodex(type) {
   if (!codexDiscovered[type]) {
     codexDiscovered[type] = true;
     saveCodexDiscovered();
-    const meta = typeof getCodexMeta === "function" ? getCodexMeta(type) : null;
-    pushGameNotice(`DISCOVERED ${meta && meta.shortName ? meta.shortName : type}`, "discovery");
     codexHasNew = true;
   }
 }

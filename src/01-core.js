@@ -82,6 +82,7 @@ let settingScreenShake = true;
 let settingReducedMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 let settingReducedFlash = false;
 let settingHighContrast = false;
+let settingSoundEffects = true;
 let respawnHold = 0;
 let respawnPointerDown = false;
 let respawnPointerInside = false;
@@ -318,7 +319,8 @@ function saveSettings() {
       settingScreenShake,
       settingReducedMotion,
       settingReducedFlash,
-      settingHighContrast
+      settingHighContrast,
+      settingSoundEffects
     }));
   } catch {}
 }
@@ -352,6 +354,7 @@ function loadSettings() {
     if (obj && typeof obj.settingReducedMotion === "boolean") settingReducedMotion = obj.settingReducedMotion;
     if (obj && typeof obj.settingReducedFlash === "boolean") settingReducedFlash = obj.settingReducedFlash;
     if (obj && typeof obj.settingHighContrast === "boolean") settingHighContrast = obj.settingHighContrast;
+    if (obj && typeof obj.settingSoundEffects === "boolean") settingSoundEffects = obj.settingSoundEffects;
   } catch {}
   MAX_PARTICLES = settingMaxParticles;
   applyAccessibilitySettings();

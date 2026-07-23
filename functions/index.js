@@ -32,12 +32,13 @@ admin.initializeApp();
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 const REGION = "us-central1";
-
-function safeEmail(value) {
-  return String(value || "")
-    .replace(/[^\w.@+-]/g, "")
-    .slice(0, 120);
-}
+const CALLABLE_OPTIONS = Object.freeze({
+  region: REGION,
+  maxInstances: 10,
+  concurrency: 40,
+  timeoutSeconds: 30,
+  memory: "256MiB"
+});
 
 function neutralPilotCallSign(uid) {
   let hash = 2166136261;
@@ -52,13 +53,7 @@ function authContext(request) {
   if (!request.auth || !request.auth.uid) {
     throw new HttpsError("unauthenticated", "Sign in is required.");
   }
-  const token = request.auth.token || {};
-  return {
-    uid: request.auth.uid,
-    email: safeEmail(token.email || ""),
-    displayName: safeText(token.name || "", "Pilot", 60),
-    photoURL: String(token.picture || "").slice(0, 300)
-  };
+  return { uid: request.auth.uid };
 }
 
 function profileFromSnapshots(privateSnap, publicSnap, leaderboardSnap) {
@@ -78,9 +73,9 @@ function privatePayloadFor(auth, profile, existing = {}) {
   const now = FieldValue.serverTimestamp();
   return {
     uid: auth.uid,
-    email: auth.email,
-    displayName: auth.displayName,
-    photoURL: auth.photoURL,
+    email: FieldValue.delete(),
+    displayName: FieldValue.delete(),
+    photoURL: FieldValue.delete(),
     glory: profile.glory,
     gloryRank: rank.name,
     gloryRankIndex: rank.index,
@@ -144,7 +139,7 @@ async function leagueResponse(leagueId) {
   };
 }
 
-exports.syncPilotProfile = onCall({ region: REGION }, async (request) => {
+exports.syncPilotProfile = onCall(CALLABLE_OPTIONS, async (request) => {
   const auth = authContext(request);
   const requestedCallSign = safeCallSign(request.data && request.data.callSign);
   const privateRef = db.doc(`players_private/${auth.uid}`);
@@ -172,7 +167,7 @@ exports.syncPilotProfile = onCall({ region: REGION }, async (request) => {
   return { ok: true, ...result };
 });
 
-exports.claimPilotHandle = onCall({ region: REGION }, async (request) => {
+exports.claimPilotHandle = onCall(CALLABLE_OPTIONS, async (request) => {
   const auth = authContext(request);
   const validation = validateHandle(request.data && request.data.handle);
   if (!validation.ok) throw new HttpsError("invalid-argument", `Handle is invalid: ${validation.reason}.`);
@@ -198,7 +193,7 @@ exports.claimPilotHandle = onCall({ region: REGION }, async (request) => {
   return { ok: true, handle };
 });
 
-exports.joinWeeklyLeague = onCall({ region: REGION }, async (request) => {
+exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
   requireCompetitionEnabled();
   const auth = authContext(request);
   const week = weekWindow();
@@ -286,7 +281,7 @@ function clientProfile(profile) {
   };
 }
 
-exports.submitRunReceipt = onCall({ region: REGION }, async (request) => {
+exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
   requireCompetitionEnabled();
   const auth = authContext(request);
   const run = sanitizeRunReceipt({
@@ -407,7 +402,7 @@ exports.submitRunReceipt = onCall({ region: REGION }, async (request) => {
   });
 });
 
-exports.claimSeasonReward = onCall({ region: REGION }, async (request) => {
+exports.claimSeasonReward = onCall(CALLABLE_OPTIONS, async (request) => {
   const auth = authContext(request);
   const rewardId = safeDocId(request.data && request.data.rewardId, "");
   if (!rewardId) throw new HttpsError("invalid-argument", "Reward id is required.");

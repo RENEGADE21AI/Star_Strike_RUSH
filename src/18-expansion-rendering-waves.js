@@ -264,7 +264,9 @@ function drawExpansionBoss(b) {
   ctx.save();
   ctx.translate(b.x, b.y + bob);
   ctx.rotate(Math.sin(state.frame * 0.022 + b.movePhase) * 0.025);
-  if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, `boss_${b.mode}`, 0, 0))) {
+  const hitScale = 1 + Math.min(0.055, (b.hitPulse || 0) * 0.045);
+  ctx.scale(hitScale, hitScale);
+  if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, `boss_${b.mode}`, 0, 0, { hitFlash: clamp((b.hitFlash || 0) / 10, 0, 1) }))) {
     drawExpansionBossShip(b.mode, false, 1);
   }
   if (b.warn > 0) {
@@ -273,6 +275,7 @@ function drawExpansionBoss(b) {
     ctx.beginPath(); ctx.arc(0, 0, Math.max(b.w, b.h) * 0.34 + Math.sin(state.frame * 0.22) * 4, 0, TAU); ctx.stroke();
   }
   ctx.restore();
+  if (typeof drawBossImpactFeedback === "function") drawBossImpactFeedback(b, bob);
   if (typeof drawBossHealthBar === "function") drawBossHealthBar(b, bossMeta.color || "#ff455c");
   return true;
 }

@@ -5,9 +5,13 @@
   "scripts": {
     "build": "node scripts/build_static.js",
     "test": "node --test tests/*.test.js",
-    "test:browser": "node --test tests/browser-gameplay.test.js"
+    "test:browser": "node --test tests/browser-gameplay.test.js",
+    "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore-rules.emulator.mjs\""
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.16.0",
+    "firebase-tools": "^15.24.0",
     "playwright": "1.61.1"
   }
 }

@@ -280,11 +280,13 @@ function damagePlayer(amount = 1) {
   state.fx.flash = Math.max(state.fx.flash, amount >= 2 ? 10 : 8);
   resetCombo();
   spawnParticles(p.x, p.y, amount >= 2 ? 18 : 12, "#ff8a8a", 1.05);
+  if (typeof playGameSound === "function") playGameSound("player_hit", amount >= 2 ? 1.15 : 0.9);
   if (p.hp <= 0) enterGameOver();
 }
 function collectPowerup(pu) {
   const p = state.player;
   state.runStats.powerups++;
+  spawnPowerupCollectBurst(pu);
   if (typeof applyExpansionPowerup === "function" && applyExpansionPowerup(pu)) return;
   if (pu.type === "spread") { p.spread = Math.max(p.spread, 900); showMessage("SPREAD SHOT", 90); }
   else if (pu.type === "rapid") { p.rapid = Math.max(p.rapid, 900); showMessage("RAPID FIRE", 90); }
@@ -293,7 +295,18 @@ function collectPowerup(pu) {
   else if (pu.type === "dual") { spawnWingmen(2); showMessage("DUAL WING", 90); }
 }
 function enemyScoreForType(type) { return (ENEMY_DATA[type] && ENEMY_DATA[type].score) ? ENEMY_DATA[type].score : 20; }
-function applyEnemyHitFeedback(e) { e.hitFlash = 12; e.hitPulse = 1; }
+function applyEnemyHitFeedback(e) {
+  e.hitFlash = 12;
+  e.hitPulse = 1;
+  if (typeof playGameSound === "function") playGameSound("enemy_hit", 0.62);
+}
+function applyBossHitFeedback(boss, x, y) {
+  if (!boss) return;
+  boss.hitFlash = 10;
+  boss.hitPulse = 1;
+  spawnParticles(x, y, 7, "#fff", 0.82);
+  if (typeof playGameSound === "function") playGameSound("boss_hit", 0.78);
+}
 function bossSpriteKey(mode) { return `boss_${mode || "standard"}`; }
 function playerBulletSpriteKey() { return "player_bullet"; }
 function enemyBulletSpriteKey(kind) { return kind === "drainShot" ? "drainShot" : "enemy_bullet"; }
@@ -317,7 +330,7 @@ function updateCollisions() {
           b.life = 0;
           p.energy = clamp(p.energy + 5, 0, p.maxEnergy);
           state.boss.hitsSinceShift++;
-          spawnParticles(b.x, b.y, 8, "#fff", 0.8);
+          applyBossHitFeedback(state.boss, b.x, b.y);
           if (state.boss.hp <= 0) {
             const deadBoss = state.boss;
             spawnBossDeath(deadBoss);
@@ -349,7 +362,7 @@ function updateCollisions() {
           state.boss.hp -= dmg;
           state.difficulty.shotsHit++;
           b.life = 0;
-          spawnParticles(b.x, b.y, 4, "#fff", 0.8);
+          applyBossHitFeedback(state.boss, b.x, b.y);
           if (state.boss.hp <= 0) {
             const deadBoss = state.boss;
             spawnBossDeath(deadBoss);
@@ -383,7 +396,7 @@ function updateCollisions() {
           state.boss.hp -= dmg;
           state.difficulty.shotsHit++;
           b.life = 0;
-          spawnParticles(b.x, b.y, 5, "#fff", 0.8);
+          applyBossHitFeedback(state.boss, b.x, b.y);
           if (state.boss.hp <= 0) {
             const deadBoss = state.boss;
             spawnBossDeath(deadBoss);
@@ -464,6 +477,7 @@ function updateCollisions() {
           state.enemyBullets.splice(i, 1);
           state.wingmen.splice(w, 1);
           spawnParticles(wm.x, wm.y, 10, "#f6f", 0.8);
+          if (typeof playGameSound === "function") playGameSound("wingman_hit", 0.85);
           wingmanBlocked = true;
           break;
         }
@@ -516,6 +530,7 @@ function updateCollisions() {
           state.enemies.splice(i, 1);
           spawnParticles(wm.x, wm.y, 12, "#f6f", 0.9);
           spawnDeathBurst(e.x, e.y, 10);
+          if (typeof playGameSound === "function") playGameSound("wingman_hit", 0.92);
           wingmanHit = true;
           break;
         }
