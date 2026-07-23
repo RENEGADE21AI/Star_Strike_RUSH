@@ -26,7 +26,9 @@ test("Hosting serves the allowlisted build with global security headers", () => 
     assert.equal(globalKeys.has(key), true, `${key} must cover the extensionless entry route`);
   }
   const csp = globalHeaders.find((header) => header.key === "Content-Security-Policy")?.value || "";
+  assert.match(csp, /script-src [^;]*https:\/\/apis\.google\.com/);
   assert.match(csp, /script-src-attr 'none'/);
+  assert.match(csp, /frame-src [^;]*https:\/\/accounts\.google\.com [^;]*https:\/\/\*\.firebaseapp\.com/);
   assert.match(csp, /object-src 'none'/);
   assert.match(csp, /frame-ancestors 'none'/);
 
