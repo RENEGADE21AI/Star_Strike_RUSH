@@ -56,6 +56,8 @@ function setupSession(mode = "start") {
   state.wingmen = [];
   state.pendingSpawns = [];
   state.score = 0;
+  state.runStartingHighScore = highScore;
+  state.newHighScore = false;
   state.multiplier = 1;
   state.comboKills = 0;
   state.comboPulse = 0;
@@ -74,6 +76,7 @@ function setupSession(mode = "start") {
   state.messageTimer = 0;
   state.messageMax = 0;
   state.messageQueue = [];
+  state.notices = [];
   state.fx.shake = 0;
   state.fx.flash = 0;
   state.gameOverShake = 0;
@@ -171,9 +174,15 @@ function setupSession(mode = "start") {
 function enterGameOver() {
   state.gameState = "gameover";
   clearGameplayInput();
-  previousHighScore = highScore;
+  previousHighScore = state.runStartingHighScore;
+  state.newHighScore = typeof isNewRunRecord === "function"
+    ? isNewRunRecord(state.runStartingHighScore, state.score, state.runMode)
+    : state.runMode !== "debug" && state.score > state.runStartingHighScore;
   if (state.runMode !== "debug") {
-    if (state.score > highScore) { highScore = state.score; highScoreDirty = true; }
+    const nextHighScore = typeof highScoreAfterRun === "function"
+      ? highScoreAfterRun(highScore, state.score, state.runMode)
+      : Math.max(highScore, state.score);
+    if (nextHighScore > highScore) { highScore = nextHighScore; highScoreDirty = true; }
     if (highScoreDirty) saveHighScore();
     applyRunMetaProgress();
   }
@@ -539,6 +548,10 @@ function update() {
   if (typeof updateExpansionHazards === "function") updateExpansionHazards();
   updateCollisions();
   updateParticles();
+  state.notices = (state.notices || []).filter((notice) => {
+    notice.age++;
+    return notice.age < notice.duration;
+  });
 
   state.fx.shake = Math.max(0, state.fx.shake - 0.7);
   state.fx.flash = Math.max(0, state.fx.flash - 0.8);
@@ -550,12 +563,6 @@ function update() {
     showNextMessage();
   }
 
-  if (encounterCard) {
-    encounterCard.timer++;
-    if (encounterCard.timer >= ENCOUNTER_CARD_DURATION) encounterCard = null;
-  } else if (encounterQueue.length > 0) {
-    encounterCard = { type: encounterQueue.shift(), timer: 0, maxTimer: ENCOUNTER_CARD_DURATION };
-  }
 }
 
 const DEVELOPMENT_BUILD = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" || globalThis.STAR_STRIKE_DEV_BUILD === true;
@@ -580,6 +587,7 @@ function getDebugSnapshot() {
     resumeCountdown: state.resumeCountdown,
     transition: {
       mode: state.sceneTransition.mode,
+      duration: state.sceneTransition.duration,
       progress: clamp(state.sceneTransition.frame / Math.max(1, state.sceneTransition.duration), 0, 1)
     },
     frame: state.frame,
@@ -605,6 +613,7 @@ function getDebugSnapshot() {
       gravityWells: state.gravityWells.length,
       powerups: state.powerups.length,
       particles: state.particles.length,
+      wingmen: state.wingmen.length,
       stars: state.stars.length,
       titleFormations: state.titleFormations.length
     },
@@ -714,6 +723,9 @@ function applyDebugScenario() {
     const siphon = state.enemies.find((enemy) => enemy.type === "siphon");
     if (siphon) { siphon.entryFrames = 0; siphon.fireTimer = 48; siphon.fireWarn = 0; }
     showMessage("DEBUG  SIPHON AIM TEST", 120);
+  } else if (scenario === "wingman") {
+    spawnWingmen(2);
+    state.player.y = H * 0.72;
   } else if (scenario === "powerups") {
     const types = [
       "spread", "rapid", "repair", "wingman", "dual", "energy_cell", "overcharge",
@@ -755,4 +767,9 @@ resize();
 setupSession("start");
 applyDebugScenario();
 window.addEventListener("resize", resize);
-Promise.resolve(typeof preloadGameAssets === "function" ? preloadGameAssets() : null).then(() => requestAnimationFrame(loop));
+if (typeof preloadGameAssets === "function") {
+  Promise.resolve(preloadGameAssets()).catch((error) => {
+    state.debugErrors.push(`Asset preload fallback: ${String(error && error.message || error).slice(0, 120)}`);
+  });
+}
+requestAnimationFrame(loop);

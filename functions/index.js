@@ -18,9 +18,11 @@ const {
 } = require("./progression");
 const {
   divisionName,
+  competitionWritesEnabled,
   normalizeHandle,
   performanceBand,
   publicLeagueMember,
+  requireCompetitionEnabled,
   validateHandle,
   weekWindow
 } = require("./competition");
@@ -163,7 +165,7 @@ exports.syncPilotProfile = onCall({ region: REGION }, async (request) => {
     const publicPayload = publicPayloadFor(auth, profile, requestedCallSign || publicData.callSign, achievementsCount, publicData);
     tx.set(privateRef, privatePayloadFor(auth, profile, privateData), { merge: true });
     tx.set(publicRef, publicPayload);
-    tx.set(leaderboardRef, publicPayload);
+    if (competitionWritesEnabled()) tx.set(leaderboardRef, publicPayload);
     return { callSign: publicPayload.callSign, handle: publicPayload.handle, profile: clientProfile(profile) };
   });
 
@@ -190,13 +192,14 @@ exports.claimPilotHandle = onCall({ region: REGION }, async (request) => {
     const now = FieldValue.serverTimestamp();
     tx.set(registryRef, { uid: auth.uid, handle, claimedAt: registrySnap.exists ? registrySnap.data().claimedAt : now, updatedAt: now });
     tx.update(publicRef, { handle, updatedAt: now });
-    if (leaderboardSnap.exists) tx.update(leaderboardRef, { handle, updatedAt: now });
+    if (competitionWritesEnabled() && leaderboardSnap.exists) tx.update(leaderboardRef, { handle, updatedAt: now });
   });
 
   return { ok: true, handle };
 });
 
 exports.joinWeeklyLeague = onCall({ region: REGION }, async (request) => {
+  requireCompetitionEnabled();
   const auth = authContext(request);
   const week = weekWindow();
   const publicRef = db.doc(`players_public/${auth.uid}`);
@@ -284,6 +287,7 @@ function clientProfile(profile) {
 }
 
 exports.submitRunReceipt = onCall({ region: REGION }, async (request) => {
+  requireCompetitionEnabled();
   const auth = authContext(request);
   const run = sanitizeRunReceipt({
     ...(request.data && request.data.receipt ? request.data.receipt : request.data || {}),
@@ -373,7 +377,7 @@ exports.submitRunReceipt = onCall({ region: REGION }, async (request) => {
 
     tx.set(privateRef, privatePayload, { merge: true });
     tx.set(publicRef, publicPayload);
-    tx.set(leaderboardRef, publicPayload);
+    if (competitionWritesEnabled()) tx.set(leaderboardRef, publicPayload);
     tx.create(receiptRef, receiptPayload);
     for (const item of newAchievementRefs) {
       tx.set(item.ref, {
@@ -452,7 +456,7 @@ exports.claimSeasonReward = onCall({ region: REGION }, async (request) => {
 
     tx.set(privateRef, privatePayload, { merge: true });
     tx.set(publicRef, publicPayload);
-    tx.set(leaderboardRef, publicPayload);
+    if (competitionWritesEnabled()) tx.set(leaderboardRef, publicPayload);
     tx.create(claimRef, {
       uid,
       rewardId,

@@ -21,7 +21,7 @@ function drawMenuFlights() {
     const overPrimaryUi = f.x > 10 && f.x < W - 10 && f.y > H * 0.12 && f.y < H * 0.72;
     const edgeDistance = Math.min(f.x + 42, W + 42 - f.x, f.y + 72, H + 72 - f.y);
     const fogFade = clamp(edgeDistance / 72, 0, 1);
-    const formationAlpha = (f.renderAlpha || 0.72) * fogFade * (overPrimaryUi ? 0.03 : 1);
+    const formationAlpha = (f.renderAlpha || 0.72) * fogFade * (overPrimaryUi ? 0.22 : 1);
     ctx.save();
     ctx.globalAlpha = formationAlpha;
     ctx.filter = f.renderBlur > 0 ? `blur(${f.renderBlur}px)` : "none";

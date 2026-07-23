@@ -35,6 +35,7 @@ scenarios include:
 - `?debug=1&scenario=debris`
 - `?debug=1&scenario=debris-incoming`
 - `?debug=1&scenario=powerups`
+- `?debug=1&scenario=wingman`
 - append `&hitboxes=1` to inspect collision geometry
 
 Debug snapshots, scenarios, hitboxes, and developer shortcuts are gated to
@@ -84,20 +85,22 @@ detailed contracts and current support boundary.
 ## Current online status
 
 Local play, local progression, editable call signs, settings, achievements, and
-the Codex are active. Google sign-in, private profile sync, and unique handle
-claims remain configuration-dependent.
+the Codex are active. Google sign-in enables private profile sync, an
+account-bound unique `@handle`, and authenticated reads of the existing public
+leaderboard. The handle Function claims normalized handles transactionally so
+two accounts cannot own the same handle.
 
-Public score submission and weekly Flight League scoring are intentionally
-disabled in the recovery client. Existing callable source validates receipts,
-but a browser can still fabricate a plausible run; public competition will not
-be re-enabled until server-issued run sessions, replay/telemetry verification,
-App Check, and abuse controls are implemented and tested. The UI labels this as
-a preseason/fair-play hold instead of pretending the leaderboard is verified.
+New public score submission and weekly Flight League scoring are intentionally
+disabled in both the recovery client and the callable Functions. A browser can
+still fabricate a plausible run, so competition writes will not be re-enabled
+until server-issued run sessions, replay/telemetry verification, App Check, and
+abuse controls are implemented and tested. The UI labels this as a
+preseason/fair-play hold instead of pretending the leaderboard is verified.
 
 ## Artwork
 
-The repository preserves 43 supplied original images under ignored-from-Hosting
-`source-art/` and ships 45 optimized derivatives under `assets/`: 25 gameplay
+The repository preserves 44 supplied original images under ignored-from-Hosting
+`source-art/` and ships 46 optimized derivatives under `assets/`: 26 gameplay
 sprites, 13 powerup icons, and 7 menu/PWA icons. The import pipeline removes
 baked checkerboards, trims transparent padding, downsizes files, and keeps
 collision geometry separate from decorative pixels. Procedural Canvas art

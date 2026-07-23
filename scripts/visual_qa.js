@@ -12,6 +12,9 @@ const isLocal = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(baseUrl);
 
 const cases = [
   { name: "mobile-title", width: 375, height: 667, route: "/" },
+  { name: "mobile-title-tall", width: 390, height: 844, route: "/" },
+  { name: "mobile-title-large", width: 430, height: 932, route: "/" },
+  { name: "mobile-achievements", width: 375, height: 667, route: "/", click: { x: 105, y: 408 } },
   { name: "mobile-dossier", width: 375, height: 667, route: "/", click: { x: 38, y: 237 } },
   { name: "mobile-road", width: 375, height: 667, route: "/", click: { x: 165, y: 405 } },
   { name: "mobile-codex", width: 375, height: 667, route: "/", click: { x: 266, y: 408 } },
@@ -20,6 +23,7 @@ const cases = [
   { name: "mobile-debris", width: 375, height: 667, route: "/?debug=1&scenario=debris" },
   { name: "mobile-boss-staging", width: 375, height: 667, route: "/?debug=1&scenario=debris-incoming" },
   { name: "mobile-powerups", width: 390, height: 844, route: "/?debug=1&scenario=powerups" },
+  { name: "mobile-wingman", width: 390, height: 844, route: "/?debug=1&scenario=wingman" },
   { name: "desktop-title", width: 1440, height: 900, route: "/" },
   { name: "desktop-debris", width: 1440, height: 900, route: "/?debug=1&scenario=debris" },
 ];

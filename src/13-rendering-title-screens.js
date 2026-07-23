@@ -1,33 +1,40 @@
 function drawTitleAndButtons() {
   ctx.save();
-  ctx.translate(W / 2, H * 0.22);
-  ctx.transform(1, 0, -0.13, 1, 0, 0);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const prefix = "STAR STRIKE ";
-  const suffix = "RUSH";
-  ctx.font = FONT_TITLE;
-  const pw = ctx.measureText(prefix).width;
-  const sw = ctx.measureText(suffix).width;
-  const total = pw + sw;
-  const startX = -total / 2;
-  const fit = Math.min(0.55, (W - 170) / Math.max(1, total));
-  ctx.scale(fit, fit);
+  ctx.translate(W / 2, H * 0.105);
+  ctx.transform(1, 0, -0.09, 1, 0, 0);
   ctx.shadowColor = "rgba(100,220,255,0.55)";
-  ctx.shadowBlur = 14;
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 16;
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(0,0,0,0.72)";
+  ctx.font = "900 46px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  const name = "STAR STRIKE";
+  const nameFit = Math.min(1, (W - 32) / Math.max(1, ctx.measureText(name).width));
+  ctx.save();
+  ctx.scale(nameFit, nameFit);
   ctx.fillStyle = "#fff";
-  ctx.strokeText(prefix, startX + pw / 2, 0);
-  ctx.fillText(prefix, startX + pw / 2, 0);
+  ctx.strokeText(name, 0, 0);
+  ctx.fillText(name, 0, 0);
+  ctx.restore();
+  ctx.font = "900 64px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  const rush = "RUSH";
+  const rushFit = Math.min(1.12, (W - 32) / Math.max(1, ctx.measureText(rush).width));
+  ctx.save();
+  ctx.translate(0, 54);
+  ctx.scale(rushFit, rushFit);
   ctx.shadowColor = "rgba(255,150,70,0.65)";
   ctx.fillStyle = "#ffbd5b";
-  ctx.strokeStyle = "rgba(0,0,0,0.60)";
-  ctx.strokeText(suffix, startX + pw + sw / 2, 0);
-  ctx.fillText(suffix, startX + pw + sw / 2, 0);
+  ctx.strokeText(rush, 0, 0);
+  ctx.fillText(rush, 0, 0);
+  ctx.restore();
   ctx.restore();
 
   const callRect = getCallSignRect();
+  const titleOnline = window.starStrikeOnline && window.starStrikeOnline.getState
+    ? window.starStrikeOnline.getState()
+    : {};
+  const visibleCallSign = titleOnline.user ? (titleOnline.profileCallSign || "PILOT") : callSign;
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.45)";
   ctx.beginPath(); ctx.roundRect(callRect.x, callRect.y, callRect.w, callRect.h, 8); ctx.fill();
@@ -41,18 +48,18 @@ function drawTitleAndButtons() {
   if (callSignEditing) {
     txt = callSignDraft + (Math.floor(callSignCursorBlink / 28) % 2 === 0 ? "|" : " ");
   } else {
-    txt = callSign || "ENTER CALL SIGN";
+    txt = visibleCallSign || "ENTER CALL SIGN";
   }
-  ctx.fillStyle = callSign ? "#fff" : "rgba(255,255,255,0.30)";
-  ctx.fillText(txt, callRect.x + callRect.w / 2, callRect.y + callRect.h / 2 + 1);
+  ctx.fillStyle = visibleCallSign ? "#fff" : "rgba(255,255,255,0.30)";
+  ctx.fillText(txt, callRect.x + callRect.w / 2, callRect.y + callRect.h / 2 - (titleOnline.profileHandle ? 4 : 0));
   ctx.font = "900 8px 'Arial Narrow', Arial, sans-serif";
   ctx.fillStyle = callSignSaveState === "error" ? "#ff8a8a" : callSignSaveState === "success" ? "#78ffb4" : callSignEditing ? "#78ffb4" : "rgba(255,255,255,0.48)";
-  const pilotHint = callSignStatusTimer > 0 || callSignEditing ? (callSignStatus || "ENTER SAVES") : "TAP TO EDIT";
-  ctx.fillText(pilotHint.slice(0, 34), callRect.x + callRect.w / 2, callRect.y + callRect.h - 7);
+  const pilotHint = callSignStatusTimer > 0 || callSignEditing ? callSignStatus : (titleOnline.profileHandle ? `@${titleOnline.profileHandle}` : "");
+  if (pilotHint) ctx.fillText(pilotHint.slice(0, 34), callRect.x + callRect.w / 2, callRect.y + callRect.h - 7);
   ctx.restore();
 
   const iconRects = getTitleIconRects();
-  const accountOnline = !!(window.starStrikeOnline && window.starStrikeOnline.getState && window.starStrikeOnline.getState().user);
+  const accountOnline = !!titleOnline.user;
   drawSimpleButton(iconRects.account, "", accountOnline ? "rgba(120,255,180,0.62)" : "rgba(255,255,255,0.24)");
   drawAccountIcon(iconRects.account, titleSubState === "online" && titlePanelTarget === 1);
 
@@ -140,7 +147,7 @@ function drawGameOverScreen() {
   const highLine = "High Score: " + highScore;
   const highW = ctx.measureText(highLine).width;
   ctx.fillText(highLine, (W - highW) / 2, H * 0.42);
-  if (state.score > previousHighScore && state.score > 0) {
+  if (state.newHighScore) {
     const record = "New High Score!";
     const rw = ctx.measureText(record).width;
     ctx.fillText(record, (W - rw) / 2, H * 0.47);
