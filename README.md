@@ -1,74 +1,106 @@
 # Star Strike RUSH
 
-Star Strike RUSH is a portrait-first browser arcade shooter built with the
-Canvas 2D API. Short runs combine automatic fire, readable enemy formations,
-energy-powered Ghost movement, boss encounters, achievements, Glory ranks, and
-optional Firebase-backed records.
+Star Strike RUSH is a portrait-first Canvas 2D arcade shooter. Automatic fire,
+responsive movement, powerup builds, adaptive pressure, achievements, upward
+progression roads, and staged boss encounters are designed for short keyboard
+or touch runs.
 
 Play: https://star-strike-rush.web.app
 
 ## Controls
 
-- Move: WASD or arrow keys
-- Ghost Dash / realm hop: Space, Shift, or E
-- Debris Warden encounter: the action becomes `DASH`; it boosts movement but
-  does not phase through asteroids
-- Touch or pen: virtual joystick and action button appear after meaningful
-  touch gameplay input and stay hidden for ordinary desktop input
+- Move: WASD or arrow keys.
+- Ability: Space, Shift, or E.
+- During the Debris Warden encounter the ability becomes a fast, non-phasing
+  `DASH`; asteroids remain solid hazards.
+- Touch or pen: use the virtual joystick and ability button. They appear only
+  after meaningful touch/pen gameplay input.
+- Pause: the HUD pause control or Escape. Gameplay time freezes while paused
+  and resumes through a short countdown.
 
 ## Run locally
 
-Serve the repository root over HTTP; opening `index.html` through `file://` is
-not supported.
+Install dependencies, serve the repository root, then open
+`http://127.0.0.1:4173`:
 
 ```powershell
+npm ci
 python -m http.server 4173
 ```
 
-Then open `http://127.0.0.1:4173`.
+The app must be served over HTTP; `file://` is not supported. Local-only QA
+scenarios include:
 
-## Test
+- `?debug=1&scenario=siphon`
+- `?debug=1&scenario=debris`
+- `?debug=1&scenario=debris-incoming`
+- `?debug=1&scenario=powerups`
+- append `&hitboxes=1` to inspect collision geometry
+
+Debug snapshots, scenarios, hitboxes, and developer shortcuts are gated to
+`localhost` and `127.0.0.1`.
+
+## Verify and build
 
 ```powershell
-$testFiles = Get-ChildItem tests -Filter *.test.js | ForEach-Object { $_.FullName }
-node --test $testFiles
+npm test
+npm run build
 ```
 
-Syntax-check all browser scripts with `node --check src/<file>.js`. Firebase
-callable code lives in `functions/` and uses Node 22. GitHub Actions runs the
-complete test and syntax suite on every push and pull request.
+`npm test` runs the Node contract tests and real Chromium gameplay tests.
+`npm run build` creates a deployment-only `dist/` directory containing the
+runtime, optimized assets, manifest, and styles. It excludes original artwork,
+tests, documentation, local Firebase configuration, and backend source.
+
+For a Hosting-only release:
+
+```powershell
+firebase deploy --only hosting
+```
+
+Do not deploy Firestore rules by themselves. Backend changes must be reviewed
+and deployed together with their matching Functions contract.
 
 ## Architecture
 
-The game remains a lightweight ordered-script Canvas application. Pure runtime
-contracts are isolated in `src/00-*.js`: asset metadata and hitboxes, public
-identity and weekly competition rules, boss fairness/Siphon rules, and input actions. Stateful systems remain
-split by responsibility across entity, collision, boss, rendering, title, and
-online modules. See `src/README.md` and `docs/ASSET_MANIFEST.md`.
+The project deliberately keeps a small ordered-script architecture rather than
+introducing a framework rewrite. Pure contracts load first: assets/collisions,
+identity, competition gates, gameplay rules, input actions, and the fixed-step
+clock. Stateful entity, boss, UI, rendering, session, and Firebase modules then
+load in the order listed by `index.html`.
 
-Debug URLs are development-only behavior: `?debug=1&scenario=siphon`,
-`?debug=1&scenario=debris`, and `?debug=1&scenario=debris-incoming` create
-deterministic encounters. The last scenario verifies that staging bosses remain
-invulnerable. `H` toggles the hitbox/safe-lane overlay, or `&hitboxes=1` opens
-directly with it visible.
+Important runtime guarantees include:
 
-## Current feature status
+- a fixed 60 Hz simulation independent of display refresh rate;
+- object-based collision calls with explicit visual/collision scaling;
+- per-sprite orientation, anchor, weapon, exhaust, and hitbox metadata;
+- boss vulnerability only after staging and the first attack begin;
+- automatic pause on focus loss and no in-run announcement popups;
+- graceful local play when Firebase is unavailable.
 
-- Signed-out local play, call-sign persistence, achievements, Glory, Season
-  Road, and settings work without Firebase.
-- Google sign-in and online records degrade to an explicit unavailable state
-  when Firebase configuration is missing.
-- Public records contain only call sign and game statistics; provider identity
-  remains private.
-- Optimized transparent player, enemy, boss, asteroid, menu, and favicon assets
-  live in `assets/`; the original source art is preserved outside the deployed
-  payload in `source-art/`. Procedural Canvas art remains a resilient fallback.
-- Editable call signs are local-first. Unique account-bound `@handles` and
-  prior-performance weekly leagues are implemented behind server callables.
-- Server-authoritative competition callables are deployed on Blaze. The client
-  still reports configuration/network failures honestly and keeps local play
-  available.
-- The game is rule-based; no AI model runs inside the game.
+See `src/README.md`, `docs/ASSET_MANIFEST.md`, and `PROJECT_STATUS.md` for the
+detailed contracts and current support boundary.
 
-See `BUILD_WEEK_2026.md` for the competition transformation and verification
-record.
+## Current online status
+
+Local play, local progression, editable call signs, settings, achievements, and
+the Codex are active. Google sign-in, private profile sync, and unique handle
+claims remain configuration-dependent.
+
+Public score submission and weekly Flight League scoring are intentionally
+disabled in the recovery client. Existing callable source validates receipts,
+but a browser can still fabricate a plausible run; public competition will not
+be re-enabled until server-issued run sessions, replay/telemetry verification,
+App Check, and abuse controls are implemented and tested. The UI labels this as
+a preseason/fair-play hold instead of pretending the leaderboard is verified.
+
+## Artwork
+
+The repository preserves 43 supplied original images under ignored-from-Hosting
+`source-art/` and ships 45 optimized derivatives under `assets/`: 25 gameplay
+sprites, 13 powerup icons, and 7 menu/PWA icons. The import pipeline removes
+baked checkerboards, trims transparent padding, downsizes files, and keeps
+collision geometry separate from decorative pixels. Procedural Canvas art
+remains a resilient fallback only.
+
+The game is deterministic/rule-based; no AI model runs inside the game.

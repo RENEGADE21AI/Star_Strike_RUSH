@@ -14,9 +14,12 @@ const cases = [
   { name: "mobile-title", width: 375, height: 667, route: "/" },
   { name: "mobile-dossier", width: 375, height: 667, route: "/", click: { x: 38, y: 237 } },
   { name: "mobile-road", width: 375, height: 667, route: "/", click: { x: 165, y: 405 } },
+  { name: "mobile-codex", width: 375, height: 667, route: "/", click: { x: 266, y: 408 } },
+  { name: "mobile-settings", width: 375, height: 667, route: "/", clicks: [{ x: 38, y: 237 }, { x: 295, y: 78 }] },
   { name: "mobile-siphon", width: 375, height: 667, route: "/?debug=1&scenario=siphon" },
   { name: "mobile-debris", width: 375, height: 667, route: "/?debug=1&scenario=debris" },
   { name: "mobile-boss-staging", width: 375, height: 667, route: "/?debug=1&scenario=debris-incoming" },
+  { name: "mobile-powerups", width: 390, height: 844, route: "/?debug=1&scenario=powerups" },
   { name: "desktop-title", width: 1440, height: 900, route: "/" },
   { name: "desktop-debris", width: 1440, height: 900, route: "/?debug=1&scenario=debris" },
 ];
@@ -55,9 +58,10 @@ if (!selectedCases.length) throw new Error(`Unknown visual QA case: ${caseFilter
         const debugReady = !needsDebug || !!document.querySelector("#debugSnapshot")?.textContent;
         return initialized && debugReady;
       }, item.route.includes("debug=1"), { timeout: 90000 });
-      if (item.click) {
+      const clicks = item.clicks || (item.click ? [item.click] : []);
+      for (const click of clicks) {
         await page.waitForTimeout(350);
-        await page.mouse.click(item.click.x, item.click.y);
+        await page.mouse.click(click.x, click.y);
         await page.waitForTimeout(900);
       }
       await page.waitForTimeout(item.route.includes("scenario") ? 1400 : 700);

@@ -1,4 +1,4 @@
-const SPRITE_MANIFEST = Object.freeze({
+const RAW_SPRITE_MANIFEST = {
   player: {
     source: "assets/sprites/player.png",
     render: { width: 40, height: 48, anchorX: 0.5, anchorY: 0.5, rotationOriginX: 0.5, rotationOriginY: 0.5, glow: "#78f6ff" },
@@ -53,11 +53,64 @@ const SPRITE_MANIFEST = Object.freeze({
   enemy_bullet: { source: null, render: { width: 7, height: 11, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 3.4 }] },
   drainShot: { source: null, render: { width: 13, height: 13, anchorX: 0.5, anchorY: 0.5, glow: "#70ff45" }, collision: [{ offsetX: 0, offsetY: 0, radius: 4.3 }] },
   powerup: { source: null, render: { width: 25, height: 25, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 17 }] },
+  powerup_spread: { source: "assets/powerups/spread.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#64ff56" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_rapid: { source: "assets/powerups/rapid.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#ffd64a" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_repair: { source: "assets/powerups/repair.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#4f8fff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_wingman: { source: "assets/powerups/wingman.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#ff52e8" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_dual: { source: "assets/powerups/dual.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#ff52e8" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_energy_cell: { source: "assets/powerups/energy-cell.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#4bdcff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_overcharge: { source: "assets/powerups/overcharge.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#80ff35" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_phase_shield: { source: "assets/powerups/phase-shield.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#78aaff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_magnet: { source: "assets/powerups/magnet.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#ff4bd8" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_piercing: { source: "assets/powerups/piercing.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#8dc8ff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_ion_burst: { source: "assets/powerups/ion-burst.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#34caff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_stabilizer: { source: "assets/powerups/stabilizer.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#54f4d2" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
+  powerup_score_surge: { source: "assets/powerups/score-surge.png", render: { width: 28, height: 28, anchorX: 0.5, anchorY: 0.5, glow: "#ffd325" }, collision: [{ offsetX: 0, offsetY: 0, radius: 18 }] },
   ui_trophy: { source: "assets/ui/menu-trophy.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
   ui_road: { source: "assets/ui/menu-road.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
   ui_world: { source: "assets/ui/menu-world.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
   ui_codex: { source: "assets/ui/menu-codex.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] }
-});
+};
+
+const FRIENDLY_SPRITES = new Set(["player", "wingman"]);
+const HOSTILE_SPRITES = new Set([
+  "red", "orange", "purple", "phantom", "splitter", "splitter_shard", "carrier", "siphon",
+  "leech", "minecaster", "shieldbearer", "railgunner", "repair_drone", "boss_standard",
+  "boss_wraith", "boss_debris_warden", "boss_mothership", "boss_siphon_core", "boss_hive_breaker",
+  "boss_rail_tyrant", "boss_gravity_well"
+]);
+
+function normalizeSpriteEntry(key, entry) {
+  const render = { ...entry.render };
+  const friendly = FRIENDLY_SPRITES.has(key);
+  const hostile = HOSTILE_SPRITES.has(key);
+  const direction = friendly ? -1 : hostile ? 1 : 0;
+  const orientationInput = entry.orientation || {};
+  const orientation = Object.freeze({
+    baseRotation: Number.isFinite(Number(orientationInput.baseRotation))
+      ? Number(orientationInput.baseRotation)
+      : (key === "player" ? Math.PI : 0),
+    flipX: orientationInput.flipX === true,
+    flipY: orientationInput.flipY === true,
+    forwardX: Number.isFinite(Number(orientationInput.forwardX)) ? Number(orientationInput.forwardX) : 0,
+    forwardY: Number.isFinite(Number(orientationInput.forwardY)) ? Number(orientationInput.forwardY) : direction,
+    codexRotation: Number.isFinite(Number(orientationInput.codexRotation)) ? Number(orientationInput.codexRotation) : 0,
+    titleRotation: Number.isFinite(Number(orientationInput.titleRotation)) ? Number(orientationInput.titleRotation) : 0
+  });
+  const projectileOrigin = entry.projectileOrigin || {
+    offsetX: 0,
+    offsetY: direction * Math.round(render.height * 0.36)
+  };
+  const exhaustOrigin = entry.exhaustOrigin || {
+    offsetX: 0,
+    offsetY: -direction * Math.round(render.height * 0.34)
+  };
+  return Object.freeze({ ...entry, render: Object.freeze(render), orientation, projectileOrigin: Object.freeze(projectileOrigin), exhaustOrigin: Object.freeze(exhaustOrigin) });
+}
+
+const SPRITE_MANIFEST = Object.freeze(Object.fromEntries(
+  Object.entries(RAW_SPRITE_MANIFEST).map(([key, entry]) => [key, normalizeSpriteEntry(key, entry)])
+));
 
 const spriteAssetRuntime = { ready: false, images: new Map(), failed: new Set() };
 
@@ -65,29 +118,53 @@ function spriteMeta(key) {
   return SPRITE_MANIFEST[key] || null;
 }
 
-function collisionCirclesFor(key, x, y, scaleValue = 1, fallbackRadius = 0) {
-  const meta = spriteMeta(key);
+function normalizeCollisionBody(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new TypeError("Collision body must be an object with key, x, and y");
+  }
+  const x = Number(body.x);
+  const y = Number(body.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    throw new TypeError("Collision body x and y must be finite numbers");
+  }
+  return {
+    key: typeof body.key === "string" ? body.key : "",
+    x,
+    y,
+    scale: Number.isFinite(Number(body.scale)) ? Math.max(0, Number(body.scale)) : 1,
+    fallbackRadius: Number.isFinite(Number(body.fallbackRadius)) ? Math.max(0, Number(body.fallbackRadius)) : 0
+  };
+}
+
+function powerupSpriteKey(type) {
+  const key = `powerup_${String(type || "").toLowerCase()}`;
+  return SPRITE_MANIFEST[key] ? key : "powerup";
+}
+
+function collisionCirclesFor(body) {
+  const normalized = normalizeCollisionBody(body);
+  const meta = spriteMeta(normalized.key);
   const circles = meta && Array.isArray(meta.collision) && meta.collision.length
     ? meta.collision
-    : [{ offsetX: 0, offsetY: 0, radius: fallbackRadius }];
+    : [{ offsetX: 0, offsetY: 0, radius: normalized.fallbackRadius }];
   return circles.map((circle) => ({
-    x: x + Number(circle.offsetX || 0) * scaleValue,
-    y: y + Number(circle.offsetY || 0) * scaleValue,
-    r: Math.max(0, Number(circle.radius || fallbackRadius || 0) * scaleValue)
+    x: normalized.x + Number(circle.offsetX || 0) * normalized.scale,
+    y: normalized.y + Number(circle.offsetY || 0) * normalized.scale,
+    r: Math.max(0, Number(circle.radius || normalized.fallbackRadius || 0) * normalized.scale)
   }));
 }
 
-function collisionCircleFor(key, x, y, scaleValue = 1, fallbackRadius = 0) {
-  return collisionCirclesFor(key, x, y, scaleValue, fallbackRadius)[0];
+function collisionCircleFor(body) {
+  return collisionCirclesFor(body)[0];
 }
 
 function hitCirclesOverlap(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r;
 }
 
-function manifestCollision(keyA, xA, yA, fallbackA, keyB, xB, yB, fallbackB, scaleA = 1, scaleB = 1) {
-  const a = collisionCirclesFor(keyA, xA, yA, scaleA, fallbackA);
-  const b = collisionCirclesFor(keyB, xB, yB, scaleB, fallbackB);
+function manifestCollision(leftBody, rightBody) {
+  const a = collisionCirclesFor(leftBody);
+  const b = collisionCirclesFor(rightBody);
   return a.some((left) => b.some((right) => hitCirclesOverlap(left, right)));
 }
 
@@ -134,8 +211,13 @@ function drawSpriteAsset(targetContext, key, x, y, options = {}) {
     targetContext.shadowColor = render.glow;
     targetContext.shadowBlur = 10 * drawScale;
   }
+  const orientation = meta.orientation;
+  const contextRotation = options.orientationContext === "codex"
+    ? orientation.codexRotation
+    : options.orientationContext === "title" ? orientation.titleRotation : 0;
   targetContext.translate(x, y);
-  targetContext.rotate(Number(options.rotation || 0));
+  targetContext.rotate(orientation.baseRotation + contextRotation + Number(options.rotation || 0));
+  targetContext.scale(orientation.flipX ? -1 : 1, orientation.flipY ? -1 : 1);
   targetContext.drawImage(image, -width * render.anchorX, -height * render.anchorY, width, height);
   targetContext.restore();
   return true;
@@ -143,6 +225,8 @@ function drawSpriteAsset(targetContext, key, x, y, options = {}) {
 
 globalThis.SPRITE_MANIFEST = SPRITE_MANIFEST;
 globalThis.spriteMeta = spriteMeta;
+globalThis.powerupSpriteKey = powerupSpriteKey;
+globalThis.normalizeCollisionBody = normalizeCollisionBody;
 globalThis.collisionCircleFor = collisionCircleFor;
 globalThis.collisionCirclesFor = collisionCirclesFor;
 globalThis.hitCirclesOverlap = hitCirclesOverlap;

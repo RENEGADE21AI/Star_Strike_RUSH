@@ -8,6 +8,10 @@ const GAME_H = 667;
 let scale = 1;
 let offsetX = 0;
 let offsetY = 0;
+let VIEW_W = GAME_W;
+let VIEW_H = GAME_H;
+let renderDpr = 1;
+const MAX_RENDER_DPR = 2;
 
 let W = GAME_W, H = GAME_H;
 let devSkipCooldown = 0;
@@ -69,11 +73,15 @@ let titleProgressPointerDownNode = null;
 let titleProgressSelectedNode = null;
 let titleProgressClaimPulse = 0;
 let titleMetaScreenTransition = 1;
+let titlePanelOrigin = { x: GAME_W / 2, y: GAME_H / 2 };
 let playBtnHold = 0;
 let playBtnPointerDown = false;
 let playBtnPointerInside = false;
 let settingMaxParticles = 900;
 let settingScreenShake = true;
+let settingReducedMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+let settingReducedFlash = false;
+let settingHighContrast = false;
 let respawnHold = 0;
 let respawnPointerDown = false;
 let respawnPointerInside = false;
@@ -83,6 +91,8 @@ let encounterQueue = [];
 let encounterCard = null;
 const ENCOUNTER_CARD_DURATION = 132;
 let codexDetailType = null;
+let codexCategory = "enemies";
+let codexScroll = 0;
 let resetProgressConfirm = false;
 
 const FONT_TITLE = "900 52px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
@@ -189,11 +199,18 @@ function cancelCallSignEditing() {
   setCallSignStatus("EDIT CANCELLED", "idle", 70);
   callSignInputEl.blur();
 }
-function commitCallSignDraft() {
+function commitCallSignDraft(fromBlur = false) {
   const result = typeof validateCallSign === "function"
     ? validateCallSign(callSignDraft)
     : { ok: !!sanitizeCallSign(callSignDraft), callSign: sanitizeCallSign(callSignDraft), message: "CALL SIGN REQUIRED" };
   if (!result.ok) {
+    if (fromBlur) {
+      callSignEditing = false;
+      callSignDraft = callSign;
+      callSignInputEl.value = callSign;
+      setCallSignStatus(result.message || "INVALID CALL SIGN", "error", 150);
+      return false;
+    }
     setCallSignStatus(result.message || "INVALID CALL SIGN", "error", 0);
     callSignEditing = true;
     callSignInputEl.focus();
@@ -286,7 +303,10 @@ function saveSettings() {
   try {
     localStorage.setItem("star_strike_rush_settings_v1", JSON.stringify({
       settingMaxParticles,
-      settingScreenShake
+      settingScreenShake,
+      settingReducedMotion,
+      settingReducedFlash,
+      settingHighContrast
     }));
   } catch {}
 }
@@ -317,8 +337,15 @@ function loadSettings() {
     if (obj && typeof obj.settingScreenShake === "boolean") {
       settingScreenShake = obj.settingScreenShake;
     }
+    if (obj && typeof obj.settingReducedMotion === "boolean") settingReducedMotion = obj.settingReducedMotion;
+    if (obj && typeof obj.settingReducedFlash === "boolean") settingReducedFlash = obj.settingReducedFlash;
+    if (obj && typeof obj.settingHighContrast === "boolean") settingHighContrast = obj.settingHighContrast;
   } catch {}
   MAX_PARTICLES = settingMaxParticles;
+  applyAccessibilitySettings();
+}
+function applyAccessibilitySettings() {
+  canvas.style.filter = settingHighContrast ? "contrast(1.16) saturate(0.92)" : "none";
 }
 function loadCodexDiscovered() {
   try {
@@ -500,8 +527,7 @@ function currentRunReceiptSnapshot() {
   const score = Math.max(0, Math.floor(state.score || 0));
   const phase = Math.max(1, Math.floor(state.phase || 1));
   const now = Date.now();
-  const startedAtMs = Math.max(0, Math.floor(stats.startedAtMs || now));
-  const runDurationMs = Math.max(0, now - startedAtMs);
+  const runDurationMs = Math.max(0, Math.round(Number(stats.activeFrames || 0) * (typeof SIMULATION_STEP_MS === "number" ? SIMULATION_STEP_MS : (1000 / 60))));
   return {
     receiptId: `local_${now}_${score}_${Math.max(0, Math.floor(stats.kills || 0))}`,
     score,
@@ -519,6 +545,7 @@ function currentRunReceiptSnapshot() {
 }
 function applyRunMetaProgress() {
   const stats = state.runStats || {};
+  if (state.runMode === "debug") return { debug: true, snapshot: currentMetaSnapshot(), receipt: currentRunReceiptSnapshot() };
   if (stats.metaApplied) return lastRunMeta || { snapshot: currentMetaSnapshot(), receipt: currentRunReceiptSnapshot() };
   const progress = getMetaProgress();
   const receipt = currentRunReceiptSnapshot();
@@ -607,6 +634,7 @@ function showNextMessage() {
   }
 }
 function showMessage(text, frames = 90) {
+  if (state.gameState === "playing" || state.gameState === "paused" || state.gameState === "resuming") return;
   const item = { text, frames };
   if (state.messageTimer > 0 || state.messageQueue.length > 0) state.messageQueue.push(item);
   else {
@@ -724,7 +752,11 @@ const state = {
   devStatsVisible: false,
   difficultySamples: [],
   difficultyDeaths: 0,
-  runStats: { kills: 0, powerups: 0, ghostUses: 0, bosses: 0, damageTaken: 0, highestCombo: 0, startedAtMs: 0, metaApplied: false },
+  runMode: "standard",
+  pausedReason: "",
+  resumeCountdown: 0,
+  sceneTransition: { mode: "idle", frame: 0, duration: 1 },
+  runStats: { kills: 0, powerups: 0, abilityUses: 0, ghostUses: 0, dashUses: 0, realmHops: 0, bosses: 0, damageTaken: 0, highestCombo: 0, activeFrames: 0, startedAtMs: 0, metaApplied: false },
   killsSinceLastDrop: 0,
   framesSinceLastDrop: 0,
   powerupDropCooldown: 0,
@@ -747,11 +779,7 @@ callSignInputEl.addEventListener("input", () => {
   if (callSignSaveState === "error") setCallSignStatus("ENTER SAVES  •  ESC CANCELS", "editing", 0);
 });
 callSignInputEl.addEventListener("blur", () => {
-  if (callSignEditing && callSignSaveState !== "success") {
-    callSignDraft = callSign;
-    callSignInputEl.value = callSign;
-  }
-  callSignEditing = false;
+  if (callSignEditing) commitCallSignDraft(true);
 });
 handleInputEl.addEventListener("input", () => {
   if (!handleEditing) return;
@@ -760,7 +788,7 @@ handleInputEl.addEventListener("input", () => {
 });
 handleInputEl.addEventListener("blur", () => {
   if (!handleEditing) return;
-  handleInputEl.value = handleDraft;
+  cancelHandleEditing();
 });
 
 function makePlayer() {

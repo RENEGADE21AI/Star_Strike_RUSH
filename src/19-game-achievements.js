@@ -40,11 +40,14 @@ function currentRunStatsSnapshot() {
   return {
     kills: Math.max(0, Math.floor(stats.kills || 0)),
     powerups: Math.max(0, Math.floor(stats.powerups || 0)),
+    abilityUses: Math.max(0, Math.floor(stats.abilityUses || 0)),
     ghostUses: Math.max(0, Math.floor(stats.ghostUses || 0)),
+    dashUses: Math.max(0, Math.floor(stats.dashUses || 0)),
+    realmHops: Math.max(0, Math.floor(stats.realmHops || 0)),
     bosses: Math.max(0, Math.floor(stats.bosses || 0)),
     damageTaken: Math.max(0, Math.floor(stats.damageTaken || 0)),
     highestCombo: Math.max(0, Math.floor(stats.highestCombo || 0)),
-    runDurationMs: Math.max(0, Date.now() - Math.max(0, Math.floor(stats.startedAtMs || Date.now())))
+    runDurationMs: Math.max(0, Math.round(Number(stats.activeFrames || 0) * (typeof SIMULATION_STEP_MS === "number" ? SIMULATION_STEP_MS : (1000 / 60))))
   };
 }
 

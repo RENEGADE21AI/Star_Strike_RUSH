@@ -1,5 +1,8 @@
 const PUBLIC_HANDLE_MIN_LENGTH = 3;
 const PUBLIC_HANDLE_MAX_LENGTH = 16;
+// Browser runs are not cheat-proof. Keep public competition scoring disabled until
+// server-issued run sessions, App Check, and abuse controls are deployed together.
+const COMPETITIVE_MODE_ENABLED = false;
 const RESERVED_PUBLIC_HANDLES = new Set([
   "admin", "administrator", "codex", "firebase", "moderator", "official",
   "renegade21ai", "starstrike", "starstrikerush", "support", "system"
@@ -57,3 +60,4 @@ globalThis.validatePublicHandle = validatePublicHandle;
 globalThis.weeklyCompetitionId = weeklyCompetitionId;
 globalThis.leagueBandForPerformance = leagueBandForPerformance;
 globalThis.leagueDivisionName = leagueDivisionName;
+globalThis.COMPETITIVE_MODE_ENABLED = COMPETITIVE_MODE_ENABLED;

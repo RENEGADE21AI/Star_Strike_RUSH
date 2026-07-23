@@ -5,6 +5,9 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 test-artifacts/
+outputs/
+dist/
+node_modules/
 functions/node_modules/
 __pycache__/
 *.pyc

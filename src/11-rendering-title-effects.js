@@ -13,14 +13,18 @@ function drawTitleSun() {
   ctx.restore();
 }
 function drawMenuFlights() {
-  for (const f of state.titleFormations) {
-    const offsets = TITLE_PATTERNS[f.pattern] || TITLE_PATTERNS.vee;
+  const flights = state.titleFormations.slice().sort((a, b) => (a.drawOrder || 0) - (b.drawOrder || 0));
+  for (const f of flights) {
+    const offsets = (TITLE_PATTERNS[f.pattern] || TITLE_PATTERNS.solo).slice(0, f.members || 1);
     const shipAngle = f.angle;
     const shipScale = f.renderScale || 0.68;
     const overPrimaryUi = f.x > 10 && f.x < W - 10 && f.y > H * 0.12 && f.y < H * 0.72;
-    const formationAlpha = (f.renderAlpha || 0.72) * (overPrimaryUi ? 0.03 : 1);
+    const edgeDistance = Math.min(f.x + 42, W + 42 - f.x, f.y + 72, H + 72 - f.y);
+    const fogFade = clamp(edgeDistance / 72, 0, 1);
+    const formationAlpha = (f.renderAlpha || 0.72) * fogFade * (overPrimaryUi ? 0.03 : 1);
     ctx.save();
     ctx.globalAlpha = formationAlpha;
+    ctx.filter = f.renderBlur > 0 ? `blur(${f.renderBlur}px)` : "none";
     for (let i = 0; i < offsets.length; i++) {
       const [ox, oy] = offsets[i];
       const histIndex = Math.max(0, f.leaderHistory.length - 6 - i * 2);

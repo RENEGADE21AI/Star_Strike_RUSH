@@ -5,12 +5,16 @@ Firestore database: `(default)`, Standard edition, `nam5 (United States)`
 Firebase Hosting live URL: `https://star-strike-rush.web.app`
 
 The game uses Firebase Auth for Google accounts, Cloud Firestore for public
-records plus private player data, and Cloud Functions for server-side
-progression validation. The proposed rules make all browser writes read-only and
-reserve profile, competition, receipt, leaderboard, and reward mutations for the
-Admin SDK in callable Functions. The repo includes callables for authoritative
-profile sync, atomic handle claims, weekly leagues, run receipts, and Season reward claims, but
-they require the Firebase project to be on the Blaze plan before deployment.
+records plus private player data, and Cloud Functions for privileged profile
+mutations. Browser writes are denied; profile, competition, receipt,
+leaderboard, and reward mutations are reserved for callable Functions using the
+Admin SDK.
+
+The recovery client deliberately sets `COMPETITIVE_MODE_ENABLED = false`.
+Profile sync and handle claims may operate when Firebase is configured, but
+public score submission, leaderboard subscription, and weekly league enrollment
+are disabled. Existing plausibility validation is useful defense in depth, but
+it cannot prove that browser-reported gameplay occurred.
 
 Firebase web config is loaded at runtime. Real API keys must not be committed to
 the repository. Local development can use ignored `src/firebase-config.local.json`
@@ -155,9 +159,12 @@ Current achievement ids:
 - `power_hungry`
 - `swarm_clearer`
 
-## Client Flow
+## Designed Competition Flow (currently disabled)
 
-1. The player opens the Online panel and signs in with Google.
+The following describes the intended callable flow, not an enabled public
+competition claim:
+
+1. The player opens the Pilot Dossier and signs in with Google.
 2. The game calls `syncPilotProfile()` to sync private and public documents.
 3. A pilot can atomically claim one immutable public handle and join the current
    UTC weekly league matched to their prior best-score band.
@@ -189,13 +196,13 @@ Explicitly not implemented yet:
 
 - AdMob rewarded ads.
 - Missions, practice, run history, and accessibility settings sync.
-- Cloud Functions deployment, because the Firebase project must be upgraded to
-  Blaze before required Functions/Artifact Registry APIs can be enabled.
+- Server-issued run sessions, replay/signed telemetry verification, App Check
+  enforcement, abuse throttles, and an idempotent offline submission outbox.
 
 ## Production Note
 
-For a serious competitive leaderboard, upgrade the project, deploy the included
-Cloud Functions first, then deploy the proposed server-authoritative Firestore
-rules and composite index. Do not deploy the new rules alone: the current live
-client still needs its existing backend contract. Firestore rules cannot
-independently verify gameplay from a browser client.
+Do not re-enable `COMPETITIVE_MODE_ENABLED` until server-issued sessions and
+gameplay attestation are implemented and abuse-tested. Firestore rules and
+callable-only writes prevent arbitrary document writes, but they cannot
+independently verify gameplay reported by a browser. Never deploy new rules
+alone; deploy and validate their matching Functions contract first.

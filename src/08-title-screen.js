@@ -1,4 +1,5 @@
 const TITLE_PATTERNS = {
+  solo: [[0,0]],
   vee: [[0,0],[-26,16],[26,16]],
   line: [[-34,0],[0,0],[34,0]],
   arrow: [[0,0],[-24,18],[24,18],[0,34]],
@@ -16,13 +17,19 @@ function pickFormationPathType() {
 }
 function makeTitleFormation(lane = 0, dir = 1, spawnAbove = false) {
   const laneYs = titleLaneYs();
-  const patternNames = Object.keys(TITLE_PATTERNS);
-  const pattern = patternNames[Math.floor(Math.random() * patternNames.length)];
+  const groupedPatterns = ["vee", "line", "arrow", "diamond", "escort"];
+  const pattern = Math.random() < 0.72 ? "solo" : groupedPatterns[Math.floor(Math.random() * groupedPatterns.length)];
   const kind = ["red", "orange", "purple"][Math.floor(Math.random() * 3)];
   const pathType = pickFormationPathType();
   const sway = rand(0, TAU);
-  const members = 3 + (Math.random() < 0.25 ? 1 : 0);
-  const depthFactor = rand(0.72, 1.12);
+  const members = pattern === "solo" ? 1 : (Math.random() < 0.74 ? 2 : 3);
+  const layerRoll = Math.random();
+  const depthLayer = layerRoll < 0.38 ? "distant" : layerRoll < 0.82 ? "midground" : "foreground";
+  const layerProfile = depthLayer === "distant"
+    ? { scale: rand(0.34, 0.46), alpha: rand(0.25, 0.42), speed: 0.72, blur: 1.2, order: 0 }
+    : depthLayer === "foreground"
+      ? { scale: rand(0.78, 0.98), alpha: rand(0.72, 0.92), speed: 1.18, blur: 0, order: 2 }
+      : { scale: rand(0.52, 0.70), alpha: rand(0.48, 0.70), speed: 0.92, blur: 0.35, order: 1 };
 
   let x = 0, y = 0, vx = 0, vy = 0, baseY = laneYs[lane] + rand(-8, 8);
   let pathDuration = 180, speed = rand(0.8, 1.0);
@@ -72,6 +79,9 @@ function makeTitleFormation(lane = 0, dir = 1, spawnAbove = false) {
     vy = rand(0.15, 0.25) * (Math.random() < 0.5 ? -1 : 1);
     pathDuration = Math.ceil((W + 420) / Math.max(0.90, Math.abs(vx))) + 120;
   }
+  speed *= layerProfile.speed;
+  vx *= layerProfile.speed;
+  vy *= layerProfile.speed;
 
   return {
     x, y, vx, vy, baseY,
@@ -89,10 +99,14 @@ function makeTitleFormation(lane = 0, dir = 1, spawnAbove = false) {
     apexY: H * rand(0.35, 0.50),
     sweepAmplitude: rand(60, 120),
     depth: rand(H * 0.35, H * 0.50),
+    depthLayer,
+    drawOrder: layerProfile.order,
+    renderBlur: layerProfile.blur,
     reversed: false,
     members,
-    renderScale: 0.52 + (depthFactor - 0.72) * 0.62,
-    renderAlpha: 0.40 + (depthFactor - 0.72) * 1.15,
+    renderScale: layerProfile.scale,
+    renderAlpha: layerProfile.alpha,
+    speedScale: layerProfile.speed,
     age: 0,
     sway,
     rot: rand(-0.03, 0.03),
@@ -227,13 +241,19 @@ function updateTitleFormations() {
   if (state.titleFormations.length > 3) state.titleFormations.length = 3;
 }
 function updateTitleScreen() {
+  if (state.sceneTransition.mode === "title_launch") {
+    state.sceneTransition.frame++;
+    updateTitleFormations();
+    if (state.sceneTransition.frame >= state.sceneTransition.duration) startPlayingSession();
+    return;
+  }
   updateTitleFormations();
   if (titlePanelTarget === 0 && titlePanelAnim < 0.02) {
     titleSubState = "main";
     codexDetailType = null;
   }
-  titlePanelAnim += (titlePanelTarget - titlePanelAnim) * 0.22;
-  titleMetaScreenTransition += (1 - titleMetaScreenTransition) * 0.24;
+  titlePanelAnim = settingReducedMotion ? titlePanelTarget : titlePanelAnim + (titlePanelTarget - titlePanelAnim) * 0.22;
+  titleMetaScreenTransition = settingReducedMotion ? 1 : titleMetaScreenTransition + (1 - titleMetaScreenTransition) * 0.24;
   if (titleMetaScreenTransition > 0.995) titleMetaScreenTransition = 1;
   titleProgressClaimPulse = Math.max(0, titleProgressClaimPulse - 1);
   callSignCursorBlink = (callSignCursorBlink + 1) % 56;
@@ -310,12 +330,7 @@ function getTitlePanelRect() {
   const marginY = 14;
   const panelW = W - marginX * 2;
   const panelH = H - marginY * 2;
-  const openX = marginX;
-  const closedX = W + 24;
-  const anim = clamp(titlePanelAnim, 0, 1);
-  const x = openX + (closedX - openX) * (1 - anim);
-  const y = marginY;
-  return { x, y, w: panelW, h: panelH };
+  return { x: marginX, y: marginY, w: panelW, h: panelH };
 }
 function getGameOverButtons() {
   const btnW = 220, btnH = 40, x = Math.round((W - btnW) / 2), y1 = Math.round(H * 0.59), gap = 10;
@@ -331,7 +346,8 @@ function getCodexRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
   const rects = codexCardRects(panel);
-  return { panel, closeRect, rects };
+  const tabs = codexTabRects(panel);
+  return { panel, closeRect, rects, ...tabs };
 }
 function getOnlineRects() {
   const panel = getTitlePanelRect();
@@ -343,10 +359,10 @@ function getOnlineRects() {
   const pilotTab = { x: innerX, y: tabY, w: tabW, h: 28 };
   const leagueTab = { x: pilotTab.x + tabW + tabGap, y: tabY, w: tabW, h: 28 };
   const settingsTab = { x: leagueTab.x + tabW + tabGap, y: tabY, w: tabW, h: 28 };
-  const editCallSign = { x: innerX, y: panel.y + 278, w: panel.w - 40, h: 32 };
-  const claimHandle = { x: innerX, y: panel.y + 318, w: panel.w - 40, h: 32 };
-  const signIn = { x: innerX, y: panel.y + 366, w: panel.w - 40, h: 34 };
-  const signOut = { x: innerX, y: panel.y + 408, w: panel.w - 40, h: 30 };
+  const editCallSign = { x: innerX + 124, y: panel.y + 126, w: panel.w - 184, h: 42 };
+  const claimHandle = { x: innerX, y: panel.y + 278, w: panel.w - 40, h: 32 };
+  const signIn = { x: innerX, y: panel.y + 326, w: panel.w - 40, h: 34 };
+  const signOut = { x: innerX, y: panel.y + 372, w: panel.w - 40, h: 30 };
   const joinLeague = { x: innerX, y: panel.y + panel.h - 92, w: panel.w - 40, h: 34 };
   const btnW = 64, btnH = 28, gap = 10, btnY = panel.y + 150;
   const low = { x: innerX, y: btnY, w: btnW, h: btnH };
@@ -354,15 +370,15 @@ function getOnlineRects() {
   const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
   const shake = { x: innerX, y: btnY + 50, w: 134, h: 30 };
   const reset = { x: panel.x + panel.w - 180, y: btnY + 50, w: 160, h: 30 };
-  const refreshY = accountPanelTab === "pilot" ? panel.y + 472 : panel.y + panel.h - 48;
-  const refresh = { x: panel.x + 20, y: refreshY, w: panel.w - 40, h: 30 };
-  return { panel, closeRect, pilotTab, leagueTab, settingsTab, editCallSign, claimHandle, signIn, signOut, joinLeague, low, med, high, shake, reset, refresh };
+  const motion = { x: innerX, y: btnY + 96, w: panel.w - 40, h: 30 };
+  const flash = { x: innerX, y: btnY + 134, w: panel.w - 40, h: 30 };
+  const contrast = { x: innerX, y: btnY + 172, w: panel.w - 40, h: 30 };
+  return { panel, closeRect, pilotTab, leagueTab, settingsTab, editCallSign, claimHandle, signIn, signOut, joinLeague, low, med, high, shake, reset, motion, flash, contrast };
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
-  const refresh = { x: panel.x + 20, y: panel.y + panel.h - 48, w: panel.w - 40, h: 30 };
-  return { panel, closeRect, refresh };
+  return { panel, closeRect };
 }
 function getAchievementsRects() {
   const panel = getTitlePanelRect();
