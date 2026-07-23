@@ -18,6 +18,7 @@ DOWNLOADS = Path(r"C:\Users\alyss\Downloads")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = REPO_ROOT / "assets" / "sprites"
 UI_OUTPUT = REPO_ROOT / "assets" / "ui"
+POWERUP_OUTPUT = REPO_ROOT / "assets" / "powerups"
 SOURCE_ART = REPO_ROOT / "source-art"
 
 ASSETS = {
@@ -53,6 +54,22 @@ UI_ASSETS = {
     "menu-road.png": ("Progression Road Icon.png", 256),
     "menu-world.png": ("World Icon.png", 256),
     "menu-trophy.png": ("Trophy Icon.png", 256),
+}
+
+POWERUP_ASSETS = {
+    "ion-burst.png": ("ion_burst.png.png", 320),
+    "magnet.png": ("magnet.png.png", 320),
+    "score-surge.png": ("score_surge.png.png", 320),
+    "dual.png": ("dual.png.png", 320),
+    "piercing.png": ("piercing.png.png", 320),
+    "wingman.png": ("wingman.png.png", 320),
+    "phase-shield.png": ("phaseshield.png.png", 320),
+    "rapid.png": ("rapid.png.png", 320),
+    "spread.png": ("spreadshot.png.png", 320),
+    "stabilizer.png": ("stabilizer.png.png", 320),
+    "energy-cell.png": ("energy_cell.png.png", 320),
+    "overcharge.png": ("overcharge.png.png", 320),
+    "repair.png": ("repair.png.png", 320),
 }
 
 
@@ -165,6 +182,18 @@ def main() -> None:
                 processed = trim_and_resize(replace_connected_checkerboard(opened), max_dimension)
                 processed.save(destination, optimize=True, compress_level=9)
                 print(f"{source.name} -> {output_name} {processed.width}x{processed.height}")
+
+        POWERUP_OUTPUT.mkdir(parents=True, exist_ok=True)
+        for output_name, (source_name, max_dimension) in POWERUP_ASSETS.items():
+            destination = POWERUP_OUTPUT / output_name
+            if destination.exists() and not args.force:
+                print(f"skip {output_name} (use --force to rebuild)")
+                continue
+            source = find_source(source_name)
+            with Image.open(source) as opened:
+                processed = trim_and_resize(replace_connected_checkerboard(opened), max_dimension)
+                processed.save(destination, optimize=True, compress_level=9)
+                print(f"{source.name} -> powerups/{output_name} {processed.width}x{processed.height}")
 
     favicon_source = find_source("StarStrikeRUSHFavicon.png")
     if favicon_source.exists():

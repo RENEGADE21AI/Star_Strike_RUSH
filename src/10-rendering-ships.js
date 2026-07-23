@@ -219,7 +219,7 @@ function drawEnemyGeometry(kind, opts = {}) {
       splitter: "186,255,54",
       splitter_shard: "186,255,54"
     };
-    drawEnginePlume(0, sprite.render.height * 0.30, {
+    drawEnginePlume(sprite.exhaustOrigin.offsetX, sprite.exhaustOrigin.offsetY, {
       scale: Math.max(0.42, sprite.render.width / 44),
       alpha: alpha * 0.62,
       color: plumeColors[kind] || "120,210,255",

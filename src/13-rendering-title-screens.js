@@ -1,6 +1,4 @@
 function drawTitleAndButtons() {
-  drawTitleMetaStrip(14, 12, W - 28);
-
   ctx.save();
   ctx.translate(W / 2, H * 0.22);
   ctx.transform(1, 0, -0.13, 1, 0, 0);
@@ -109,7 +107,7 @@ function drawTitleAndButtons() {
   ctx.fillText(line3, (W - w3) / 2, H * 0.72);
   if (typeof currentMetaSnapshot === "function") {
     const meta = currentMetaSnapshot();
-    const rankLine = `${meta.gloryRank.toUpperCase()}  |  GLORY ${Number(meta.totalGlory || 0).toLocaleString()}`;
+    const rankLine = `${meta.gloryRank.toUpperCase()}  •  SEASON TIER ${meta.seasonTier}`;
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,230,128,0.88)";
     ctx.textAlign = "center";
@@ -120,6 +118,9 @@ function drawTitleAndButtons() {
 function drawStartScreen() {
   drawTitleSun();
   drawMenuFlights();
+  // Fade ambient traffic into the same edge fog used by gameplay before the
+  // interactive title controls are drawn at full contrast.
+  drawPlayfieldFogBlend();
   drawTitleAndButtons();
   drawSettingsAndCodexPanels();
   drawResetProgressConfirm();

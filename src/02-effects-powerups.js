@@ -45,7 +45,13 @@ function spawnRapidFireMuzzleParticles(x, y) {
   }
   enforceParticleCap();
 }
-function spawnPowerupAt(x, y, type) { state.powerups.push({ x, y, type, vy: 1.9, size: 11, life: 900 }); }
+function spawnPowerupAt(x, y, type) {
+  state.powerups.push({
+    x, y, type, vy: 1.9, size: 11, life: 900,
+    rotation: rand(0, TAU),
+    spinSpeed: rand(-0.035, 0.035) || 0.02
+  });
+}
 function countBulletsByKind(kind) { let n = 0; for (const b of state.enemyBullets) if (b.kind === kind) n++; return n; }
 function activePurpleCount() { let n = 0; for (const e of state.enemies) if (e.type === "purple") n++; return n; }
 function activePhantomCount() { let n = 0; for (const e of state.enemies) if (e.type === "phantom") n++; return n; }
@@ -161,6 +167,8 @@ function attemptGhost() {
     if (p.energy < cost) return;
     p.energy -= cost;
     state.playerRealm = 1 - state.playerRealm;
+    state.runStats.abilityUses++;
+    state.runStats.realmHops++;
     state.fx.flash = Math.max(state.fx.flash, 4);
     state.comboPulse = Math.max(state.comboPulse, 6);
     spawnParticles(p.x, p.y, 10, state.playerRealm === 0 ? "#bfe8ff" : "#d9b6ff", 0.9);
@@ -179,11 +187,13 @@ function attemptGhost() {
     p.inv = 24;
   } else {
     p.dashTimer = 12;
-    p.inv = 0;
+    p.ghostTimer = 0;
   }
   p.ghostCooldown = profile.cooldown;
   p.energy -= profile.cost;
-  state.runStats.ghostUses++;
+  state.runStats.abilityUses++;
+  if (profile.phaseThroughDebris) state.runStats.ghostUses++;
+  else state.runStats.dashUses++;
   state.difficulty.ghostGrace = profile.phaseThroughDebris ? 60 : 24;
   state.fx.flash = Math.max(state.fx.flash, 6);
   spawnParticles(p.x, p.y, profile.label === "DASH" ? 16 : 10, profile.label === "DASH" ? "#ffcc78" : "#fff", profile.label === "DASH" ? 1.35 : 1.05);

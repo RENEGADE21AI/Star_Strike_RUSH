@@ -260,41 +260,32 @@ function drawBossDeath() {
 function drawPowerups() {
   for (const p of state.powerups) {
     const bob = Math.sin(state.frame * 0.12 + p.x * 0.03) * 1.4;
-    const spin = state.frame * 0.04;
+    const spin = Number.isFinite(p.rotation) ? p.rotation : state.frame * 0.024;
     const visual = typeof expansionPowerupVisual === "function" ? expansionPowerupVisual(p.type) : null;
     const color = p.type === "spread" ? "#55ff72" : p.type === "rapid" ? "#ffe65c" : p.type === "repair" ? "#58adff" : p.type === "wingman" || p.type === "dual" ? "#ff72ee" : visual ? visual.color : "#ff72ee";
     const label = p.type === "spread" ? "S" : p.type === "rapid" ? "R" : p.type === "repair" ? "+" : p.type === "wingman" ? "W" : p.type === "dual" ? "2" : visual ? visual.label : "?";
     ctx.save();
     ctx.translate(p.x, p.y + bob);
-    ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = 0.16 + (0.5 + 0.5 * Math.sin(state.frame * 0.12 + p.x)) * 0.10;
-    ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 16;
-    ctx.beginPath(); ctx.arc(0, 0, p.size + 10, 0, TAU); ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 1;
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 5]);
-    ctx.rotate(-spin * 0.55);
-    ctx.beginPath(); ctx.arc(0, 0, p.size + 7, 0, TAU); ctx.stroke();
-    ctx.restore();
-    ctx.save();
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = color;
-    ctx.rotate(spin);
-    ctx.beginPath();
-    ctx.moveTo(0, -p.size); ctx.lineTo(p.size, 0); ctx.lineTo(0, p.size); ctx.lineTo(-p.size, 0); ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "rgba(3,6,14,0.92)";
-    ctx.font = FONT_TINY;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, 0, 1);
+    const spriteKey = typeof powerupSpriteKey === "function" ? powerupSpriteKey(p.type) : "powerup";
+    const pulse = 0.96 + Math.sin(state.frame * 0.09 + p.x * 0.02) * 0.025;
+    const rendered = spriteKey !== "powerup" && drawSpriteAsset(ctx, spriteKey, 0, 0, { scale: pulse, rotation: spin });
+    if (!rendered) {
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = color;
+      ctx.rotate(spin);
+      ctx.beginPath();
+      ctx.moveTo(0, -p.size); ctx.lineTo(p.size, 0); ctx.lineTo(0, p.size); ctx.lineTo(-p.size, 0); ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "rgba(3,6,14,0.92)";
+      ctx.font = FONT_TINY;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, 0, 1);
+    }
     ctx.restore();
   }
 }

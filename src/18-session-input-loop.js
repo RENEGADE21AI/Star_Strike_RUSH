@@ -1,4 +1,45 @@
-function beginGame() { setupSession("playing"); showMessage("PHASE 1", 90); }
+function startPlayingSession() {
+  setupSession("playing");
+  state.sceneTransition = { mode: "game_arrival", frame: 0, duration: settingReducedMotion ? 1 : 36 };
+  state.player.inv = Math.max(state.player.inv, 45);
+  showMessage("PHASE 1", 90);
+}
+function beginGame() {
+  if (state.gameState === "start") {
+    if (state.sceneTransition.mode !== "idle") return;
+    titlePanelTarget = 0;
+    state.sceneTransition = { mode: "title_launch", frame: 0, duration: settingReducedMotion ? 1 : 42 };
+    clearGameplayInput();
+    return;
+  }
+  startPlayingSession();
+}
+function clearGameplayInput() {
+  state.keyboard.up = false;
+  state.keyboard.down = false;
+  state.keyboard.left = false;
+  state.keyboard.right = false;
+  state.joystick.active = false;
+  state.joystick.id = null;
+  state.joystick.ax = 0;
+  state.joystick.ay = 0;
+}
+function pauseGame(reason = "manual") {
+  if (state.gameState !== "playing" && state.gameState !== "resuming") return false;
+  clearGameplayInput();
+  state.pausedReason = reason;
+  state.resumeCountdown = 0;
+  state.gameState = "paused";
+  return true;
+}
+function resumeGame() {
+  if (state.gameState !== "paused") return false;
+  clearGameplayInput();
+  state.pausedReason = "";
+  state.resumeCountdown = 90;
+  state.gameState = "resuming";
+  return true;
+}
 function setupSession(mode = "start") {
   state.player = makePlayer();
   state.bullets = [];
@@ -66,14 +107,22 @@ function setupSession(mode = "start") {
   state.difficultyDeaths = 0;
   state.runStats.kills = 0;
   state.runStats.powerups = 0;
+  state.runStats.abilityUses = 0;
   state.runStats.ghostUses = 0;
+  state.runStats.dashUses = 0;
+  state.runStats.realmHops = 0;
   state.runStats.bosses = 0;
   state.runStats.damageTaken = 0;
   state.runStats.highestCombo = 0;
+  state.runStats.activeFrames = 0;
   state.runStats.startedAtMs = Date.now();
   state.runStats.metaApplied = false;
   lastRunMeta = null;
   state.gameState = mode;
+  state.runMode = "standard";
+  state.pausedReason = "";
+  state.resumeCountdown = 0;
+  if (mode === "start") state.sceneTransition = { mode: "idle", frame: 0, duration: 1 };
   state.keyboard.up = false;
   state.keyboard.down = false;
   state.keyboard.left = false;
@@ -121,10 +170,13 @@ function setupSession(mode = "start") {
 }
 function enterGameOver() {
   state.gameState = "gameover";
+  clearGameplayInput();
   previousHighScore = highScore;
-  if (state.score > highScore) { highScore = state.score; highScoreDirty = true; }
-  if (highScoreDirty) saveHighScore();
-  applyRunMetaProgress();
+  if (state.runMode !== "debug") {
+    if (state.score > highScore) { highScore = state.score; highScoreDirty = true; }
+    if (highScoreDirty) saveHighScore();
+    applyRunMetaProgress();
+  }
   state.message = "";
   state.messageTimer = 0;
   state.messageMax = 0;
@@ -135,13 +187,19 @@ function enterGameOver() {
   state.gameOverShake = 6;
   state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
   if (typeof recordDifficultySample === "function") recordDifficultySample(true);
-  submitOnlineRun();
+  if (state.runMode !== "debug") submitOnlineRun();
 }
 function resize() {
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
-  canvas.width = screenW;
-  canvas.height = screenH;
+  VIEW_W = screenW;
+  VIEW_H = screenH;
+  renderDpr = clamp(Number(window.devicePixelRatio || 1), 1, MAX_RENDER_DPR);
+  canvas.style.width = `${screenW}px`;
+  canvas.style.height = `${screenH}px`;
+  canvas.width = Math.max(1, Math.round(screenW * renderDpr));
+  canvas.height = Math.max(1, Math.round(screenH * renderDpr));
+  ctx.setTransform(renderDpr, 0, 0, renderDpr, 0, 0);
   scale = Math.min(screenW / GAME_W, screenH / GAME_H);
   offsetX = Math.round((screenW - GAME_W * scale) / 2);
   offsetY = Math.round((screenH - GAME_H * scale) / 2);
@@ -186,15 +244,12 @@ canvas.addEventListener("pointerdown", (e) => {
     if (handleGameOverPointerDown(x, y)) return;
     return;
   }
+  if (state.gameState === "paused" || state.gameState === "resuming") {
+    handlePausePointerDown(x, y);
+    return;
+  }
   if (state.gameState === "playing") {
-    if (DEBUG_SNAPSHOT_ENABLED && (k === "h" || k === "H") && !e.repeat) {
-      e.preventDefault();
-      state.debugHitboxes = !state.debugHitboxes;
-      showMessage(state.debugHitboxes ? "DEBUG HITBOXES ON" : "DEBUG HITBOXES OFF", 70);
-      return;
-    }
-    if (inDevSkipZone(x, y)) { triggerPhaseSkip(); return; }
-    if (onDevToggleZone(x, y)) { state.devStatsVisible = !state.devStatsVisible; return; }
+    if (hitRect(getPauseButtonRect(), x, y)) { pauseGame("manual"); return; }
     const pointerKind = e.pointerType === "touch" || e.pointerType === "pen" ? e.pointerType : "mouse_down";
     const nextMode = nextGameplayInputMode(state.inputMode, pointerKind, Date.now(), state.lastTouchAt, e.buttons || 1);
     state.inputMode = nextMode.mode;
@@ -202,10 +257,10 @@ canvas.addEventListener("pointerdown", (e) => {
     state.inputHintTimer = 144;
   }
   if (state.gameState !== "playing") {
-    if (handleTitlePointerDown(x, y, e.pointerId)) return;
+    if (handleTitlePointerDown(x, y, e.pointerId)) { e.preventDefault(); return; }
     return;
   }
-  canvas.setPointerCapture(e.pointerId);
+  try { canvas.setPointerCapture(e.pointerId); } catch {}
   if (onActionZone(x, y)) { attemptGhost(); return; }
   if (onJoystickZone(x, y)) {
     state.joystick.active = true;
@@ -311,13 +366,18 @@ function endPointer(e) {
 canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", endPointer);
 canvas.addEventListener("wheel", (e) => {
-  if (state.gameState === "playing" || titleSubState !== "progress" || titlePanelAnim <= 0.02) return;
+  if (state.gameState === "playing" || titlePanelAnim <= 0.02 || (titleSubState !== "progress" && titleSubState !== "codex")) return;
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left - offsetX) / scale;
   const y = (e.clientY - rect.top - offsetY) / scale;
-  const r = getProgressRects();
+  const r = titleSubState === "codex" ? getCodexRects() : getProgressRects();
   if (!hitRect(r.panel, x, y)) return;
   e.preventDefault();
+  if (titleSubState === "codex") {
+    codexScroll += e.deltaY / Math.max(0.5, scale);
+    clampCodexScroll();
+    return;
+  }
   titleProgressSelectedNode = null;
   titleProgressScroll += e.deltaY / Math.max(0.5, scale);
   clampTitleProgressScroll();
@@ -339,7 +399,19 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   const k = e.key;
+  if ((state.gameState === "paused" || state.gameState === "resuming") && k === "Escape") {
+    e.preventDefault();
+    if (state.gameState === "paused") resumeGame();
+    else pauseGame("manual");
+    return;
+  }
   if (state.gameState === "start") {
+    if (titleSubState === "codex" && titlePanelAnim > 0.02 && (k === "ArrowUp" || k === "ArrowDown" || k === "PageUp" || k === "PageDown")) {
+      e.preventDefault();
+      codexScroll += (k === "ArrowUp" || k === "PageUp") ? -140 : 140;
+      clampCodexScroll();
+      return;
+    }
     if (k === "Enter" || k === " ") {
       e.preventDefault();
       beginGame();
@@ -355,6 +427,12 @@ window.addEventListener("keydown", (e) => {
   }
   if (state.gameState === "playing") {
     const action = typeof gameplayActionForKey === "function" ? gameplayActionForKey(k) : (isMoveKey(k) ? "move" : null);
+    if (action === "pause") { e.preventDefault(); pauseGame("manual"); return; }
+    if (DEVELOPMENT_BUILD && DEBUG_SNAPSHOT_ENABLED && (k === "h" || k === "H") && !e.repeat) {
+      e.preventDefault();
+      state.debugHitboxes = !state.debugHitboxes;
+      return;
+    }
     if (action) {
       const nextMode = nextGameplayInputMode(state.inputMode, "keyboard", Date.now(), state.lastTouchAt, 0);
       state.inputMode = nextMode.mode;
@@ -379,6 +457,15 @@ window.addEventListener("keyup", (e) => {
   if (k === "ArrowLeft" || k === "a" || k === "A") state.keyboard.left = false;
   if (k === "ArrowRight" || k === "d" || k === "D") state.keyboard.right = false;
 });
+window.addEventListener("blur", () => {
+  clearGameplayInput();
+  if (state.gameState === "playing") pauseGame("focus");
+});
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) return;
+  clearGameplayInput();
+  if (state.gameState === "playing") pauseGame("visibility");
+});
 window.addEventListener("beforeunload", () => {
   if (highScoreDirty) saveHighScore();
   saveCallSign();
@@ -388,6 +475,12 @@ window.addEventListener("beforeunload", () => {
 });
 
 function update() {
+  if (state.gameState === "paused") return;
+  if (state.gameState === "resuming") {
+    state.resumeCountdown = Math.max(0, state.resumeCountdown - 1);
+    if (state.resumeCountdown <= 0) state.gameState = "playing";
+    return;
+  }
   if (devSkipCooldown > 0) devSkipCooldown--;
   if (callSignStatusTimer > 0) {
     callSignStatusTimer--;
@@ -424,6 +517,11 @@ function update() {
     return;
   }
 
+  state.runStats.activeFrames = Math.max(0, Math.floor(state.runStats.activeFrames || 0)) + 1;
+  if (state.sceneTransition.mode === "game_arrival") {
+    state.sceneTransition.frame++;
+    if (state.sceneTransition.frame >= state.sceneTransition.duration) state.sceneTransition = { mode: "idle", frame: 0, duration: 1 };
+  }
   state.framesSinceLastDrop++;
   state.inputHintTimer = Math.max(0, (state.inputHintTimer || 0) - 1);
   if (state.powerupDropCooldown > 0) state.powerupDropCooldown--;
@@ -460,7 +558,8 @@ function update() {
   }
 }
 
-const DEBUG_SNAPSHOT_ENABLED = new URLSearchParams(window.location.search).has("debug");
+const DEVELOPMENT_BUILD = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" || globalThis.STAR_STRIKE_DEV_BUILD === true;
+const DEBUG_SNAPSHOT_ENABLED = DEVELOPMENT_BUILD && new URLSearchParams(window.location.search).has("debug");
 let debugSnapshotEl = null;
 if (DEBUG_SNAPSHOT_ENABLED) {
   window.addEventListener("error", (event) => {
@@ -477,6 +576,12 @@ function getDebugSnapshot() {
   const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
   return {
     gameState: state.gameState,
+    runMode: state.runMode,
+    resumeCountdown: state.resumeCountdown,
+    transition: {
+      mode: state.sceneTransition.mode,
+      progress: clamp(state.sceneTransition.frame / Math.max(1, state.sceneTransition.duration), 0, 1)
+    },
     frame: state.frame,
     score: state.score,
     highScore,
@@ -507,11 +612,20 @@ function getDebugSnapshot() {
       titleSubState,
       titlePanelTarget,
       titlePanelAnim,
+      titlePanelOrigin: { x: titlePanelOrigin.x, y: titlePanelOrigin.y },
       callSign,
+      callSignEditing,
+      handleEditing,
+      message: state.message,
       settingMaxParticles,
       settingScreenShake,
+      settingReducedMotion,
+      settingReducedFlash,
+      settingHighContrast,
       codexHasNew,
       codexDetailType,
+      codexCategory,
+      codexScroll,
       titleProgressTab,
       titleProgressScroll,
       titleProgressMaxScroll: typeof getProgressMaxScroll === "function" ? getProgressMaxScroll() : 0,
@@ -570,7 +684,13 @@ function updateDebugSnapshot() {
   debugSnapshotEl.textContent = JSON.stringify(getDebugSnapshot());
 }
 
-function loop() { update(); draw(); updateDebugSnapshot(); requestAnimationFrame(loop); }
+const simulationClock = createFixedStepClock();
+function loop(timestamp) {
+  advanceFixedStep(simulationClock, timestamp, update);
+  draw();
+  updateDebugSnapshot();
+  requestAnimationFrame(loop);
+}
 
 function applyDebugScenario() {
   if (!DEBUG_SNAPSHOT_ENABLED) return;
@@ -583,6 +703,7 @@ function applyDebugScenario() {
     return;
   }
   setupSession("playing");
+  state.runMode = "debug";
   state.player.hp = state.player.maxHp;
   state.player.energy = state.player.maxEnergy;
   state.waveRest = 999999;
@@ -593,6 +714,21 @@ function applyDebugScenario() {
     const siphon = state.enemies.find((enemy) => enemy.type === "siphon");
     if (siphon) { siphon.entryFrames = 0; siphon.fireTimer = 48; siphon.fireWarn = 0; }
     showMessage("DEBUG  SIPHON AIM TEST", 120);
+  } else if (scenario === "powerups") {
+    const types = [
+      "spread", "rapid", "repair", "wingman", "dual", "energy_cell", "overcharge",
+      "phase_shield", "magnet", "piercing", "ion_burst", "stabilizer", "score_surge"
+    ];
+    state.powerups = types.map((type, index) => ({
+      type,
+      x: W * (0.2 + (index % 3) * 0.3),
+      y: 125 + Math.floor(index / 3) * 82,
+      vy: 0,
+      size: 11,
+      life: 999999,
+      static: true
+    }));
+    state.player.y = H - 42;
   } else if (scenario === "debris" || scenario === "debris-incoming") {
     state.phase = 12;
     spawnExpansionBoss("debris_warden");
@@ -619,4 +755,4 @@ resize();
 setupSession("start");
 applyDebugScenario();
 window.addEventListener("resize", resize);
-Promise.resolve(typeof preloadGameAssets === "function" ? preloadGameAssets() : null).then(loop);
+Promise.resolve(typeof preloadGameAssets === "function" ? preloadGameAssets() : null).then(() => requestAnimationFrame(loop));

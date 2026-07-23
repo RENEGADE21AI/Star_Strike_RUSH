@@ -156,7 +156,13 @@ function drawDebugHitboxes() {
   const drawCircles = (key, entity, fallback, color) => {
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
-    for (const circle of collisionCirclesFor(key, entity.x, entity.y, 1, fallback)) {
+    for (const circle of collisionCirclesFor({
+      key,
+      x: entity.x,
+      y: entity.y,
+      scale: entity.collisionScale == null ? 1 : entity.collisionScale,
+      fallbackRadius: fallback
+    })) {
       ctx.beginPath(); ctx.arc(circle.x, circle.y, circle.r, 0, TAU); ctx.stroke();
     }
     const origin = spriteMeta(key) && spriteMeta(key).projectileOrigin;
@@ -181,10 +187,63 @@ function drawDebugHitboxes() {
   if (state.boss) drawCircles(`boss_${state.boss.mode}`, state.boss, 28, "#d7a7ff");
   ctx.restore();
 }
-function drawHUD() { drawTopLeftHUD(); drawTopRightHUD(); drawDesktopControlHint(); drawDebugHitboxes(); }
+function getPauseButtonRect() { return { x: W / 2 - 18, y: 12, w: 36, h: 28 }; }
+function getPauseOverlayRects() {
+  return {
+    resume: { x: W / 2 - 92, y: H / 2 + 18, w: 184, h: 42 },
+    restart: { x: W / 2 - 92, y: H / 2 + 70, w: 184, h: 38 },
+    title: { x: W / 2 - 92, y: H / 2 + 116, w: 184, h: 38 }
+  };
+}
+function handlePausePointerDown(x, y) {
+  const rects = getPauseOverlayRects();
+  if (hitRect(rects.resume, x, y)) { resumeGame(); return true; }
+  if (hitRect(rects.restart, x, y)) { beginGame(); return true; }
+  if (hitRect(rects.title, x, y)) { setupSession("start"); return true; }
+  return true;
+}
+function drawPauseButton() {
+  const r = getPauseButtonRect();
+  ctx.save();
+  ctx.fillStyle = "rgba(5,10,22,0.54)";
+  ctx.strokeStyle = "rgba(180,235,255,0.34)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "rgba(225,247,255,0.82)";
+  ctx.fillRect(r.x + 12, r.y + 8, 3, 12);
+  ctx.fillRect(r.x + 21, r.y + 8, 3, 12);
+  ctx.restore();
+}
+function drawPauseOverlay() {
+  const rects = getPauseOverlayRects();
+  const resuming = state.gameState === "resuming";
+  ctx.save();
+  ctx.fillStyle = "rgba(1,4,13,0.78)";
+  ctx.fillRect(0, 0, W, H);
+  const glow = ctx.createRadialGradient(W / 2, H / 2 - 48, 0, W / 2, H / 2 - 48, 150);
+  glow.addColorStop(0, "rgba(68,202,255,0.16)");
+  glow.addColorStop(1, "rgba(68,202,255,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, H / 2 - 210, W, 330);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#eafaff";
+  ctx.font = "700 24px system-ui, sans-serif";
+  ctx.fillText(resuming ? String(Math.max(1, Math.ceil(state.resumeCountdown / 30))) : "FLIGHT PAUSED", W / 2, H / 2 - 70);
+  ctx.font = "600 10px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(194,231,244,0.62)";
+  ctx.fillText(resuming ? "RE-ENGAGING CONTROLS" : "SIMULATION FROZEN", W / 2, H / 2 - 42);
+  if (!resuming) {
+    drawSimpleButton(rects.resume, "RESUME", "rgba(88,229,255,0.62)");
+    drawSimpleButton(rects.restart, "RESTART RUN", "rgba(255,255,255,0.28)");
+    drawSimpleButton(rects.title, "RETURN TO TITLE", "rgba(255,255,255,0.18)");
+  }
+  ctx.restore();
+}
+function drawHUD() { drawTopLeftHUD(); drawTopRightHUD(); drawPauseButton(); drawDesktopControlHint(); drawDebugHitboxes(); }
 function drawLowHpWarning() {
   if (!state.player || state.player.hp !== 1) return;
-  const pulse = 0.5 + 0.5 * Math.sin(state.frame * 0.08);
+  const pulse = settingReducedFlash ? 0.35 : 0.5 + 0.5 * Math.sin(state.frame * 0.08);
   const alpha = 0.04 + pulse * 0.08;
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -196,7 +255,7 @@ function drawLowHpWarning() {
   ctx.restore();
 }
 function drawDamageFlash() {
-  if (state.fx.flash <= 0) return;
+  if (state.fx.flash <= 0 || settingReducedFlash) return;
   const alpha = (state.fx.flash / 8) * 0.18;
   ctx.save();
   ctx.fillStyle = `rgba(255,255,255,${alpha})`;

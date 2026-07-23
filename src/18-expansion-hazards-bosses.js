@@ -231,7 +231,10 @@ function updateExpansionHazards() {
     }
     for (let j = state.bullets.length - 1; j >= 0; j--) {
       const b = state.bullets[j];
-      if (manifestCollision("player_bullet", b.x, b.y, d.kind, d.x, d.y, b.r || 3, d.r || 12, 1, d.collisionScale == null ? 1 : d.collisionScale)) {
+      if (manifestCollision(
+        { key: "player_bullet", x: b.x, y: b.y, fallbackRadius: b.r || 3 },
+        { key: d.kind, x: d.x, y: d.y, fallbackRadius: d.r || 12, scale: d.collisionScale == null ? 1 : d.collisionScale }
+      )) {
         d.hp -= b.damage || 1;
         b.life = 0;
         spawnParticles(b.x, b.y, 4, "#fff", 0.45);
@@ -247,19 +250,28 @@ function updateExpansionHazards() {
       state.debris.splice(i, 1);
       continue;
     }
-    if ((d.kind === "mine" || d.kind === "energy_mine") && d.armed && manifestCollision(d.kind, d.x, d.y, "player", p.x, p.y, d.r || 12, 14, d.collisionScale == null ? 1 : d.collisionScale, 1)) {
+    if ((d.kind === "mine" || d.kind === "energy_mine") && d.armed && manifestCollision(
+      { key: d.kind, x: d.x, y: d.y, fallbackRadius: d.r || 12, scale: d.collisionScale == null ? 1 : d.collisionScale },
+      { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+    )) {
       explodeHazard(d);
       state.debris.splice(i, 1);
       continue;
     }
-    if (d.kind !== "mine" && d.kind !== "energy_mine" && manifestCollision(d.kind, d.x, d.y, "player", p.x, p.y, d.r || 12, 14, d.collisionScale == null ? 1 : d.collisionScale, 1) && p.inv <= 0) {
+    if (d.kind !== "mine" && d.kind !== "energy_mine" && manifestCollision(
+      { key: d.kind, x: d.x, y: d.y, fallbackRadius: d.r || 12, scale: d.collisionScale == null ? 1 : d.collisionScale },
+      { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+    ) && p.inv <= 0) {
       damagePlayer(d.damage || 1);
       if (!d.wall) d.hp -= 2;
     }
     if (d.kind !== "mine" && d.kind !== "energy_mine") {
       for (let j = state.enemies.length - 1; j >= 0; j--) {
         const e = state.enemies[j];
-        if (manifestCollision(d.kind, d.x, d.y, e.type, e.x, e.y, d.r || 12, e.r || 12, d.collisionScale == null ? 1 : d.collisionScale, 1)) {
+        if (manifestCollision(
+          { key: d.kind, x: d.x, y: d.y, fallbackRadius: d.r || 12, scale: d.collisionScale == null ? 1 : d.collisionScale },
+          { key: e.type, x: e.x, y: e.y, fallbackRadius: e.r || 12, scale: e.collisionScale == null ? 1 : e.collisionScale }
+        )) {
           e.hp -= d.wall ? 2 : 1.5;
           if (!d.wall) d.hp -= 1;
           applyEnemyHitFeedback(e);
@@ -381,8 +393,8 @@ function beginExpansionBossAttack(b, attack) {
     const rowSpeed = debrisWardenRowSpeed(b.hp / b.maxHp, "double");
     b.safePlan = createDoubleDebrisPlan({
       width: W,
-      asteroidRadius: collisionCircleFor("boss_wall", 0, 0, 1, 24).r,
-      playerRadius: collisionCircleFor("player", 0, 0, 1, 14).r,
+      asteroidRadius: collisionCircleFor({ key: "boss_wall", x: 0, y: 0, fallbackRadius: 24 }).r,
+      playerRadius: collisionCircleFor({ key: "player", x: 0, y: 0, fallbackRadius: 14 }).r,
       playerMaxSpeed: state.player.maxSpeed,
       playerSteer: 0.22,
       rowDistance: 96,
@@ -574,7 +586,10 @@ function handleExpansionBossSpecialHit(bullet, boss) {
     const bayY = boss.y + 26;
     const offsets = [-48, 0, 48];
     for (const off of offsets) {
-      if (!circleHit(bullet.x, bullet.y, bullet.r || 3, boss.x + off, bayY, 16)) continue;
+      if (!hitCirclesOverlap(
+        { x: bullet.x, y: bullet.y, r: bullet.r || 3 },
+        { x: boss.x + off, y: bayY, r: 16 }
+      )) continue;
       bullet.life = 0;
       boss.warn = 0;
       boss.warnMax = 0;

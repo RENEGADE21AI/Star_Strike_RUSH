@@ -20,6 +20,13 @@ function titlePanelHit(x, y) {
 
 function openTitleMetaScreen(screen) {
   if (titleSubState !== screen || titlePanelTarget < 1) titleMetaScreenTransition = 0;
+  const icons = getTitleIconRects();
+  const source = screen === "online" ? icons.account
+    : screen === "records" ? icons.records
+      : screen === "achievements" ? icons.achievements
+        : screen === "progress" ? icons.progress
+          : screen === "codex" ? icons.codex : null;
+  if (source) titlePanelOrigin = { x: source.x + source.w / 2, y: source.y + source.h / 2 };
   titleSubState = screen;
   titlePanelTarget = 1;
   if (screen !== "codex") codexDetailType = null;
@@ -149,7 +156,11 @@ function handleCodexPanelPointerDown(x, y) {
     }
     return true;
   }
-  const types = typeof getCodexTypes === "function" ? getCodexTypes() : ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"];
+  if (hitRect(r.enemies, x, y)) { setCodexCategory("enemies"); return true; }
+  if (hitRect(r.bosses, x, y)) { setCodexCategory("bosses"); return true; }
+  if (hitRect(r.scrollUp, x, y)) { codexScroll -= 180; clampCodexScroll(); return true; }
+  if (hitRect(r.scrollDown, x, y)) { codexScroll += 180; clampCodexScroll(); return true; }
+  const types = codexTypesForCategory();
   for (const type of types) {
     const card = r.rects[type];
     if (!hitRect(card, x, y)) continue;
@@ -161,6 +172,8 @@ function handleCodexPanelPointerDown(x, y) {
 
 function handleOnlinePanelPointerDown(x, y) {
   const r = getOnlineRects();
+  if (callSignEditing && !hitRect(r.editCallSign, x, y)) commitCallSignDraft(true);
+  if (handleEditing && !hitRect(r.claimHandle, x, y)) cancelHandleEditing();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
   if (hitRect(r.pilotTab, x, y)) { accountPanelTab = "pilot"; return true; }
   if (hitRect(r.leagueTab, x, y)) { accountPanelTab = "league"; return true; }
@@ -178,19 +191,20 @@ function handleOnlinePanelPointerDown(x, y) {
   if (accountPanelTab === "settings" && hitRect(r.high, x, y)) { settingMaxParticles = 900; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.shake, x, y)) { settingScreenShake = !settingScreenShake; saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.reset, x, y)) { resetProgressConfirm = true; return true; }
+  if (accountPanelTab === "settings" && hitRect(r.motion, x, y)) { settingReducedMotion = !settingReducedMotion; saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.flash, x, y)) { settingReducedFlash = !settingReducedFlash; saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.contrast, x, y)) { settingHighContrast = !settingHighContrast; applyAccessibilitySettings(); saveSettings(); return true; }
   if (accountPanelTab === "pilot" && hitRect(r.editCallSign, x, y)) {
     if (callSignEditing) commitCallSignDraft();
     else beginCallSignEditing();
     return true;
   }
-  if (hitRect(r.refresh, x, y)) { requestOnlineRefresh(); return true; }
   return true;
 }
 
 function handleRecordsPanelPointerDown(x, y) {
   const r = getRecordsRects();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
-  if (hitRect(r.refresh, x, y)) { requestOnlineRefresh(); return true; }
   return true;
 }
 
@@ -234,6 +248,7 @@ function handleOpenTitlePanelPointerDown(x, y, pointerId = null) {
 }
 
 function handleTitlePointerDown(x, y, pointerId = null) {
+  if (state.sceneTransition.mode !== "idle") return true;
   if (resetProgressConfirm) return handleResetProgressConfirmDown(x, y);
   if (titlePanelAnim > 0.02) return handleOpenTitlePanelPointerDown(x, y, pointerId);
 
@@ -246,7 +261,7 @@ function handleTitlePointerDown(x, y, pointerId = null) {
     return true;
   }
   if (callSignEditing) {
-    cancelCallSignEditing();
+    commitCallSignDraft(true);
   }
 
   if (hitRect(playRect, x, y)) {

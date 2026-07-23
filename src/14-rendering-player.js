@@ -62,7 +62,7 @@ function drawPlayer() {
       ctx.restore();
       for (let echo = 3; echo >= 1; echo--) {
         drawSpriteAsset(ctx, "player", p.x - p.vx * echo * 1.8, p.y + bob + echo * (dashActive ? 5 : 2), {
-          rotation: tilt + Math.PI,
+          rotation: tilt,
           alpha: (dashActive ? 0.12 : 0.08) * echo,
           glow: false,
           filter: dashActive ? "sepia(1) saturate(2)" : "hue-rotate(18deg) saturate(1.4)"
@@ -71,7 +71,7 @@ function drawPlayer() {
     }
     const realmFilter = realmActive && state.playerRealm === 1 ? "hue-rotate(48deg) saturate(1.35)" : "";
     if (drawSpriteAsset(ctx, "player", p.x, p.y + bob, {
-      rotation: tilt + Math.PI,
+      rotation: tilt,
       alpha: blinkAlpha,
       filter: realmFilter
     })) return;

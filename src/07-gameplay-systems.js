@@ -235,6 +235,8 @@ function updateEnemies() {
 }
 function updatePowerups() {
   for (const p of state.powerups) {
+    if (p.static) continue;
+    p.rotation = Number(p.rotation || 0) + Number(p.spinSpeed == null ? 0.024 : p.spinSpeed);
     const nearPlayer = Math.hypot(p.x - state.player.x, p.y - state.player.y) < 140;
     if (state.player.magnet > 0) {
       const dx = state.player.x - p.x, dy = state.player.y - p.y, d = Math.max(1, Math.hypot(dx, dy));
@@ -298,9 +300,8 @@ function enemyBulletSpriteKey(kind) { return kind === "drainShot" ? "drainShot" 
 function bossCollisionHits(bullet, boss) {
   const origin = { x: boss.x, y: boss.y - ((boss.recoil || 0) * 0.35) };
   return manifestCollision(
-    playerBulletSpriteKey(), bullet.x, bullet.y,
-    bossSpriteKey(boss.mode), origin.x, origin.y,
-    bullet.r || 3, Math.max(18, (boss.w || 80) * 0.32)
+    { key: playerBulletSpriteKey(), x: bullet.x, y: bullet.y, fallbackRadius: bullet.r || 3 },
+    { key: bossSpriteKey(boss.mode), x: origin.x, y: origin.y, fallbackRadius: Math.max(18, (boss.w || 80) * 0.32) }
   );
 }
 function updateCollisions() {
@@ -418,7 +419,10 @@ function updateCollisions() {
         const phantomIsGhost = e.stateMode === "ghost";
         if (bulletIsGhost !== phantomIsGhost) continue;
       }
-      if (manifestCollision(playerBulletSpriteKey(), b.x, b.y, e.type, e.x, e.y, b.r || 3, e.r || 12)) {
+      if (manifestCollision(
+        { key: playerBulletSpriteKey(), x: b.x, y: b.y, fallbackRadius: b.r || 3 },
+        { key: e.type, x: e.x, y: e.y, fallbackRadius: e.r || 12, scale: e.collisionScale == null ? 1 : e.collisionScale }
+      )) {
         b.hitIds = b.hitIds || [];
         b.hitIds.push(e.id);
         if (b.pierce > 0) b.pierce--;
@@ -453,7 +457,10 @@ function updateCollisions() {
       let wingmanBlocked = false;
       for (let w = state.wingmen.length - 1; w >= 0; w--) {
         const wm = state.wingmen[w];
-        if (manifestCollision(enemyBulletSpriteKey(b.kind), b.x, b.y, "wingman", wm.x, wm.y, b.r || 4, 12)) {
+        if (manifestCollision(
+          { key: enemyBulletSpriteKey(b.kind), x: b.x, y: b.y, fallbackRadius: b.r || 4 },
+          { key: "wingman", x: wm.x, y: wm.y, fallbackRadius: 12 }
+        )) {
           state.enemyBullets.splice(i, 1);
           state.wingmen.splice(w, 1);
           spawnParticles(wm.x, wm.y, 10, "#f6f", 0.8);
@@ -464,7 +471,10 @@ function updateCollisions() {
       if (wingmanBlocked) continue;
     }
     if (b.kind === "drainShot") {
-      if (manifestCollision("drainShot", b.x, b.y, "player", p.x, p.y, b.r || 5, 14)) {
+      if (manifestCollision(
+        { key: "drainShot", x: b.x, y: b.y, fallbackRadius: b.r || 5 },
+        { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+      )) {
         state.enemyBullets.splice(i, 1);
         if (typeof drainPlayerEnergy === "function") drainPlayerEnergy(b.drain || 22, "drainShot");
         spawnParticles(p.x, p.y, 10, "#70ff45", 0.65);
@@ -472,13 +482,19 @@ function updateCollisions() {
       continue;
     }
     if (state.boss && state.boss.mode === "wraith" && (b.kind === "wraithPhysical" || b.kind === "wraithGhost")) {
-      if (manifestCollision(enemyBulletSpriteKey(b.kind), b.x, b.y, "player", p.x, p.y, b.r || 4, 14) && p.inv <= 0) {
+      if (manifestCollision(
+        { key: enemyBulletSpriteKey(b.kind), x: b.x, y: b.y, fallbackRadius: b.r || 4 },
+        { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+      ) && p.inv <= 0) {
         state.enemyBullets.splice(i, 1);
         damagePlayer(b.damage || 1);
       }
       continue;
     }
-    if (manifestCollision(enemyBulletSpriteKey(b.kind), b.x, b.y, "player", p.x, p.y, b.r || 4, 14) && p.inv <= 0) {
+    if (manifestCollision(
+      { key: enemyBulletSpriteKey(b.kind), x: b.x, y: b.y, fallbackRadius: b.r || 4 },
+      { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+    ) && p.inv <= 0) {
       state.enemyBullets.splice(i, 1);
       damagePlayer(1);
     }
@@ -491,7 +507,10 @@ function updateCollisions() {
       let wingmanHit = false;
       for (let w = state.wingmen.length - 1; w >= 0; w--) {
         const wm = state.wingmen[w];
-        if (manifestCollision(e.type, e.x, e.y, "wingman", wm.x, wm.y, e.r || 12, 12)) {
+        if (manifestCollision(
+          { key: e.type, x: e.x, y: e.y, fallbackRadius: e.r || 12, scale: e.collisionScale == null ? 1 : e.collisionScale },
+          { key: "wingman", x: wm.x, y: wm.y, fallbackRadius: 12 }
+        )) {
           state.wingmen.splice(w, 1);
           if (typeof onEnemyDestroyed === "function") onEnemyDestroyed(e);
           state.enemies.splice(i, 1);
@@ -516,7 +535,10 @@ function updateCollisions() {
     }
     if (e.type === "leech") continue;
 
-    if (manifestCollision(e.type, e.x, e.y, "player", p.x, p.y, e.r || 12, 14) && p.inv <= 0) {
+    if (manifestCollision(
+      { key: e.type, x: e.x, y: e.y, fallbackRadius: e.r || 12, scale: e.collisionScale == null ? 1 : e.collisionScale },
+      { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+    ) && p.inv <= 0) {
       state.enemies.splice(i, 1);
       damagePlayer(1);
     }
@@ -524,7 +546,10 @@ function updateCollisions() {
 
   for (let i = state.powerups.length - 1; i >= 0; i--) {
     const pu = state.powerups[i];
-    if (manifestCollision("powerup", pu.x, pu.y, "player", p.x, p.y, pu.size || 16, 15)) {
+    if (manifestCollision(
+      { key: `powerup_${pu.type}`, x: pu.x, y: pu.y, fallbackRadius: pu.size || 16 },
+      { key: "player", x: p.x, y: p.y, fallbackRadius: 15 }
+    )) {
       collectPowerup(pu);
       state.powerups.splice(i, 1);
     }

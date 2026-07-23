@@ -9,6 +9,7 @@ let auth = null;
 let db = null;
 let functionsApi = null;
 let leaderboardUnsubscribe = null;
+const competitiveModeEnabled = window.COMPETITIVE_MODE_ENABLED === true;
 
 const GLORY_RANK_NAMES = [
   "Rookie Pilot",
@@ -30,7 +31,7 @@ const online = {
   profileHandle: "",
   profileMeta: null,
   weeklyLeague: null,
-  competitionBackend: "unknown",
+  competitionBackend: competitiveModeEnabled ? "unknown" : "disabled",
   leaderboard: [],
   achievements: [],
   lastStatus: "Connecting Firebase...",
@@ -54,6 +55,7 @@ function getState() {
       members: Array.isArray(online.weeklyLeague.members) ? online.weeklyLeague.members.map((member) => ({ ...member })) : []
     } : null,
     competitionBackend: online.competitionBackend,
+    competitiveModeEnabled,
     leaderboard: online.leaderboard.map((row) => ({ ...row })),
     achievements: online.achievements.slice(),
     lastStatus: online.lastStatus,
@@ -278,7 +280,7 @@ async function syncProfile(callSignOverride = "") {
     const result = response && response.data ? response.data : {};
     online.profileCallSign = safeCallSign(result.callSign || callSignOverride || online.profileCallSign);
     online.profileHandle = safeHandle(result.handle || "");
-    online.competitionBackend = "ready";
+    online.competitionBackend = competitiveModeEnabled ? "ready" : "disabled";
     applyServerProfile(result.profile);
     setStatus("Profile synced.");
     return result;
@@ -325,6 +327,11 @@ async function updateCallSign(callSign) {
 }
 
 async function joinWeeklyLeague() {
+  if (!competitiveModeEnabled) {
+    online.weeklyLeague = null;
+    setStatus("Weekly competition is paused for fair-play hardening.");
+    return { ok: false, reason: "disabled" };
+  }
   if (!online.ready || !auth || !auth.currentUser || !functionsApi || !window.starStrikeFirebaseApi) {
     setStatus("Sign in to enter a weekly league.");
     return { ok: false, reason: "signed_out" };
@@ -337,7 +344,7 @@ async function joinWeeklyLeague() {
     const join = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "joinWeeklyLeague");
     const response = await join({});
     const result = response && response.data ? response.data : {};
-    online.competitionBackend = "ready";
+    online.competitionBackend = competitiveModeEnabled ? "ready" : "disabled";
     online.weeklyLeague = result.league || null;
     setStatus(online.weeklyLeague ? "Weekly standings refreshed." : "Weekly league unavailable.");
     return result;
@@ -361,8 +368,10 @@ async function claimHandle(handle) {
     online.profileHandle = safeHandle(result.handle);
     online.competitionBackend = "ready";
     setStatus(`@${online.profileHandle} is account-bound.`);
-    await joinWeeklyLeague();
-    subscribeLeaderboard();
+    if (competitiveModeEnabled) {
+      await joinWeeklyLeague();
+      subscribeLeaderboard();
+    }
     return { ok: true, handle: online.profileHandle };
   } catch (error) {
     setCompetitionBackendUnavailable(error, "Competition services are awaiting deployment.");
@@ -371,6 +380,10 @@ async function claimHandle(handle) {
 }
 
 function subscribeLeaderboard() {
+  if (!competitiveModeEnabled) {
+    online.leaderboard = [];
+    return;
+  }
   if (!db || !auth || !auth.currentUser) return;
   const { collection, limit, onSnapshot, orderBy, query } = window.starStrikeFirebaseApi;
   if (leaderboardUnsubscribe) leaderboardUnsubscribe();
@@ -489,6 +502,10 @@ function applyServerProfile(profile) {
 }
 
 async function submitRun(rawRun) {
+  if (!competitiveModeEnabled) {
+    setStatus("Run saved locally. Public scoring is paused.");
+    return { ok: false, reason: "disabled", localOnly: true };
+  }
   if (!online.ready || !auth || !db) {
     setStatus("Firebase is still connecting.");
     return;
@@ -622,7 +639,7 @@ async function bootFirebase() {
         online.profileHandle = "";
         online.profileMeta = null;
         online.weeklyLeague = null;
-        online.competitionBackend = "unknown";
+        online.competitionBackend = competitiveModeEnabled ? "unknown" : "disabled";
         setStatus("Sign in to sync records.");
         return;
       }

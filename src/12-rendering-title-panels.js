@@ -2,9 +2,9 @@ function drawTitleMetaStrip(x, y, w) {
   const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
   if (!meta) return;
   const chips = [
-    { label: "GLORY", value: Number(meta.totalGlory || 0).toLocaleString(), color: "rgba(255,230,128,0.70)" },
-    { label: "CREDITS", value: Number(meta.credits || 0).toLocaleString(), color: "rgba(120,210,255,0.70)" },
-    { label: "TIER", value: String(meta.seasonTier || 1), color: "rgba(120,255,180,0.72)" }
+    { label: "BEST", value: Number((meta.lifetime && meta.lifetime.bestScore) || highScore || 0).toLocaleString(), color: "rgba(92,238,255,0.72)" },
+    { label: "RANK", value: String(meta.gloryRank || "ROOKIE").toUpperCase(), color: "rgba(255,230,128,0.70)" },
+    { label: "SEASON", value: `T${String(meta.seasonTier || 1)}`, color: "rgba(120,255,180,0.72)" }
   ];
   const gap = 6;
   const chipW = Math.max(72, Math.floor((w - gap * (chips.length - 1)) / chips.length));
@@ -23,7 +23,7 @@ function drawTitleMetaStrip(x, y, w) {
     ctx.fillText(chip.label, rx + 7, y + 11);
     ctx.textAlign = "right";
     ctx.fillStyle = "#fff";
-    ctx.fillText(String(chip.value).slice(0, 8), rx + chipW - 7, y + 11);
+    ctx.fillText(String(chip.value).slice(0, 11), rx + chipW - 7, y + 11);
   }
   ctx.restore();
 }
@@ -62,16 +62,15 @@ function drawCodexSilhouetteLockIcon(x, y) {
   ctx.restore();
 }
 function codexCardRects(panel) {
-  const types = typeof getCodexTypes === "function" ? getCodexTypes() : ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"];
-  const cols = types.length > 8 ? 4 : 3;
-  const cardW = types.length > 8 ? 66 : 80;
-  const cardH = types.length > 8 ? 76 : 100;
-  const gap = types.length > 8 ? 8 : 12;
+  const types = codexTypesForCategory(codexCategory);
+  const cols = 2;
+  const cardW = Math.floor((panel.w - 54) / cols);
+  const cardH = 104;
+  const gap = 10;
   const rows = Math.ceil(types.length / cols);
   const totalW = cardW * cols + gap * (cols - 1);
-  const totalH = cardH * rows + gap * (rows - 1);
   const startX = panel.x + Math.round((panel.w - totalW) / 2);
-  const startY = panel.y + 82;
+  const startY = panel.y + 130 - codexScroll;
   const rects = {};
   for (let i = 0; i < types.length; i++) {
     const col = i % cols, row = Math.floor(i / cols);
@@ -79,9 +78,59 @@ function codexCardRects(panel) {
   }
   return rects;
 }
+function codexTypesForCategory(category = codexCategory) {
+  const all = typeof getCodexTypes === "function" ? getCodexTypes() : ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"];
+  return all.filter((type) => category === "bosses" ? type.startsWith("boss_") : !type.startsWith("boss_"));
+}
+function codexMaxScroll(panel = getTitlePanelRect()) {
+  const rows = Math.ceil(codexTypesForCategory().length / 2);
+  const contentHeight = rows * 104 + Math.max(0, rows - 1) * 10;
+  return Math.max(0, contentHeight - (panel.h - 168));
+}
+function clampCodexScroll() {
+  codexScroll = clamp(codexScroll, 0, codexMaxScroll());
+}
+function setCodexCategory(category) {
+  codexCategory = category === "bosses" ? "bosses" : "enemies";
+  codexScroll = 0;
+  codexDetailType = null;
+}
+function codexTabRects(panel) {
+  const tabW = Math.floor((panel.w - 48) / 2);
+  return {
+    enemies: { x: panel.x + 20, y: panel.y + 76, w: tabW, h: 32 },
+    bosses: { x: panel.x + 28 + tabW, y: panel.y + 76, w: tabW, h: 32 },
+    scrollUp: { x: panel.x + panel.w - 48, y: panel.y + panel.h - 68, w: 28, h: 24 },
+    scrollDown: { x: panel.x + panel.w - 48, y: panel.y + panel.h - 38, w: 28, h: 24 }
+  };
+}
 function drawCodexGrid(panel) {
   const rects = codexCardRects(panel);
-  const types = typeof getCodexTypes === "function" ? getCodexTypes() : ["red", "orange", "purple", "phantom", "boss_standard", "boss_wraith"];
+  const types = codexTypesForCategory();
+  const tabs = codexTabRects(panel);
+  const all = typeof getCodexTypes === "function" ? getCodexTypes() : types;
+  const discoveredCount = all.filter((type) => codexDiscovered[type]).length;
+  ctx.save();
+  ctx.font = FONT_TINY;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const [category, rect] of [["enemies", tabs.enemies], ["bosses", tabs.bosses]]) {
+    const active = codexCategory === category;
+    ctx.fillStyle = active ? "rgba(92,238,255,0.15)" : "rgba(255,255,255,0.05)";
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.strokeStyle = active ? "rgba(92,238,255,0.72)" : "rgba(255,255,255,0.16)";
+    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.fillStyle = active ? "#d8fbff" : "rgba(255,255,255,0.58)";
+    ctx.fillText(category.toUpperCase(), rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
+  }
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255,255,255,0.48)";
+  ctx.fillText(`${discoveredCount}/${all.length} DISCOVERED`, panel.x + 22, panel.y + 116);
+  ctx.restore();
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(panel.x + 14, panel.y + 128, panel.w - 28, panel.h - 142);
+  ctx.clip();
   for (const type of types) {
     const r = rects[type];
     const meta = typeof getCodexMeta === "function" ? getCodexMeta(type) : { color: "#fff", shortName: type.toUpperCase() };
@@ -93,11 +142,11 @@ function drawCodexGrid(panel) {
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 8); ctx.stroke();
     ctx.save();
-    ctx.translate(r.x + r.w / 2, r.y + 42);
+    ctx.translate(r.x + r.w / 2, r.y + 46);
     if (discovered) {
-      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.25 : 0.34, silhouette: false, stateMode: "physical", realm: 0 });
+      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.34 : 0.42, silhouette: false, stateMode: "physical", realm: 0 });
     } else {
-      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.25 : 0.34, silhouette: true, stateMode: "physical", realm: 0 });
+      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.34 : 0.42, silhouette: true, stateMode: "physical", realm: 0 });
     }
     ctx.restore();
     ctx.textAlign = "center";
@@ -110,6 +159,20 @@ function drawCodexGrid(panel) {
       ctx.beginPath(); ctx.arc(r.x + r.w - 10, r.y + 10, 3, 0, TAU); ctx.fill();
     } else {
       drawCodexSilhouetteLockIcon(r.x + r.w - 10, r.y + 6);
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+  if (codexMaxScroll(panel) > 0) {
+    ctx.save();
+    ctx.font = FONT_SMALL;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const [rect, label, enabled] of [[tabs.scrollUp, "▲", codexScroll > 0], [tabs.scrollDown, "▼", codexScroll < codexMaxScroll(panel)]]) {
+      ctx.fillStyle = enabled ? "rgba(92,238,255,0.16)" : "rgba(255,255,255,0.04)";
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.fillStyle = enabled ? "#d8fbff" : "rgba(255,255,255,0.24)";
+      ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
     }
     ctx.restore();
   }
@@ -134,6 +197,23 @@ function drawStatBar(x, y, label, value, max = 5) {
   ctx.strokeStyle = "rgba(255,255,255,0.22)";
   ctx.strokeRect(barX, barY, barW, barH);
   ctx.restore();
+}
+function drawWrappedPanelText(text, x, y, maxWidth, lineHeight, maxLines = 3) {
+  const words = String(text || "").split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (ctx.measureText(candidate).width <= maxWidth || !line) line = candidate;
+    else {
+      lines.push(line);
+      line = word;
+      if (lines.length >= maxLines) break;
+    }
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  lines.forEach((value, index) => ctx.fillText(value, x, y + index * lineHeight));
+  return lines.length;
 }
 function codexTacticalLines(type, meta) {
   const notes = {
@@ -190,19 +270,19 @@ function drawCodexDetail(panel, type) {
   const tactics = codexTacticalLines(type, meta);
   const briefY = card.y + 184;
   ctx.fillStyle = "rgba(255,255,255,0.045)";
-  ctx.fillRect(card.x + 14, briefY, card.w - 28, 116);
+  ctx.fillRect(card.x + 14, briefY, card.w - 28, 142);
   ctx.strokeStyle = "rgba(255,255,255,0.14)";
-  ctx.strokeRect(card.x + 14, briefY, card.w - 28, 116);
+  ctx.strokeRect(card.x + 14, briefY, card.w - 28, 142);
   ctx.fillStyle = meta.color || "#fff";
   ctx.font = FONT_TINY;
   ctx.fillText(type.startsWith("boss") ? "BOSS TACTICAL BRIEF" : "TACTICAL BRIEF", card.x + 26, briefY + 14);
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.font = FONT_SMALL;
-  ctx.fillText(String(meta.trait || "Unknown combat pattern").slice(0, 42), card.x + 26, briefY + 36);
+  drawWrappedPanelText(meta.trait || "Unknown combat pattern", card.x + 26, briefY + 36, card.w - 52, 14, 2);
   ctx.fillStyle = "rgba(255,255,255,0.62)";
   ctx.font = FONT_TINY;
-  ctx.fillText(`1  ${tactics[0]}`.slice(0, 42), card.x + 26, briefY + 64);
-  ctx.fillText(`2  ${tactics[1]}`.slice(0, 42), card.x + 26, briefY + 84);
+  drawWrappedPanelText(`1  ${tactics[0]}`, card.x + 26, briefY + 70, card.w - 52, 12, 2);
+  drawWrappedPanelText(`2  ${tactics[1]}`, card.x + 26, briefY + 108, card.w - 52, 12, 2);
   ctx.restore();
 }
 function drawCodexPanel() {
@@ -343,7 +423,7 @@ function drawPilotHologram(x, y) {
   ctx.beginPath(); ctx.ellipse(0, 0, 35, 50, 0, 0, TAU); ctx.stroke();
   ctx.setLineDash([]);
   ctx.rotate(state.frame * 0.006);
-  if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "player", 0, 0, { scale: 1.32, rotation: Math.PI }))) {
+  if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "player", 0, 0, { scale: 1.32, orientationContext: "title" }))) {
     ctx.fillStyle = "#d8fbff";
     ctx.beginPath(); ctx.moveTo(0, -28); ctx.lineTo(-22, 22); ctx.lineTo(0, 12); ctx.lineTo(22, 22); ctx.closePath(); ctx.fill();
   }
@@ -417,6 +497,14 @@ function drawOnlinePanel() {
     ctx.fillStyle = "#fff";
     ctx.font = "900 22px 'Arial Narrow', Arial, sans-serif";
     ctx.fillText(String(name || "PILOT").slice(0, 14), card.x + 132, card.y + 40);
+    ctx.strokeStyle = callSignEditing ? "rgba(120,255,180,0.86)" : "rgba(255,255,255,0.20)";
+    ctx.lineWidth = callSignEditing ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(card.x + 130, card.y + 66); ctx.lineTo(card.x + card.w - 18, card.y + 66); ctx.stroke();
+    ctx.fillStyle = callSignEditing ? "#78ffb4" : "rgba(255,255,255,0.46)";
+    ctx.font = "900 9px Arial, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(callSignEditing ? "AUTOSAVES" : "EDIT", card.x + card.w - 18, card.y + 24);
+    ctx.textAlign = "left";
     ctx.fillStyle = handle ? "#73efff" : "rgba(255,255,255,0.38)";
     ctx.font = FONT_SMALL;
     ctx.fillText(handle ? `@${handle}${handleEditing ? "_" : ""}` : "@handle unclaimed", card.x + 132, card.y + 70);
@@ -428,21 +516,22 @@ function drawOnlinePanel() {
     ctx.fillStyle = "rgba(255,184,108,0.86)";
     ctx.fillText("PUBLIC: CALL SIGN + @HANDLE APPEAR TO OTHER PLAYERS", card.x + 14, card.y + 151);
     ctx.restore();
-    drawOnlineActionButton(r.editCallSign, callSignEditing ? "SAVE EDITABLE CALL SIGN" : "EDIT CALL SIGN", true);
     const handleLabel = online.profileHandle ? `@${online.profileHandle}  •  ACCOUNT-BOUND` : (handleEditing ? `CLAIM @${handleDraft || "handle"}` : "CLAIM UNIQUE @HANDLE");
-    const competitionAvailable = online.competitionBackend !== "unavailable";
-    drawOnlineActionButton(r.claimHandle, competitionAvailable ? handleLabel : "COMPETITION SERVICES OFFLINE", !!user && !online.profileHandle && competitionAvailable);
-    drawOnlineActionButton(r.signIn, user ? "SYNC PILOT" : "SIGN IN WITH GOOGLE", true);
+    const identityAvailable = online.competitionBackend !== "unavailable";
+    drawOnlineActionButton(r.claimHandle, identityAvailable ? handleLabel : "IDENTITY SERVICE OFFLINE", !!user && !online.profileHandle && identityAvailable);
+    if (!user) drawOnlineActionButton(r.signIn, "CONNECT GOOGLE ACCOUNT", true);
     drawOnlineActionButton(r.signOut, "SIGN OUT", !!user);
     ctx.save();
     ctx.font = FONT_TINY;
     ctx.textAlign = "center";
     ctx.fillStyle = handleStatus ? "#ffd27a" : (online.lastError ? "#ff9f9f" : "rgba(255,255,255,0.48)");
-    ctx.fillText(String(handleStatus || online.lastError || online.lastStatus || "").slice(0, 48), panel.x + panel.w / 2, panel.y + 454);
+    const quietStatus = handleStatus || online.lastError || (!user ? "LOCAL PLAY IS READY" : "ACCOUNT CONNECTED");
+    ctx.fillText(String(quietStatus).slice(0, 48), panel.x + panel.w / 2, panel.y + 426);
     ctx.restore();
-    drawFlightNetworkCard({ x: panel.x + 20, y: panel.y + 514, w: panel.w - 40, h: 112 }, online, user);
+    drawFlightNetworkCard({ x: panel.x + 20, y: panel.y + 452, w: panel.w - 40, h: 112 }, online, user);
   } else if (accountPanelTab === "league") {
-    const league = online.weeklyLeague || null;
+    const competitionEnabled = globalThis.COMPETITIVE_MODE_ENABLED === true;
+    const league = competitionEnabled ? (online.weeklyLeague || null) : null;
     const card = { x: panel.x + 20, y: panel.y + 96, w: panel.w - 40, h: 116 };
     drawDossierCard(card, "#ffd65c");
     ctx.save();
@@ -453,11 +542,11 @@ function drawOnlinePanel() {
     ctx.fillText("SEVEN-DAY FLIGHT LEAGUE", card.x + 16, card.y + 16);
     ctx.font = "900 24px 'Arial Narrow', Arial, sans-serif";
     ctx.fillStyle = "#ffe67a";
-    ctx.fillText(league ? `${String(league.division || "ROOKIE")} LEAGUE` : "WEEKLY LEAGUES", card.x + 16, card.y + 38);
+    ctx.fillText(league ? `${String(league.division || "ROOKIE")} LEAGUE` : (competitionEnabled ? "WEEKLY LEAGUES" : "PRESEASON LOCK"), card.x + 16, card.y + 38);
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,255,255,0.64)";
-    ctx.fillText(league ? `${league.memberCount || 0}/${league.capacity || 30} PILOTS  •  PRIOR PERFORMANCE MATCHED` : "GROUPS OF UP TO 30 • MATCHED BY PRIOR BEST SCORE", card.x + 16, card.y + 76);
-    ctx.fillText(league ? String(league.weekLabel || "CURRENT WEEK") : "CLAIM A HANDLE, THEN ENTER THIS WEEK'S GROUP", card.x + 16, card.y + 94);
+    ctx.fillText(league ? `${league.memberCount || 0}/${league.capacity || 30} PILOTS  •  PRIOR PERFORMANCE MATCHED` : (competitionEnabled ? "GROUPS OF UP TO 30 • MATCHED BY PRIOR BEST SCORE" : "PUBLIC SCORING PAUSED FOR FAIR-PLAY HARDENING"), card.x + 16, card.y + 76);
+    ctx.fillText(league ? String(league.weekLabel || "CURRENT WEEK") : (competitionEnabled ? "CLAIM A HANDLE, THEN ENTER THIS WEEK'S GROUP" : "LOCAL PLAY AND PROGRESSION REMAIN AVAILABLE"), card.x + 16, card.y + 94);
     let listY = panel.y + 232;
     const members = league && Array.isArray(league.members) ? league.members.slice(0, 10) : [];
     if (members.length) {
@@ -477,11 +566,13 @@ function drawOnlinePanel() {
       });
     } else {
       ctx.fillStyle = "rgba(255,255,255,0.52)";
-      ctx.fillText(!user ? "SIGN IN TO ENTER A WEEKLY LEAGUE." : (!online.profileHandle ? "CLAIM YOUR @HANDLE IN THE PILOT TAB FIRST." : "ENTER TO FIND YOUR WEEKLY GROUP."), panel.x + 24, listY);
+      ctx.fillText(!competitionEnabled ? "WEEKLY PLACEMENTS RETURN WITH VERIFIED RUN SESSIONS." : (!user ? "SIGN IN TO ENTER A WEEKLY LEAGUE." : (!online.profileHandle ? "CLAIM YOUR @HANDLE IN THE PILOT TAB FIRST." : "ENTER TO FIND YOUR WEEKLY GROUP.")), panel.x + 24, listY);
     }
     ctx.restore();
-    const competitionAvailable = online.competitionBackend !== "unavailable";
-    drawOnlineActionButton(r.joinLeague, competitionAvailable ? (league ? "REFRESH WEEKLY STANDINGS" : "ENTER THIS WEEK'S LEAGUE") : "COMPETITION SERVICES OFFLINE", !!user && !!online.profileHandle && competitionAvailable);
+    if (competitionEnabled) {
+      const competitionAvailable = online.competitionBackend !== "unavailable";
+      drawOnlineActionButton(r.joinLeague, competitionAvailable ? (league ? "LEAGUE ACTIVE • AUTO UPDATES" : "ENTER THIS WEEK'S LEAGUE") : "COMPETITION SERVICES OFFLINE", !!user && !!online.profileHandle && competitionAvailable && !league);
+    }
   } else {
     ctx.save();
     ctx.textAlign = "left";
@@ -506,17 +597,19 @@ function drawOnlinePanel() {
     }
     ctx.restore();
     drawOnlineActionButton(r.shake, `SHAKE: ${settingScreenShake ? "ON" : "OFF"}`, true);
-    drawOnlineActionButton(r.reset, "RESET PROGRESS", true);
+    drawOnlineActionButton(r.reset, "RESET LOCAL DATA", true);
+    drawOnlineActionButton(r.motion, `REDUCED MOTION: ${settingReducedMotion ? "ON" : "OFF"}`, true);
+    drawOnlineActionButton(r.flash, `REDUCED FLASH: ${settingReducedFlash ? "ON" : "OFF"}`, true);
+    drawOnlineActionButton(r.contrast, `HIGH CONTRAST: ${settingHighContrast ? "ON" : "OFF"}`, true);
   }
-
-  drawOnlineActionButton(r.refresh, "REFRESH ONLINE DATA", true);
 }
 function drawRecordsPanel() {
   const r = getRecordsRects();
   const panel = r.panel;
   const online = onlineState();
   const user = online.user || null;
-  const leaderboard = Array.isArray(online.leaderboard) ? online.leaderboard : [];
+  const competitionEnabled = globalThis.COMPETITIVE_MODE_ENABLED === true;
+  const leaderboard = competitionEnabled && Array.isArray(online.leaderboard) ? online.leaderboard : [];
   drawTitlePanelFrame(panel, "WORLD RECORDS");
   drawPanelCloseButton(r.closeRect);
 
@@ -526,7 +619,7 @@ function drawRecordsPanel() {
   let listY = panel.y + 82;
   ctx.font = FONT_SMALL;
   ctx.fillStyle = "rgba(255,255,255,0.70)";
-  ctx.fillText(user ? "GLOBAL BEST-SCORE LADDER" : "SIGN IN TO LOAD GLOBAL SCORES", panel.x + 20, listY);
+  ctx.fillText(competitionEnabled ? (user ? "GLOBAL BEST-SCORE LADDER" : "SIGN IN TO LOAD GLOBAL SCORES") : "PUBLIC SCORING PAUSED FOR FAIR-PLAY HARDENING", panel.x + 20, listY);
   listY += 30;
   ctx.font = FONT_TINY;
   if (leaderboard.length) {
@@ -544,11 +637,9 @@ function drawRecordsPanel() {
     });
   } else {
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText(user ? "No synced records yet." : "Use the account chip to sign in.", panel.x + 22, listY);
+    ctx.fillText(competitionEnabled ? (user ? "No synced records yet." : "Use the account chip to sign in.") : `LOCAL BEST  ${Number(highScore || 0).toLocaleString()}`, panel.x + 22, listY);
   }
   ctx.restore();
-
-  drawOnlineActionButton(r.refresh, "REFRESH RECORDS", true);
 }
 function drawAchievementsPanel() {
   const r = getAchievementsRects();
@@ -596,8 +687,16 @@ function drawSettingsAndCodexPanels() {
   ctx.globalAlpha = panelAlpha;
   ctx.fillStyle = "rgba(0,0,0,0.56)";
   ctx.fillRect(0, 0, W, H);
+  const spatialEase = panelAlpha * panelAlpha * (3 - 2 * panelAlpha);
+  const panelScale = 0.16 + spatialEase * 0.84;
+  ctx.translate(titlePanelOrigin.x, titlePanelOrigin.y);
+  ctx.scale(panelScale, panelScale);
+  ctx.translate(-titlePanelOrigin.x, -titlePanelOrigin.y);
   ctx.globalAlpha = panelAlpha * screenEase;
-  ctx.translate((1 - screenEase) * 18, 0);
+  const screenScale = 0.94 + screenEase * 0.06;
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(screenScale, screenScale);
+  ctx.translate(-W / 2, -H / 2);
   if (titleSubState === "codex") drawCodexPanel();
   else if (titleSubState === "online") drawOnlinePanel();
   else if (titleSubState === "records") drawRecordsPanel();

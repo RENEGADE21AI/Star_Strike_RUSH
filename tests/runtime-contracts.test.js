@@ -81,6 +81,14 @@ test("Debris Warden rocks grow smoothly from zero to their collision size", () =
   assert.equal(context.debrisSpawnScale(30, 30), 1);
 });
 
+test("ability accounting separates Ghost, DASH, and Realm Hop without clearing protection", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "src/02-effects-powerups.js"), "utf8");
+  assert.match(source, /runStats\.abilityUses\+\+/);
+  assert.match(source, /runStats\.realmHops\+\+/);
+  assert.match(source, /runStats\.dashUses\+\+/);
+  assert.doesNotMatch(source, /p\.inv\s*=\s*0/);
+});
+
 test("bosses stay invulnerable until their first attack begins", () => {
   assert.equal(context.bossCanTakeDamage({ entered: false, combatActive: false }), false);
   assert.equal(context.bossCanTakeDamage({ entered: true, combatActive: false }), false);
@@ -93,7 +101,8 @@ test("gameplay renders compact HUD without announcement popups", () => {
   const sceneSource = fs.readFileSync(path.join(repoRoot, "src", "17-rendering-scene.js"), "utf8");
   const hudSource = fs.readFileSync(path.join(repoRoot, "src", "16-rendering-hud.js"), "utf8");
   assert.doesNotMatch(sceneSource, /drawEncounterCard\(\);/);
-  assert.match(hudSource, /function drawHUD\(\) \{ drawTopLeftHUD\(\); drawTopRightHUD\(\); drawDesktopControlHint\(\); drawDebugHitboxes\(\); \}/);
+  assert.match(hudSource, /function drawHUD\(\) \{ drawTopLeftHUD\(\); drawTopRightHUD\(\); drawPauseButton\(\); drawDesktopControlHint\(\); drawDebugHitboxes\(\); \}/);
+  assert.doesNotMatch(hudSource.match(/function drawHUD\(\).*$/m)[0], /drawAnnouncements/);
 });
 
 test("Siphon shot aims toward predicted player position with bounded range", () => {
@@ -176,7 +185,11 @@ test("public Firebase writers and rules exclude provider identity fields", () =>
   assert.doesNotMatch(clientSource, /setDoc\(/);
   assert.match(clientSource, /httpsCallable\(functionsApi, "syncPilotProfile"\)/);
   assert.match(clientSource, /httpsCallable\(functionsApi, "claimPilotHandle"\)/);
-  assert.match(clientSource, /competitionBackend:\s*"unknown"/);
+  assert.match(
+    clientSource,
+    /competitionBackend:\s*competitiveModeEnabled\s*\?\s*"unknown"\s*:\s*"disabled"/
+  );
+  assert.match(clientSource, /if \(!competitiveModeEnabled\)[\s\S]*reason:\s*"disabled"/);
   assert.match(clientSource, /Local play remains available/);
   const leaderboardReader = clientSource.slice(
     clientSource.indexOf("function applyLeaderboardSnapshot"),
