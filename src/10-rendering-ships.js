@@ -207,6 +207,13 @@ function drawEnemyGeometry(kind, opts = {}) {
   if (!silhouette) ctx.globalAlpha = alpha;
   const sprite = typeof spriteMeta === "function" ? spriteMeta(kind) : null;
   if (!silhouette && sprite && sprite.source && !String(kind).startsWith("boss_") && typeof drawEnginePlume === "function") {
+    const presentationRotation = opts.orientationContext === "codex"
+      ? sprite.orientation.codexRotation
+      : opts.orientationContext === "title" ? sprite.orientation.titleRotation : 0;
+    const exhaustX = sprite.exhaustOrigin.offsetX * Math.cos(presentationRotation)
+      - sprite.exhaustOrigin.offsetY * Math.sin(presentationRotation);
+    const exhaustY = sprite.exhaustOrigin.offsetX * Math.sin(presentationRotation)
+      + sprite.exhaustOrigin.offsetY * Math.cos(presentationRotation);
     const plumeColors = {
       orange: "255,168,72",
       purple: "190,120,255",
@@ -219,18 +226,25 @@ function drawEnemyGeometry(kind, opts = {}) {
       splitter: "186,255,54",
       splitter_shard: "186,255,54"
     };
-    drawEnginePlume(sprite.exhaustOrigin.offsetX, sprite.exhaustOrigin.offsetY, {
+    drawEnginePlume(exhaustX, exhaustY, {
       scale: Math.max(0.42, sprite.render.width / 44),
       alpha: alpha * 0.62,
       color: plumeColors[kind] || "120,210,255",
       phase
     });
   }
-  if (!silhouette && typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, kind, 0, 0, { alpha, hitFlash: hitMix })) {
+  if (!silhouette && typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, kind, 0, 0, {
+    alpha,
+    hitFlash: hitMix,
+    orientationContext: opts.orientationContext
+  })) {
     ctx.globalAlpha = 1;
     return;
   }
 
+  // Procedural fallbacks were authored facing down for combat. Neutral
+  // presentation contexts mirror them to match the nose-up artwork contract.
+  if (opts.orientationContext === "title" || opts.orientationContext === "codex") ctx.scale(1, -1);
   if (kind === "red") drawRedShip(hitMix, silhouette, phase);
   else if (kind === "orange") drawOrangeShip(hitMix, silhouette, phase);
   else if (kind === "purple") drawPurpleShip(hitMix, silhouette, phase);
@@ -247,8 +261,14 @@ function drawFormationShip(kind, x, y, shipScale, angle) {
   ctx.translate(x, y);
   ctx.rotate(angle);
   ctx.scale(shipScale, shipScale);
-  ctx.scale(1, -1);
-  drawEnemyGeometry(kind, { hitMix: 0, alpha: 1, silhouette: false, stateMode: "physical", phase: state.frame * 0.04 + x * 0.01 });
+  drawEnemyGeometry(kind, {
+    hitMix: 0,
+    alpha: 1,
+    silhouette: false,
+    stateMode: "physical",
+    phase: state.frame * 0.04 + x * 0.01,
+    orientationContext: "title"
+  });
   ctx.restore();
 }
 function drawEncounterShipGraphic(type, opts = {}) {
@@ -259,8 +279,16 @@ function drawEncounterShipGraphic(type, opts = {}) {
   ctx.save();
   ctx.translate(0, 0);
   ctx.scale(scale, scale);
-  ctx.scale(1, -1);
-  drawEnemyGeometry(type, { hitMix: 0, alpha: 1, silhouette, stateMode, telegraph: 0, realm, phase: state.frame * 0.04 });
+  drawEnemyGeometry(type, {
+    hitMix: 0,
+    alpha: 1,
+    silhouette,
+    stateMode,
+    telegraph: 0,
+    realm,
+    phase: state.frame * 0.04,
+    orientationContext: "codex"
+  });
   ctx.restore();
 }
 function drawMenuShip(kind, x, y, scale, angle, shipAlpha = 0.95, trailAlpha = 0.55) {

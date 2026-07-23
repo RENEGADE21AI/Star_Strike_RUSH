@@ -8,7 +8,6 @@ const RAW_SPRITE_MANIFEST = {
   wingman: {
     source: "assets/sprites/wingman.png",
     render: { width: 27, height: 31, anchorX: 0.5, anchorY: 0.5, glow: "#ff78ef" },
-    orientation: { baseRotation: Math.PI },
     collision: [{ offsetX: 0, offsetY: 1, radius: 8.5 }],
     projectileOrigin: { offsetX: 0, offsetY: -13 }
   },
@@ -80,23 +79,35 @@ const HOSTILE_SPRITES = new Set([
   "boss_wraith", "boss_debris_warden", "boss_mothership", "boss_siphon_core", "boss_hive_breaker",
   "boss_rail_tyrant", "boss_gravity_well"
 ]);
+const SHIP_SPRITES = new Set([...FRIENDLY_SPRITES, ...HOSTILE_SPRITES]);
 
 function normalizeSpriteEntry(key, entry) {
   const render = { ...entry.render };
   const friendly = FRIENDLY_SPRITES.has(key);
   const hostile = HOSTILE_SPRITES.has(key);
+  const ship = SHIP_SPRITES.has(key);
   const direction = friendly ? -1 : hostile ? 1 : 0;
   const orientationInput = entry.orientation || {};
   const orientation = Object.freeze({
     baseRotation: Number.isFinite(Number(orientationInput.baseRotation))
       ? Number(orientationInput.baseRotation)
-      : (key === "player" ? Math.PI : 0),
+      : (hostile ? Math.PI : 0),
     flipX: orientationInput.flipX === true,
     flipY: orientationInput.flipY === true,
+    artworkForwardX: Number.isFinite(Number(orientationInput.artworkForwardX))
+      ? Number(orientationInput.artworkForwardX)
+      : 0,
+    artworkForwardY: Number.isFinite(Number(orientationInput.artworkForwardY))
+      ? Number(orientationInput.artworkForwardY)
+      : (ship ? -1 : 0),
     forwardX: Number.isFinite(Number(orientationInput.forwardX)) ? Number(orientationInput.forwardX) : 0,
     forwardY: Number.isFinite(Number(orientationInput.forwardY)) ? Number(orientationInput.forwardY) : direction,
-    codexRotation: Number.isFinite(Number(orientationInput.codexRotation)) ? Number(orientationInput.codexRotation) : 0,
-    titleRotation: Number.isFinite(Number(orientationInput.titleRotation)) ? Number(orientationInput.titleRotation) : 0
+    codexRotation: Number.isFinite(Number(orientationInput.codexRotation))
+      ? Number(orientationInput.codexRotation)
+      : (hostile ? -Math.PI : 0),
+    titleRotation: Number.isFinite(Number(orientationInput.titleRotation))
+      ? Number(orientationInput.titleRotation)
+      : (hostile ? -Math.PI : 0)
   });
   const projectileOrigin = entry.projectileOrigin || {
     offsetX: 0,

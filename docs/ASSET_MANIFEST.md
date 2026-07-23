@@ -43,11 +43,17 @@ The script:
 2. converts baked light checkerboards to transparency;
 3. trims excess transparent space around the visible subject;
 4. adds consistent safe padding;
-5. creates browser-sized PNGs in `assets/`.
+5. rotates every ship derivative to the canonical nose-up orientation;
+6. creates browser-sized PNGs in `assets/`.
 
 The originals are never rewritten. Collision geometry must be tuned in the
 manifest after visual inspection; it is never inferred from the full image
 rectangle.
+
+Friendly ships use the canonical PNG orientation in play. Hostile ships receive
+one manifest-owned 180-degree gameplay rotation so they face down toward the
+player; title-screen patrols and Codex previews deliberately cancel that combat
+rotation and display the canonical nose-up art.
 
 ## Validation
 

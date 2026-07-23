@@ -51,6 +51,13 @@ ASSETS = {
     "asteroid-rock-3.png": ("AsteroidNumber3.png", 320),
 }
 
+# The supplied ship originals are archived exactly as received and currently
+# point nose-down. Runtime ship derivatives follow one stable convention:
+# nose-up in the PNG, with gameplay-facing rotations owned by the manifest.
+SHIP_ASSET_NAMES = frozenset(
+    output_name for output_name in ASSETS if not output_name.startswith("asteroid-")
+)
+
 UI_ASSETS = {
     "menu-codex.png": ("Codex Book Icon.png", 256),
     "menu-road.png": ("Progression Road Icon.png", 256),
@@ -159,6 +166,12 @@ def trim_and_resize(image: Image.Image, max_dimension: int) -> Image.Image:
     return cropped
 
 
+def normalize_runtime_orientation(image: Image.Image, output_name: str) -> Image.Image:
+    if output_name in SHIP_ASSET_NAMES:
+        return image.transpose(Image.Transpose.ROTATE_180)
+    return image
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build optimized game artwork derivatives.")
     parser.add_argument("--force", action="store_true", help="Rebuild sprite files that already exist.")
@@ -179,6 +192,7 @@ def main() -> None:
             archive_source(source)
             with Image.open(source) as opened:
                 processed = trim_and_resize(replace_connected_checkerboard(opened), max_dimension)
+                processed = normalize_runtime_orientation(processed, output_name)
                 processed.save(destination, optimize=True, compress_level=9)
                 print(f"{source.name} -> {output_name} {processed.width}x{processed.height}")
 
