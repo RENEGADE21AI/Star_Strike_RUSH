@@ -67,7 +67,7 @@ npm audit --omit=dev --audit-level=high
 npm audit --prefix functions --omit=dev --audit-level=high
 ```
 
-Current local recovery evidence: 29/29 tests pass, 11 browser visual states pass,
+Current local recovery evidence: 30/30 tests pass, 11 browser visual states pass,
 the root dependency audit has zero findings, and the Function audit has no
 high/critical finding. Nine moderate transitive findings remain in the Function
 tree; npm's suggested forced resolution is breaking, so they were not hidden by

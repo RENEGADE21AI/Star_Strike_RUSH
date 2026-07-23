@@ -56,7 +56,7 @@ visual/UI inconsistency.
 
 ## Verification evidence
 
-- `npm test`: 29/29 Node and Chromium tests passing on the recovery branch.
+- `npm test`: 30/30 Node and Chromium tests passing on the recovery branch.
 - Browser coverage starts a run, moves, pauses/resumes, verifies frozen pause
   time, exercises touch joystick/ability input, edits and autosaves a call sign,
   and checks that gameplay announcements remain absent.
