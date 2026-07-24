@@ -178,14 +178,12 @@ function handleOnlinePanelPointerDown(x, y) {
   if (handleEditing && !hitRect(r.claimHandle, x, y)) cancelHandleEditing();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
   if (hitRect(r.pilotTab, x, y)) { accountPanelTab = "pilot"; return true; }
-  if (hitRect(r.leagueTab, x, y)) { accountPanelTab = "league"; return true; }
   if (hitRect(r.settingsTab, x, y)) { accountPanelTab = "settings"; return true; }
   if (accountPanelTab === "pilot" && hitRect(r.claimHandle, x, y)) {
     if (handleEditing) commitPublicHandleDraft();
     else beginHandleEditing();
     return true;
   }
-  if (accountPanelTab === "league" && hitRect(r.joinLeague, x, y)) { requestWeeklyLeague(); return true; }
   if (accountPanelTab === "pilot" && hitRect(r.signIn, x, y)) { requestOnlineSignIn(); return true; }
   if (accountPanelTab === "pilot" && hitRect(r.signOut, x, y)) { requestOnlineSignOut(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
@@ -208,12 +206,20 @@ function handleOnlinePanelPointerDown(x, y) {
 function handleRecordsPanelPointerDown(x, y) {
   const r = getRecordsRects();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
+  if (hitRect(r.globalTab, x, y)) { recordsPanelTab = "global"; return true; }
+  if (hitRect(r.weeklyTab, x, y)) { recordsPanelTab = "weekly"; return true; }
+  if (recordsPanelTab === "weekly" && hitRect(r.joinLeague, x, y)) { requestWeeklyLeague(); return true; }
   return true;
 }
 
 function handleAchievementsPanelPointerDown(x, y) {
   const r = getAchievementsRects();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
+  for (const [category, rect] of Object.entries(r.tabs)) {
+    if (hitRect(rect, x, y)) { setAchievementCategory(category); return true; }
+  }
+  if (hitRect(r.scrollUp, x, y)) { achievementScroll -= 222; clampAchievementScroll(); return true; }
+  if (hitRect(r.scrollDown, x, y)) { achievementScroll += 222; clampAchievementScroll(); return true; }
   return true;
 }
 

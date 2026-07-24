@@ -26,9 +26,9 @@ visual/UI inconsistency.
 - Added explicit sprite orientation, weapon origins, exhaust origins, and
   anchors. The player ship now always faces forward/up; hostile ships face into
   the playfield.
-- Imported 44 supplied source images through a reproducible transparency,
-  trim, padding, and browser-size pipeline. Hosting ships 46 optimized
-  derivatives: 26 sprites, 13 powerups, and 7 menu/PWA icons.
+- Imported 45 supplied source images through a reproducible transparency,
+  trim, padding, and browser-size pipeline. Hosting ships 47 optimized
+  derivatives: 26 sprites, 13 powerups, and 8 menu/PWA icons.
 - Added the supplied wingman as a compact, independently trimmed sprite with
   its own collision radius. Player and wingmen are rotated into forward/up
   flight; hostile fighters remain oriented into the playfield.

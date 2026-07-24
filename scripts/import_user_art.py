@@ -59,6 +59,7 @@ SHIP_ASSET_NAMES = frozenset(
 )
 
 UI_ASSETS = {
+    "menu-account.png": ("Account_Icon.png.png", 256),
     "menu-codex.png": ("Codex Book Icon.png", 256),
     "menu-road.png": ("Progression Road Icon.png", 256),
     "menu-world.png": ("World Icon.png", 256),

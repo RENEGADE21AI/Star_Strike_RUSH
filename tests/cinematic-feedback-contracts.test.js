@@ -62,6 +62,22 @@ test("hits and powerup pickups share explicit visual and audio feedback", () => 
   assert.match(render, /kind === "ring"/);
 });
 
+test("owner-supplied title and gameplay music use gesture-safe state crossfades", () => {
+  const audio = fs.readFileSync(path.join(repoRoot, "src", "02-audio.js"), "utf8");
+  const loop = fs.readFileSync(path.join(repoRoot, "src", "18-session-input-loop.js"), "utf8");
+  const titleTrack = path.join(repoRoot, "assets", "audio", "hangar-bay-seven.mp3");
+  const gameplayTrack = path.join(repoRoot, "assets", "audio", "gravitys-edge.mp3");
+
+  assert.ok(fs.statSync(titleTrack).size > 1000000);
+  assert.ok(fs.statSync(gameplayTrack).size > 1000000);
+  assert.match(audio, /title:\s*"assets\/audio\/hangar-bay-seven\.mp3"/);
+  assert.match(audio, /gameplay:\s*"assets\/audio\/gravitys-edge\.mp3"/);
+  assert.match(audio, /window\.addEventListener\("pointerdown", unlockGameMusic/);
+  assert.match(audio, /mode === "start"[\s\S]*title:\s*0\.22/);
+  assert.match(audio, /mode === "paused"[\s\S]*gameplay:\s*0\.065/);
+  assert.match(loop, /updateGameMusic\(\)[\s\S]*draw\(\)/);
+});
+
 test("title patrol separation resolves actual visual radii without overlap", () => {
   const context = vm.createContext({
     state: {

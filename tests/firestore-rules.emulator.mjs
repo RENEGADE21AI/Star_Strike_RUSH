@@ -41,6 +41,7 @@ before(async () => {
       setDoc(doc(db, "leaderboard_scores/alice"), { uid: "alice", callSign: "ALPHA", bestScore: 100 }),
       setDoc(doc(db, "leaderboard_scores/bob"), { uid: "bob", callSign: "BRAVO", bestScore: 200 }),
       setDoc(doc(db, "player_achievements/alice/items/first_run"), { achievementId: "first_run" }),
+      setDoc(doc(db, "player_achievement_state/alice"), { uid: "alice", ids: ["first_run"], count: 1 }),
       setDoc(doc(db, "run_receipts/alice/items/run_1"), { receiptId: "run_1" }),
       setDoc(doc(db, "season_reward_claims/alice/items/reward_1"), { rewardId: "reward_1" }),
       setDoc(doc(db, "handle_registry/alpha"), { uid: "alice" }),
@@ -85,11 +86,13 @@ test("private progression and receipts are owner-readable and browser-immutable"
   await assertFails(getDoc(doc(aliceDb, "players_private/bob")));
   await assertFails(getDocs(collection(aliceDb, "players_private")));
   await assertSucceeds(getDoc(doc(aliceDb, "player_achievements/alice/items/first_run")));
+  await assertFails(getDoc(doc(aliceDb, "player_achievement_state/alice")));
   await assertSucceeds(getDoc(doc(aliceDb, "run_receipts/alice/items/run_1")));
   await assertSucceeds(getDoc(doc(aliceDb, "season_reward_claims/alice/items/reward_1")));
   await assertFails(getDoc(doc(bobDb, "player_achievements/alice/items/first_run")));
   await assertFails(updateDoc(doc(aliceDb, "players_private/alice"), { credits: 999999999 }));
   await assertFails(setDoc(doc(aliceDb, "run_receipts/alice/items/forged"), { score: 999999999 }));
+  await assertFails(setDoc(doc(aliceDb, "player_achievement_state/alice"), { ids: ["everything"] }));
 });
 
 test("handle and league internals remain callable-only", async () => {

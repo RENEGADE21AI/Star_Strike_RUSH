@@ -17,22 +17,85 @@ const GLORY_RANKS = [
 ];
 
 const ACHIEVEMENTS = [
-  { id: "first_sortie", name: "First Sortie" },
+  { id: "first_sortie", name: "First Sortie", minLifetimeRuns: 1 },
   { id: "rookie_score", name: "Rookie Ace", minScore: 250 },
   { id: "ace_score", name: "Ace Pilot", minScore: 1000 },
   { id: "legend_score", name: "Legend Run", minScore: 3000 },
   { id: "surge_score", name: "Score Surge", minScore: 6000 },
   { id: "mythic_score", name: "Mythic Rush", minScore: 10000 },
+  { id: "stellar_score", name: "Stellar Velocity", minScore: 25000 },
+  { id: "nova_score", name: "Nova Standard", minScore: 50000 },
+  { id: "eternal_score", name: "Eternal Rush", minScore: 100000 },
   { id: "phase_two", name: "Phase Runner", minPhase: 2 },
   { id: "phase_three", name: "Deep Strike", minPhase: 3 },
   { id: "phase_eight", name: "Wraith Contact", minPhase: 8 },
   { id: "phase_twelve", name: "Expansion Front", minPhase: 12 },
+  { id: "phase_twenty", name: "Outer Dark", minPhase: 20 },
+  { id: "phase_thirty", name: "Beyond the Map", minPhase: 30 },
   { id: "boss_breaker", name: "Boss Breaker", minBosses: 1 },
   { id: "boss_hunter", name: "Boss Hunter", minBosses: 3 },
+  { id: "boss_reaper", name: "Boss Reaper", minBosses: 5 },
+  { id: "warden_bane", name: "Warden's Bane", minBosses: 10 },
+  { id: "pantheon_fall", name: "Pantheon Fall", minBosses: 20 },
+  { id: "swarm_clearer", name: "Swarm Clearer", minKills: 25 },
+  { id: "century_breaker", name: "Century Breaker", minKills: 100 },
+  { id: "void_harvester", name: "Void Harvester", minKills: 250 },
+  { id: "fleet_eraser", name: "Fleet Eraser", minKills: 500 },
+  { id: "one_ship_army", name: "One Ship Army", minKills: 1000 },
+  { id: "combo_ten", name: "Locked On", minCombo: 10 },
+  { id: "combo_twenty_five", name: "No Misses", minCombo: 25 },
+  { id: "combo_fifty", name: "Perfect Vector", minCombo: 50 },
+  { id: "combo_hundred", name: "Untouchable Rhythm", minCombo: 100 },
+  { id: "combo_two_fifty", name: "Combat Singularity", minCombo: 250 },
   { id: "ghost_runner", name: "Ghost Runner", minGhostUses: 3 },
+  { id: "ghost_dancer", name: "Ghost Dancer", minGhostUses: 10 },
+  { id: "phase_specter", name: "Phase Specter", minGhostUses: 25 },
+  { id: "unseen_fifty", name: "Unseen Fifty", minGhostUses: 50 },
   { id: "collector", name: "Collector", minPowerups: 3 },
   { id: "power_hungry", name: "Power Hungry", minPowerups: 8 },
-  { id: "swarm_clearer", name: "Swarm Clearer", minKills: 25 }
+  { id: "arsenal_online", name: "Arsenal Online", minPowerups: 15 },
+  { id: "reactor_feast", name: "Reactor Feast", minPowerups: 30 },
+  { id: "limitless_loadout", name: "Limitless Loadout", minPowerups: 50 },
+  { id: "five_minute_flight", name: "Holding Pattern", minRunDurationMs: 300000 },
+  { id: "ten_minute_flight", name: "Long Range", minRunDurationMs: 600000 },
+  { id: "twenty_minute_flight", name: "Endurance Pilot", minRunDurationMs: 1200000 },
+  { id: "thirty_minute_flight", name: "No Return Vector", minRunDurationMs: 1800000 },
+  { id: "flawless_three", name: "Clean Hull", minPhase: 3, maxDamageTaken: 0 },
+  { id: "flawless_eight", name: "Glass Phantom", minPhase: 8, maxDamageTaken: 0 },
+  { id: "flawless_twelve", name: "Perfect Machine", minPhase: 12, maxDamageTaken: 0 },
+  { id: "career_runs_10", name: "Regular Patrol", minLifetimeRuns: 10 },
+  { id: "career_runs_50", name: "Flight Habit", minLifetimeRuns: 50 },
+  { id: "career_runs_100", name: "Centurion Pilot", minLifetimeRuns: 100 },
+  { id: "career_runs_250", name: "Veteran Circuit", minLifetimeRuns: 250 },
+  { id: "career_runs_500", name: "Five Hundred Flights", minLifetimeRuns: 500 },
+  { id: "career_runs_1000", name: "The Thousandth Dawn", minLifetimeRuns: 1000 },
+  { id: "career_score_50k", name: "Rising Record", minLifetimeScore: 50000 },
+  { id: "career_score_250k", name: "Quarter Million", minLifetimeScore: 250000 },
+  { id: "career_score_1m", name: "Million Point Pilot", minLifetimeScore: 1000000 },
+  { id: "career_score_5m", name: "Five Million Flight", minLifetimeScore: 5000000 },
+  { id: "career_score_10m", name: "Eight Digit Ace", minLifetimeScore: 10000000 },
+  { id: "career_score_25m", name: "Star Eternal", minLifetimeScore: 25000000 },
+  { id: "career_kills_100", name: "Threat Removed", minLifetimeKills: 100 },
+  { id: "career_kills_1k", name: "Thousand Down", minLifetimeKills: 1000 },
+  { id: "career_kills_5k", name: "Sector Defender", minLifetimeKills: 5000 },
+  { id: "career_kills_25k", name: "Fleetbreaker", minLifetimeKills: 25000 },
+  { id: "career_kills_100k", name: "Hundred Thousand", minLifetimeKills: 100000 },
+  { id: "career_kills_250k", name: "Final Answer", minLifetimeKills: 250000 },
+  { id: "career_powerups_25", name: "Systems Student", minLifetimePowerups: 25 },
+  { id: "career_powerups_100", name: "Systems Engineer", minLifetimePowerups: 100 },
+  { id: "career_powerups_500", name: "Loadout Architect", minLifetimePowerups: 500 },
+  { id: "career_powerups_2500", name: "Arsenal Curator", minLifetimePowerups: 2500 },
+  { id: "career_powerups_10k", name: "Every System Online", minLifetimePowerups: 10000 },
+  { id: "career_bosses_10", name: "Command Hunter", minLifetimeBosses: 10 },
+  { id: "career_bosses_50", name: "Warden Specialist", minLifetimeBosses: 50 },
+  { id: "career_bosses_250", name: "Pantheon Breaker", minLifetimeBosses: 250 },
+  { id: "career_bosses_1k", name: "One Thousand Crowns", minLifetimeBosses: 1000 },
+  { id: "career_bosses_2500", name: "No Gods Left", minLifetimeBosses: 2500 },
+  { id: "career_ghost_25", name: "Between Frames", minLifetimeGhostUses: 25 },
+  { id: "career_ghost_100", name: "Phase Native", minLifetimeGhostUses: 100 },
+  { id: "career_ghost_500", name: "Half Seen", minLifetimeGhostUses: 500 },
+  { id: "career_ghost_2500", name: "Unbound", minLifetimeGhostUses: 2500 },
+  { id: "career_ghost_5k", name: "Living Ghost", minLifetimeGhostUses: 5000 }
 ];
 
 function clamp(value, min, max) {
@@ -202,18 +265,35 @@ function normalizeProfile(profile = {}) {
   return base;
 }
 
-function runMeetsAchievement(run, achievement) {
+function runMeetsAchievement(run, achievement, profile = {}) {
   if (achievement.minScore && run.score < achievement.minScore) return false;
   if (achievement.minPhase && run.phaseReached < achievement.minPhase) return false;
   if (achievement.minBosses && run.bossesKilled < achievement.minBosses) return false;
   if (achievement.minGhostUses && run.ghostUses < achievement.minGhostUses) return false;
   if (achievement.minPowerups && run.powerupsCollected < achievement.minPowerups) return false;
   if (achievement.minKills && run.enemiesKilled < achievement.minKills) return false;
+  if (achievement.minCombo && run.highestCombo < achievement.minCombo) return false;
+  if (achievement.minRunDurationMs && run.runDurationMs < achievement.minRunDurationMs) return false;
+  if (Number.isFinite(achievement.maxDamageTaken) && run.damageTaken > achievement.maxDamageTaken) return false;
+  if (achievement.minLifetimeRuns && profile.lifetimeRuns < achievement.minLifetimeRuns) return false;
+  if (achievement.minLifetimeScore && profile.lifetimeScore < achievement.minLifetimeScore) return false;
+  if (achievement.minLifetimeKills && profile.lifetimeKills < achievement.minLifetimeKills) return false;
+  if (achievement.minLifetimePowerups && profile.lifetimePowerups < achievement.minLifetimePowerups) return false;
+  if (achievement.minLifetimeGhostUses && profile.lifetimeGhostUses < achievement.minLifetimeGhostUses) return false;
+  if (achievement.minLifetimeBosses && profile.lifetimeBosses < achievement.minLifetimeBosses) return false;
   return true;
 }
 
-function earnedAchievementIdsForRun(run) {
-  return ACHIEVEMENTS.filter((achievement) => runMeetsAchievement(run, achievement)).map((achievement) => achievement.id);
+function earnedAchievementIdsForRun(run, profile = null) {
+  const lifetime = profile || {
+    lifetimeRuns: 1,
+    lifetimeScore: run.score,
+    lifetimeKills: run.enemiesKilled,
+    lifetimePowerups: run.powerupsCollected,
+    lifetimeGhostUses: run.ghostUses,
+    lifetimeBosses: run.bossesKilled
+  };
+  return ACHIEVEMENTS.filter((achievement) => runMeetsAchievement(run, achievement, lifetime)).map((achievement) => achievement.id);
 }
 
 function achievementTitle(achievementId) {
@@ -239,7 +319,7 @@ function applyRunToProfile(profile, run) {
   next.bestScore = Math.max(next.bestScore, run.score);
   next.phase = Math.max(next.phase, run.phaseReached);
   next.grants = grants;
-  next.earnedAchievementIds = earnedAchievementIdsForRun(run);
+  next.earnedAchievementIds = earnedAchievementIdsForRun(run, next);
   return next;
 }
 

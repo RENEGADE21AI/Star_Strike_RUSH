@@ -5,6 +5,10 @@ responsive movement, powerup builds, adaptive pressure, achievements, upward
 progression roads, and staged boss encounters are designed for short keyboard
 or touch runs.
 
+Hangar Bay Seven scores title/profile navigation; Gravity's Edge takes over
+during gameplay with a short state-driven crossfade. Browser audio begins on
+the first player gesture and follows the persisted Music + Effects setting.
+
 Play: https://star-strike-rush.web.app
 
 ## Controls
@@ -102,9 +106,9 @@ preseason/fair-play hold instead of pretending the leaderboard is verified.
 
 ## Artwork
 
-The repository preserves 44 supplied original images under ignored-from-Hosting
-`source-art/` and ships 46 optimized derivatives under `assets/`: 26 gameplay
-sprites, 13 powerup icons, and 7 menu/PWA icons. The import pipeline removes
+The repository preserves 45 supplied original images under ignored-from-Hosting
+`source-art/` and ships 47 optimized derivatives under `assets/`: 26 gameplay
+sprites, 13 powerup icons, and 8 menu/PWA icons. The import pipeline removes
 baked checkerboards, trims transparent padding, downsizes files, and keeps
 collision geometry separate from decorative pixels. Procedural Canvas art
 remains a resilient fallback only.

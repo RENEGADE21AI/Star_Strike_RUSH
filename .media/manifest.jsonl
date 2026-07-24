@@ -1,0 +1,2 @@
+{"id":"bgm_001","type":"bgm","path":"assets/audio/hangar-bay-seven.mp3","source":"existing","description":"hangar bay seven","provenance":{"provider":"local","adopted":true,"prompt":"Hangar Bay Seven title screen background music"}}
+{"id":"bgm_002","type":"bgm","path":"assets/audio/gravitys-edge.mp3","source":"existing","description":"gravitys edge","provenance":{"provider":"local","adopted":true,"prompt":"Gravitys Edge gameplay background music"}}

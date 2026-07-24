@@ -38,6 +38,12 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // Aggregate state is server-only. The owner-facing UI reads the sanitized
+    // individual unlock documents above.
+    match /player_achievement_state/{userId} {
+      allow read, write: if false;
+    }
+
     match /run_receipts/{userId}/items/{receiptId} {
       allow get: if isOwner(userId);
       allow list: if isOwner(userId) && request.query.limit <= 50;

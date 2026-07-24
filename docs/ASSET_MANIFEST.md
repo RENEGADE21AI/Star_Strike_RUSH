@@ -4,15 +4,18 @@ Audited on 2026-07-23 against the final polish branch.
 
 ## Inventory
 
-The project owner supplied 44 original PNG files. They are preserved unchanged
+The project owner supplied 45 original PNG files. They are preserved unchanged
 under `source-art/` alongside a short archive README and are excluded from the
 Firebase Hosting payload.
 
-The public runtime contains 46 optimized PNG derivatives:
+The public runtime contains 47 optimized PNG derivatives:
 
 - `assets/sprites/`: 26 player, wingman, enemy, boss, and asteroid sprites.
 - `assets/powerups/`: 13 powerup icons.
-- `assets/ui/`: 7 menu, favicon, and PWA icons.
+- `assets/ui/`: 8 menu, favicon, and PWA icons.
+
+Two owner-supplied MP3 tracks live under `assets/audio/`: Hangar Bay Seven for
+title/profile navigation and Gravity's Edge for active play.
 
 The derivative count is larger because the supplied favicon generates multiple
 PWA sizes. No authorship or third-party-license claim is inferred from a file

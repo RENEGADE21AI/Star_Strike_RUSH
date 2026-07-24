@@ -301,19 +301,20 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
   const receiptRef = db.doc(`run_receipts/${uid}/items/${receiptId}`);
   const currentWeek = weekWindow();
   const enrollmentRef = db.doc(`weekly_enrollments/${currentWeek.id}_${uid}`);
+  const achievementStateRef = db.doc(`player_achievement_state/${uid}`);
   const achievementRefs = ACHIEVEMENTS.map((achievement) => ({
     achievement,
     ref: db.doc(`player_achievements/${uid}/items/${achievement.id}`)
   }));
 
   return db.runTransaction(async (tx) => {
-    const [privateSnap, publicSnap, leaderboardSnap, receiptSnap, enrollmentSnap, ...achievementSnaps] = await Promise.all([
+    const [privateSnap, publicSnap, leaderboardSnap, receiptSnap, enrollmentSnap, achievementStateSnap] = await Promise.all([
       tx.get(privateRef),
       tx.get(publicRef),
       tx.get(leaderboardRef),
       tx.get(receiptRef),
       tx.get(enrollmentRef),
-      ...achievementRefs.map((item) => tx.get(item.ref))
+      tx.get(achievementStateRef)
     ]);
     const baseProfile = profileFromSnapshots(privateSnap, publicSnap, leaderboardSnap);
     if (receiptSnap.exists) {
@@ -326,10 +327,11 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
     }
 
     const nextProfile = applyRunToProfile(baseProfile, run);
+    const achievementState = achievementStateSnap.exists ? achievementStateSnap.data() : {};
     const existingAchievementIds = new Set(
-      achievementRefs
-        .filter((_, index) => achievementSnaps[index] && achievementSnaps[index].exists)
-        .map((item) => item.achievement.id)
+      Array.isArray(achievementState.ids)
+        ? achievementState.ids.map((id) => safeDocId(id, "")).filter(Boolean)
+        : []
     );
     const earned = new Set(nextProfile.earnedAchievementIds || []);
     const newAchievementRefs = achievementRefs.filter((item) => earned.has(item.achievement.id) && !existingAchievementIds.has(item.achievement.id));
@@ -337,7 +339,8 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
       Number((publicSnap.exists && publicSnap.data().achievementsCount) || 0),
       Number((leaderboardSnap.exists && leaderboardSnap.data().achievementsCount) || 0)
     );
-    const achievementsCount = Math.min(ACHIEVEMENTS.length, existingPublicCount + newAchievementRefs.length);
+    const mergedAchievementIds = Array.from(new Set([...existingAchievementIds, ...earned])).slice(0, ACHIEVEMENTS.length);
+    const achievementsCount = Math.min(ACHIEVEMENTS.length, Math.max(existingPublicCount, mergedAchievementIds.length));
     const publicData = publicSnap.exists ? publicSnap.data() : {};
     const privateData = privateSnap.exists ? privateSnap.data() : {};
     const publicPayload = publicPayloadFor(auth, nextProfile, run.callSign, achievementsCount, publicData);
@@ -374,6 +377,12 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
     tx.set(publicRef, publicPayload);
     if (competitionWritesEnabled()) tx.set(leaderboardRef, publicPayload);
     tx.create(receiptRef, receiptPayload);
+    tx.set(achievementStateRef, {
+      uid,
+      ids: mergedAchievementIds,
+      count: achievementsCount,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
     for (const item of newAchievementRefs) {
       tx.set(item.ref, {
         uid,

@@ -16,8 +16,8 @@ after the files they depend on, because the current code intentionally shares gl
 - `00-runtime.js`: deterministic fixed-step simulation clock, render-rate
   independence, and long-background-gap clamping.
 - `01-core.js`: canvas handles, constants, persistent settings, global state, scoring.
-- `02-audio.js`: throttled procedural Web Audio effects and the persisted sound
-  preference, with a silent fallback for unsupported or blocked audio contexts.
+- `02-audio.js`: throttled procedural Web Audio effects, gesture-safe looping
+  title/gameplay music with state crossfades, and the persisted audio preference.
 - `02-effects-powerups.js`: particles, rotating artwork-backed drops, wingmen,
   pickup bursts, ghost action, and star updates.
 - `03-pacing.js`: phase timing, pressure, difficulty, bullet budget, dev skip.
@@ -29,8 +29,8 @@ after the files they depend on, because the current code intentionally shares gl
 - `09-rendering-controls.js`: shared button and icon drawing helpers.
 - `10-rendering-ships.js`: enemy, boss, formation, and menu ship art.
 - `11-rendering-title-effects.js`: title sun, menu flights, encounter cards.
-- `12-rendering-title-panels.js`: account/settings, records, achievements, codex,
-  and reset-confirm panels.
+- `12-rendering-title-panels.js`: identity/settings, global and weekly records,
+  the categorized achievement vault, Codex, and reset-confirm panels.
 - `12-progress-road-data.js`: Glory Road and Season Road reward tables, detail
   payloads, and local reward claim logic.
 - `12-rendering-progress-road.js`: Glory Road and Season Road layout and rendering.
@@ -54,8 +54,8 @@ after the files they depend on, because the current code intentionally shares gl
   Local debug-only `scenario=siphon`, `scenario=debris`,
   `scenario=debris-incoming`, and `scenario=powerups` URLs create deterministic
   QA encounters; `H` toggles hitboxes, anchors, origins, and safe lanes.
-- `19-game-achievements.js`: run stat payloads, achievement definitions, and
-  online sync hooks called by the game loop.
+- `19-game-achievements.js`: per-run and lifetime achievement ladders, progress
+  metrics, run stat payloads, and online sync hooks called by the game loop.
 - `20-firebase-online.js`: Firebase Auth, callable profile/handle services,
   graceful backend-unavailable state, and the explicit recovery competition
   gate. Public score/league submission and leaderboard subscription remain

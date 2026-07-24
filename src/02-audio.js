@@ -1,6 +1,12 @@
 let gameAudioContext = null;
 let gameAudioBus = null;
 const gameSoundLastPlayed = new Map();
+const GAME_MUSIC_SOURCES = Object.freeze({
+  title: "assets/audio/hangar-bay-seven.mp3",
+  gameplay: "assets/audio/gravitys-edge.mp3"
+});
+let gameMusicTracks = null;
+let gameMusicUnlocked = false;
 
 function gameAudioNow() {
   return typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
@@ -98,7 +104,75 @@ function playGameSound(kind, intensity = 1) {
   return true;
 }
 
+function ensureGameMusicTracks() {
+  if (gameMusicTracks || typeof window.Audio !== "function") return gameMusicTracks;
+  gameMusicTracks = {};
+  for (const [name, source] of Object.entries(GAME_MUSIC_SOURCES)) {
+    const track = new window.Audio(source);
+    track.loop = true;
+    track.preload = "auto";
+    track.volume = 0;
+    track.setAttribute("playsinline", "");
+    gameMusicTracks[name] = track;
+  }
+  return gameMusicTracks;
+}
+
+function unlockGameMusic() {
+  if (settingSoundEffects === false) return false;
+  const tracks = ensureGameMusicTracks();
+  if (!tracks) return false;
+  gameMusicUnlocked = true;
+  for (const track of Object.values(tracks)) {
+    if (track.paused) Promise.resolve(track.play()).catch(() => {});
+  }
+  return true;
+}
+
+function gameMusicMix() {
+  const mode = state && state.gameState;
+  if (mode === "start") return { title: 0.22, gameplay: 0 };
+  if (mode === "paused" || mode === "resuming") return { title: 0, gameplay: 0.065 };
+  if (mode === "gameover") return { title: 0, gameplay: 0.09 };
+  return { title: 0, gameplay: 0.17 };
+}
+
+function stopGameMusicImmediately() {
+  if (!gameMusicTracks) return;
+  for (const track of Object.values(gameMusicTracks)) {
+    track.volume = 0;
+    track.pause();
+  }
+}
+
+function updateGameMusic() {
+  const tracks = gameMusicTracks;
+  if (!tracks || !gameMusicUnlocked) return;
+  if (settingSoundEffects === false || document.hidden) {
+    stopGameMusicImmediately();
+    return;
+  }
+  const targets = gameMusicMix();
+  for (const [name, track] of Object.entries(tracks)) {
+    const target = targets[name] || 0;
+    if ((target > 0 || track.volume > 0.001) && track.paused) {
+      Promise.resolve(track.play()).catch(() => {});
+    }
+    const nextVolume = track.volume + (target - track.volume) * 0.065;
+    track.volume = clamp(Math.abs(nextVolume - target) < 0.001 ? target : nextVolume, 0, 1);
+    if (target === 0 && track.volume === 0 && !track.paused) track.pause();
+  }
+}
+
 function setSoundEffectsEnabled(enabled) {
   settingSoundEffects = !!enabled;
-  if (settingSoundEffects) playGameSound("ui", 0.8);
+  if (settingSoundEffects) {
+    unlockGameMusic();
+    playGameSound("ui", 0.8);
+  } else {
+    stopGameMusicImmediately();
+  }
 }
+
+window.addEventListener("pointerdown", unlockGameMusic, { passive: true });
+window.addEventListener("keydown", unlockGameMusic);

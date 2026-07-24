@@ -203,6 +203,20 @@ function drawBookIcon(rect, active = false) {
   ctx.restore();
 }
 function drawAccountIcon(rect, active = false) {
+  if (drawUiAssetIcon("ui_account", rect, active, "120,255,180")) {
+    const online = !!(window.starStrikeOnline && window.starStrikeOnline.getState().user);
+    if (online) {
+      ctx.save();
+      ctx.fillStyle = "#78ffb4";
+      ctx.shadowColor = "rgba(120,255,180,0.9)";
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(rect.x + rect.w - 3, rect.y + 3, 4, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+    return;
+  }
   const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
   const online = !!(window.starStrikeOnline && window.starStrikeOnline.getState().user);
   ctx.save();

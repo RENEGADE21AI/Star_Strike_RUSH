@@ -419,15 +419,13 @@ function getOnlineRects() {
   const innerX = panel.x + 20;
   const tabY = panel.y + 50;
   const tabGap = 6;
-  const tabW = Math.floor((panel.w - 40 - tabGap * 2) / 3);
+  const tabW = Math.floor((panel.w - 40 - tabGap) / 2);
   const pilotTab = { x: innerX, y: tabY, w: tabW, h: 28 };
-  const leagueTab = { x: pilotTab.x + tabW + tabGap, y: tabY, w: tabW, h: 28 };
-  const settingsTab = { x: leagueTab.x + tabW + tabGap, y: tabY, w: tabW, h: 28 };
+  const settingsTab = { x: pilotTab.x + tabW + tabGap, y: tabY, w: tabW, h: 28 };
   const editCallSign = { x: innerX + 124, y: panel.y + 126, w: panel.w - 184, h: 42 };
   const claimHandle = { x: innerX, y: panel.y + 278, w: panel.w - 40, h: 32 };
   const signIn = { x: innerX, y: panel.y + 326, w: panel.w - 40, h: 34 };
   const signOut = { x: innerX, y: panel.y + 372, w: panel.w - 40, h: 30 };
-  const joinLeague = { x: innerX, y: panel.y + panel.h - 92, w: panel.w - 40, h: 34 };
   const btnW = 64, btnH = 28, gap = 10, btnY = panel.y + 150;
   const low = { x: innerX, y: btnY, w: btnW, h: btnH };
   const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
@@ -438,17 +436,52 @@ function getOnlineRects() {
   const flash = { x: innerX, y: btnY + 134, w: panel.w - 40, h: 30 };
   const contrast = { x: innerX, y: btnY + 172, w: panel.w - 40, h: 30 };
   const sound = { x: innerX, y: btnY + 210, w: panel.w - 40, h: 30 };
-  return { panel, closeRect, pilotTab, leagueTab, settingsTab, editCallSign, claimHandle, signIn, signOut, joinLeague, low, med, high, shake, reset, motion, flash, contrast, sound };
+  return { panel, closeRect, pilotTab, settingsTab, editCallSign, claimHandle, signIn, signOut, low, med, high, shake, reset, motion, flash, contrast, sound };
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
-  return { panel, closeRect };
+  const tabGap = 6;
+  const tabW = Math.floor((panel.w - 40 - tabGap) / 2);
+  const globalTab = { x: panel.x + 20, y: panel.y + 50, w: tabW, h: 28 };
+  const weeklyTab = { x: globalTab.x + tabW + tabGap, y: globalTab.y, w: tabW, h: 28 };
+  const joinLeague = { x: panel.x + 20, y: panel.y + panel.h - 58, w: panel.w - 40, h: 34 };
+  return { panel, closeRect, globalTab, weeklyTab, joinLeague };
 }
 function getAchievementsRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
-  return { panel, closeRect };
+  const categories = ["all", "strike", "combat", "systems", "career"];
+  const gap = 4;
+  const tabW = Math.floor((panel.w - 40 - gap * (categories.length - 1)) / categories.length);
+  const tabs = {};
+  categories.forEach((category, index) => {
+    tabs[category] = { x: panel.x + 20 + index * (tabW + gap), y: panel.y + 52, w: tabW, h: 25 };
+  });
+  const contentRect = { x: panel.x + 16, y: panel.y + 176, w: panel.w - 32, h: panel.h - 230 };
+  const scrollUp = { x: panel.x + panel.w - 60, y: panel.y + panel.h - 43, w: 20, h: 20 };
+  const scrollDown = { x: panel.x + panel.w - 34, y: panel.y + panel.h - 43, w: 20, h: 20 };
+  return { panel, closeRect, tabs, contentRect, scrollUp, scrollDown };
+}
+function achievementsForCurrentCategory() {
+  const definitions = typeof getAchievementDefinitions === "function" ? getAchievementDefinitions() : [];
+  return achievementCategory === "all"
+    ? definitions
+    : definitions.filter((achievement) => achievement.category === achievementCategory);
+}
+function getAchievementContentHeight() {
+  return Math.ceil(achievementsForCurrentCategory().length / 2) * 74;
+}
+function getAchievementMaxScroll() {
+  return Math.max(0, getAchievementContentHeight() - getAchievementsRects().contentRect.h);
+}
+function clampAchievementScroll() {
+  achievementScroll = clamp(achievementScroll, 0, getAchievementMaxScroll());
+}
+function setAchievementCategory(category) {
+  if (!["all", "strike", "combat", "systems", "career"].includes(category)) return;
+  achievementCategory = category;
+  achievementScroll = 0;
 }
 function getProgressRects() {
   const panel = getTitlePanelRect();

@@ -69,7 +69,8 @@ const RAW_SPRITE_MANIFEST = {
   ui_trophy: { source: "assets/ui/menu-trophy.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
   ui_road: { source: "assets/ui/menu-road.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
   ui_world: { source: "assets/ui/menu-world.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
-  ui_codex: { source: "assets/ui/menu-codex.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] }
+  ui_codex: { source: "assets/ui/menu-codex.png", render: { width: 38, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] },
+  ui_account: { source: "assets/ui/menu-account.png", render: { width: 36, height: 36, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 1 }] }
 };
 
 const FRIENDLY_SPRITES = new Set(["player", "wingman"]);

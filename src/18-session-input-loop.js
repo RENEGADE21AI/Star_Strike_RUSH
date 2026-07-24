@@ -157,6 +157,9 @@ function setupSession(mode = "start") {
   titleProgressPointerDownNode = null;
   titleProgressSelectedNode = null;
   titleProgressClaimPulse = 0;
+  recordsPanelTab = "global";
+  achievementCategory = "all";
+  achievementScroll = 0;
   titleMetaScreenTransition = 1;
   codexDetailType = null;
   resetProgressConfirm = false;
@@ -376,16 +379,23 @@ function endPointer(e) {
 canvas.addEventListener("pointerup", endPointer);
 canvas.addEventListener("pointercancel", endPointer);
 canvas.addEventListener("wheel", (e) => {
-  if (state.gameState === "playing" || titlePanelAnim <= 0.02 || (titleSubState !== "progress" && titleSubState !== "codex")) return;
+  if (state.gameState === "playing" || titlePanelAnim <= 0.02 || !["progress", "codex", "achievements"].includes(titleSubState)) return;
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left - offsetX) / scale;
   const y = (e.clientY - rect.top - offsetY) / scale;
-  const r = titleSubState === "codex" ? getCodexRects() : getProgressRects();
+  const r = titleSubState === "codex"
+    ? getCodexRects()
+    : (titleSubState === "achievements" ? getAchievementsRects() : getProgressRects());
   if (!hitRect(r.panel, x, y)) return;
   e.preventDefault();
   if (titleSubState === "codex") {
     codexScroll += e.deltaY / Math.max(0.5, scale);
     clampCodexScroll();
+    return;
+  }
+  if (titleSubState === "achievements") {
+    achievementScroll += e.deltaY / Math.max(0.5, scale);
+    clampAchievementScroll();
     return;
   }
   titleProgressSelectedNode = null;
@@ -416,10 +426,16 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (state.gameState === "start") {
-    if (titleSubState === "codex" && titlePanelAnim > 0.02 && (k === "ArrowUp" || k === "ArrowDown" || k === "PageUp" || k === "PageDown")) {
+    if ((titleSubState === "codex" || titleSubState === "achievements") && titlePanelAnim > 0.02 && (k === "ArrowUp" || k === "ArrowDown" || k === "PageUp" || k === "PageDown")) {
       e.preventDefault();
-      codexScroll += (k === "ArrowUp" || k === "PageUp") ? -140 : 140;
-      clampCodexScroll();
+      const delta = (k === "ArrowUp" || k === "PageUp") ? -148 : 148;
+      if (titleSubState === "codex") {
+        codexScroll += delta;
+        clampCodexScroll();
+      } else {
+        achievementScroll += delta;
+        clampAchievementScroll();
+      }
       return;
     }
     if (k === "Enter" || k === " ") {
@@ -698,6 +714,7 @@ function updateDebugSnapshot() {
 const simulationClock = createFixedStepClock();
 function loop(timestamp) {
   advanceFixedStep(simulationClock, timestamp, update);
+  if (typeof updateGameMusic === "function") updateGameMusic();
   draw();
   updateDebugSnapshot();
   requestAnimationFrame(loop);

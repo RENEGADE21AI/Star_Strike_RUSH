@@ -17,6 +17,8 @@ const cases = [
   { name: "mobile-achievements", width: 375, height: 667, route: "/", click: { x: 105, y: 408 } },
   { name: "mobile-dossier", width: 375, height: 667, route: "/", click: { x: 38, y: 237 } },
   { name: "mobile-road", width: 375, height: 667, route: "/", click: { x: 165, y: 405 } },
+  { name: "mobile-records", width: 375, height: 667, route: "/", click: { x: 225, y: 408 } },
+  { name: "mobile-records-weekly", width: 375, height: 667, route: "/", clicks: [{ x: 225, y: 408 }, { x: 270, y: 78 }] },
   { name: "mobile-codex", width: 375, height: 667, route: "/", click: { x: 266, y: 408 } },
   { name: "mobile-settings", width: 375, height: 667, route: "/", clicks: [{ x: 38, y: 237 }, { x: 295, y: 78 }] },
   { name: "mobile-siphon", width: 375, height: 667, route: "/?debug=1&scenario=siphon" },
