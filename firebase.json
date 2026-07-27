@@ -150,6 +150,18 @@
     "functions": {
       "port": 5101
     },
+    "hub": {
+      "port": 4600
+    },
+    "logging": {
+      "port": 4601
+    },
+    "eventarc": {
+      "port": 9399
+    },
+    "tasks": {
+      "port": 9599
+    },
     "ui": {
       "enabled": false
     },

@@ -67,6 +67,8 @@ test("production build pins every runtime entry to one commit and describes its 
   assert.equal(Number.isNaN(Date.parse(version.buildTimestamp)), false);
 
   const html = fs.readFileSync(path.join(repoRoot, "dist", "index.html"), "utf8");
+  const productionLoop = fs.readFileSync(path.join(repoRoot, "dist", "src", "18-session-input-loop.js"), "utf8");
+  assert.doesNotMatch(productionLoop, /DEVELOPMENT_QA_START|DEBUG_SNAPSHOT_ENABLED|scenario=siphon|applyDevelopmentQaScenario|qaHoldStaging/);
   const expectedTag = expectedCommit.slice(0, 12);
   const runtimeReferences = Array.from(
     html.matchAll(/\b(?:src|href)="((?:src\/|styles\.css|site\.webmanifest)[^"]*)"/g),

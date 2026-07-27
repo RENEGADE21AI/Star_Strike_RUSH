@@ -12,12 +12,12 @@
     "test": "npm run check:achievements && node --test tests/*.test.js",
     "test:browser": "node --test tests/browser-gameplay.test.js",
     "test:rules": "npx firebase emulators:exec --only firestore \"node --test tests/firestore-rules.emulator.mjs\"",
-    "test:firebase-client": "npx firebase emulators:exec --only auth,firestore,functions \"node --test tests/firebase-client.emulator.mjs\"",
+    "test:firebase-client": "node scripts/run-firebase-client-emulator.js",
     "test:visual": "node scripts/visual_qa.js",
     "test:secret": "node scripts/secret_scan.js",
     "release:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -CheckOnly -ExpectedBranch \"*\"",
-    "deploy:preview": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -ExpectedBranch main",
-    "deploy:production": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Production -ExpectedBranch main"
+    "deploy:preview": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -StageBackendPreview -ExpectedBranch main",
+    "deploy:production": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Production -ApprovalFile release-approval.local.json -ExpectedBranch main"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.1",

@@ -6,8 +6,11 @@ firestore-debug.log
 ui-debug.log
 test-artifacts/
 outputs/
+release-approval.local.json
+release-evidence/
 dist/
 node_modules/
 functions/node_modules/
+functions/release-identity.generated.js
 __pycache__/
 *.pyc

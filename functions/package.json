@@ -6,7 +6,8 @@
     "node": "22"
   },
   "scripts": {
-    "migrate:achievements": "node scripts/migrate-achievement-aggregates.js"
+    "migrate:achievements": "node scripts/migrate-achievement-aggregates.js",
+    "migrate:public-profiles": "node scripts/migrate-public-profiles.js"
   },
   "dependencies": {
     "firebase-admin": "13.10.0",

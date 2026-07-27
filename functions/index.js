@@ -28,7 +28,13 @@ const {
   weekWindow
 } = require("./competition");
 const { SERVER_APP_CHECK_ENFORCED } = require("./release-config");
-const { accountArchiveMeta, legacyRecord } = require("./profile-archive");
+const { BACKEND_RELEASE_IDENTITY } = require("./release-identity");
+const {
+  accountArchiveMeta,
+  buildPublicProfileMigration,
+  legacyRecord,
+  publicPilotIdFor
+} = require("./profile-archive");
 const { enforceUidThrottle, requirePayloadWithin } = require("./callable-security");
 
 admin.initializeApp();
@@ -104,8 +110,14 @@ function privatePayloadFor(auth, profile, existing = {}) {
 function publicIdentityPayloadFor(auth, callSign, achievementArchiveCount, legacyRecord, existing = {}) {
   const now = FieldValue.serverTimestamp();
   const sanitizedCallSign = safeCallSign(callSign || existing.callSign || "");
-  return {
+  const canonical = buildPublicProfileMigration(existing, {}, {
     uid: auth.uid,
+    requestedCallSign: sanitizedCallSign,
+    achievementArchiveCount,
+    publicPilotId: publicPilotIdFor(auth.uid)
+  }).canonical;
+  return {
+    publicPilotId: canonical.publicPilotId,
     callSign: sanitizedCallSign.length >= 3 ? sanitizedCallSign : neutralPilotCallSign(auth.uid),
     handle: normalizeHandle(existing.handle || ""),
     legacyBestScore: legacyRecord.legacyBestScore,
@@ -115,28 +127,41 @@ function publicIdentityPayloadFor(auth, callSign, achievementArchiveCount, legac
     recordTrust: legacyRecord.recordTrust,
     achievementArchiveCount,
     createdAt: existing.createdAt || now,
-    updatedAt: now
+    updatedAt: now,
+    uid: FieldValue.delete(),
+    bestScore: FieldValue.delete(),
+    phase: FieldValue.delete(),
+    glory: FieldValue.delete(),
+    gloryRank: FieldValue.delete(),
+    gloryRankIndex: FieldValue.delete(),
+    seasonTier: FieldValue.delete(),
+    achievementsCount: FieldValue.delete()
   };
 }
 
 function publicVerifiedPayloadFor(auth, profile, callSign, achievementsCount, existing = {}) {
-  const rank = rankForGlory(profile.glory);
   const now = FieldValue.serverTimestamp();
   const sanitizedCallSign = safeCallSign(callSign || existing.callSign || "");
   return {
-    uid: auth.uid,
+    publicPilotId: publicPilotIdFor(auth.uid),
     callSign: sanitizedCallSign.length >= 3 ? sanitizedCallSign : neutralPilotCallSign(auth.uid),
     handle: normalizeHandle(existing.handle || ""),
+    legacyBestScore: Number(existing.legacyBestScore || 0),
+    legacyPhase: Math.max(1, Number(existing.legacyPhase || 1)),
     verifiedBestScore: profile.bestScore,
     verifiedPhase: profile.phase,
     recordTrust: "verified_run_session",
-    achievementsCount,
-    glory: profile.glory,
-    gloryRank: rank.name,
-    gloryRankIndex: rank.index,
-    seasonTier: profile.currentSeasonTier,
+    achievementArchiveCount: achievementsCount,
     createdAt: existing.createdAt || now,
-    updatedAt: now
+    updatedAt: now,
+    uid: FieldValue.delete(),
+    bestScore: FieldValue.delete(),
+    phase: FieldValue.delete(),
+    glory: FieldValue.delete(),
+    gloryRank: FieldValue.delete(),
+    gloryRankIndex: FieldValue.delete(),
+    seasonTier: FieldValue.delete(),
+    achievementsCount: FieldValue.delete()
   };
 }
 
@@ -208,6 +233,7 @@ exports.syncPilotProfile = onCall(CALLABLE_OPTIONS, async (request) => {
     );
     tx.set(publicRef, publicPayload, { merge: true });
     return {
+      publicPilotId: publicPayload.publicPilotId,
       callSign: publicPayload.callSign,
       handle: publicPayload.handle,
       accountArchiveMeta: clientProfile(accountArchiveMeta),
@@ -220,7 +246,7 @@ exports.syncPilotProfile = onCall(CALLABLE_OPTIONS, async (request) => {
     };
   });
 
-  return { ok: true, ...result };
+  return { ok: true, ...result, release: BACKEND_RELEASE_IDENTITY };
 });
 
 exports.claimPilotHandle = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -251,7 +277,7 @@ exports.claimPilotHandle = onCall(CALLABLE_OPTIONS, async (request) => {
     tx.update(publicRef, { handle, updatedAt: now });
   });
 
-  return { ok: true, handle };
+  return { ok: true, handle, release: BACKEND_RELEASE_IDENTITY };
 });
 
 exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
@@ -271,7 +297,10 @@ exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
 
     if (enrollmentSnap.exists) return { leagueId: enrollmentSnap.data().leagueId };
 
-    const band = performanceBand(publicData.bestScore);
+    if (publicData.recordTrust !== "verified_run_session") {
+      throw new HttpsError("failed-precondition", "A verified run-session record is required before league enrollment.");
+    }
+    const band = performanceBand(publicData.verifiedBestScore);
     const availableQuery = db.collection("weekly_leagues")
       .where("weekId", "==", week.id)
       .where("band", "==", band)
@@ -301,11 +330,11 @@ exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
       });
     }
     tx.create(memberRef, {
-      uid: auth.uid,
+      publicPilotId: String(publicData.publicPilotId || publicPilotIdFor(auth.uid)),
       callSign: safeCallSign(publicData.callSign) || neutralPilotCallSign(auth.uid),
       handle,
       weeklyPoints: 0,
-      previousBestScore: Number(publicData.bestScore || 0),
+      previousBestScore: Number(publicData.verifiedBestScore || 0),
       joinedAt: now,
       updatedAt: now
     });

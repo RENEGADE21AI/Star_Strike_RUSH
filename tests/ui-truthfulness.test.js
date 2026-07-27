@@ -7,11 +7,25 @@ const { test } = require("node:test");
 const repoRoot = path.resolve(__dirname, "..");
 
 test("competitive scoring remains explicitly gated until verified sessions ship", () => {
-  const context = { globalThis: null, Set, String, Number, Math, Date };
-  context.globalThis = context;
-  vm.createContext(context);
-  vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/00-competition.js"), "utf8"), context);
-  assert.equal(context.COMPETITIVE_MODE_ENABLED, false);
+  const evaluateCompetitionGate = (verifiedRunSessionsEnabled) => {
+    const context = {
+      globalThis: null,
+      Set,
+      String,
+      Number,
+      Math,
+      Date,
+      CLIENT_COMPETITION_WRITES_ENABLED: true,
+      VERIFIED_RUN_SESSIONS_ENABLED: verifiedRunSessionsEnabled
+    };
+    context.globalThis = context;
+    vm.createContext(context);
+    vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/00-competition.js"), "utf8"), context);
+    return context.COMPETITIVE_MODE_ENABLED;
+  };
+
+  assert.equal(evaluateCompetitionGate(false), false);
+  assert.equal(evaluateCompetitionGate(true), true);
 });
 
 test("Pilot Dossier does not expose manual sync or refresh controls", () => {

@@ -96,6 +96,11 @@ async function seedAccount(account, options = {}) {
       callSign: options.callSign || "ARCHIVE_A",
       bestScore: options.publicBest ?? 555555,
       phase: options.publicPhase ?? 88,
+      glory: 1234,
+      gloryRank: "Ace",
+      gloryRankIndex: 4,
+      seasonTier: 12,
+      achievementsCount: 1,
       verifiedBestScore: 0,
       verifiedPhase: 1
     }),
@@ -231,6 +236,10 @@ test("real Firebase client keeps device progression authoritative across account
   assert.equal(signedIn.ui.account.counters.profileCallableCalls, 1);
   assert.equal(signedIn.ui.account.counters.achievementAggregateLoads, 1);
   assert.equal(signedIn.ui.account.counters.archiveListenerSubscriptions, 1);
+  assert.equal(
+    (await page.evaluate(() => window.starStrikeOnline.getState().backendRelease)).progressionAuthority,
+    "device_local_preseason"
+  );
   assert.deepEqual(
     await page.evaluate(() => window.starStrikeOnline.getState().achievements),
     ["first_sortie", "mythic_score"]
@@ -239,6 +248,24 @@ test("real Firebase client keeps device progression authoritative across account
   assert.equal(archive.legacyRecord.legacyBestScore, 999999);
   assert.equal(archive.legacyRecord.verifiedBestScore, 0);
   assert.equal(archive.legacyRecord.recordTrust, "legacy_unverified");
+  const cleanedPublicProfile = await db.doc(`players_public/${accountA.uid}`).get().then((snapshot) => snapshot.data());
+  assert.equal(cleanedPublicProfile.legacyBestScore, 999999);
+  assert.equal(cleanedPublicProfile.legacyPhase, 99);
+  assert.equal(cleanedPublicProfile.verifiedBestScore, 0);
+  assert.equal(cleanedPublicProfile.verifiedPhase, 1);
+  assert.equal(cleanedPublicProfile.recordTrust, "legacy_unverified");
+  for (const field of [
+    "uid",
+    "bestScore",
+    "phase",
+    "glory",
+    "gloryRank",
+    "gloryRankIndex",
+    "seasonTier",
+    "achievementsCount"
+  ]) {
+    assert.equal(field in cleanedPublicProfile, false, `obsolete public field remained: ${field}`);
+  }
 
   await page.evaluate(() => window.starStrikeOnline.refresh());
   await page.waitForTimeout(200);
@@ -249,6 +276,46 @@ test("real Firebase client keeps device progression authoritative across account
   assert.equal(await db.doc(`players_public/${accountA.uid}`).get().then((snapshot) => snapshot.data().callSign), "ACCOUNT_A");
   assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_callsign_v1")), "GUEST_ONLY");
   assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress, "call-sign publication replaced device progression");
+
+  const secondContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await secondContext.addInitScript(({ uid, seed }) => {
+    localStorage.setItem("star_strike_rush_meta_v1", JSON.stringify(seed));
+    localStorage.setItem(`star_strike_rush_account_identity_v1:${uid}`, JSON.stringify({
+      uid,
+      desiredCallSign: "STALE_A",
+      publishedCallSign: "STALE_A",
+      pending: false,
+      status: "published",
+      updatedAtMs: 1
+    }));
+  }, { uid: accountA.uid, seed: localMetaSeed() });
+  const secondPage = await secondContext.newPage();
+  await secondPage.goto(`${baseUrl}/?debug=1&firebaseEmulators=1`, { waitUntil: "domcontentloaded" });
+  await secondPage.waitForFunction(() => window.starStrikeOnline?.getState().ready === true, null, { timeout: 90000 });
+  await secondPage.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountAName);
+  await secondPage.waitForFunction(
+    (uid) => window.starStrikeOnline?.getState().user?.uid === uid
+      && window.starStrikeOnline?.getState().accountArchive === "loaded",
+    accountA.uid,
+    { timeout: 90000 }
+  );
+  assert.equal(await secondPage.evaluate(() => window.starStrikeOnline.getState().profileCallSign), "ACCOUNT_A");
+  assert.equal(
+    await secondPage.evaluate((uid) => window.readAccountIdentityState(localStorage, uid).publishedCallSign, accountA.uid),
+    "ACCOUNT_A",
+    "server call sign did not replace the stale second-device cache"
+  );
+  const secondDevicePublished = await secondPage.evaluate(() => window.starStrikeOnline.updateCallSign("STARFOX"));
+  assert.equal(secondDevicePublished.published, true);
+  await page.evaluate(() => window.starStrikeOnline.refresh());
+  await page.waitForFunction(() => window.starStrikeOnline.getState().profileCallSign === "STARFOX", null, { timeout: 90000 });
+  assert.equal(
+    await page.evaluate((uid) => window.readAccountIdentityState(localStorage, uid).publishedCallSign, accountA.uid),
+    "STARFOX",
+    "first device did not accept the newer server-confirmed call sign"
+  );
+  assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress);
+  await secondContext.close();
 
   const handle = `p${suffix.replace(/[^a-z0-9]/g, "").slice(-12)}`.slice(0, 16);
   const handleResult = await page.evaluate((value) => window.starStrikeOnline.claimHandle(value), handle);

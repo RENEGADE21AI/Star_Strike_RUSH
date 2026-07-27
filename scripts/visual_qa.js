@@ -37,6 +37,8 @@ const cases = [
   { name: "reduced-motion", width: 390, height: 844, kind: "reduced-motion" },
   { name: "audio-settings", width: 390, height: 844, kind: "audio-settings" },
   { name: "play-immediate", width: 390, height: 844, kind: "play" },
+  { name: "gameplay-hud-375x667", width: 375, height: 667, kind: "gameplay-hud" },
+  { name: "paused-hud-375x667", width: 375, height: 667, kind: "paused-hud" },
   { name: "debris-staging", width: 375, height: 667, kind: "scenario", scenario: "debris-incoming" },
   { name: "powerup-gallery", width: 390, height: 844, kind: "scenario", scenario: "powerups" }
 ];
@@ -162,7 +164,8 @@ async function runCase(browser, baseUrl, item) {
   const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("canvas", { state: "visible" });
   await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent);
-  await page.waitForTimeout(500);
+  const initialSettleMs = item.scenario === "debris-incoming" ? 50 : 500;
+  await page.waitForTimeout(initialSettleMs);
 
   let before = await snapshot(page);
   const evidence = { before };
@@ -250,6 +253,26 @@ async function runCase(browser, baseUrl, item) {
     });
     await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
     evidence.after = await snapshot(page);
+  } else if (item.kind === "gameplay-hud" || item.kind === "paused-hud") {
+    await clickLayout(page, "play");
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
+    const playing = await snapshot(page);
+    evidence.playing = playing;
+    if (!(playing.layout.pause?.x < 60 && playing.layout.pause?.y < 60)) errors.push("pause button is not top-left");
+    if (!(playing.layout.hud?.energy?.y < playing.layout.hud?.health?.y)) errors.push("energy is not above health");
+    if (!(playing.layout.hud?.energy?.y > item.height * 0.58)) errors.push("energy and health are not bottom-left");
+    if (playing.layout.hud?.health?.orientation !== "horizontal") errors.push("health is not a classic horizontal layout");
+    if (!(playing.layout.hud?.score?.x > item.width / 2)) errors.push("score cluster is not top-right");
+    if (item.kind === "paused-hud") {
+      await clickLayout(page, "pause");
+      await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "paused");
+      const paused = await snapshot(page);
+      evidence.after = paused;
+      if (paused.player.hp !== playing.player.hp - 1) errors.push("manual pause did not cost exactly one health bar");
+      if (paused.ui.pauseNotice !== "PAUSE COST: 1 HEALTH BAR") errors.push("pause cost was not explained");
+    } else {
+      evidence.after = playing;
+    }
   } else if (item.kind === "scenario") {
     if (item.scenario === "debris-incoming") {
       const boss = before.encounter.boss;

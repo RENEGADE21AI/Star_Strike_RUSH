@@ -545,6 +545,7 @@ function resolveExpansionBossAttack(b, attack) {
 function updateExpansionBoss() {
   const b = state.boss;
   if (!b || !isExpansionBossMode(b.mode)) return false;
+  /* DEVELOPMENT_QA_CALL */ if (b.qaHoldStaging === true) return true;
   if (!b.entered) {
     b.y += 0.58;
     if (b.y >= b.targetY) { b.y = b.targetY; b.entered = true; b.attackTimer = 72; }

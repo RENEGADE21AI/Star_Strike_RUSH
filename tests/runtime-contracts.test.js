@@ -31,7 +31,7 @@ function test(name, fn) {
   }
 }
 
-const context = loadPureScripts("00-asset-manifest.js", "00-competition.js", "00-identity.js", "00-gameplay-rules.js", "00-input-actions.js");
+const context = loadPureScripts("00-asset-manifest.js", "00-competition.js", "00-identity.js", "00-gameplay-rules.js", "00-input-actions.js", "00-pause-policy.js");
 
 test("sprite manifest has render and collision metadata for every registered entity", () => {
   const result = context.validateSpriteManifest();
@@ -97,12 +97,40 @@ test("bosses stay invulnerable until their first attack begins", () => {
   assert.match(collisionSource, /state\.boss && bossCanTakeDamage\(state\.boss\)/);
 });
 
-test("gameplay renders compact HUD without announcement popups", () => {
+test("gameplay renders compact classic HUD without announcement popups", () => {
   const sceneSource = fs.readFileSync(path.join(repoRoot, "src", "17-rendering-scene.js"), "utf8");
   const hudSource = fs.readFileSync(path.join(repoRoot, "src", "16-rendering-hud.js"), "utf8");
   assert.doesNotMatch(sceneSource, /drawEncounterCard\(\);/);
-  assert.match(hudSource, /function drawHUD\(\) \{ drawTopLeftHUD\(\); drawTopRightHUD\(\); drawGameNotices\(\); drawPauseButton\(\); drawDesktopControlHint\(\); drawDebugHitboxes\(\); \}/);
+  assert.match(hudSource, /function drawHUD\(\) \{ drawLeftStatusHUD\(\); drawTopRightHUD\(\); drawGameNotices\(\); drawPauseButton\(\); drawDesktopControlHint\(\); \}/);
+  assert.match(hudSource, /orientation:\s*"horizontal"/);
+  assert.match(hudSource, /energy:\s*\{\s*x:\s*12,\s*y:\s*H\s*-\s*164/);
   assert.doesNotMatch(hudSource.match(/function drawHUD\(\).*$/m)[0], /drawAnnouncements/);
+  assert.doesNotMatch(hudSource, /devStatsVisible|drawDebugHitboxes/);
+});
+
+test("manual pauses cost one health while automatic safety pauses are free", () => {
+  const decision = (player, reason) => JSON.parse(JSON.stringify(context.pauseHealthDecision(player, reason)));
+  assert.deepEqual(
+    decision({ hp: 5, maxHp: 5 }, "manual"),
+    { allowed: true, cost: 1, remainingHp: 4, message: "PAUSE COST: 1 HEALTH BAR" }
+  );
+  assert.deepEqual(
+    decision({ hp: 5, maxHp: 5 }, "visibility"),
+    { allowed: true, cost: 0, remainingHp: 5, message: "AUTO-PAUSE: NO HEALTH COST" }
+  );
+  assert.deepEqual(
+    decision({ hp: 1, maxHp: 5 }, "manual"),
+    { allowed: false, cost: 0, remainingHp: 1, message: "PAUSE NEEDS 1 SPARE HEALTH BAR" }
+  );
+});
+
+test("obsolete developer gameplay skips and overlays are removed", () => {
+  const coreSource = fs.readFileSync(path.join(repoRoot, "src", "01-core.js"), "utf8");
+  const pacingSource = fs.readFileSync(path.join(repoRoot, "src", "03-pacing.js"), "utf8");
+  const loopSource = fs.readFileSync(path.join(repoRoot, "src", "18-session-input-loop.js"), "utf8");
+  assert.doesNotMatch(coreSource, /devSkipCooldown|DEV_SKIP_COOLDOWN_FRAMES|devStatsVisible|debugHitboxes/);
+  assert.doesNotMatch(pacingSource, /triggerPhaseSkip|devSkipCooldown/);
+  assert.doesNotMatch(loopSource, /STAR_STRIKE_DEV_BUILD|debugHitboxes|applyDebugScenario/);
 });
 
 test("Siphon shot aims toward predicted player position with bounded range", () => {

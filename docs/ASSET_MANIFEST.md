@@ -70,10 +70,10 @@ rotation and display the canonical nose-up art.
   orientation contracts.
 - `tests/collision-contract.test.js` verifies object-only collision calls,
   boss circles, and asteroid spawn-scale collision growth.
-- Local `?debug=1&scenario=powerups` renders all 13 supplied powerups together.
-- Local `?debug=1&scenario=wingman` renders two compact supplied-art wingmen
-  beside the player and confirms all three friendly craft face forward/up.
-- Local `?debug=1&hitboxes=1` shows hit circles, anchors, origins, and safe lanes.
+- The asserted visual suite uses build-excluded localhost instrumentation to
+  render all 13 powerups and the compact wingman formation.
+- Collision, anchor, origin, and safe-lane contracts are verified through
+  automated tests and visual artifacts; no player-facing hitbox toggle ships.
 
 Procedural Canvas drawings remain decode-failure fallbacks; the normal runtime
 path uses the optimized supplied artwork.

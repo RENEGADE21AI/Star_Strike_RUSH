@@ -28,8 +28,18 @@ function clearGameplayInput() {
 }
 function pauseGame(reason = "manual") {
   if (state.gameState !== "playing" && state.gameState !== "resuming") return false;
+  const decision = typeof pauseHealthDecision === "function"
+    ? pauseHealthDecision(state.player, reason)
+    : { allowed: true, cost: 0, remainingHp: state.player.hp, message: "" };
+  if (!decision.allowed) {
+    state.pauseNotice = decision.message;
+    showMessage(decision.message, 100);
+    return false;
+  }
+  state.player.hp = decision.remainingHp;
   clearGameplayInput();
   state.pausedReason = reason;
+  state.pauseNotice = decision.message;
   state.resumeCountdown = 0;
   state.gameState = "paused";
   return true;
@@ -107,7 +117,6 @@ function setupSession(mode = "start") {
   state.difficulty.shotsHit = 0;
   state.difficulty.pacingMemory = 0;
   state.playerRealm = 0;
-  state.devStatsVisible = false;
   state.difficultySamples = [];
   state.difficultyDeaths = 0;
   state.runStats.kills = 0;
@@ -126,6 +135,7 @@ function setupSession(mode = "start") {
   state.gameState = mode;
   state.runMode = "standard";
   state.pausedReason = "";
+  state.pauseNotice = "";
   state.resumeCountdown = 0;
   if (mode === "start") state.sceneTransition = { mode: "idle", frame: 0, duration: 1 };
   state.keyboard.up = false;
@@ -449,11 +459,6 @@ window.addEventListener("keydown", (e) => {
   if (state.gameState === "playing") {
     const action = typeof gameplayActionForKey === "function" ? gameplayActionForKey(k) : (isMoveKey(k) ? "move" : null);
     if (action === "pause") { e.preventDefault(); pauseGame("manual"); return; }
-    if (DEVELOPMENT_BUILD && DEBUG_SNAPSHOT_ENABLED && (k === "h" || k === "H") && !e.repeat) {
-      e.preventDefault();
-      state.debugHitboxes = !state.debugHitboxes;
-      return;
-    }
     if (action) {
       const nextMode = nextGameplayInputMode(state.inputMode, "keyboard", Date.now(), state.lastTouchAt, 0);
       state.inputMode = nextMode.mode;
@@ -501,10 +506,13 @@ function update() {
   if (state.gameState === "paused") return;
   if (state.gameState === "resuming") {
     state.resumeCountdown = Math.max(0, state.resumeCountdown - 1);
-    if (state.resumeCountdown <= 0) state.gameState = "playing";
+    if (state.resumeCountdown <= 0) {
+      state.gameState = "playing";
+      if (state.pauseNotice) showMessage(state.pauseNotice, 100);
+      state.pauseNotice = "";
+    }
     return;
   }
-  if (devSkipCooldown > 0) devSkipCooldown--;
   if (callSignStatusTimer > 0) {
     callSignStatusTimer--;
     if (callSignStatusTimer <= 0 && !callSignEditing) {
@@ -578,7 +586,8 @@ function update() {
 
 }
 
-const DEVELOPMENT_BUILD = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" || globalThis.STAR_STRIKE_DEV_BUILD === true;
+/* DEVELOPMENT_QA_START */
+const DEVELOPMENT_BUILD = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
 const DEBUG_SNAPSHOT_ENABLED = DEVELOPMENT_BUILD && new URLSearchParams(window.location.search).has("debug");
 let debugSnapshotEl = null;
 if (DEBUG_SNAPSHOT_ENABLED) {
@@ -657,6 +666,7 @@ function getDebugSnapshot() {
       callSignEditing,
       handleEditing,
       message: state.message,
+      pauseNotice: state.pauseNotice,
       settingMaxParticles,
       settingScreenShake,
       settingReducedMotion,
@@ -713,6 +723,9 @@ function getDebugSnapshot() {
       codexContent: debugScreenRect(codexRects.contentRect),
       codexScrollUp: debugScreenRect(codexRects.scrollUp),
       codexScrollDown: debugScreenRect(codexRects.scrollDown)
+      ,
+      pause: debugScreenRect(typeof getPauseButtonRect === "function" ? getPauseButtonRect() : null),
+      hud: typeof getGameplayHudLayout === "function" ? getGameplayHudLayout() : null
     },
     titleTraffic: state.titleFormations.map((formation) => ({
       depth: formation.depthLayer,
@@ -751,8 +764,7 @@ function getDebugSnapshot() {
         spawnScale: Number((rock.spawnScale == null ? 1 : rock.spawnScale).toFixed(3)),
         collisionScale: Number((rock.collisionScale == null ? 1 : rock.collisionScale).toFixed(3)),
         row: rock.row || 0
-      })),
-      debugHitboxes: state.debugHitboxes
+      }))
     },
     runtimeErrors: state.debugErrors.slice(),
     difficulty: {
@@ -775,24 +787,25 @@ function updateDebugSnapshot() {
   }
   debugSnapshotEl.textContent = JSON.stringify(getDebugSnapshot());
 }
+/* DEVELOPMENT_QA_END */
 
 const simulationClock = createFixedStepClock();
 function loop(timestamp) {
   const frameTiming = advanceFixedStep(simulationClock, timestamp, update);
   if (typeof updateGameMusic === "function") updateGameMusic(frameTiming.deltaMs / 1000);
   draw();
-  updateDebugSnapshot();
+  /* DEVELOPMENT_QA_CALL */ if (typeof updateDebugSnapshot === "function") updateDebugSnapshot();
   requestAnimationFrame(loop);
 }
 
-function applyDebugScenario() {
+/* DEVELOPMENT_QA_START */
+function applyDevelopmentQaScenario() {
   if (!DEBUG_SNAPSHOT_ENABLED) return;
   const params = new URLSearchParams(window.location.search);
   const scenario = params.get("scenario");
   const requestedInput = params.get("input");
   if (!scenario) {
     if (requestedInput === "touch") state.inputMode = "touch";
-    if (params.get("hitboxes") === "1") state.debugHitboxes = true;
     return;
   }
   setupSession("playing");
@@ -834,13 +847,14 @@ function applyDebugScenario() {
       beginExpansionBossAttack(state.boss, "double");
       showMessage("DEBUG  DOUBLE GATE", 120);
     } else {
-      state.boss.y = state.boss.targetY - 20;
+      state.boss.y = state.boss.targetY - 60;
+      state.boss.qaHoldStaging = true;
       showMessage("DEBUG  BOSS STAGING", 72);
     }
   }
   if (requestedInput === "touch") state.inputMode = "touch";
-  if (params.get("hitboxes") === "1") state.debugHitboxes = true;
 }
+/* DEVELOPMENT_QA_END */
 
 loadHighScore();
 loadCallSign();
@@ -849,7 +863,7 @@ loadCodexDiscovered();
 loadMetaProgress();
 resize();
 setupSession("start");
-applyDebugScenario();
+/* DEVELOPMENT_QA_CALL */ if (typeof applyDevelopmentQaScenario === "function") applyDevelopmentQaScenario();
 window.addEventListener("resize", resize);
 if (typeof preloadGameAssets === "function") {
   Promise.resolve(preloadGameAssets()).catch((error) => {

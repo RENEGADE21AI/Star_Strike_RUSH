@@ -46,10 +46,15 @@ fs.writeFileSync(htmlPath, html, "utf8");
 for (const entry of fs.readdirSync(path.join(out, "src"))) {
   if (!entry.endsWith(".js")) continue;
   const filePath = path.join(out, "src", entry);
-  const content = fs.readFileSync(filePath, "utf8").replace(
+  let content = fs.readFileSync(filePath, "utf8").replace(
     /(["'`])(assets\/[A-Za-z0-9_./-]+\.(?:png|webp|jpg|jpeg|mp3|svg))\1/g,
     (_, quote, url) => `${quote}${withVersion(url)}${quote}`
   );
+  content = content.replace(
+    /\/\* DEVELOPMENT_QA_START \*\/[\s\S]*?\/\* DEVELOPMENT_QA_END \*\//g,
+    ""
+  );
+  content = content.replace(/^.*\/\* DEVELOPMENT_QA_CALL \*\/.*(?:\r?\n|$)/gm, "");
   fs.writeFileSync(filePath, content, "utf8");
 }
 

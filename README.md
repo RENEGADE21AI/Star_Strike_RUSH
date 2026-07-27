@@ -20,31 +20,26 @@ Play: https://star-strike-rush.web.app
   `DASH`; asteroids remain solid hazards.
 - Touch or pen: use the virtual joystick and ability button. They appear only
   after meaningful touch/pen gameplay input.
-- Pause: the HUD pause control or Escape. Gameplay time freezes while paused
-  and resumes through a short countdown.
+- Pause: the top-left HUD control or Escape. A deliberate pause costs one
+  Health bar and reports the cost; automatic focus/visibility pauses are free.
+  Gameplay resumes through a short countdown.
+- HUD: Energy sits above segmented Health in the classic bottom-left layout;
+  Score, Hi-Score, and Combo stay compact at the top-right.
 
 ## Run locally
 
-Install dependencies, serve the repository root, then open
+Install dependencies, start the repository's safe static server, then open
 `http://127.0.0.1:4173`:
 
 ```powershell
 npm ci
-python -m http.server 4173
+node scripts/serve-static.js 4173
 ```
 
-The app must be served over HTTP; `file://` is not supported. Local-only QA
-scenarios include:
-
-- `?debug=1&scenario=siphon`
-- `?debug=1&scenario=debris`
-- `?debug=1&scenario=debris-incoming`
-- `?debug=1&scenario=powerups`
-- `?debug=1&scenario=wingman`
-- append `&hitboxes=1` to inspect collision geometry
-
-Debug snapshots, scenarios, hitboxes, and developer shortcuts are gated to
-`localhost` and `127.0.0.1`.
+The app must be served over HTTP; `file://` is not supported. Automated browser
+and visual suites own their localhost-only deterministic instrumentation.
+Developer phase skips, hitbox toggles, and player-facing debug controls have
+been removed. The production build strips QA scenarios and debug snapshots.
 
 ## Verify and build
 
@@ -76,18 +71,22 @@ and backend source.
 Use the guarded release workflow rather than deploying individual resources:
 
 ```powershell
-.\scripts\release.ps1
-# Only after preview evidence and explicit approval:
-.\scripts\release.ps1 -Production
+.\scripts\release.ps1 -CheckOnly
+.\scripts\release.ps1 -StageBackendPreview
+# Only after exact-preview human evidence and owner approval:
+.\scripts\release.ps1 -Production -ApprovalFile .\release-approval.local.json
 ```
 
 Run releases with Node.js 22, matching the Functions runtime and GitHub
 verification job. The script refuses other Node majors before contacting
 Firebase so a host-runtime mismatch cannot produce a partial release.
-Preview is the default. The script verifies repository/branch/clean-state
-invariants, uses the locked CLI through `npx firebase`, runs tests, emulators,
-audits, build, and smoke checks, and requires `-Production` for a live release.
-Functions deploy before matching Firestore rules; Hosting deploys last.
+Check-only is the safe default. Staging calculates the full release range from
+the current production `version.json` (or a reviewed explicit full SHA), deploys
+the exact-SHA Functions, deploys the tested Rules idempotently, deploys changed
+indexes, creates a commit-named Hosting preview, verifies Hosting and backend
+SHAs, then stops. Production requires a local ignored approval file tied to
+that exact SHA and preview. Hosting deploys last. See
+`docs/RELEASE_WORKFLOW.md`.
 
 ## Architecture
 
@@ -108,6 +107,7 @@ Important runtime guarantees include:
 - device-local gameplay progression that account operations cannot replace;
 - exact browser/test Firebase SDK parity at `12.16.0`;
 - one canonical 79-entry achievement catalog generated for browser and server.
+- no player-facing developer shortcuts or phase skips in the shipped build.
 
 See `src/README.md`, `docs/ASSET_MANIFEST.md`, and `PROJECT_STATUS.md` for the
 detailed contracts and current support boundary.
@@ -135,13 +135,25 @@ authenticated legacy-archive reads. A failed signed-in call-sign publication is
 stored under that Firebase UID and retried after reconnect or restored auth; it
 never changes the guest call sign or device progression.
 
+Pending local call-sign intent temporarily wins so an offline edit remains
+visible. When no pending intent exists, the server-confirmed call sign is
+authoritative and refreshes the UID-scoped published cache. Sign-out clears the
+runtime pending indicator but preserves that account's private pending entry for
+retry when the same account returns.
+
 Ordinary clients cannot invoke the achievement migration. The Admin-only,
 dry-run-by-default command is:
 
 ```powershell
 npm run migrate:achievements --prefix functions
 npm run migrate:achievements --prefix functions -- --apply
+npm run migrate:public-profiles --prefix functions
+npm run migrate:public-profiles --prefix functions -- --apply
 ```
+
+Both commands default to a dry run, require Admin credentials, and refuse an
+unexpected Firebase project. Never commit a service-account key. Achievement
+apply requires explicit owner approval after reviewing the sanitized dry-run.
 
 App Check support is prepared behind
 `serverAppCheckEnforced = false`. To enable it in a future verified release,

@@ -91,12 +91,18 @@ function markAccountCallSignFailed(storage, uid) {
 function resolvedAccountCallSign(storage, uid, serverCallSign = "") {
   const account = readAccountIdentityState(storage, uid);
   if (account.pending && account.desiredCallSign) return account.desiredCallSign;
-  return account.publishedCallSign || String(serverCallSign || "").slice(0, 12);
+  const confirmedServerCallSign = typeof normalizeCallSign === "function"
+    ? normalizeCallSign(serverCallSign || "")
+    : String(serverCallSign || "").slice(0, 12);
+  if (!confirmedServerCallSign) return account.publishedCallSign;
+  const published = markAccountCallSignPublished(storage, uid, confirmedServerCallSign);
+  return published.ok ? published.state.publishedCallSign : confirmedServerCallSign;
 }
 
 function clearAccountIdentity(onlineState, options = {}) {
   if (!onlineState || typeof onlineState !== "object") return onlineState;
   onlineState.user = null;
+  onlineState.publicPilotId = "";
   onlineState.profileCallSign = "";
   onlineState.profileHandle = "";
   onlineState.profileMeta = null;
@@ -105,6 +111,7 @@ function clearAccountIdentity(onlineState, options = {}) {
   onlineState.weeklyLeague = null;
   onlineState.achievements = [];
   onlineState.leaderboard = [];
+  onlineState.pendingCallSign = false;
   onlineState.identityService = "signed_out";
   onlineState.accountArchive = "not_loaded";
   onlineState.progressionMode = options.progressionMode || "device_local_preseason";

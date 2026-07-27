@@ -37,6 +37,7 @@ const GLORY_RANK_NAMES = [
 const online = {
   ready: false,
   user: null,
+  publicPilotId: "",
   profileCallSign: "",
   profileHandle: "",
   profileMeta: null,
@@ -50,6 +51,7 @@ const online = {
   networkState: navigator.onLine === false ? "offline" : "online",
   leaderboard: [],
   achievements: [],
+  backendRelease: null,
   pendingCallSign: false,
   lastStatus: "Connecting Firebase...",
   lastError: "",
@@ -77,6 +79,7 @@ function getState() {
   return {
     ready: online.ready,
     user: clonePublicUser(online.user),
+    publicPilotId: online.publicPilotId,
     profileCallSign: online.profileCallSign,
     profileHandle: online.profileHandle,
     profileMeta: cloneMeta(online.profileMeta),
@@ -91,6 +94,7 @@ function getState() {
     competitiveModeEnabled,
     leaderboard: online.leaderboard.map((row) => ({ ...row })),
     achievements: online.achievements.slice(),
+    backendRelease: online.backendRelease ? { ...online.backendRelease } : null,
     pendingCallSign: online.pendingCallSign,
     lastStatus: online.lastStatus,
     lastError: online.lastError,
@@ -213,6 +217,22 @@ function normalizeAchievementArchive(archive) {
   ));
 }
 
+function normalizeBackendRelease(release) {
+  if (!release || typeof release !== "object") return null;
+  return {
+    commitSha: /^[0-9a-f]{40}$/i.test(String(release.commitSha || ""))
+      ? String(release.commitSha).toLowerCase()
+      : "development",
+    packageVersion: safeText(release.packageVersion, "development", 30),
+    progressionAuthority: release.progressionAuthority === "device_local_preseason"
+      ? "device_local_preseason"
+      : "unknown",
+    competitionWritesEnabled: release.competitionWritesEnabled === true,
+    serverProgressionWritesEnabled: release.serverProgressionWritesEnabled === true,
+    appCheckEnforced: release.appCheckEnforced === true
+  };
+}
+
 async function loadFirebaseConfig() {
   if (emulatorMode) {
     return {
@@ -332,11 +352,13 @@ async function syncProfile(explicitCallSign = "", generation = authGeneration) {
     ? window.resolvedAccountCallSign(localStorage, uid, serverCallSign)
     : serverCallSign;
   online.profileCallSign = storedCallSign || serverCallSign;
+  online.publicPilotId = safeText(result.publicPilotId, "", 40).replace(/[^a-z0-9_]/gi, "");
   online.profileHandle = safeHandle(result.handle || "");
   online.onlineArchiveMeta = normalizeArchiveMeta(result.accountArchiveMeta || {});
   online.profileMeta = online.onlineArchiveMeta;
   online.legacyRecord = normalizeLegacyRecord(result.legacyRecord || {});
   online.achievements = normalizeAchievementArchive(result.achievementArchive || {});
+  online.backendRelease = normalizeBackendRelease(result.release);
   online.developmentCounters.achievementAggregateLoads++;
   online.accountArchive = "loaded";
   online.identityService = "available";

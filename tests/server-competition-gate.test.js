@@ -8,7 +8,14 @@ test("server competition gate defaults closed with a controlled error", () => {
   assert.equal(typeof competition.requireCompetitionEnabled, "function");
   assert.throws(
     () => competition.requireCompetitionEnabled(),
-    (error) => error && error.code === "failed-precondition" && /preseason|paused/i.test(error.message)
+    (error) => (
+      error &&
+      error.code === "failed-precondition" &&
+      /preseason|paused/i.test(error.message) &&
+      error.details?.release?.progressionAuthority === "device_local_preseason" &&
+      error.details?.release?.competitionWritesEnabled === false &&
+      error.details?.release?.serverProgressionWritesEnabled === false
+    )
   );
 });
 
@@ -16,7 +23,12 @@ test("deployed progression callables reject before authentication or Firestore",
   for (const endpoint of [callableFunctions.submitRunReceipt, callableFunctions.joinWeeklyLeague, callableFunctions.claimSeasonReward]) {
     await assert.rejects(
       endpoint.run({ auth: null, data: {} }),
-      (error) => error && error.code === "failed-precondition" && /preseason|paused/i.test(error.message)
+      (error) => (
+        error &&
+        error.code === "failed-precondition" &&
+        /preseason|paused/i.test(error.message) &&
+        error.details?.release?.progressionAuthority === "device_local_preseason"
+      )
     );
   }
 });
