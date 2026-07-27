@@ -29,13 +29,27 @@ jobs:
           find src -name '*.js' -print0 | xargs -0 -n1 node --check
           find functions -maxdepth 1 -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Run all tests
-        run: node --test tests/*.test.js
+        run: npm test
       - name: Verify Firestore authorization in the emulator
         run: npm run test:rules
+      - name: Verify the real Firebase browser client against emulators
+        run: npm run test:firebase-client
+      - name: Run asserted visual QA
+        run: npm run test:visual
+      - name: Upload visual QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-qa-${{ github.run_id }}
+          path: test-artifacts/visual-qa/
+          if-no-files-found: error
+          retention-days: 14
       - name: Dependency audit
         run: |
           npm audit --omit=dev --audit-level=high
           npm audit --prefix functions --omit=dev --audit-level=high
+      - name: Local tracked-file secret scan
+        run: npm run test:secret
       - name: Production build
         run: npm run build
       - name: Load Function module and validate Firebase config

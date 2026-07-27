@@ -1,4 +1,5 @@
 const admin = require("firebase-admin");
+const { FieldValue } = require("firebase-admin/firestore");
 const { HttpsError, onCall } = require("firebase-functions/v2/https");
 
 const {
@@ -7,7 +8,6 @@ const {
   achievementTitle,
   applyRunToProfile,
   applySeasonRewardToProfile,
-  normalizeProfile,
   publicProfileFromPrivate,
   rankForGlory,
   safeCallSign,
@@ -23,21 +23,25 @@ const {
   performanceBand,
   publicLeagueMember,
   requireCompetitionEnabled,
+  requireServerProgressionWritesEnabled,
   validateHandle,
   weekWindow
 } = require("./competition");
+const { SERVER_APP_CHECK_ENFORCED } = require("./release-config");
+const { accountArchiveMeta, legacyRecord } = require("./profile-archive");
+const { enforceUidThrottle, requirePayloadWithin } = require("./callable-security");
 
 admin.initializeApp();
 
 const db = admin.firestore();
-const FieldValue = admin.firestore.FieldValue;
 const REGION = "us-central1";
 const CALLABLE_OPTIONS = Object.freeze({
   region: REGION,
   maxInstances: 10,
   concurrency: 40,
   timeoutSeconds: 30,
-  memory: "256MiB"
+  memory: "256MiB",
+  enforceAppCheck: SERVER_APP_CHECK_ENFORCED
 });
 
 function neutralPilotCallSign(uid) {
@@ -56,16 +60,15 @@ function authContext(request) {
   return { uid: request.auth.uid };
 }
 
-function profileFromSnapshots(privateSnap, publicSnap, leaderboardSnap) {
-  const privateData = privateSnap.exists ? privateSnap.data() : {};
-  const publicData = publicSnap.exists ? publicSnap.data() : {};
-  const leaderboardData = leaderboardSnap && leaderboardSnap.exists ? leaderboardSnap.data() : {};
-  return normalizeProfile({
-    ...privateData,
-    bestScore: Math.max(Number(publicData.bestScore || 0), Number(leaderboardData.bestScore || 0)),
-    phase: Math.max(Number(publicData.phase || 1), Number(leaderboardData.phase || 1)),
-    seasonClaimedRewardIds: privateData.seasonClaimedRewardIds || []
-  });
+function profileFromSnapshots(privateSnap) {
+  return accountArchiveMeta(privateSnap.exists ? privateSnap.data() : {});
+}
+
+function legacyArchiveFromSnapshots(publicSnap, leaderboardSnap) {
+  return legacyRecord(
+    publicSnap && publicSnap.exists ? publicSnap.data() : {},
+    leaderboardSnap && leaderboardSnap.exists ? leaderboardSnap.data() : {}
+  );
 }
 
 function privatePayloadFor(auth, profile, existing = {}) {
@@ -98,7 +101,25 @@ function privatePayloadFor(auth, profile, existing = {}) {
   };
 }
 
-function publicPayloadFor(auth, profile, callSign, achievementsCount, existing = {}) {
+function publicIdentityPayloadFor(auth, callSign, achievementArchiveCount, legacyRecord, existing = {}) {
+  const now = FieldValue.serverTimestamp();
+  const sanitizedCallSign = safeCallSign(callSign || existing.callSign || "");
+  return {
+    uid: auth.uid,
+    callSign: sanitizedCallSign.length >= 3 ? sanitizedCallSign : neutralPilotCallSign(auth.uid),
+    handle: normalizeHandle(existing.handle || ""),
+    legacyBestScore: legacyRecord.legacyBestScore,
+    legacyPhase: legacyRecord.legacyPhase,
+    verifiedBestScore: legacyRecord.verifiedBestScore,
+    verifiedPhase: legacyRecord.verifiedPhase,
+    recordTrust: legacyRecord.recordTrust,
+    achievementArchiveCount,
+    createdAt: existing.createdAt || now,
+    updatedAt: now
+  };
+}
+
+function publicVerifiedPayloadFor(auth, profile, callSign, achievementsCount, existing = {}) {
   const rank = rankForGlory(profile.glory);
   const now = FieldValue.serverTimestamp();
   const sanitizedCallSign = safeCallSign(callSign || existing.callSign || "");
@@ -106,8 +127,9 @@ function publicPayloadFor(auth, profile, callSign, achievementsCount, existing =
     uid: auth.uid,
     callSign: sanitizedCallSign.length >= 3 ? sanitizedCallSign : neutralPilotCallSign(auth.uid),
     handle: normalizeHandle(existing.handle || ""),
-    bestScore: profile.bestScore,
-    phase: profile.phase,
+    verifiedBestScore: profile.bestScore,
+    verifiedPhase: profile.phase,
+    recordTrust: "verified_run_session",
     achievementsCount,
     glory: profile.glory,
     gloryRank: rank.name,
@@ -140,60 +162,100 @@ async function leagueResponse(leagueId) {
 }
 
 exports.syncPilotProfile = onCall(CALLABLE_OPTIONS, async (request) => {
+  requirePayloadWithin(request.data, 1024);
   const auth = authContext(request);
+  await enforceUidThrottle(db, {
+    endpoint: "syncPilotProfile",
+    uid: auth.uid,
+    maximumCalls: 8,
+    windowMs: 10000
+  });
   const requestedCallSign = safeCallSign(request.data && request.data.callSign);
   const privateRef = db.doc(`players_private/${auth.uid}`);
   const publicRef = db.doc(`players_public/${auth.uid}`);
   const leaderboardRef = db.doc(`leaderboard_scores/${auth.uid}`);
+  const achievementStateRef = db.doc(`player_achievement_state/${auth.uid}`);
 
   const result = await db.runTransaction(async (tx) => {
-    const [privateSnap, publicSnap, leaderboardSnap] = await Promise.all([
-      tx.get(privateRef), tx.get(publicRef), tx.get(leaderboardRef)
+    const [privateSnap, publicSnap, leaderboardSnap, achievementStateSnap] = await Promise.all([
+      tx.get(privateRef), tx.get(publicRef), tx.get(leaderboardRef), tx.get(achievementStateRef)
     ]);
-    const profile = profileFromSnapshots(privateSnap, publicSnap, leaderboardSnap);
-    const privateData = privateSnap.exists ? privateSnap.data() : {};
+    const accountArchiveMeta = profileFromSnapshots(privateSnap);
     const publicData = publicSnap.exists ? publicSnap.data() : {};
-    const achievementsCount = Math.max(
-      Number(publicData.achievementsCount || 0),
-      Number((leaderboardSnap.exists && leaderboardSnap.data().achievementsCount) || 0)
+    const legacyRecord = legacyArchiveFromSnapshots(publicSnap, leaderboardSnap);
+    const achievementState = achievementStateSnap.exists ? achievementStateSnap.data() : {};
+    const validAchievementIds = new Set(ACHIEVEMENTS.map((achievement) => achievement.id));
+    const achievementIds = Array.from(new Set(
+      (Array.isArray(achievementState.ids) ? achievementState.ids : [])
+        .map((id) => safeDocId(id, ""))
+        .filter((id) => validAchievementIds.has(id))
+    )).slice(0, ACHIEVEMENTS.length);
+    const achievementArchiveCount = Math.min(
+      ACHIEVEMENTS.length,
+      Math.max(
+        achievementIds.length,
+        Number(achievementState.count || 0),
+        Number(publicData.achievementArchiveCount || publicData.achievementsCount || 0),
+        Number((leaderboardSnap.exists && leaderboardSnap.data().achievementsCount) || 0)
+      )
     );
-    const publicPayload = publicPayloadFor(auth, profile, requestedCallSign || publicData.callSign, achievementsCount, publicData);
-    tx.set(privateRef, privatePayloadFor(auth, profile, privateData), { merge: true });
-    tx.set(publicRef, publicPayload);
-    if (competitionWritesEnabled()) tx.set(leaderboardRef, publicPayload);
-    return { callSign: publicPayload.callSign, handle: publicPayload.handle, profile: clientProfile(profile) };
+    const publicPayload = publicIdentityPayloadFor(
+      auth,
+      requestedCallSign || publicData.callSign,
+      achievementArchiveCount,
+      legacyRecord,
+      publicData
+    );
+    tx.set(publicRef, publicPayload, { merge: true });
+    return {
+      callSign: publicPayload.callSign,
+      handle: publicPayload.handle,
+      accountArchiveMeta: clientProfile(accountArchiveMeta),
+      legacyRecord,
+      achievementArchive: {
+        ids: achievementIds,
+        count: achievementArchiveCount,
+        schemaVersion: Math.max(0, Math.floor(Number(achievementState.schemaVersion || 0)))
+      }
+    };
   });
 
   return { ok: true, ...result };
 });
 
 exports.claimPilotHandle = onCall(CALLABLE_OPTIONS, async (request) => {
+  requirePayloadWithin(request.data, 512);
   const auth = authContext(request);
+  await enforceUidThrottle(db, {
+    endpoint: "claimPilotHandle",
+    uid: auth.uid,
+    maximumCalls: 4,
+    windowMs: 30000
+  });
   const validation = validateHandle(request.data && request.data.handle);
   if (!validation.ok) throw new HttpsError("invalid-argument", `Handle is invalid: ${validation.reason}.`);
   const handle = validation.handle;
   const registryRef = db.doc(`handle_registry/${handle}`);
   const publicRef = db.doc(`players_public/${auth.uid}`);
-  const leaderboardRef = db.doc(`leaderboard_scores/${auth.uid}`);
 
   await db.runTransaction(async (tx) => {
-    const [registrySnap, publicSnap, leaderboardSnap] = await Promise.all([
-      tx.get(registryRef), tx.get(publicRef), tx.get(leaderboardRef)
+    const [registrySnap, publicSnap] = await Promise.all([
+      tx.get(registryRef), tx.get(publicRef)
     ]);
-    if (!publicSnap.exists) throw new HttpsError("failed-precondition", "Sync your pilot profile before claiming a handle.");
+    if (!publicSnap.exists) throw new HttpsError("failed-precondition", "Activate pilot identity before claiming a handle.");
     const current = normalizeHandle(publicSnap.data().handle || "");
     if (current && current !== handle) throw new HttpsError("failed-precondition", "Your handle is already locked to this account.");
     if (registrySnap.exists && registrySnap.data().uid !== auth.uid) throw new HttpsError("already-exists", "That handle is already claimed.");
     const now = FieldValue.serverTimestamp();
     tx.set(registryRef, { uid: auth.uid, handle, claimedAt: registrySnap.exists ? registrySnap.data().claimedAt : now, updatedAt: now });
     tx.update(publicRef, { handle, updatedAt: now });
-    if (competitionWritesEnabled() && leaderboardSnap.exists) tx.update(leaderboardRef, { handle, updatedAt: now });
   });
 
   return { ok: true, handle };
 });
 
 exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
+  requireServerProgressionWritesEnabled();
   requireCompetitionEnabled();
   const auth = authContext(request);
   const week = weekWindow();
@@ -202,7 +264,7 @@ exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const assignment = await db.runTransaction(async (tx) => {
     const [publicSnap, enrollmentSnap] = await Promise.all([tx.get(publicRef), tx.get(enrollmentRef)]);
-    if (!publicSnap.exists) throw new HttpsError("failed-precondition", "Sync your pilot profile before entering a league.");
+    if (!publicSnap.exists) throw new HttpsError("failed-precondition", "Activate pilot identity before entering a league.");
     const publicData = publicSnap.data();
     const handle = normalizeHandle(publicData.handle || "");
     if (!handle) throw new HttpsError("failed-precondition", "Claim a unique handle before entering a weekly league.");
@@ -282,6 +344,7 @@ function clientProfile(profile) {
 }
 
 exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
+  requireServerProgressionWritesEnabled();
   requireCompetitionEnabled();
   const auth = authContext(request);
   const run = sanitizeRunReceipt({
@@ -316,7 +379,7 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
       tx.get(enrollmentRef),
       tx.get(achievementStateRef)
     ]);
-    const baseProfile = profileFromSnapshots(privateSnap, publicSnap, leaderboardSnap);
+    const baseProfile = profileFromSnapshots(privateSnap);
     if (receiptSnap.exists) {
       return {
         ok: true,
@@ -343,7 +406,7 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
     const achievementsCount = Math.min(ACHIEVEMENTS.length, Math.max(existingPublicCount, mergedAchievementIds.length));
     const publicData = publicSnap.exists ? publicSnap.data() : {};
     const privateData = privateSnap.exists ? privateSnap.data() : {};
-    const publicPayload = publicPayloadFor(auth, nextProfile, run.callSign, achievementsCount, publicData);
+    const publicPayload = publicVerifiedPayloadFor(auth, nextProfile, run.callSign, achievementsCount, publicData);
     const privatePayload = privatePayloadFor(auth, nextProfile, privateData);
     let weeklyMemberRef = null;
     let weeklyMemberData = null;
@@ -412,6 +475,7 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
 });
 
 exports.claimSeasonReward = onCall(CALLABLE_OPTIONS, async (request) => {
+  requireServerProgressionWritesEnabled();
   const auth = authContext(request);
   const rewardId = safeDocId(request.data && request.data.rewardId, "");
   if (!rewardId) throw new HttpsError("invalid-argument", "Reward id is required.");
@@ -429,7 +493,7 @@ exports.claimSeasonReward = onCall(CALLABLE_OPTIONS, async (request) => {
       tx.get(leaderboardRef),
       tx.get(claimRef)
     ]);
-    const baseProfile = profileFromSnapshots(privateSnap, publicSnap, leaderboardSnap);
+    const baseProfile = profileFromSnapshots(privateSnap);
     if (claimSnap.exists) {
       return {
         ok: false,
@@ -455,7 +519,7 @@ exports.claimSeasonReward = onCall(CALLABLE_OPTIONS, async (request) => {
       Number(publicData.achievementsCount || 0),
       Number((leaderboardSnap.exists && leaderboardSnap.data().achievementsCount) || 0)
     );
-    const publicPayload = publicPayloadFor(auth, claim.profile, publicData.callSign || "", existingPublicCount, publicData);
+    const publicPayload = publicVerifiedPayloadFor(auth, claim.profile, publicData.callSign || "", existingPublicCount, publicData);
     const privatePayload = privatePayloadFor(auth, claim.profile, privateData);
 
     tx.set(privateRef, privatePayload, { merge: true });

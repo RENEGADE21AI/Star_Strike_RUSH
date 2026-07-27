@@ -8,15 +8,14 @@ const repoRoot = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(repoRoot, file), "utf8");
 
 test("title patrols reserve space between formations and their own ships", () => {
-  const title = read("src/08-title-screen.js");
+  const title = read("src/08-title-traffic.js");
   const render = read("src/11-rendering-title-effects.js");
   assert.match(title, /TITLE_MAX_FORMATIONS\s*=\s*2/);
   assert.match(title, /function separateTitleFormations/);
   assert.match(title, /titleFormationVisualRadius/);
-  assert.match(title, /separateTitleFormations\(\)/);
+  assert.match(title, /titlePathReservationConflict/);
   assert.match(render, /memberSpacingScale/);
-  assert.match(render, /avoidX/);
-  assert.match(render, /avoidY/);
+  assert.doesNotMatch(render, /avoidX|avoidY/);
 });
 
 test("wingmen keep an edge-safe gap from the player and one another", () => {
@@ -75,31 +74,38 @@ test("owner-supplied title and gameplay music use gesture-safe state crossfades"
   assert.match(audio, /window\.addEventListener\("pointerdown", unlockGameMusic/);
   assert.match(audio, /mode === "start"[\s\S]*title:\s*0\.22/);
   assert.match(audio, /mode === "paused"[\s\S]*gameplay:\s*0\.065/);
-  assert.match(loop, /updateGameMusic\(\)[\s\S]*draw\(\)/);
+  assert.match(loop, /updateGameMusic\(frameTiming\.deltaMs \/ 1000\)[\s\S]*draw\(\)/);
 });
 
-test("title patrol separation resolves actual visual radii without overlap", () => {
+test("title patrol reservation uses the same normalized path without runtime side-sliding", () => {
   const context = vm.createContext({
-    state: {
-      titleFormations: [
-        { x: 180, y: 260, renderScale: 1.35, members: 3, avoidX: 0, avoidY: 0 },
-        { x: 180, y: 260, renderScale: 0.92, members: 2, avoidX: 0, avoidY: 0 }
-      ]
-    }
+    globalThis: null,
+    W: 375,
+    H: 667,
+    TAU: Math.PI * 2,
+    Math,
+    Number,
+    Object,
+    state: { titleFormations: [] },
+    settingReducedMotion: false,
+    SIMULATION_STEP_MS: 1000 / 60,
+    clamp: (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value)),
+    rand: (minimum, maximum) => (minimum + maximum) / 2
   });
-  vm.runInContext(read("src/08-title-screen.js"), context);
+  context.globalThis = context;
+  vm.runInContext(read("src/08-title-traffic.js"), context);
   const result = vm.runInContext(`(() => {
-    separateTitleFormations();
-    const [first, second] = state.titleFormations;
+    const first = makeTitleFormation(0, 1, true, "midground");
+    const second = makeTitleFormation(1, -1, true, "midground");
     return {
-      distance: Math.hypot(
-        (second.x + second.avoidX) - (first.x + first.avoidX),
-        (second.y + second.avoidY) - (first.y + first.avoidY)
-      ),
-      minimum: titleFormationVisualRadius(first) + titleFormationVisualRadius(second) + TITLE_FORMATION_MIN_GAP
+      conflict: titlePathReservationConflict(first, second, 4),
+      first: titleFormationPositionAt(first, 0.5),
+      second: titleFormationPositionAt(second, 0.5)
     };
   })()`, context);
-  assert.ok(result.distance >= result.minimum - 0.001);
+  assert.equal(typeof result.conflict, "boolean");
+  assert.notDeepEqual(result.first, result.second);
+  assert.doesNotMatch(read("src/08-title-traffic.js"), /avoidX|avoidY/);
 });
 
 test("wingman targets preserve player clearance at every screen corner", () => {

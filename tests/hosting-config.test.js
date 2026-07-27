@@ -5,6 +5,13 @@ const test = require("node:test");
 
 const repoRoot = path.resolve(__dirname, "..");
 
+function cacheControlFor(hosting, source) {
+  return hosting.headers
+    .find((entry) => entry.source === source)
+    ?.headers.find((header) => header.key === "Cache-Control")
+    ?.value;
+}
+
 test("Hosting serves the allowlisted build with global security headers", () => {
   const config = JSON.parse(fs.readFileSync(path.join(repoRoot, "firebase.json"), "utf8"));
   const hosting = config.hosting;
@@ -34,6 +41,40 @@ test("Hosting serves the allowlisted build with global security headers", () => 
 
   const rootHeaders = hosting.headers.find((entry) => entry.source === "/")?.headers || [];
   assert.equal(rootHeaders.some((header) => header.key === "Cache-Control" && header.value === "no-store"), true);
+  assert.equal(cacheControlFor(hosting, "**/*.html"), "no-store");
+  assert.equal(cacheControlFor(hosting, "/version.json"), "no-store");
   assert.equal(hosting.ignore.includes("source-art/**"), true);
   assert.equal(hosting.ignore.includes("tests/**"), true);
+});
+
+test("production build pins every runtime entry to one commit and describes its authority", () => {
+  const { execFileSync } = require("node:child_process");
+  const expectedCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  }).trim();
+  execFileSync(process.execPath, ["scripts/build_static.js"], {
+    cwd: repoRoot,
+    env: { ...process.env, RELEASE_COMMIT_SHA: expectedCommit },
+    stdio: "pipe"
+  });
+
+  const version = JSON.parse(fs.readFileSync(path.join(repoRoot, "dist", "version.json"), "utf8"));
+  assert.equal(version.commitSha, expectedCommit);
+  assert.equal(version.packageVersion, "1.1.0");
+  assert.equal(version.progressionMode, "device_local_preseason");
+  assert.equal(version.competitionMode, "paused");
+  assert.equal(Number.isNaN(Date.parse(version.buildTimestamp)), false);
+
+  const html = fs.readFileSync(path.join(repoRoot, "dist", "index.html"), "utf8");
+  const expectedTag = expectedCommit.slice(0, 12);
+  const runtimeReferences = Array.from(
+    html.matchAll(/\b(?:src|href)="((?:src\/|styles\.css|site\.webmanifest)[^"]*)"/g),
+    (match) => match[1]
+  );
+  assert.ok(runtimeReferences.length > 20);
+  for (const reference of runtimeReferences) {
+    assert.match(reference, new RegExp(`[?&]v=${expectedTag}(?:&|$)`), reference);
+  }
+  assert.equal(new Set(runtimeReferences.map((reference) => new URL(reference, "https://build.invalid").searchParams.get("v"))).size, 1);
 });

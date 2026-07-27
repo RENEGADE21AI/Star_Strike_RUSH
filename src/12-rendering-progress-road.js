@@ -519,6 +519,7 @@ function drawProgressPanel() {
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.50)";
   ctx.textAlign = "center";
-  ctx.fillText(atEnd ? "ROAD START" : titleProgressDragActive ? "DRAGGING ROAD" : titleProgressSelectedNode ? "NODE SELECTED" : "DRAG, WHEEL, OR TAP NODES", panel.x + panel.w / 2, panel.y + panel.h - 26);
+  const interactionLabel = atEnd ? "ROAD START" : titleProgressDragActive ? "DRAGGING ROAD" : titleProgressSelectedNode ? "NODE SELECTED" : "DRAG, WHEEL, OR TAP NODES";
+  ctx.fillText(titleProgressTab === "season" ? `REWARDS STORED ON THIS DEVICE • ${interactionLabel}` : interactionLabel, panel.x + panel.w / 2, panel.y + panel.h - 26);
   ctx.restore();
 }

@@ -191,6 +191,114 @@ test("accessibility settings persist, reduce transition motion, and apply high c
   }
 });
 
+test("debug runs cannot persist records or progression across reload", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 375, height: 667 } });
+  await context.addInitScript(() => {
+    localStorage.setItem("star_strike_rush_high_score_v1", "100");
+    localStorage.setItem("star_strike_rush_meta_v1", JSON.stringify({
+      totalGlory: 55,
+      credits: 12,
+      currentSeason: { id: "season_01", name: "Launch Flight", xp: 77, claimedRewardIds: [] },
+      lifetime: { runs: 2, score: 100, bestScore: 100, bestPhase: 2 }
+    }));
+    localStorage.setItem("star_strike_rush_achievements_v1", JSON.stringify(["first_sortie"]));
+  });
+  const { page, errors } = await openGame(context, "/?debug=1&scenario=siphon");
+  try {
+    const before = await debugSnapshot(page);
+    await page.evaluate(() => {
+      addScore(50000);
+      saveMilestone();
+      window.dispatchEvent(new Event("beforeunload"));
+    });
+    const during = await debugSnapshot(page);
+    assert.ok(during.score >= 50000);
+    assert.equal(during.highScore, 100);
+    assert.deepEqual(during.deviceProgress, before.deviceProgress);
+    assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_high_score_v1")), "100");
+
+    await page.reload({ waitUntil: "commit" });
+    await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent);
+    const reloaded = await debugSnapshot(page);
+    assert.equal(reloaded.highScore, 100);
+    assert.equal(reloaded.deviceProgress.totalGlory, 55);
+    assert.equal(reloaded.deviceProgress.lifetime.runs, 2);
+    assert.deepEqual(reloaded.localAchievements, ["first_sortie"]);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("Reset Local Data clears every progression store and preserves settings and identities after reload", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => {
+    if (sessionStorage.getItem("reset-fixture-seeded") === "1") return;
+    sessionStorage.setItem("reset-fixture-seeded", "1");
+    localStorage.setItem("star_strike_rush_high_score_v1", "12345");
+    localStorage.setItem("star_strike_rush_meta_v1", JSON.stringify({
+      totalGlory: 999,
+      credits: 222,
+      currentSeason: { id: "season_01", name: "Launch Flight", xp: 3333, claimedRewardIds: ["season_01_tier_1"] },
+      lifetime: { runs: 9, score: 12345, kills: 80, bestScore: 12345, bestPhase: 8 },
+      recentReceipts: [{ receiptId: "local-old" }]
+    }));
+    localStorage.setItem("star_strike_rush_achievements_v1", JSON.stringify(["first_sortie", "mythic_score"]));
+    localStorage.setItem("star_strike_rush_codex_v1", JSON.stringify({ red: true, boss_standard: true }));
+    localStorage.setItem("star_strike_rush_last_run_v1", JSON.stringify({ score: 12345 }));
+    localStorage.setItem("star_strike_rush_callsign_v1", "GUEST_KEEP");
+    localStorage.setItem("star_strike_rush_settings_v1", JSON.stringify({
+      settingMaxParticles: 600,
+      settingScreenShake: false,
+      settingReducedMotion: true,
+      settingReducedFlash: true,
+      settingHighContrast: true,
+      settingMusicEnabled: false,
+      settingEffectsEnabled: true
+    }));
+    localStorage.setItem("star_strike_rush_account_identity_v1:account-a", JSON.stringify({
+      uid: "account-a",
+      desiredCallSign: "ACCOUNT_KEEP",
+      publishedCallSign: "ACCOUNT_KEEP",
+      pending: false,
+      status: "published",
+      updatedAtMs: 100
+    }));
+  });
+  const { page, errors } = await openGame(context);
+  try {
+    await page.evaluate(() => resetProgressData());
+    await page.reload({ waitUntil: "commit" });
+    await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent);
+    const reset = await debugSnapshot(page);
+    assert.equal(reset.highScore, 0);
+    assert.equal(reset.deviceProgress.totalGlory, 0);
+    assert.equal(reset.deviceProgress.seasonXP, 0);
+    assert.equal(reset.deviceProgress.credits, 0);
+    assert.equal(reset.deviceProgress.lifetime.runs, 0);
+    assert.deepEqual(reset.deviceProgress.seasonClaimedRewardIds, []);
+    assert.deepEqual(reset.localAchievements, []);
+    const preserved = await page.evaluate(() => ({
+      callSign: localStorage.getItem("star_strike_rush_callsign_v1"),
+      settings: JSON.parse(localStorage.getItem("star_strike_rush_settings_v1")),
+      account: JSON.parse(localStorage.getItem("star_strike_rush_account_identity_v1:account-a")),
+      achievements: localStorage.getItem("star_strike_rush_achievements_v1"),
+      lastRun: localStorage.getItem("star_strike_rush_last_run_v1"),
+      codex: JSON.parse(localStorage.getItem("star_strike_rush_codex_v1"))
+    }));
+    assert.equal(preserved.callSign, "GUEST_KEEP");
+    assert.equal(preserved.settings.settingMusicEnabled, false);
+    assert.equal(preserved.settings.settingEffectsEnabled, true);
+    assert.equal(preserved.account.publishedCallSign, "ACCOUNT_KEEP");
+    assert.equal(preserved.achievements, null);
+    assert.equal(preserved.lastRun, null);
+    assert.deepEqual(preserved.codex, {});
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 after(async () => {
   if (browser) await browser.close();
   if (server) await new Promise((resolve) => server.close(resolve));

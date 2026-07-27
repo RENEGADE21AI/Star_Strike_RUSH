@@ -1,91 +1,118 @@
 # Project Status
 
-Last audited: 2026-07-23
+Last audited: 2026-07-27
 
-This file is the release truth table. A feature listed as disabled or deferred
-must not be described elsewhere as production-ready.
+This is the release truth table. Disabled, configuration-dependent, previewed,
+and production-deployed are distinct states.
 
-## Stable and verified
+## Preseason product authority
+
+| Concept | Current state |
+| --- | --- |
+| Progression authority | `device_local_preseason` |
+| Gameplay profile | **DEVICE PROGRESS**, stored locally and authoritative |
+| Firebase identity | Active when configured; separate from gameplay progression |
+| Account archive | Legacy data preserved and loaded separately |
+| Legacy records | `legacy_unverified`; never used to seed verified/current progress |
+| Client competition writes | Disabled |
+| Server competition writes | Disabled |
+| Server progression writes | Disabled |
+| App Check enforcement | Prepared but disabled; live configuration not verified |
+
+Account sign-in, refresh, call-sign publication, restored auth, sign-out, and
+switching between Accounts A and B must not change high score, Glory, Season XP,
+Credits, lifetime statistics, local reward claims, achievements, or Codex
+discoveries. Signed-in Season rewards use the same local path as signed-out
+rewards.
+
+## Stable and verified locally
 
 | Area | State | Evidence |
 | --- | --- | --- |
-| Local keyboard/touch play | Stable | Real Chromium start, move, ability, pause, resume, and touch tests |
-| Runtime clock | Stable | Fixed-step equivalence at 30/60/90/120 Hz and long-gap clamping tests |
-| Collision system | Stable | Object-only API, overlap/miss, boss-circle, and spawn-scale tests |
-| Sprite presentation | Stable | Explicit player/wingman/hostile orientation, anchors, weapon/exhaust metadata |
-| Powerups | Stable | 13 optimized icons, falling rotation, ship-safe size, no dotted ring |
-| Boss staging | Stable | Incoming bosses remain at full HP and non-damageable until first attack |
-| Debris Warden | Stable | Single-heavy rows, rare reachable doubles, HP speed scaling, growth-in |
-| Pause/focus behavior | Stable | Simulation and active run duration freeze; focus loss auto-pauses |
-| Local profile/meta | Stable | Call-sign autosave, achievements, Glory/Season roads, local settings |
-| Accessibility toggles | Stable/local | Persisted reduced motion, reduced flash, high contrast; Chromium regression coverage |
-| Existing leaderboard reads | Stable/authenticated | Authenticated users can read the existing public leaderboard |
-| Firestore authorization | Stable | 4 emulator suites prove anonymous denial, owner privacy, bounded public reads, and browser-write denial |
-| Callable resource policy | Stable | Five Functions share explicit timeout, concurrency, memory, and maximum-instance ceilings |
-| Deployment payload | Stable | Allowlisted `dist/`; originals, tests, docs, backend, and local config excluded |
+| Keyboard/touch play | Stable | Real Chromium start, move, ability, pause, resume, pickup, and touch tests |
+| Device progression boundary | Stable | Real browser + Auth/Firestore/Functions emulators with conflicting account data |
+| Account call sign | Stable | UID-scoped pending/published state, failure persistence, reconnect retry, guest isolation |
+| Auth hydration | Stable | `onAuthStateChanged` sole owner; one callable, one aggregate load, one listener per login |
+| Mobile Google auth flow | Mock/emulator verified | Popup success, blocked-popup redirect fallback, redirect restoration, sign-out, account switching |
+| Season rewards | Stable/local | Signed-in and signed-out local claims are identical and survive reload |
+| Server preseason gates | Stable/closed | All three endpoints reject before auth or Firestore access |
+| Legacy leaderboard | Quarantined | Separate legacy/verified fields and public-only/leaderboard-only/conflict/no-record tests |
+| Achievements | Stable | One generated 79-entry catalog, browser/server parity, semantic and reachability checks |
+| Achievement migration | Ready | Admin-only, dry-run default, idempotent/additive aggregate migration |
+| Achievement hydration | Stable | One aggregate returned by the profile owner callable; no 79-document browser listing |
+| Vault/Codex scrolling | Stable | Touch drag at 375×667, 390×844, 430×932; wheel, keyboard, and buttons |
+| Audio | Stable | Independent Music/Effects, legacy setting migration, lazy load, time-based 30/60/90/120 Hz mix |
+| Title/traffic | Stable | Measured title bounds, normalized time paths, depth durations, UI-safe lanes, Reduced Motion |
+| Debug records/reset | Stable | Debug cannot persist records/progression; reset clears all progression-bearing local state |
+| Firestore authorization | Stable | Emulator tests cover anonymous denial, owner privacy, bounded reads, browser-write denial |
+| Build/cache contract | Stable | Commit-versioned runtime/assets plus no-store HTML and `version.json` |
+| Visual QA | Stable | 16 asserted Chromium cases; screenshots/report and failure traces |
 
-## Functional when Firebase is configured
+## Firebase identity and archive boundary
 
-| Area | State | Boundary |
-| --- | --- | --- |
-| Google sign-in/out | Configuration-dependent | Requires authorized domains and a human account smoke test |
-| Private profile sync | Configuration-dependent | Uses callable Functions; local play remains available on failure |
-| Unique `@handle` claim | Configuration-dependent | Atomic callable claim; immutable/account-bound by current UI contract |
-| Season reward sync | Configuration-dependent | Callable source and Firestore model exist; signed-out claims remain local |
+The active callables are:
 
-Provider display name, avatar, and email remain in Firebase Authentication only;
-game profile documents no longer duplicate them. Public payload builders and
-rules whitelist game identity and game stats only.
+- `syncPilotProfile`: publishes account identity, returns sanitized legacy
+  account archive metadata and one achievement aggregate.
+- `claimPilotHandle`: transactionally claims one account-bound public handle.
 
-## Intentionally disabled
+Both enforce payload limits and per-UID Firestore throttles with structured
+errors. Provider email, display name, and avatar remain in Firebase
+Authentication and are not copied into game profile documents.
 
-| Area | Reason |
+The paused callables are:
+
+- `submitRunReceipt`
+- `joinWeeklyLeague`
+- `claimSeasonReward`
+
+They fail with `failed-precondition` before authentication, reads, or writes
+while `SERVER_PROGRESSION_WRITES_ENABLED` is false. Existing server data is
+preserved; it is not described as current, live, verified, or a world record.
+
+## Configuration-dependent and not yet proven live
+
+| Area | Boundary |
 | --- | --- |
-| Public best-score submission | Plausibility checks cannot prove a browser run actually occurred |
-| Weekly Flight League scoring/enrollment | Depends on trustworthy accepted runs; UI shows a preseason fair-play hold |
-
-The client-side gate is `COMPETITIVE_MODE_ENABLED = false` in
-`src/00-competition.js`. The matching server gate is closed in
-`functions/competition.js` and runs before authentication or payload handling
-in both competition callables. Re-enabling either is not a copy change; the
-security work below must ship first.
-
-## Deferred before public competition
-
-- Server-issued, expiring run sessions bound to authenticated users.
-- Replay or signed telemetry sufficient to validate movement, score, phase,
-  duration, damage, drops, and boss outcomes.
-- Firebase App Check enforcement and per-user/IP abuse throttles.
-- Idempotent offline submission outbox with retry/backoff and expiry.
-- Real-account auth, cross-device, reconnect, concurrency, and abuse testing.
-- Account migration and handle recovery UX.
-- Synced accessibility settings.
-- Music and haptics. Procedural gameplay/UI sound effects now ship with an
-  independent persisted on/off control.
+| Real Google popup/redirect | Requires Firebase authorized domains and a human account smoke test |
+| Real account call-sign publication | Requires live Functions/Auth verification |
+| App Check | Console provider registration and direct enforcement tests have not been performed |
+| Audio distribution rights | Owner supplied MP3s; public-distribution provenance is not verified in repository evidence |
+| Production deployment | Must not be claimed until merged SHA and live `version.json` are verified |
 
 ## Verification commands
 
 ```powershell
 npm ci
+npm ci --prefix functions
 npm test
+npm run test:rules
+npm run test:firebase-client
+npm run test:visual
 npm run build
 npm audit --omit=dev --audit-level=high
 npm audit --prefix functions --omit=dev --audit-level=high
 ```
 
-Current local hardening evidence: 56/56 core tests and 4/4 Firestore emulator
-authorization suites pass, while 15 browser visual states pass. The shipped root
-dependency audit has zero production findings, and the Function audit has no
-high/critical finding. Eight moderate transitive findings remain in the Function
-tree; npm's suggested forced resolution is breaking, so they were not hidden by
-an unsafe downgrade.
+Current branch evidence at the time of this update:
+
+- `npm test`: 85/85 passed.
+- Firebase client integration: one complete real-emulator browser scenario
+  passed, including Accounts A/B, pending retry, aggregate loading, cleanup, and
+  all three direct gate rejections.
+- Visual QA: 16/16 asserted cases passed.
+- Firestore rule tests and final dependency audits must be rerun on the exact
+  commit before release and are not implied by the counts above.
 
 ## Release policy
 
-1. Merge only with green GitHub verification and secret scanning.
-2. Build `dist/` from the merged commit.
-3. Deploy matching Functions before Hosting when a client release changes the
-   callable contract or competition state.
-4. Never deploy restrictive Firestore rules without their matching Functions.
-5. Smoke-test the public URL, required assets, security headers, and private-path
-   404 behavior after deployment.
+1. Merge only with green `verify` and `secret-scan` GitHub checks plus local
+   emulator, visual, build, dependency-audit, and secret-scan evidence.
+2. Run `scripts/release.ps1` from a clean repository. Preview is the default.
+3. Build from the exact merge commit and smoke-test its Hosting preview.
+4. Deploy changed Functions first. Deploy matching rules only when rules
+   changed and after Functions. Deploy Hosting last.
+5. Verify `version.json`, security headers, private-path 404 responses, and all
+   paused callable boundaries after deployment.
+6. Production remains blocked if real-account or other required live evidence
+   cannot be completed truthfully.

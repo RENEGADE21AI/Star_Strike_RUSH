@@ -2,24 +2,29 @@ function drawTitleAndButtons() {
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.translate(W / 2, H * 0.105);
+  const titleCenterY = H * 0.105;
+  ctx.translate(W / 2, titleCenterY);
   ctx.transform(1, 0, -0.09, 1, 0, 0);
   ctx.shadowColor = "rgba(100,220,255,0.55)";
   ctx.shadowBlur = 16;
   ctx.lineWidth = 4;
   ctx.strokeStyle = "rgba(0,0,0,0.72)";
-  ctx.font = "900 46px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  ctx.font = "900 68px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
   const name = "STAR STRIKE";
-  const nameFit = Math.min(1, (W - 32) / Math.max(1, ctx.measureText(name).width));
+  const nameMeasure = ctx.measureText(name);
+  const nameTargetWidth = Math.min(W - 20, Math.max(W * 0.88, nameMeasure.width));
+  const nameFit = nameTargetWidth / Math.max(1, nameMeasure.width);
   ctx.save();
   ctx.scale(nameFit, nameFit);
   ctx.fillStyle = "#fff";
   ctx.strokeText(name, 0, 0);
   ctx.fillText(name, 0, 0);
   ctx.restore();
-  ctx.font = "900 64px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  ctx.font = "900 88px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
   const rush = "RUSH";
-  const rushFit = Math.min(1.12, (W - 32) / Math.max(1, ctx.measureText(rush).width));
+  const rushMeasure = ctx.measureText(rush);
+  const rushTargetWidth = Math.min(W - 34, Math.max(W * 0.66, rushMeasure.width));
+  const rushFit = rushTargetWidth / Math.max(1, rushMeasure.width);
   ctx.save();
   ctx.translate(0, 54);
   ctx.scale(rushFit, rushFit);
@@ -29,6 +34,24 @@ function drawTitleAndButtons() {
   ctx.fillText(rush, 0, 0);
   ctx.restore();
   ctx.restore();
+  const titleLogicalBounds = {
+    x: (W - nameTargetWidth) / 2,
+    y: titleCenterY - 38,
+    w: nameTargetWidth,
+    h: 145
+  };
+  state.titleMetrics = {
+    logicalBounds: titleLogicalBounds,
+    screenBounds: {
+      x: offsetX + titleLogicalBounds.x * scale,
+      y: offsetY + titleLogicalBounds.y * scale,
+      w: titleLogicalBounds.w * scale,
+      h: titleLogicalBounds.h * scale
+    },
+    nameWidth: nameTargetWidth,
+    rushWidth: rushTargetWidth,
+    playableScreenWidth: W * scale
+  };
 
   const callRect = getCallSignRect();
   const titleOnline = window.starStrikeOnline && window.starStrikeOnline.getState
@@ -64,7 +87,7 @@ function drawTitleAndButtons() {
   drawAccountIcon(iconRects.account, titleSubState === "online" && titlePanelTarget === 1);
 
   const playRect = getPlayButtonRect();
-  drawHoldButton(playRect, "PLAY", playBtnHold, 45, "rgba(0,180,100,0.18)", 0.45, 0.90);
+  drawPressButton(playRect, "PLAY", playBtnPointerDown && playBtnPointerInside, "rgba(0,180,100,0.18)");
 
   const dockX = iconRects.achievements.x - 8;
   const dockY = iconRects.achievements.y - 18;
@@ -168,7 +191,7 @@ function drawGameOverScreen() {
     ctx.fillText(`Season XP +${Number(meta.seasonXPGained || 0).toLocaleString()}  |  Credits +${Number(meta.creditsEarned || 0).toLocaleString()}  |  Tier ${meta.seasonTier || 1}`, W / 2, y);
   }
   ctx.restore();
-  drawHoldButton(buttons.respawn, "RESPAWN", respawnHold, 30, "rgba(255,255,255,0.08)", 0.28, 0.75);
+  drawPressButton(buttons.respawn, "RESPAWN", respawnPointerDown && respawnPointerInside, "rgba(255,255,255,0.08)", "rgba(255,255,255,0.58)");
   drawSimpleButton(buttons.road, "VIEW ROAD", "rgba(120,255,180,0.58)");
   drawSimpleButton(buttons.title, "TITLE SCREEN");
 }

@@ -310,10 +310,17 @@ function drawResetProgressConfirm() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = FONT_SMALL;
-  ctx.fillText("Are you sure you want to reset your progress?", r.box.x + r.box.w / 2, r.box.y + 44);
+  ctx.fillText("ERASE DEVICE GAMEPLAY PROGRESS?", r.box.x + r.box.w / 2, r.box.y + 32);
   ctx.fillStyle = "#fff";
   ctx.font = FONT_HUD;
-  ctx.fillText(labelName || "PILOT", r.box.x + r.box.w / 2, r.box.y + 72);
+  ctx.fillText(labelName || "PILOT", r.box.x + r.box.w / 2, r.box.y + 55);
+  ctx.font = FONT_TINY;
+  ctx.fillStyle = "rgba(255,150,150,0.88)";
+  ctx.fillText("ERASES: SCORE, GLORY, XP, CREDITS, STATS,", r.box.x + r.box.w / 2, r.box.y + 83);
+  ctx.fillText("RECEIPTS, REWARDS, ACHIEVEMENTS, CODEX, LAST RUN", r.box.x + r.box.w / 2, r.box.y + 99);
+  ctx.fillStyle = "rgba(150,255,205,0.80)";
+  ctx.fillText("PRESERVES: ACCESSIBILITY, AUDIO, CALL SIGN,", r.box.x + r.box.w / 2, r.box.y + 124);
+  ctx.fillText("ACCOUNT IDENTITY AND FIREBASE AUTH", r.box.x + r.box.w / 2, r.box.y + 140);
   ctx.font = FONT_BUTTON;
   ctx.fillStyle = "rgba(255,255,255,0.88)";
   ctx.fillRect(r.no.x, r.no.y, r.no.w, r.no.h);
@@ -474,9 +481,11 @@ function drawFlightNetworkCard(rect, online, user) {
   ctx.fillText("FLIGHT NETWORK", rect.x + 116, rect.y + 22);
   ctx.font = "900 18px 'Arial Narrow', Arial, sans-serif";
   ctx.fillStyle = connected ? "#78ffb4" : "#d8fbff";
-  ctx.fillText(connected ? "CONNECTED" : "LOCAL MODE", rect.x + 116, rect.y + 40);
+  ctx.fillText(connected ? "ACCOUNT CONNECTED" : "DEVICE PROGRESS", rect.x + 116, rect.y + 40);
   ctx.font = FONT_TINY; ctx.fillStyle = "rgba(255,255,255,0.52)";
-  ctx.fillText(connected ? "PROFILE + LEAGUE SYNC ACTIVE" : "PLAY READY  /  SIGN IN TO SYNC", rect.x + 116, rect.y + 69);
+  ctx.fillText(connected ? "PILOT IDENTITY ACTIVE" : "LOCAL GAMEPLAY READY", rect.x + 116, rect.y + 66);
+  ctx.fillStyle = "rgba(255,214,92,0.76)";
+  ctx.fillText("PUBLIC COMPETITION PAUSED", rect.x + 116, rect.y + 82);
   ctx.restore();
 }
 function drawOnlinePanel() {
@@ -501,7 +510,7 @@ function drawOnlinePanel() {
     ctx.textBaseline = "top";
     ctx.fillStyle = "rgba(255,255,255,0.48)";
     ctx.font = FONT_TINY;
-    ctx.fillText(user ? "VERIFIED PILOT" : "LOCAL PILOT", card.x + 132, card.y + 22);
+    ctx.fillText(user ? "PILOT IDENTITY ACTIVE" : "DEVICE PILOT", card.x + 132, card.y + 22);
     ctx.fillStyle = "#fff";
     ctx.font = "900 22px 'Arial Narrow', Arial, sans-serif";
     ctx.fillText(String(name || "PILOT").slice(0, 14), card.x + 132, card.y + 40);
@@ -525,7 +534,7 @@ function drawOnlinePanel() {
     ctx.fillText("PUBLIC: CALL SIGN + @HANDLE APPEAR TO OTHER PLAYERS", card.x + 14, card.y + 151);
     ctx.restore();
     const handleLabel = online.profileHandle ? `@${online.profileHandle}  •  ACCOUNT-BOUND` : (handleEditing ? `CLAIM @${handleDraft || "handle"}` : "CLAIM UNIQUE @HANDLE");
-    const identityAvailable = online.competitionBackend !== "unavailable";
+    const identityAvailable = online.identityService !== "unavailable";
     drawOnlineActionButton(r.claimHandle, identityAvailable ? handleLabel : "IDENTITY SERVICE OFFLINE", !!user && !online.profileHandle && identityAvailable);
     if (!user) drawOnlineActionButton(r.signIn, "CONNECT GOOGLE ACCOUNT", true);
     if (user) drawOnlineActionButton(r.signOut, "SIGN OUT", true);
@@ -565,7 +574,8 @@ function drawOnlinePanel() {
     drawOnlineActionButton(r.motion, `REDUCED MOTION: ${settingReducedMotion ? "ON" : "OFF"}`, true);
     drawOnlineActionButton(r.flash, `REDUCED FLASH: ${settingReducedFlash ? "ON" : "OFF"}`, true);
     drawOnlineActionButton(r.contrast, `HIGH CONTRAST: ${settingHighContrast ? "ON" : "OFF"}`, true);
-    drawOnlineActionButton(r.sound, `MUSIC + EFFECTS: ${settingSoundEffects ? "ON" : "OFF"}`, true);
+    drawOnlineActionButton(r.music, `MUSIC: ${settingMusicEnabled ? "ON" : "OFF"}`, true);
+    drawOnlineActionButton(r.effects, `EFFECTS: ${settingEffectsEnabled ? "ON" : "OFF"}`, true);
   }
 }
 function drawRecordsPanel() {
@@ -581,7 +591,7 @@ function drawRecordsPanel() {
   ctx.strokeStyle = "rgba(92,238,255,0.12)";
   ctx.beginPath(); ctx.moveTo(panel.x + 20, panel.y + 84); ctx.lineTo(panel.x + panel.w - 20, panel.y + 84); ctx.stroke();
   ctx.restore();
-  drawAccountTab(r.globalTab, "GLOBAL", recordsPanelTab === "global");
+  drawAccountTab(r.globalTab, "ARCHIVE", recordsPanelTab === "global");
   drawAccountTab(r.weeklyTab, "WEEKLY", recordsPanelTab === "weekly");
 
   if (recordsPanelTab === "weekly") {
@@ -613,7 +623,7 @@ function drawRecordsPanel() {
     ctx.fillText(
       league
         ? String(league.weekLabel || "CURRENT WEEK")
-        : (competitionEnabled ? "CLAIM A HANDLE, THEN ENTER THIS WEEK'S GROUP" : "GLOBAL RECORDS AND LOCAL PROGRESSION REMAIN ACTIVE"),
+        : (competitionEnabled ? "CLAIM A HANDLE, THEN ENTER THIS WEEK'S GROUP" : "DEVICE PROGRESS CONTINUES; PUBLIC WRITES ARE CLOSED"),
       card.x + 16,
       card.y + 94
     );
@@ -677,7 +687,7 @@ function drawRecordsPanel() {
       });
     }
     ctx.restore();
-    const competitionAvailable = online.competitionBackend !== "unavailable";
+    const competitionAvailable = online.competitionMode !== "unavailable";
     const actionLabel = !competitionEnabled
       ? "WEEKLY LEAGUES • PRESEASON"
       : (competitionAvailable ? (league ? "LEAGUE ACTIVE • AUTO UPDATES" : "ENTER THIS WEEK'S LEAGUE") : "COMPETITION SERVICES OFFLINE");
@@ -694,16 +704,16 @@ function drawRecordsPanel() {
   ctx.textBaseline = "top";
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.48)";
-  ctx.fillText("WORLD BEST-SCORE LADDER", summary.x + 16, summary.y + 15);
+  ctx.fillText("LEGACY/PRESEASON ARCHIVE", summary.x + 16, summary.y + 15);
   ctx.font = "900 24px 'Arial Narrow', Arial, sans-serif";
   ctx.fillStyle = "#dffcff";
-  ctx.fillText(user ? "LIVE FLIGHT RECORDS" : "LOCAL RECORD", summary.x + 16, summary.y + 33);
+  ctx.fillText("DEVICE BEST", summary.x + 16, summary.y + 33);
   ctx.textAlign = "right";
   ctx.fillStyle = "#5ceeff";
   ctx.fillText(Number(highScore || 0).toLocaleString(), summary.x + summary.w - 16, summary.y + 33);
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.48)";
-  ctx.fillText(user ? "SYNCED ACCOUNT" : "SIGN IN FROM PILOT DOSSIER TO SYNC", summary.x + summary.w - 16, summary.y + 66);
+  ctx.fillText("NEW PUBLIC WRITES PAUSED", summary.x + summary.w - 16, summary.y + 66);
   ctx.textAlign = "left";
   let listY = panel.y + 198;
   ctx.font = FONT_TINY;
@@ -711,7 +721,7 @@ function drawRecordsPanel() {
     leaderboard.slice(0, 10).forEach((row, index) => {
       const who = String(row.callSign || "PILOT").slice(0, 12);
       const handle = row.handle ? ` @${String(row.handle).slice(0, 16)}` : "";
-      const score = Number(row.bestScore || 0).toLocaleString();
+      const score = Number(row.legacyBestScore || row.bestScore || 0).toLocaleString();
       ctx.fillStyle = index === 0 ? "rgba(255,224,118,0.12)" : (index % 2 ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.05)");
       ctx.fillRect(panel.x + 20, listY - 6, panel.w - 40, 31);
       ctx.strokeStyle = index === 0 ? "rgba(255,224,118,0.34)" : "rgba(255,255,255,0.07)";
@@ -722,12 +732,12 @@ function drawRecordsPanel() {
       ctx.fillText(score, panel.x + panel.w - 22, listY);
       ctx.textAlign = "left";
       ctx.fillStyle = "rgba(255,255,255,0.35)";
-      ctx.fillText(String(row.gloryRank || "ROOKIE PILOT").toUpperCase().slice(0, 16), panel.x + 29, listY + 12);
+      ctx.fillText("ARCHIVE SCORE • UNVERIFIED", panel.x + 29, listY + 12);
       listY += 34;
     });
   } else {
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText(user ? "NO SYNCED RECORDS YET." : "YOUR RUNS STILL COUNT TOWARD LOCAL ACHIEVEMENTS.", panel.x + 22, listY);
+    ctx.fillText(user ? "NO LEGACY ARCHIVE RECORDS FOUND." : "YOUR RUNS COUNT ONLY TOWARD DEVICE PROGRESS.", panel.x + 22, listY);
     const archive = { x: panel.x + 20, y: listY + 34, w: panel.w - 40, h: 222 };
     drawDossierCard(archive, "#5ceeff");
     const radarX = archive.x + 78;
@@ -746,7 +756,7 @@ function drawRecordsPanel() {
     ctx.fillStyle = "#5ceeff";
     ctx.beginPath(); ctx.arc(radarX + 25, radarY - 16, 2.5, 0, TAU); ctx.fill();
     ctx.fillStyle = "rgba(255,255,255,0.48)";
-    ctx.fillText("LOCAL FLIGHT ARCHIVE", archive.x + 16, archive.y + 15);
+    ctx.fillText("DEVICE PROGRESS", archive.x + 16, archive.y + 15);
     const lifetime = (meta && meta.lifetime) || {};
     const stats = [
       ["BEST PHASE", lifetime.bestPhase || 1],
@@ -803,6 +813,30 @@ function drawAchievementScrollButton(rect, label, enabled) {
   ctx.textBaseline = "middle";
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
   ctx.restore();
+}
+
+function drawMeasuredTwoLineText(text, x, y, maxWidth, lineHeight = 9) {
+  const words = String(text || "").toUpperCase().trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (!current || ctx.measureText(candidate).width <= maxWidth) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = word;
+      if (lines.length === 2) break;
+    }
+  }
+  if (lines.length < 2 && current) lines.push(current);
+  if (lines.length === 2 && words.join(" ") !== lines.join(" ")) {
+    let final = lines[1];
+    while (final.length > 1 && ctx.measureText(`${final}…`).width > maxWidth) final = final.slice(0, -1);
+    lines[1] = `${final.trim()}…`;
+  }
+  lines.slice(0, 2).forEach((line, index) => ctx.fillText(line, x, y + index * lineHeight));
+  return lines.slice(0, 2);
 }
 
 function drawAchievementsPanel() {
@@ -886,7 +920,7 @@ function drawAchievementsPanel() {
     ctx.fillStyle = unlocked ? color : "rgba(255,255,255,0.38)";
     ctx.fillText(unlocked ? `TIER ${achievement.tier} • UNLOCKED` : `TIER ${achievement.tier} • IN PROGRESS`, x + 34, y + 24);
     ctx.fillStyle = "rgba(255,255,255,0.44)";
-    ctx.fillText(String(achievement.description || "").toUpperCase().slice(0, 34), x + 9, y + 39);
+    drawMeasuredTwoLineText(achievement.description, x + 9, y + 37, cardW - 18, 8);
     const progress = typeof achievementProgressForMeta === "function"
       ? achievementProgressForMeta(achievement, meta)
       : { ratio: 0, label: "LOCKED" };
@@ -913,7 +947,7 @@ function drawAchievementsPanel() {
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.48)";
   ctx.fillText(
-    online.user ? "SERVER-SYNCED UNLOCKS" : "SAVED LOCALLY • SIGN IN TO SYNC",
+    online.user && online.accountArchive === "loaded" ? "DEVICE + ARCHIVE UNLOCKS" : "SAVED ON THIS DEVICE",
     panel.x + 20,
     panel.y + panel.h - 35
   );

@@ -1,20 +1,16 @@
-function drawHoldButton(rect, label, hold, threshold, baseFill, strokeMin, strokeMax) {
-  const progress = clamp(hold / threshold, 0, 1);
+function drawPressButton(rect, label, pressed, baseFill, stroke = "rgba(120,255,180,0.62)") {
   ctx.save();
-  ctx.fillStyle = baseFill;
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  if (hold > 0) {
-    ctx.fillStyle = "rgba(120,255,180,0.22)";
-    ctx.fillRect(rect.x, rect.y, rect.w * progress, rect.h);
-  }
-  ctx.strokeStyle = `rgba(120,255,180,${strokeMin + (strokeMax - strokeMin) * progress})`;
+  const inset = pressed ? 2 : 0;
+  ctx.fillStyle = pressed ? "rgba(120,255,180,0.24)" : baseFill;
+  ctx.fillRect(rect.x + inset, rect.y + inset, rect.w - inset * 2, rect.h - inset * 2);
+  ctx.strokeStyle = stroke;
   ctx.lineWidth = 2;
-  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeRect(rect.x + inset, rect.y + inset, rect.w - inset * 2, rect.h - inset * 2);
   ctx.fillStyle = "#fff";
   ctx.font = FONT_BUTTON;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
+  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1 + inset);
   ctx.restore();
 }
 function drawSimpleButton(rect, label, stroke = "rgba(255,255,255,0.28)") {

@@ -1,6 +1,6 @@
 # Asset Manifest
 
-Audited on 2026-07-23 against the final polish branch.
+Audited on 2026-07-27 during the release-integrity pass.
 
 ## Inventory
 
@@ -15,11 +15,15 @@ The public runtime contains 47 optimized PNG derivatives:
 - `assets/ui/`: 8 menu, favicon, and PWA icons.
 
 Two owner-supplied MP3 tracks live under `assets/audio/`: Hangar Bay Seven for
-title/profile navigation and Gravity's Edge for active play.
+title/profile navigation and Gravity's Edge for active play. The owner supplied
+the files for this project, but no public-distribution license, authorship
+record, or original source URL was available in the repository during this
+audit. Public-distribution provenance therefore remains unverified and must be
+resolved by the owner before any distribution claim is made.
 
 The derivative count is larger because the supplied favicon generates multiple
 PWA sizes. No authorship or third-party-license claim is inferred from a file
-name; these files are documented only as artwork supplied by the project owner.
+name; these files are documented only as assets supplied by the project owner.
 
 ## Runtime contract
 

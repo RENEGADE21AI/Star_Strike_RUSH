@@ -27,7 +27,12 @@ test("sign-out clears every account-scoped identity field without touching guest
     weeklyLeague: { id: "week-a" },
     achievements: ["ace"],
     leaderboard: [{ uid: "account-a" }],
-    competitionBackend: "ready"
+    identityService: "available",
+    accountArchive: "loaded",
+    progressionMode: "account",
+    competitionMode: "ready",
+    networkState: "online",
+    ready: true
   };
   const guestIdentity = { callSign: "GUEST_7" };
 
@@ -40,7 +45,11 @@ test("sign-out clears every account-scoped identity field without touching guest
   assert.equal(online.weeklyLeague, null);
   assert.equal(online.achievements.length, 0);
   assert.equal(online.leaderboard.length, 0);
-  assert.equal(online.competitionBackend, "disabled");
+  assert.equal(online.identityService, "signed_out");
+  assert.equal(online.accountArchive, "not_loaded");
+  assert.equal(online.progressionMode, "device_local_preseason");
+  assert.equal(online.competitionMode, "paused");
+  assert.equal(online.networkState, "online");
   assert.equal(guestIdentity.callSign, "GUEST_7");
 });
 
@@ -59,4 +68,53 @@ test("handle claim errors distinguish validation and ownership from outages", ()
   assert.equal(context.identityErrorKind({ code: "functions/unauthenticated" }), "signed_out");
   assert.equal(context.identityErrorKind({ code: "functions/unavailable" }), "backend_unavailable");
   assert.equal(context.identityErrorKind({ code: "functions/deadline-exceeded" }), "backend_unavailable");
+});
+
+test("popup success waits for the auth-owned hydration exactly once", async () => {
+  const context = loadIdentityContracts();
+  const calls = { popup: 0, redirect: 0, transition: 0, hydration: 0 };
+  const result = await context.initiateGoogleAuthFlow({
+    popup: async () => { calls.popup++; },
+    redirect: async () => { calls.redirect++; },
+    waitForAuthTransition: async () => {
+      calls.transition++;
+      return { uid: "account-a" };
+    },
+    waitForHydration: async (uid) => {
+      assert.equal(uid, "account-a");
+      calls.hydration++;
+    }
+  });
+  assert.equal(result.user.uid, "account-a");
+  assert.deepEqual(calls, { popup: 1, redirect: 0, transition: 1, hydration: 1 });
+});
+
+test("blocked popup falls back to redirect without starting hydration", async () => {
+  const context = loadIdentityContracts();
+  const calls = { popup: 0, redirect: 0, transition: 0, hydration: 0 };
+  const result = await context.initiateGoogleAuthFlow({
+    popup: async () => {
+      calls.popup++;
+      throw { code: "auth/popup-blocked" };
+    },
+    redirect: async () => { calls.redirect++; },
+    waitForAuthTransition: async () => {
+      calls.transition++;
+      return { uid: "unexpected" };
+    },
+    waitForHydration: async () => { calls.hydration++; }
+  });
+  assert.equal(result.redirecting, true);
+  assert.deepEqual(calls, { popup: 1, redirect: 1, transition: 0, hydration: 0 });
+});
+
+test("redirect restoration consumes one result and leaves hydration to auth state", async () => {
+  const context = loadIdentityContracts();
+  let resultCalls = 0;
+  const restored = await context.restoreGoogleRedirect(async () => {
+    resultCalls++;
+    return { user: { uid: "account-r" } };
+  });
+  assert.equal(restored.user.uid, "account-r");
+  assert.equal(resultCalls, 1);
 });

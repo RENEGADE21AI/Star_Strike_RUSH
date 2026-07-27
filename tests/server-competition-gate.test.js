@@ -12,8 +12,8 @@ test("server competition gate defaults closed with a controlled error", () => {
   );
 });
 
-test("deployed competition callables reject before authentication or Firestore", async () => {
-  for (const endpoint of [callableFunctions.submitRunReceipt, callableFunctions.joinWeeklyLeague]) {
+test("deployed progression callables reject before authentication or Firestore", async () => {
+  for (const endpoint of [callableFunctions.submitRunReceipt, callableFunctions.joinWeeklyLeague, callableFunctions.claimSeasonReward]) {
     await assert.rejects(
       endpoint.run({ auth: null, data: {} }),
       (error) => error && error.code === "failed-precondition" && /preseason|paused/i.test(error.message)
