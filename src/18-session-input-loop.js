@@ -730,6 +730,7 @@ function getDebugSnapshot() {
     titleTraffic: state.titleFormations.map((formation) => ({
       depth: formation.depthLayer,
       durationSeconds: Number(formation.durationSeconds.toFixed(3)),
+      ageSeconds: Number(formation.ageSeconds.toFixed(4)),
       normalizedProgress: Number(formation.normalizedProgress.toFixed(4)),
       x: Number(formation.x.toFixed(2)),
       y: Number(formation.y.toFixed(2)),

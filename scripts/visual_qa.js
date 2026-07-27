@@ -186,19 +186,30 @@ async function runCase(browser, baseUrl, item) {
     await page.waitForTimeout(1200);
     const after = await snapshot(page);
     evidence.after = after;
-    const observedWindowSeconds = Math.max(0, after.timestampMs - before.timestampMs) / 1000;
+    const wallWindowSeconds = Math.max(0, after.timestampMs - before.timestampMs) / 1000;
     evidence.traversalMeasurements = before.titleTraffic.map((formation) => {
       const match = after.titleTraffic.find((candidate) => candidate.depth === formation.depth);
       const progressDelta = match ? match.normalizedProgress - formation.normalizedProgress : 0;
+      const simulationWindowSeconds = match ? Math.max(0, match.ageSeconds - formation.ageSeconds) : 0;
       return {
         depth: formation.depth,
         configuredSeconds: formation.durationSeconds,
-        observedSeconds: progressDelta > 0 ? Number((observedWindowSeconds / progressDelta).toFixed(2)) : null
+        simulatedObservedSeconds: progressDelta > 0
+          ? Number((simulationWindowSeconds / progressDelta).toFixed(2))
+          : null,
+        wallObservedSeconds: progressDelta > 0
+          ? Number((wallWindowSeconds / progressDelta).toFixed(2))
+          : null,
+        simulationWindowSeconds: Number(simulationWindowSeconds.toFixed(3)),
+        wallWindowSeconds: Number(wallWindowSeconds.toFixed(3))
       };
     });
     for (const measurement of evidence.traversalMeasurements) {
-      if (measurement.observedSeconds !== null && Math.abs(measurement.observedSeconds - measurement.configuredSeconds) > 1.2) {
-        errors.push(`${measurement.depth} observed traversal differs from configured duration`);
+      if (
+        measurement.simulatedObservedSeconds !== null &&
+        Math.abs(measurement.simulatedObservedSeconds - measurement.configuredSeconds) > 0.25
+      ) {
+        errors.push(`${measurement.depth} simulated traversal differs from configured duration`);
       }
     }
   } else if (item.kind === "scroll") {
