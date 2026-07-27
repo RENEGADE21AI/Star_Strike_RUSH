@@ -20,7 +20,7 @@ after the files they depend on, because the current code intentionally shares gl
   title/gameplay music with state crossfades, and the persisted audio preference.
 - `02-effects-powerups.js`: particles, rotating artwork-backed drops, wingmen,
   pickup bursts, ghost action, and star updates.
-- `03-pacing.js`: phase timing, pressure, difficulty, bullet budget, dev skip.
+- `03-pacing.js`: phase timing, pressure, difficulty, and bullet budget.
 - `04-waves.js`: wave templates, wave selection, codex discovery, wave spawning.
 - `05-entities.js`: enemy spawning, player shots, bullet and wingman updates.
 - `06-bosses.js`: boss spawning, boss attacks, boss death effects.
@@ -37,7 +37,8 @@ after the files they depend on, because the current code intentionally shares gl
 - `13-rendering-title-screens.js`: title screen and game-over screen composition.
 - `14-rendering-player.js`: background and player ship rendering.
 - `15-rendering-entities.js`: wingmen, bullets, enemies, bosses, powerups, particles.
-- `16-rendering-hud.js`: controls, HUD, warnings, and damage flash overlays.
+- `16-rendering-hud.js`: top-left paid pause control, compact top-right score
+  block, classic bottom-left Energy/Health status, warnings, and damage flash.
 - `17-rendering-scene.js`: outer fog and top-level draw orchestration.
 - `18-expansion-data.js`: expansion roster constants, codex metadata, spawn
   caps, and enemy setup defaults.
@@ -50,10 +51,9 @@ after the files they depend on, because the current code intentionally shares gl
 - `18-title-input.js`: title-screen meta panel routing, account/settings actions,
   progress-road drag/claim input, and reset-progress confirmation.
 - `18-session-input-loop.js`: session setup, resize, input events, update loop,
-  and the hidden `#debugSnapshot` smoke-test state when loaded with `?debug=1`.
-  Local debug-only `scenario=siphon`, `scenario=debris`,
-  `scenario=debris-incoming`, and `scenario=powerups` URLs create deterministic
-  QA encounters; `H` toggles hitboxes, anchors, origins, and safe lanes.
+  and localhost-only automated QA instrumentation. The production build removes
+  scenarios and hidden snapshots. Player-facing phase skips, hitbox toggles,
+  and developer stat controls are not part of the runtime.
 - `19-game-achievements.js`: per-run and lifetime achievement ladders, progress
   metrics, run stat payloads, and account-identity hooks called by the game loop.
 - `20-firebase-online.js`: Firebase Auth, callable profile/handle services,

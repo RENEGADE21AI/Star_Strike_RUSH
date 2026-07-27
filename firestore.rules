@@ -38,8 +38,9 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
-    // Aggregate state is server-only. The owner-facing UI reads the sanitized
-    // individual unlock documents above.
+    // Aggregate state is server-only. Ordinary account hydration receives
+    // sanitized aggregate IDs from syncPilotProfile; individual documents stay
+    // available only for owner history, audit, and Admin migration.
     match /player_achievement_state/{userId} {
       allow read, write: if false;
     }

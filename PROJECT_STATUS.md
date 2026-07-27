@@ -17,6 +17,7 @@ and production-deployed are distinct states.
 | Client competition writes | Disabled |
 | Server competition writes | Disabled |
 | Server progression writes | Disabled |
+| Verified run sessions | Disabled/not implemented |
 | App Check enforcement | Prepared but disabled; live configuration not verified |
 
 Account sign-in, refresh, call-sign publication, restored auth, sign-out, and
@@ -31,7 +32,7 @@ rewards.
 | --- | --- | --- |
 | Keyboard/touch play | Stable | Real Chromium start, move, ability, pause, resume, pickup, and touch tests |
 | Device progression boundary | Stable | Real browser + Auth/Firestore/Functions emulators with conflicting account data |
-| Account call sign | Stable | UID-scoped pending/published state, failure persistence, reconnect retry, guest isolation |
+| Account call sign | Stable | Pending intent wins temporarily; otherwise server confirmation replaces stale UID-scoped cache; failure retry and guest isolation |
 | Auth hydration | Stable | `onAuthStateChanged` sole owner; one callable, one aggregate load, one listener per login |
 | Mobile Google auth flow | Mock/emulator verified | Popup success, blocked-popup redirect fallback, redirect restoration, sign-out, account switching |
 | Season rewards | Stable/local | Signed-in and signed-out local claims are identical and survive reload |
@@ -44,6 +45,8 @@ rewards.
 | Audio | Stable | Independent Music/Effects, legacy setting migration, lazy load, time-based 30/60/90/120 Hz mix |
 | Title/traffic | Stable | Measured title bounds, normalized time paths, depth durations, UI-safe lanes, Reduced Motion |
 | Debug records/reset | Stable | Debug cannot persist records/progression; reset clears all progression-bearing local state |
+| Combat HUD | Stable | Pause top-left with one-Health deliberate cost; Energy above segmented Health bottom-left; compact score block top-right |
+| Production debug surface | Removed | Build strips QA scenarios/snapshots; player-facing phase skips and hitbox controls removed |
 | Firestore authorization | Stable | Emulator tests cover anonymous denial, owner privacy, bounded reads, browser-write denial |
 | Build/cache contract | Stable | Commit-versioned runtime/assets plus no-store HTML and `version.json` |
 | Visual QA | Stable | 16 asserted Chromium cases; screenshots/report and failure traces |
@@ -57,8 +60,16 @@ The active callables are:
 - `claimPilotHandle`: transactionally claims one account-bound public handle.
 
 Both enforce payload limits and per-UID Firestore throttles with structured
-errors. Provider email, display name, and avatar remain in Firebase
-Authentication and are not copied into game profile documents.
+errors. Provider email, display name, avatar, and redundant public UID fields
+are not copied into public game profiles. `publicPilotId` is an opaque,
+deterministic game identifier; private ownership still uses the document path
+and server-only handle registry.
+
+`syncPilotProfile` also performs migration-on-touch for public identity. It
+preserves legacy score/phase under explicit names, never inflates verified
+fields, and deletes obsolete `bestScore`, `phase`, Glory/rank/tier,
+`achievementsCount`, and duplicated `uid` fields. `leaderboard_scores` remains
+untouched as the legacy archive.
 
 The paused callables are:
 
@@ -76,9 +87,11 @@ preserved; it is not described as current, live, verified, or a world record.
 | --- | --- |
 | Real Google popup/redirect | Requires Firebase authorized domains and a human account smoke test |
 | Real account call-sign publication | Requires live Functions/Auth verification |
+| Production achievement archive | Admin dry-run has not yet been performed against production data |
 | App Check | Console provider registration and direct enforcement tests have not been performed |
 | Audio distribution rights | Owner supplied MP3s; public-distribution provenance is not verified in repository evidence |
-| Production deployment | Must not be claimed until merged SHA and live `version.json` are verified |
+| Exact-SHA backend staging | Not yet performed for this final gate branch |
+| Production deployment | Must not be claimed until Hosting SHA, backend SHA, approval, and live smoke are verified |
 
 ## Verification commands
 
@@ -94,25 +107,33 @@ npm audit --omit=dev --audit-level=high
 npm audit --prefix functions --omit=dev --audit-level=high
 ```
 
-Current branch evidence at the time of this update:
+Evidence inherited from the preceding release candidate:
 
 - `npm test`: 85/85 passed.
 - Firebase client integration: one complete real-emulator browser scenario
   passed, including Accounts A/B, pending retry, aggregate loading, cleanup, and
   all three direct gate rejections.
 - Visual QA: 16/16 asserted cases passed.
-- Firestore rule tests and final dependency audits must be rerun on the exact
-  commit before release and are not implied by the counts above.
+
+The final-gate branch adds tests for cross-device server precedence,
+public-profile cleanup, stale-backend detection, full release-range planning,
+approval validation, and the three-condition future league gate. The full suite,
+GitHub checks, exact-SHA staging, Account A/B smoke, production migration
+disposition, and music authorization must still be completed on the merge
+commit; this document does not imply those results.
 
 ## Release policy
 
 1. Merge only with green `verify` and `secret-scan` GitHub checks plus local
    emulator, visual, build, dependency-audit, and secret-scan evidence.
-2. Run `scripts/release.ps1` from a clean repository. Preview is the default.
-3. Build from the exact merge commit and smoke-test its Hosting preview.
-4. Deploy changed Functions first. Deploy matching rules only when rules
-   changed and after Functions. Deploy Hosting last.
-5. Verify `version.json`, security headers, private-path 404 responses, and all
-   paused callable boundaries after deployment.
-6. Production remains blocked if real-account or other required live evidence
-   cannot be completed truthfully.
+2. Run `scripts/release.ps1 -StageBackendPreview` from clean merged `main`.
+3. Calculate the complete production-baseline-to-release range. Deploy exact-SHA
+   Functions first, then the exact tested Rules idempotently, then changed
+   indexes, then a commit-named preview.
+4. Require intended SHA = Hosting SHA = backend SHA and smoke-test headers,
+   private 404s, and all three paused callable boundaries.
+5. Complete the ignored sanitized approval file with Account A/B, unchanged
+   device progress, migration disposition, and explicit owner music rights.
+6. Run `-Production -ApprovalFile ...`; deploy Hosting last.
+7. Production remains blocked if any required evidence cannot be completed
+   truthfully. See `docs/RELEASE_WORKFLOW.md`.

@@ -164,7 +164,8 @@ async function runCase(browser, baseUrl, item) {
   const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("canvas", { state: "visible" });
   await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent);
-  await page.waitForTimeout(500);
+  const initialSettleMs = item.scenario === "debris-incoming" ? 50 : 500;
+  await page.waitForTimeout(initialSettleMs);
 
   let before = await snapshot(page);
   const evidence = { before };

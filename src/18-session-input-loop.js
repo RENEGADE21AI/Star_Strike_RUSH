@@ -847,7 +847,8 @@ function applyDevelopmentQaScenario() {
       beginExpansionBossAttack(state.boss, "double");
       showMessage("DEBUG  DOUBLE GATE", 120);
     } else {
-      state.boss.y = state.boss.targetY - 20;
+      state.boss.y = state.boss.targetY - 60;
+      state.boss.qaHoldStaging = true;
       showMessage("DEBUG  BOSS STAGING", 72);
     }
   }

@@ -6,6 +6,9 @@
 - Release-integrity starting commit:
   `d5a298fd5cb9d653b2013c6a3e5d894342a1e5e0`.
 - Release-integrity feature branch: `codex/release-integrity-preseason`.
+- Final production-gate starting commit:
+  `419395afda3061754d98a74d42fcfd9aed2dc0af`.
+- Final production-gate branch: `codex/final-production-gate`.
 
 The starting game already had local play, 79 achievements, Glory/Season roads,
 music/effects, a Records Network, a Pilot Dossier, Firestore rules, callable
@@ -41,6 +44,9 @@ and release evidence.
 - Signed-in and signed-out Season reward claims use one local path.
 - Call-sign publication uses UID-scoped pending state with explicit stored,
   publishing, published, pending, and failed outcomes.
+- Pending call-sign intent temporarily wins; without pending intent, the
+  server-confirmed value replaces stale cross-device published caches. Sign-out
+  clears runtime pending state without deleting a UID-scoped retry.
 - `onAuthStateChanged` is the sole hydration owner, with stale-UID cancellation,
   one profile callable, one aggregate load, one archive listener, and listener
   teardown on sign-out.
@@ -57,6 +63,12 @@ and release evidence.
   auth, reads, or writes while server progression writes are paused.
 - Active identity callables have payload-size bounds, per-UID throttles, safe
   errors, and a prepared-but-disabled App Check flag.
+- Public profiles migrate on touch to explicit legacy/verified record fields.
+  Obsolete score, phase, Glory, rank, tier, achievement-count, and duplicated
+  UID fields are deleted only after legacy values are preserved.
+- Callable responses and paused-error details include a sanitized backend
+  release identity so smoke tests can prove Hosting and Functions run the same
+  exact commit.
 
 ### Achievement migration
 
@@ -87,6 +99,14 @@ and release evidence.
   Reduced Motion freezes a nearly static atmospheric formation.
 - Play and Respawn use immediate activation with a short press response; the
   misleading hold meter is gone.
+- The combat HUD now keeps the top-left pause control separate from compact
+  top-right Score/Hi-Score/Combo text. Energy sits above segmented Health in a
+  classic bottom-left stack above touch controls.
+- A deliberate pause costs one Health bar and reports the cost; focus and
+  visibility auto-pauses remain free. A pause is refused when no spare Health
+  remains.
+- Player-facing phase skips, developer stats, and hitbox toggles are removed.
+  Production builds also strip automated QA scenarios and debug snapshots.
 
 ### Build and release safety
 
@@ -101,8 +121,10 @@ and release evidence.
 - Visual QA starts its own server, clicks computed debug rectangles, asserts
   state, measures title traffic, tests touch scrolling/Reduced Motion, and
   writes screenshots, JSON, and failure traces.
-- `scripts/release.ps1` defaults to a Hosting preview and requires an explicit
-  production switch.
+- `scripts/release.ps1` has explicit check-only, backend/Rules/preview staging,
+  and approval-file production stages. It compares the complete last-production
+  range, includes Rules and indexes, verifies backend/Hosting SHA equality, and
+  stops before production Hosting for human evidence.
 
 ## Current branch evidence
 
@@ -126,6 +148,8 @@ release commit. This document does not claim those pending steps.
   against the configured live project and its authorized domains.
 - The two MP3 files were supplied by the owner, but repository evidence does not
   independently verify public-distribution license, authorship, or source URL.
+- Production achievement migration has not been dry-run against live account
+  data; repository tests establish only the migration contract.
 - Production is not considered deployed until live `version.json`, headers,
   private-path 404s, identity actions, device progression, and paused callables
   are verified against the merge commit.
