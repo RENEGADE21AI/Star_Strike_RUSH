@@ -30,6 +30,7 @@ test("device-local preseason authority is explicit and client/server gates remai
   assert.equal(release.clientCompetitionWritesEnabled, false);
   assert.equal(release.serverCompetitionWritesEnabled, false);
   assert.equal(release.serverProgressionWritesEnabled, false);
+  assert.equal(release.verifiedRunSessionsEnabled, false);
 
   const functionsSource = source("functions/index.js");
   for (const [start, end] of [
@@ -79,13 +80,20 @@ test("account-scoped pending call signs survive failure and remain isolated by U
   vm.runInContext(source("src/00-online-identity.js"), context);
   const storage = memoryStorage();
 
+  context.markAccountCallSignPublished(storage, "account-a", "STALE_A");
+  assert.equal(context.resolvedAccountCallSign(storage, "account-a", "SERVER_A"), "SERVER_A");
+  assert.equal(context.readAccountIdentityState(storage, "account-a").publishedCallSign, "SERVER_A");
+
   assert.equal(context.savePendingAccountCallSign(storage, "account-a", "NOVA_7").ok, true);
   assert.equal(context.savePendingAccountCallSign(storage, "account-b", "EMBER_2").ok, true);
   context.markAccountCallSignFailed(storage, "account-a");
   assert.equal(context.resolvedAccountCallSign(storage, "account-a", "SERVER_A"), "NOVA_7");
   assert.equal(context.resolvedAccountCallSign(storage, "account-b", "SERVER_B"), "EMBER_2");
+  assert.equal(context.readAccountIdentityState(storage, "account-a").publishedCallSign, "SERVER_A");
   context.markAccountCallSignPublished(storage, "account-a", "NOVA_7");
   assert.equal(context.readAccountIdentityState(storage, "account-a").pending, false);
+  assert.equal(context.readAccountIdentityState(storage, "account-a").desiredCallSign, "NOVA_7");
+  assert.equal(context.readAccountIdentityState(storage, "account-a").publishedCallSign, "NOVA_7");
   assert.equal(context.readAccountIdentityState(storage, "account-b").pending, true);
   assert.notEqual(context.accountIdentityStorageKey("account-a"), context.accountIdentityStorageKey("account-b"));
 });

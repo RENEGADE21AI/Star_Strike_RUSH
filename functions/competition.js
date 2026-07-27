@@ -1,8 +1,10 @@
 const { HttpsError } = require("firebase-functions/v2/https");
 const {
   SERVER_COMPETITION_WRITES_ENABLED,
-  SERVER_PROGRESSION_WRITES_ENABLED
+  SERVER_PROGRESSION_WRITES_ENABLED,
+  VERIFIED_RUN_SESSIONS_ENABLED
 } = require("./release-config");
+const { BACKEND_RELEASE_IDENTITY } = require("./release-identity");
 
 const COMPETITIVE_MODE_ENABLED = SERVER_COMPETITION_WRITES_ENABLED;
 const HANDLE_MIN_LENGTH = 3;
@@ -60,16 +62,32 @@ function divisionName(band = 0) {
 
 function publicLeagueMember(raw = {}) {
   return {
-    uid: String(raw.uid || "").slice(0, 128),
+    publicPilotId: String(raw.publicPilotId || "").replace(/[^a-z0-9_]/gi, "").slice(0, 40),
     callSign: String(raw.callSign || "PILOT").toUpperCase().replace(/[^A-Z0-9_]/g, "").slice(0, 12),
     handle: normalizeHandle(raw.handle),
     weeklyPoints: Math.max(0, Math.min(999999999, Math.floor(Number(raw.weeklyPoints) || 0)))
   };
 }
 
+function competitionActivationState(config = {}) {
+  return (
+    config.progressionWritesEnabled === true &&
+    config.competitionWritesEnabled === true &&
+    config.verifiedRunSessionsEnabled === true
+  );
+}
+
 function requireCompetitionEnabled() {
-  if (!SERVER_COMPETITION_WRITES_ENABLED) {
-    throw new HttpsError("failed-precondition", "Public competition is paused during preseason hardening.");
+  if (!competitionActivationState({
+    progressionWritesEnabled: SERVER_PROGRESSION_WRITES_ENABLED,
+    competitionWritesEnabled: SERVER_COMPETITION_WRITES_ENABLED,
+    verifiedRunSessionsEnabled: VERIFIED_RUN_SESSIONS_ENABLED
+  })) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Public competition is paused until verified run sessions and matching progression writes are enabled.",
+      { release: BACKEND_RELEASE_IDENTITY }
+    );
   }
 }
 
@@ -81,7 +99,8 @@ function requireServerProgressionWritesEnabled() {
   if (!SERVER_PROGRESSION_WRITES_ENABLED) {
     throw new HttpsError(
       "failed-precondition",
-      "Account progression writes are paused while device-local preseason progression is authoritative."
+      "Account progression writes are paused while device-local preseason progression is authoritative.",
+      { release: BACKEND_RELEASE_IDENTITY }
     );
   }
 }
@@ -90,6 +109,7 @@ module.exports = {
   COMPETITIVE_MODE_ENABLED,
   HANDLE_MAX_LENGTH,
   HANDLE_MIN_LENGTH,
+  competitionActivationState,
   divisionName,
   competitionWritesEnabled,
   normalizeHandle,

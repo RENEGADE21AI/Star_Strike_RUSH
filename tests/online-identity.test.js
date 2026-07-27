@@ -21,6 +21,7 @@ test("sign-out clears every account-scoped identity field without touching guest
   const context = loadIdentityContracts();
   const online = {
     user: { uid: "account-a" },
+    publicPilotId: "pilot_public_a",
     profileCallSign: "ACCOUNT_A",
     profileHandle: "account_a",
     profileMeta: { glory: 900 },
@@ -32,6 +33,7 @@ test("sign-out clears every account-scoped identity field without touching guest
     progressionMode: "account",
     competitionMode: "ready",
     networkState: "online",
+    pendingCallSign: true,
     ready: true
   };
   const guestIdentity = { callSign: "GUEST_7" };
@@ -39,6 +41,7 @@ test("sign-out clears every account-scoped identity field without touching guest
   context.clearAccountIdentity(online, { competitiveModeEnabled: false });
 
   assert.equal(online.user, null);
+  assert.equal(online.publicPilotId, "");
   assert.equal(online.profileCallSign, "");
   assert.equal(online.profileHandle, "");
   assert.equal(online.profileMeta, null);
@@ -50,6 +53,7 @@ test("sign-out clears every account-scoped identity field without touching guest
   assert.equal(online.progressionMode, "device_local_preseason");
   assert.equal(online.competitionMode, "paused");
   assert.equal(online.networkState, "online");
+  assert.equal(online.pendingCallSign, false);
   assert.equal(guestIdentity.callSign, "GUEST_7");
 });
 

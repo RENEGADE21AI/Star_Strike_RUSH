@@ -7,6 +7,7 @@ const RELEASE_INTEGRITY_CONFIG = Object.freeze({
   clientCompetitionWritesEnabled: false,
   serverCompetitionWritesEnabled: false,
   serverProgressionWritesEnabled: false,
+  verifiedRunSessionsEnabled: false,
   serverAppCheckEnforced: false
 });
 
@@ -15,5 +16,6 @@ module.exports = {
   PROGRESSION_AUTHORITY: RELEASE_INTEGRITY_CONFIG.progressionAuthority,
   SERVER_APP_CHECK_ENFORCED: RELEASE_INTEGRITY_CONFIG.serverAppCheckEnforced,
   SERVER_COMPETITION_WRITES_ENABLED: RELEASE_INTEGRITY_CONFIG.serverCompetitionWritesEnabled,
-  SERVER_PROGRESSION_WRITES_ENABLED: RELEASE_INTEGRITY_CONFIG.serverProgressionWritesEnabled
+  SERVER_PROGRESSION_WRITES_ENABLED: RELEASE_INTEGRITY_CONFIG.serverProgressionWritesEnabled,
+  VERIFIED_RUN_SESSIONS_ENABLED: RELEASE_INTEGRITY_CONFIG.verifiedRunSessionsEnabled
 };

@@ -631,7 +631,7 @@ function drawRecordsPanel() {
     const members = league && Array.isArray(league.members) ? league.members.slice(0, 10) : [];
     if (members.length) {
       members.forEach((member, index) => {
-        const mine = user && member.uid === user.uid;
+        const mine = online.publicPilotId && member.publicPilotId === online.publicPilotId;
         ctx.fillStyle = mine ? "rgba(92,238,255,0.14)" : (index % 2 ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.055)");
         ctx.fillRect(panel.x + 20, listY - 5, panel.w - 40, 29);
         ctx.strokeStyle = mine ? "rgba(92,238,255,0.38)" : "rgba(255,255,255,0.07)";

@@ -4,5 +4,6 @@
   "clientCompetitionWritesEnabled": false,
   "serverCompetitionWritesEnabled": false,
   "serverProgressionWritesEnabled": false,
+  "verifiedRunSessionsEnabled": false,
   "serverAppCheckEnforced": false
 }
