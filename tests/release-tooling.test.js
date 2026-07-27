@@ -20,7 +20,9 @@ test("release tooling separates backend staging from approval-gated production H
   assert.match(releaseScript, /Verified release Node runtime/);
   assert.match(releaseScript, /git fetch origin --prune/);
   assert.match(releaseScript, /Local main .* differs from origin\/main/);
-  assert.match(releaseScript, /Verified Firebase project/);
+  assert.match(releaseScript, /Verified configured Firebase project/);
+  assert.match(releaseScript, /Verified authenticated Firebase project access/);
+  assert.ok(releaseScript.indexOf("if ($CheckOnly)") < releaseScript.indexOf("projects:list --json"));
   assert.match(releaseScript, /release-plan\.js/);
   assert.match(releaseScript, /generate-backend-release\.js/);
   assert.match(releaseScript, /validate-release-approval\.js/);

@@ -135,21 +135,23 @@ $firebaseConfig = Get-Content -Raw -LiteralPath (Join-Path $RepositoryRoot ".fir
 if ($firebaseConfig.projects.default -ne $ExpectedProject) {
   throw ".firebaserc default project is '$($firebaseConfig.projects.default)', expected '$ExpectedProject'."
 }
+Write-Host "Verified configured Firebase project: $ExpectedProject"
+
+if ($CheckOnly) {
+  Invoke-ReleaseChecks -ReleaseCommit $releaseCommit
+  Write-Host ""
+  Write-Host "Release checks passed for $releaseCommit. No Firebase credentials were required and no resources were changed."
+  exit 0
+}
+
 $projectsJson = & npx firebase projects:list --json
-if ($LASTEXITCODE -ne 0) { throw "Unable to list Firebase projects with the locked CLI." }
+if ($LASTEXITCODE -ne 0) { throw "Unable to prove authenticated access to Firebase project '$ExpectedProject' with the locked CLI." }
 $projects = $projectsJson | ConvertFrom-Json
 $visibleProjects = @($projects.result | ForEach-Object { $_.projectId })
 if ($visibleProjects -notcontains $ExpectedProject) {
   throw "Authenticated Firebase CLI account cannot access '$ExpectedProject'."
 }
-Write-Host "Verified Firebase project: $ExpectedProject"
-
-if ($CheckOnly) {
-  Invoke-ReleaseChecks -ReleaseCommit $releaseCommit
-  Write-Host ""
-  Write-Host "Release checks passed for $releaseCommit. No Firebase resources were changed."
-  exit 0
-}
+Write-Host "Verified authenticated Firebase project access: $ExpectedProject"
 
 if ($StageBackendPreview) {
   $baseline = Resolve-ReleaseBaseline -ExplicitBaseline $BaselineCommit

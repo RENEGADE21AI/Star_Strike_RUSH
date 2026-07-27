@@ -14,10 +14,11 @@ Run from a clean `main` whose commit matches `origin/main`:
 .\scripts\release.ps1 -StageBackendPreview
 ```
 
-`-CheckOnly` changes no Firebase resources. `-StageBackendPreview`:
+`-CheckOnly` needs no Firebase credentials, validates the configured project
+locally, and changes no resources. `-StageBackendPreview`:
 
-1. verifies repository, branch, Node 22, clean state, origin, and Firebase
-   project `star-strike-rush`;
+1. verifies repository, branch, Node 22, clean state, origin, and authenticated
+   access to Firebase project `star-strike-rush`;
 2. runs dependencies, unit/browser tests, Rules and real-client emulators,
    asserted visual QA, production dependency audits, build, and secret scan;
 3. reads the last production SHA from `/version.json`, or accepts a reviewed
