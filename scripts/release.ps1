@@ -36,6 +36,11 @@ $DetectedRoot = Get-GitText -Arguments @("rev-parse", "--show-toplevel")
 if ([IO.Path]::GetFullPath($DetectedRoot).TrimEnd("\") -ne [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd("\")) {
   throw "release.ps1 must run inside the Star Strike RUSH repository."
 }
+$NodeVersion = (& node --version | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $NodeVersion -notmatch "^v22\.") {
+  throw "Node.js 22 is required for Firebase release tooling; found '$NodeVersion'. Select Node 22 and rerun."
+}
+Write-Host "Verified release Node runtime: $NodeVersion"
 $Remote = Get-GitText -Arguments @("remote", "get-url", "origin")
 if ($Remote -notmatch "RENEGADE21AI[/:]Star_Strike_RUSH(?:\.git)?$") {
   throw "origin does not point to RENEGADE21AI/Star_Strike_RUSH: $Remote"

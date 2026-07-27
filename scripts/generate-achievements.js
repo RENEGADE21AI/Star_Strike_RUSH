@@ -94,7 +94,10 @@ function serverSource(catalog, achievements) {
 function verifyOrWrite(targetPath, content) {
   if (checkOnly) {
     const existing = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, "utf8") : "";
-    if (existing !== content) fail(`${path.relative(root, targetPath)} is stale; run npm run generate:achievements`);
+    const normalizeLineEndings = (value) => String(value).replace(/\r\n/g, "\n");
+    if (normalizeLineEndings(existing) !== normalizeLineEndings(content)) {
+      fail(`${path.relative(root, targetPath)} is stale; run npm run generate:achievements`);
+    }
     return;
   }
   fs.writeFileSync(targetPath, content, "utf8");

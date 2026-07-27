@@ -81,6 +81,9 @@ Use the guarded release workflow rather than deploying individual resources:
 .\scripts\release.ps1 -Production
 ```
 
+Run releases with Node.js 22, matching the Functions runtime and GitHub
+verification job. The script refuses other Node majors before contacting
+Firebase so a host-runtime mismatch cannot produce a partial release.
 Preview is the default. The script verifies repository/branch/clean-state
 invariants, uses the locked CLI through `npx firebase`, runs tests, emulators,
 audits, build, and smoke checks, and requires `-Production` for a live release.

@@ -2,6 +2,9 @@
   "name": "star-strike-rush",
   "version": "1.1.0",
   "private": true,
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "generate:achievements": "node scripts/generate-achievements.js",
     "check:achievements": "node scripts/generate-achievements.js --check",
