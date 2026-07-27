@@ -14,8 +14,6 @@ let renderDpr = 1;
 const MAX_RENDER_DPR = 2;
 
 let W = GAME_W, H = GAME_H;
-let devSkipCooldown = 0;
-const DEV_SKIP_COOLDOWN_FRAMES = 48;
 let MAX_PARTICLES = 900;
 let enemyIdCounter = 1;
 
@@ -763,15 +761,14 @@ const state = {
   inputMode: "keyboard",
   lastTouchAt: -Infinity,
   inputHintTimer: 144,
-  debugHitboxes: false,
   debugErrors: [],
   safeLanes: [],
   playerRealm: 0,
-  devStatsVisible: false,
   difficultySamples: [],
   difficultyDeaths: 0,
   runMode: "standard",
   pausedReason: "",
+  pauseNotice: "",
   resumeCountdown: 0,
   sceneTransition: { mode: "idle", frame: 0, duration: 1 },
   runStats: { kills: 0, powerups: 0, abilityUses: 0, ghostUses: 0, dashUses: 0, realmHops: 0, bosses: 0, damageTaken: 0, highestCombo: 0, activeFrames: 0, startedAtMs: 0, metaApplied: false },

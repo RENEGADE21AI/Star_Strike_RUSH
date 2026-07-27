@@ -82,7 +82,7 @@ function makeDifficultySample() {
 function recordDifficultySample(force = false) {
   if (!state.difficultySamples) state.difficultySamples = [];
   if (!force) {
-    if (typeof DEBUG_SNAPSHOT_ENABLED !== "undefined" && !DEBUG_SNAPSHOT_ENABLED) return;
+    if (typeof DEBUG_SNAPSHOT_ENABLED === "undefined" || !DEBUG_SNAPSHOT_ENABLED) return;
     if ((state.frame || 0) % DIFFICULTY_SAMPLE_INTERVAL !== 0) return;
   }
   state.difficultySamples.push(makeDifficultySample());
@@ -107,37 +107,6 @@ function applyLowHpReliefAfterHit() {
   }
 }
 
-function triggerPhaseSkip() {
-  if (state.gameState !== "playing") return;
-  if (devSkipCooldown > 0) return;
-  devSkipCooldown = DEV_SKIP_COOLDOWN_FRAMES;
-  state.bullets = [];
-  state.enemyBullets = [];
-  state.enemies = [];
-  state.pendingSpawns = [];
-  state.powerups = [];
-  state.boss = null;
-  state.bossDeath = null;
-  state.bossRecovery = 0;
-  state.waveRest = 24;
-  state.playerRealm = 0;
-  state.waveMood = "open";
-  state.waveMoodTimer = 120;
-  state.lastWaveTemplateName = null;
-  state.phase++;
-  state.phaseTimer = 0;
-  state.waveTimer = 0;
-  state.pressure = 0;
-  state.threatScore = 0;
-  state.difficulty.grace = 90;
-  state.difficulty.ghostGrace = 0;
-  state.difficulty.heatStreak = false;
-  state.difficulty.threat = Math.max(0.68, state.difficulty.threat - 0.08);
-  state.difficulty.target = state.difficulty.threat;
-  state.fx.flash = Math.max(state.fx.flash, 8);
-  showMessage("PHASE " + state.phase, 90);
-  if (state.phase % 4 === 0) spawnBoss();
-}
 function inDevSkipZone(x, y) { const zoneW = W * 0.15, zoneH = H * 0.15; return x > W - zoneW && y < zoneH; }
 function onDevToggleZone(x, y) { return x >= W / 3 && x <= (2 * W) / 3 && y >= 0 && y <= 60; }
 

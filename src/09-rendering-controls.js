@@ -101,7 +101,7 @@ function drawBossHealthBar(boss, color = "#ff455c") {
   const key = boss.mode === "standard" ? "boss_standard" : boss.mode === "wraith" ? "boss_wraith" : `boss_${boss.mode}`;
   const meta = typeof getCodexMeta === "function" ? getCodexMeta(key) : null;
   const label = String((meta && meta.name) || boss.mode || "BOSS").replace(/_/g, " ").toUpperCase();
-  const barW = Math.min(320, W - 36);
+  const barW = Math.min(258, W - 116);
   const x = (W - barW) / 2;
   const y = 7;
   ctx.save();

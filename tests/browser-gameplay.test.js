@@ -321,12 +321,36 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
     await page.waitForTimeout(120);
     const paused = await debugSnapshot(page);
     assert.equal(paused.gameState, "paused");
+    assert.equal(paused.player.hp, moved.player.hp - 1, "a deliberate pause must cost exactly one health bar");
+    assert.equal(paused.ui.pauseNotice, "PAUSE COST: 1 HEALTH BAR");
+    assert.ok(paused.layout.pause.x < 60, "pause control must be in the top-left");
+    assert.ok(paused.layout.hud.energy.y < paused.layout.hud.health.y, "energy must render above health");
+    assert.equal(paused.layout.hud.health.orientation, "vertical");
     await page.waitForTimeout(180);
     const stillPaused = await debugSnapshot(page);
     assert.equal(stillPaused.frame, paused.frame, "simulation frames must freeze while paused");
+    assert.equal(stillPaused.player.hp, paused.player.hp, "a paused frame must not charge health again");
 
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
+
+    await page.evaluate(() => {
+      state.player.hp = 1;
+      pauseGame("manual");
+    });
+    const refused = await debugSnapshot(page);
+    assert.equal(refused.gameState, "playing");
+    assert.equal(refused.player.hp, 1);
+    assert.equal(refused.ui.pauseNotice, "PAUSE NEEDS 1 SPARE HEALTH BAR");
+
+    await page.evaluate(() => {
+      state.player.hp = 3;
+      pauseGame("visibility");
+    });
+    const automatic = await debugSnapshot(page);
+    assert.equal(automatic.gameState, "paused");
+    assert.equal(automatic.player.hp, 3, "automatic safety pauses must not cost health");
+    assert.equal(automatic.ui.pauseNotice, "AUTO-PAUSE: NO HEALTH COST");
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
