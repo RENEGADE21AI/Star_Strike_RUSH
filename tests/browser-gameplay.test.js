@@ -423,16 +423,20 @@ test("collecting a powerup applies its effect and emits visible pickup feedback"
         spinSpeed: 0.02
       }];
     });
-    await page.waitForFunction(() =>
-      state.player.rapid > 0 &&
-      state.powerups.length === 0 &&
-      state.particles.some((particle) => particle.kind === "ring")
-    );
-    const feedback = await page.evaluate(() => ({
-      rapid: state.player.rapid,
-      rings: state.particles.filter((particle) => particle.kind === "ring").length,
-      particles: state.particles.length
-    }));
+    const feedbackHandle = await page.waitForFunction(() => {
+      const feedback = {
+        rapid: state.player.rapid,
+        rings: state.particles.filter((particle) => particle.kind === "ring").length,
+        particles: state.particles.length
+      };
+      return feedback.rapid > 0 &&
+        state.powerups.length === 0 &&
+        feedback.rings >= 1 &&
+        feedback.particles >= 20
+        ? feedback
+        : null;
+    });
+    const feedback = await feedbackHandle.jsonValue();
     assert.ok(feedback.rapid > 0);
     assert.ok(feedback.rings >= 1);
     assert.ok(feedback.particles >= 20);
