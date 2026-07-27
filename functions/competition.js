@@ -1,6 +1,10 @@
 const { HttpsError } = require("firebase-functions/v2/https");
+const {
+  SERVER_COMPETITION_WRITES_ENABLED,
+  SERVER_PROGRESSION_WRITES_ENABLED
+} = require("./release-config");
 
-const COMPETITIVE_MODE_ENABLED = false;
+const COMPETITIVE_MODE_ENABLED = SERVER_COMPETITION_WRITES_ENABLED;
 const HANDLE_MIN_LENGTH = 3;
 const HANDLE_MAX_LENGTH = 16;
 const RESERVED_HANDLES = new Set([
@@ -64,13 +68,22 @@ function publicLeagueMember(raw = {}) {
 }
 
 function requireCompetitionEnabled() {
-  if (!COMPETITIVE_MODE_ENABLED) {
+  if (!SERVER_COMPETITION_WRITES_ENABLED) {
     throw new HttpsError("failed-precondition", "Public competition is paused during preseason hardening.");
   }
 }
 
 function competitionWritesEnabled() {
-  return COMPETITIVE_MODE_ENABLED;
+  return SERVER_COMPETITION_WRITES_ENABLED;
+}
+
+function requireServerProgressionWritesEnabled() {
+  if (!SERVER_PROGRESSION_WRITES_ENABLED) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Account progression writes are paused while device-local preseason progression is authoritative."
+    );
+  }
 }
 
 module.exports = {
@@ -83,6 +96,7 @@ module.exports = {
   performanceBand,
   publicLeagueMember,
   requireCompetitionEnabled,
+  requireServerProgressionWritesEnabled,
   validateHandle,
   weekWindow
 };

@@ -6,7 +6,7 @@ const { test } = require("node:test");
 const repoRoot = path.resolve(__dirname, "..");
 const competition = require(path.join(repoRoot, "functions", "competition.js"));
 
-test("competition-disabled identity and progression calls cannot write leaderboard state", () => {
+test("identity endpoints preserve the legacy archive while progression endpoints are gated first", () => {
   assert.equal(competition.competitionWritesEnabled(), false);
 
   const source = fs.readFileSync(path.join(repoRoot, "functions", "index.js"), "utf8");
@@ -18,8 +18,14 @@ test("competition-disabled identity and progression calls cannot write leaderboa
     source.indexOf("exports.claimPilotHandle"),
     source.indexOf("exports.joinWeeklyLeague")
   );
-  const claimReward = source.slice(source.indexOf("exports.claimSeasonReward"));
-  assert.match(syncProfile, /if \(competitionWritesEnabled\(\)\) tx\.set\(leaderboardRef/);
-  assert.match(claimHandle, /if \(competitionWritesEnabled\(\) && leaderboardSnap\.exists\) tx\.update\(leaderboardRef/);
-  assert.match(claimReward, /if \(competitionWritesEnabled\(\)\) tx\.set\(leaderboardRef/);
+  assert.doesNotMatch(syncProfile, /tx\.(set|update|create|delete)\(leaderboardRef/);
+  assert.doesNotMatch(claimHandle, /leaderboardRef|leaderboard_scores/);
+  for (const [start, end] of [
+    ["exports.joinWeeklyLeague", "function clientProfile"],
+    ["exports.submitRunReceipt", "exports.claimSeasonReward"],
+    ["exports.claimSeasonReward", ""]
+  ]) {
+    const body = source.slice(source.indexOf(start), end ? source.indexOf(end) : undefined);
+    assert.ok(body.indexOf("requireServerProgressionWritesEnabled()") < body.indexOf("authContext(request)"));
+  }
 });

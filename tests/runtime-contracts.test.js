@@ -174,26 +174,28 @@ test("public handles and weekly performance bands are deterministic", () => {
 test("public Firebase writers and rules exclude provider identity fields", () => {
   const functionsSource = fs.readFileSync(path.join(repoRoot, "functions", "index.js"), "utf8");
   const publicBuilder = functionsSource.slice(
-    functionsSource.indexOf("function publicPayloadFor"),
-    functionsSource.indexOf("function clientProfile")
+    functionsSource.indexOf("function publicIdentityPayloadFor"),
+    functionsSource.indexOf("async function leagueResponse")
   );
   assert.doesNotMatch(publicBuilder, /displayName|photoURL|email/);
-  assert.match(functionsSource, /tx\.set\(publicRef, publicPayload\);/);
-  assert.match(functionsSource, /tx\.set\(leaderboardRef, publicPayload\);/);
+  assert.match(functionsSource, /tx\.set\(publicRef, publicPayload, \{ merge: true \}\);/);
+  const syncProfile = functionsSource.slice(
+    functionsSource.indexOf("exports.syncPilotProfile"),
+    functionsSource.indexOf("exports.claimPilotHandle")
+  );
+  assert.doesNotMatch(syncProfile, /tx\.(set|update|create|delete)\(leaderboardRef/);
 
   const clientSource = fs.readFileSync(path.join(repoRoot, "src", "20-firebase-online.js"), "utf8");
   assert.doesNotMatch(clientSource, /setDoc\(/);
   assert.match(clientSource, /httpsCallable\(functionsApi, "syncPilotProfile"\)/);
   assert.match(clientSource, /httpsCallable\(functionsApi, "claimPilotHandle"\)/);
-  assert.match(
-    clientSource,
-    /competitionBackend:\s*competitiveModeEnabled\s*\?\s*"unknown"\s*:\s*"disabled"/
-  );
-  assert.match(clientSource, /if \(!competitiveModeEnabled\)[\s\S]*reason:\s*"disabled"/);
-  assert.match(clientSource, /Local play remains available/);
+  assert.match(clientSource, /progressionMode:\s*PROGRESSION_MODE/);
+  assert.match(clientSource, /competitionMode:\s*competitiveModeEnabled\s*\?\s*"unknown"\s*:\s*"paused"/);
+  assert.match(clientSource, /reason:\s*"device_local_preseason"/);
+  assert.match(clientSource, /Run saved as device progress/);
   const leaderboardReader = clientSource.slice(
-    clientSource.indexOf("function applyLeaderboardSnapshot"),
-    clientSource.indexOf("function subscribeLeaderboard")
+    clientSource.indexOf("function applyArchiveSnapshot"),
+    clientSource.indexOf("function subscribeLegacyArchive")
   );
   assert.doesNotMatch(leaderboardReader, /displayName|photoURL|email/);
 

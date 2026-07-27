@@ -21,12 +21,20 @@ function drawMenuFlights() {
       .slice(0, f.members || 1)
       .map(([x, y]) => [x * memberSpacingScale, y * memberSpacingScale]);
     const shipAngle = f.angle;
-    const visualX = f.x + (f.avoidX || 0);
-    const visualY = f.y + (f.avoidY || 0);
-    const overPrimaryUi = visualX > 10 && visualX < W - 10 && visualY > H * 0.12 && visualY < H * 0.72;
+    const visualX = f.x;
+    const visualY = f.y;
+    const visualRadius = typeof titleFormationVisualRadius === "function"
+      ? titleFormationVisualRadius(f)
+      : 36 * Math.max(0.5, Number(f.renderScale || 1));
+    const overPrimaryUi = (
+      visualX + visualRadius > 10 &&
+      visualX - visualRadius < W - 10 &&
+      visualY + visualRadius > H * 0.08 &&
+      visualY - visualRadius < H * 0.76
+    );
     const edgeDistance = Math.min(visualX + 42, W + 42 - visualX, visualY + 72, H + 72 - visualY);
     const fogFade = clamp(edgeDistance / 72, 0, 1);
-    const formationAlpha = (f.renderAlpha || 0.72) * fogFade * (overPrimaryUi ? 0.22 : 1);
+    const formationAlpha = (f.renderAlpha || 0.72) * fogFade * (overPrimaryUi ? 0.04 : 1);
     ctx.save();
     ctx.globalAlpha = formationAlpha;
     ctx.filter = f.renderBlur > 0 ? `blur(${f.renderBlur}px)` : "none";
@@ -36,8 +44,8 @@ function drawMenuFlights() {
       const history = f.leaderHistory[histIndex] || { x: f.x, y: f.y };
       const histPos = i === 0
         ? { x: visualX, y: visualY }
-        : { x: history.x + (f.avoidX || 0), y: history.y + (f.avoidY || 0) };
-      const wobble = Math.sin(state.frame * 0.055 + i * 2.1 + f.sway) * 2.8;
+        : { x: history.x, y: history.y };
+      const wobble = settingReducedMotion ? 0 : Math.sin(state.frame * 0.032 + i * 2.1 + f.sway) * 1.5;
       drawFormationShip(
         f.kind,
         histPos.x + ox,

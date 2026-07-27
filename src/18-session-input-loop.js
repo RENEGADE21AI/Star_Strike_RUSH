@@ -5,6 +5,7 @@ function startPlayingSession() {
   showMessage("PHASE 1", 90);
 }
 function beginGame() {
+  if (typeof prepareGameplayMusic === "function") prepareGameplayMusic();
   if (typeof playGameSound === "function") playGameSound("launch", 0.9);
   if (state.gameState === "start") {
     if (state.sceneTransition.mode !== "idle") return;
@@ -137,10 +138,8 @@ function setupSession(mode = "start") {
   state.joystick.ay = 0;
   encounterCard = null;
   encounterQueue = [];
-  playBtnHold = 0;
   playBtnPointerDown = false;
   playBtnPointerInside = false;
-  respawnHold = 0;
   respawnPointerDown = false;
   respawnPointerInside = false;
   titleSubState = "main";
@@ -200,7 +199,7 @@ function enterGameOver() {
   state.gameOverShake = 6;
   state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
   if (typeof recordDifficultySample === "function") recordDifficultySample(true);
-  if (state.runMode !== "debug") submitOnlineRun();
+  if (state.runMode !== "debug") finalizeLocalRunAchievements();
 }
 function resize() {
   const screenW = window.innerWidth;
@@ -233,7 +232,6 @@ function handleGameOverPointerDown(x, y) {
   if (hitRect(buttons.respawn, x, y)) {
     respawnPointerDown = true;
     respawnPointerInside = true;
-    respawnHold = 0;
     return true;
   }
   if (hitRect(buttons.title, x, y)) {
@@ -288,6 +286,10 @@ canvas.addEventListener("pointermove", (e) => {
   const x = (e.clientX - rect.left - offsetX) / scale;
   const y = (e.clientY - rect.top - offsetY) / scale;
   if (state.gameState !== "playing") {
+    if (updateTitleScrollableDrag(e.pointerId, x, y)) {
+      e.preventDefault();
+      return;
+    }
     if (updateTitleProgressDrag(e.pointerId, x, y)) {
       e.preventDefault();
       return;
@@ -342,6 +344,7 @@ function updateJoystickFromPointer(e) {
   state.joystick.ay = ay;
 }
 function endPointer(e) {
+  endTitleScrollableDrag(e.pointerId, e.type === "pointercancel");
   endTitleProgressDrag(e.pointerId);
   if (state.joystick.active && state.joystick.id === e.pointerId) {
     state.joystick.active = false;
@@ -352,27 +355,23 @@ function endPointer(e) {
   if (state.gameState === "gameover" && respawnPointerDown && respawnPointerInside) {
     respawnPointerDown = false;
     respawnPointerInside = false;
-    respawnHold = 0;
     beginGame();
     return;
   }
   if (state.gameState === "start" && playBtnPointerDown && playBtnPointerInside) {
     playBtnPointerDown = false;
     playBtnPointerInside = false;
-    playBtnHold = 0;
     beginGame();
     return;
   }
   if (state.gameState === "gameover") {
     respawnPointerDown = false;
     respawnPointerInside = false;
-    respawnHold = 0;
     return;
   }
   if (state.gameState !== "playing") {
     playBtnPointerDown = false;
     playBtnPointerInside = false;
-    playBtnHold = 0;
     return;
   }
 }
@@ -389,13 +388,11 @@ canvas.addEventListener("wheel", (e) => {
   if (!hitRect(r.panel, x, y)) return;
   e.preventDefault();
   if (titleSubState === "codex") {
-    codexScroll += e.deltaY / Math.max(0.5, scale);
-    clampCodexScroll();
+    codexScrollController.scrollBy(e.deltaY / Math.max(0.5, scale));
     return;
   }
   if (titleSubState === "achievements") {
-    achievementScroll += e.deltaY / Math.max(0.5, scale);
-    clampAchievementScroll();
+    achievementScrollController.scrollBy(e.deltaY / Math.max(0.5, scale));
     return;
   }
   titleProgressSelectedNode = null;
@@ -430,11 +427,9 @@ window.addEventListener("keydown", (e) => {
       e.preventDefault();
       const delta = (k === "ArrowUp" || k === "PageUp") ? -148 : 148;
       if (titleSubState === "codex") {
-        codexScroll += delta;
-        clampCodexScroll();
+        codexScrollController.scrollBy(delta);
       } else {
-        achievementScroll += delta;
-        clampAchievementScroll();
+        achievementScrollController.scrollBy(delta);
       }
       return;
     }
@@ -493,7 +488,7 @@ document.addEventListener("visibilitychange", () => {
   if (state.gameState === "playing") pauseGame("visibility");
 });
 window.addEventListener("beforeunload", () => {
-  if (highScoreDirty) saveHighScore();
+  if (state.runMode !== "debug" && highScoreDirty) saveHighScore();
   saveCallSign();
   saveSettings();
   saveCodexDiscovered();
@@ -501,6 +496,8 @@ window.addEventListener("beforeunload", () => {
 });
 
 function update() {
+  codexScrollController.tick();
+  achievementScrollController.tick();
   if (state.gameState === "paused") return;
   if (state.gameState === "resuming") {
     state.resumeCountdown = Math.max(0, state.resumeCountdown - 1);
@@ -539,7 +536,6 @@ function update() {
     } else {
       state.gameOverShake = 0;
     }
-    updateRespawnHold();
     return;
   }
 
@@ -596,9 +592,25 @@ if (DEBUG_SNAPSHOT_ENABLED) {
   });
 }
 
+function debugScreenRect(rect) {
+  if (!rect) return null;
+  return {
+    x: Number((offsetX + rect.x * scale).toFixed(2)),
+    y: Number((offsetY + rect.y * scale).toFixed(2)),
+    w: Number((rect.w * scale).toFixed(2)),
+    h: Number((rect.h * scale).toFixed(2))
+  };
+}
+
 function getDebugSnapshot() {
   const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
+  const titleIcons = typeof getTitleIconRects === "function" ? getTitleIconRects() : {};
+  const achievementRects = typeof getAchievementsRects === "function" ? getAchievementsRects() : {};
+  const codexRects = typeof getCodexRects === "function" ? getCodexRects() : {};
+  const onlineRects = typeof getOnlineRects === "function" ? getOnlineRects() : {};
+  const onlineState = typeof accountIdentitySnapshot === "function" ? accountIdentitySnapshot() : {};
   return {
+    timestampMs: Number(performance.now().toFixed(2)),
     gameState: state.gameState,
     runMode: state.runMode,
     resumeCountdown: state.resumeCountdown,
@@ -611,6 +623,8 @@ function getDebugSnapshot() {
     score: state.score,
     highScore,
     phase: state.phase,
+    deviceProgress: typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null,
+    localAchievements: typeof localAchievementIds !== "undefined" ? localAchievementIds.slice() : [],
     player: state.player ? {
       x: state.player.x,
       y: state.player.y,
@@ -648,7 +662,20 @@ function getDebugSnapshot() {
       settingReducedMotion,
       settingReducedFlash,
       settingHighContrast,
-      settingSoundEffects,
+      settingMusicEnabled,
+      settingEffectsEnabled,
+      music: typeof gameMusicStateSnapshot === "function" ? gameMusicStateSnapshot() : null,
+      account: {
+        user: onlineState.user || null,
+        callSign: onlineState.profileCallSign || "",
+        handle: onlineState.profileHandle || "",
+        identityService: onlineState.identityService || "",
+        accountArchive: onlineState.accountArchive || "",
+        progressionMode: onlineState.progressionMode || "",
+        competitionMode: onlineState.competitionMode || "",
+        pendingCallSign: onlineState.pendingCallSign === true,
+        counters: onlineState.developmentCounters || {}
+      },
       codexHasNew,
       codexDetailType,
       codexCategory,
@@ -664,6 +691,44 @@ function getDebugSnapshot() {
         status: titleProgressSelectedNode.status
       } : null,
       resetProgressConfirm
+    },
+    layout: {
+      scale,
+      offsetX,
+      title: state.titleMetrics || null,
+      play: debugScreenRect(typeof getPlayButtonRect === "function" ? getPlayButtonRect() : null),
+      account: debugScreenRect(titleIcons.account),
+      accountPilotTab: debugScreenRect(onlineRects.pilotTab),
+      accountSettingsTab: debugScreenRect(onlineRects.settingsTab),
+      reducedMotion: debugScreenRect(onlineRects.motion),
+      music: debugScreenRect(onlineRects.music),
+      effects: debugScreenRect(onlineRects.effects),
+      achievements: debugScreenRect(titleIcons.achievements),
+      progress: debugScreenRect(titleIcons.progress),
+      records: debugScreenRect(titleIcons.records),
+      codex: debugScreenRect(titleIcons.codex),
+      achievementContent: debugScreenRect(achievementRects.contentRect),
+      achievementScrollUp: debugScreenRect(achievementRects.scrollUp),
+      achievementScrollDown: debugScreenRect(achievementRects.scrollDown),
+      codexContent: debugScreenRect(codexRects.contentRect),
+      codexScrollUp: debugScreenRect(codexRects.scrollUp),
+      codexScrollDown: debugScreenRect(codexRects.scrollDown)
+    },
+    titleTraffic: state.titleFormations.map((formation) => ({
+      depth: formation.depthLayer,
+      durationSeconds: Number(formation.durationSeconds.toFixed(3)),
+      normalizedProgress: Number(formation.normalizedProgress.toFixed(4)),
+      x: Number(formation.x.toFixed(2)),
+      y: Number(formation.y.toFixed(2)),
+      scale: Number(formation.renderScale.toFixed(3)),
+      alpha: Number(formation.renderAlpha.toFixed(3)),
+      radius: typeof titleFormationVisualRadius === "function"
+        ? Number(titleFormationVisualRadius(formation).toFixed(2))
+        : 0
+    })),
+    scrolling: {
+      achievements: typeof achievementScrollController !== "undefined" ? achievementScrollController.snapshot() : null,
+      codex: typeof codexScrollController !== "undefined" ? codexScrollController.snapshot() : null
     },
     input: {
       mode: state.inputMode,
@@ -713,8 +778,8 @@ function updateDebugSnapshot() {
 
 const simulationClock = createFixedStepClock();
 function loop(timestamp) {
-  advanceFixedStep(simulationClock, timestamp, update);
-  if (typeof updateGameMusic === "function") updateGameMusic();
+  const frameTiming = advanceFixedStep(simulationClock, timestamp, update);
+  if (typeof updateGameMusic === "function") updateGameMusic(frameTiming.deltaMs / 1000);
   draw();
   updateDebugSnapshot();
   requestAnimationFrame(loop);

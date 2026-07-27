@@ -16,7 +16,7 @@ function validateCallSign(value) {
   const callSign = normalizeCallSign(value);
   if (!callSign) return { ok: false, callSign: "", message: "CALL SIGN REQUIRED" };
   if (callSign.length < CALL_SIGN_MIN_LENGTH) return { ok: false, callSign, message: `USE ${CALL_SIGN_MIN_LENGTH}-${CALL_SIGN_MAX_LENGTH} CHARACTERS` };
-  return { ok: true, callSign, message: "PILOT ID SAVED" };
+  return { ok: true, callSign, message: "CALL SIGN READY" };
 }
 
 function neutralPilotCallSign(seed = "LOCAL") {

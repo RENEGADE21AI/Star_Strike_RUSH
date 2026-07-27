@@ -27,6 +27,11 @@ function saveLocalAchievementIds(storage, ids, validIds) {
   return normalized;
 }
 
+function clearLocalAchievementIds(storage) {
+  try { storage.removeItem(LOCAL_ACHIEVEMENTS_STORAGE_ID); } catch {}
+  return [];
+}
+
 function mergeAchievementIds(localIds, onlineIds, validIds) {
   return normalizedAchievementIds(
     [...(Array.isArray(localIds) ? localIds : []), ...(Array.isArray(onlineIds) ? onlineIds : [])],
@@ -37,3 +42,4 @@ function mergeAchievementIds(localIds, onlineIds, validIds) {
 globalThis.loadLocalAchievementIds = loadLocalAchievementIds;
 globalThis.saveLocalAchievementIds = saveLocalAchievementIds;
 globalThis.mergeAchievementIds = mergeAchievementIds;
+globalThis.clearLocalAchievementIds = clearLocalAchievementIds;

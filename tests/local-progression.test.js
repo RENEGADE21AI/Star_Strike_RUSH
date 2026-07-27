@@ -47,8 +47,10 @@ test("new-record state is based on the score captured at run start and ignores d
 });
 
 test("Ghost Runner counts only true Ghost uses, not DASH or Realm Hop", () => {
+  const catalog = require("../shared/achievements.json");
   const source = fs.readFileSync(path.join(repoRoot, "src", "19-game-achievements.js"), "utf8");
-  assert.match(source, /minGhostUses:\s*3/);
-  assert.match(source, /stats\.ghostUses/);
-  assert.doesNotMatch(source, /minGhostUses[\s\S]{0,160}(dashUses|realmHops)/);
+  const runCheck = source.slice(source.indexOf("function runMeetsAchievement"), source.indexOf("function achievementProgressForMeta"));
+  assert.equal(catalog.achievements.find((item) => item.id === "ghost_runner").minGhostUses, 3);
+  assert.match(runCheck, /stats\.ghostUses/);
+  assert.doesNotMatch(runCheck, /stats\.(dashUses|realmHops)/);
 });

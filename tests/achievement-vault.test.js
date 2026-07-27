@@ -8,6 +8,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const { ACHIEVEMENTS, applyRunToProfile, earnedAchievementIdsForRun, sanitizeRunReceipt } = require("../functions/progression");
 
 function clientAchievementDefinitions() {
+  const catalogSource = fs.readFileSync(path.join(repoRoot, "src", "00-achievement-catalog.js"), "utf8");
   const source = fs.readFileSync(path.join(repoRoot, "src", "19-game-achievements.js"), "utf8");
   const context = {
     globalThis: null,
@@ -21,6 +22,7 @@ function clientAchievementDefinitions() {
   };
   context.globalThis = context;
   vm.createContext(context);
+  vm.runInContext(catalogSource, context);
   vm.runInContext(`${source}\nglobalThis.__achievementDefinitions = getAchievementDefinitions();`, context);
   return Array.from(context.__achievementDefinitions);
 }
@@ -38,7 +40,7 @@ test("achievement vault has a large categorized grind ladder with server parity"
       .map((key) => [key, item[key]])
   );
 
-  assert.ok(client.length >= 70, `expected at least 70 achievements, found ${client.length}`);
+  assert.equal(client.length, 79);
   assert.deepEqual(client.map(compact), ACHIEVEMENTS.map(compact));
   assert.deepEqual(new Set(client.map((item) => item.category)), new Set(["strike", "combat", "systems", "career"]));
   assert.ok(client.some((item) => item.minLifetimeRuns >= 1000));

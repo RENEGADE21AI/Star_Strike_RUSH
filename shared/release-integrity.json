@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "progressionAuthority": "device_local_preseason",
+  "clientCompetitionWritesEnabled": false,
+  "serverCompetitionWritesEnabled": false,
+  "serverProgressionWritesEnabled": false,
+  "serverAppCheckEnforced": false
+}

@@ -6,6 +6,8 @@ function resetProgressData() {
   codexDiscovered = {};
   codexHasNew = false;
   saveCodexDiscovered();
+  if (typeof resetLocalAchievements === "function") resetLocalAchievements();
+  try { localStorage.removeItem("star_strike_rush_last_run_v1"); } catch {}
   metaProgress = makeDefaultMetaProgress();
   lastRunMeta = null;
   saveMetaProgress();
@@ -115,23 +117,6 @@ function openTitleProgressRoad(tab = null) {
 }
 
 function handleProgressClaim(rewardId) {
-  const onlineSvc = window.starStrikeOnline;
-  const onlineState = onlineSvc && typeof onlineSvc.getState === "function" ? onlineSvc.getState() : null;
-  if (onlineState && onlineState.user && typeof onlineSvc.claimSeasonReward === "function") {
-    titleProgressSelectedNode = { ...titleProgressSelectedNode, status: "CLAIMING" };
-    titleProgressClaimPulse = 32;
-    onlineSvc.claimSeasonReward(rewardId).then((result) => {
-      const refreshed = typeof getProgressDetailById === "function" ? getProgressDetailById(rewardId) : null;
-      if (refreshed) titleProgressSelectedNode = refreshed;
-      titleProgressClaimPulse = result && result.ok ? 32 : 0;
-    }).catch(() => {
-      const refreshed = typeof getProgressDetailById === "function" ? getProgressDetailById(rewardId) : null;
-      if (refreshed) titleProgressSelectedNode = refreshed;
-      showMessage("ONLINE CLAIM FAILED", 90);
-    });
-    return;
-  }
-
   const result = claimSeasonReward(rewardId);
   titleProgressClaimPulse = 32;
   const refreshed = typeof getProgressDetailById === "function" ? getProgressDetailById(rewardId) : null;
@@ -145,7 +130,35 @@ function handleProgressClaim(rewardId) {
   }
 }
 
-function handleCodexPanelPointerDown(x, y) {
+let titleScrollablePendingAction = null;
+const codexScrollController = createCanvasScrollController({
+  getValue: () => codexScroll,
+  setValue: (value) => { codexScroll = value; },
+  getMax: () => codexMaxScroll()
+});
+const achievementScrollController = createCanvasScrollController({
+  getValue: () => achievementScroll,
+  setValue: (value) => { achievementScroll = value; },
+  getMax: () => getAchievementMaxScroll()
+});
+
+function updateTitleScrollableDrag(pointerId, x, y) {
+  if (codexScrollController.move(pointerId, x, y)) return true;
+  if (achievementScrollController.move(pointerId, x, y)) return true;
+  return false;
+}
+
+function endTitleScrollableDrag(pointerId, cancelled = false) {
+  const codexResult = codexScrollController.end(pointerId, cancelled);
+  const achievementResult = achievementScrollController.end(pointerId, cancelled);
+  const result = codexResult.handled ? codexResult : achievementResult;
+  const pending = titleScrollablePendingAction;
+  titleScrollablePendingAction = null;
+  if (result.handled && !result.moved && !result.cancelled && typeof pending === "function") pending();
+  return result.handled;
+}
+
+function handleCodexPanelPointerDown(x, y, pointerId = null) {
   const r = getCodexRects();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
   if (codexDetailType) {
@@ -166,8 +179,15 @@ function handleCodexPanelPointerDown(x, y) {
   for (const type of types) {
     const card = r.rects[type];
     if (!hitRect(card, x, y)) continue;
-    if (codexDiscovered[type]) codexDetailType = type;
+    titleScrollablePendingAction = () => {
+      if (codexDiscovered[type]) codexDetailType = type;
+    };
+    codexScrollController.begin(pointerId, x, y, canvas);
     return true;
+  }
+  if (hitRect(r.contentRect, x, y)) {
+    titleScrollablePendingAction = null;
+    codexScrollController.begin(pointerId, x, y, canvas);
   }
   return true;
 }
@@ -194,7 +214,8 @@ function handleOnlinePanelPointerDown(x, y) {
   if (accountPanelTab === "settings" && hitRect(r.motion, x, y)) { settingReducedMotion = !settingReducedMotion; saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.flash, x, y)) { settingReducedFlash = !settingReducedFlash; saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.contrast, x, y)) { settingHighContrast = !settingHighContrast; applyAccessibilitySettings(); saveSettings(); return true; }
-  if (accountPanelTab === "settings" && hitRect(r.sound, x, y)) { setSoundEffectsEnabled(!settingSoundEffects); saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.music, x, y)) { setMusicEnabled(!settingMusicEnabled); saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.effects, x, y)) { setEffectsEnabled(!settingEffectsEnabled); saveSettings(); return true; }
   if (accountPanelTab === "pilot" && hitRect(r.editCallSign, x, y)) {
     if (callSignEditing) commitCallSignDraft();
     else beginCallSignEditing();
@@ -212,7 +233,7 @@ function handleRecordsPanelPointerDown(x, y) {
   return true;
 }
 
-function handleAchievementsPanelPointerDown(x, y) {
+function handleAchievementsPanelPointerDown(x, y, pointerId = null) {
   const r = getAchievementsRects();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
   for (const [category, rect] of Object.entries(r.tabs)) {
@@ -220,6 +241,10 @@ function handleAchievementsPanelPointerDown(x, y) {
   }
   if (hitRect(r.scrollUp, x, y)) { achievementScroll -= 222; clampAchievementScroll(); return true; }
   if (hitRect(r.scrollDown, x, y)) { achievementScroll += 222; clampAchievementScroll(); return true; }
+  if (hitRect(r.contentRect, x, y)) {
+    titleScrollablePendingAction = null;
+    achievementScrollController.begin(pointerId, x, y, canvas);
+  }
   return true;
 }
 
@@ -248,10 +273,10 @@ function handleProgressPanelPointerDown(x, y, pointerId = null) {
 
 function handleOpenTitlePanelPointerDown(x, y, pointerId = null) {
   if (!titlePanelHit(x, y)) return true;
-  if (titleSubState === "codex") return handleCodexPanelPointerDown(x, y);
+  if (titleSubState === "codex") return handleCodexPanelPointerDown(x, y, pointerId);
   if (titleSubState === "online") return handleOnlinePanelPointerDown(x, y);
   if (titleSubState === "records") return handleRecordsPanelPointerDown(x, y);
-  if (titleSubState === "achievements") return handleAchievementsPanelPointerDown(x, y);
+  if (titleSubState === "achievements") return handleAchievementsPanelPointerDown(x, y, pointerId);
   if (titleSubState === "progress") return handleProgressPanelPointerDown(x, y, pointerId);
   return true;
 }
@@ -276,7 +301,6 @@ function handleTitlePointerDown(x, y, pointerId = null) {
   if (hitRect(playRect, x, y)) {
     playBtnPointerDown = true;
     playBtnPointerInside = true;
-    playBtnHold = 0;
     return true;
   }
   if (hitRect(iconRects.account, x, y)) {

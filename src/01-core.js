@@ -77,7 +77,6 @@ let titleProgressSelectedNode = null;
 let titleProgressClaimPulse = 0;
 let titleMetaScreenTransition = 1;
 let titlePanelOrigin = { x: GAME_W / 2, y: GAME_H / 2 };
-let playBtnHold = 0;
 let playBtnPointerDown = false;
 let playBtnPointerInside = false;
 let settingMaxParticles = 900;
@@ -85,8 +84,8 @@ let settingScreenShake = true;
 let settingReducedMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 let settingReducedFlash = false;
 let settingHighContrast = false;
-let settingSoundEffects = true;
-let respawnHold = 0;
+let settingMusicEnabled = true;
+let settingEffectsEnabled = true;
 let respawnPointerDown = false;
 let respawnPointerInside = false;
 let codexDiscovered = {};
@@ -169,7 +168,12 @@ function getLocalHighScore() {
   return Math.max(0, Math.floor(highScore || 0));
 }
 function saveCallSign() {
-  try { localStorage.setItem("star_strike_rush_callsign_v1", callSign); } catch {}
+  try {
+    localStorage.setItem("star_strike_rush_callsign_v1", callSign);
+    return true;
+  } catch {
+    return false;
+  }
 }
 function getLocalPilotSeed() {
   const key = "star_strike_rush_pilot_seed_v1";
@@ -234,24 +238,33 @@ function commitCallSignDraft(fromBlur = false) {
   callSignInputEl.value = callSignDraft;
   if (!savingAccountIdentity) {
     callSign = result.callSign;
-    saveCallSign();
+    const stored = saveCallSign();
+    callSignEditing = false;
+    callSignInputEl.blur();
+    setCallSignStatus(stored ? "SAVED ON THIS DEVICE" : "LOCAL SAVE FAILED", stored ? "success" : "error", 180);
+    return stored;
   }
   callSignEditing = false;
-  setCallSignStatus(result.message || "PILOT ID SAVED", "success", 150);
   callSignInputEl.blur();
   const onlineService = window.starStrikeOnline;
   if (savingAccountIdentity && onlineService && typeof onlineService.updateCallSign === "function") {
-    setCallSignStatus("SAVING PILOT ID...", "saving", 0);
+    setCallSignStatus("PUBLISHING TO ACCOUNT", "saving", 0);
     Promise.resolve(onlineService.updateCallSign(result.callSign)).then((syncResult) => {
-      if (syncResult && syncResult.localOnly) {
-        setCallSignStatus("ACCOUNT SAVE UNAVAILABLE", "error", 210);
+      if (!syncResult || syncResult.storageSucceeded === false) {
+        setCallSignStatus("ACCOUNT UPDATE FAILED", "error", 210);
+      } else if (syncResult.published) {
+        setCallSignStatus("ACCOUNT UPDATED", "success", 180);
+      } else if (syncResult.pending) {
+        setCallSignStatus("SAVED LOCALLY — ACCOUNT UPDATE PENDING", "pending", 240);
       } else {
-        setCallSignStatus("PILOT ID SYNCED", "success", 150);
+        setCallSignStatus("ACCOUNT UPDATE FAILED", "error", 210);
       }
     }).catch(() => {
-      setCallSignStatus("SAVED LOCALLY | ONLINE SYNC FAILED", "error", 210);
+      setCallSignStatus("ACCOUNT UPDATE FAILED", "error", 210);
     });
-  } else if (!savingAccountIdentity) setCallSignStatus("LOCAL CALL SIGN SAVED", "success", 120);
+  } else {
+    setCallSignStatus("ACCOUNT UPDATE FAILED", "error", 210);
+  }
   return true;
 }
 function setHandleStatus(message, frames = 150) {
@@ -265,8 +278,8 @@ function beginHandleEditing() {
     setHandleStatus("SIGN IN TO CLAIM A HANDLE", 150);
     return false;
   }
-  if (online.competitionBackend === "unavailable") {
-    setHandleStatus("COMPETITION SERVICES ARE OFFLINE", 180);
+  if (online.identityService === "unavailable") {
+    setHandleStatus("IDENTITY SERVICE IS OFFLINE", 180);
     return false;
   }
   if (online.profileHandle) {
@@ -323,7 +336,8 @@ function saveSettings() {
       settingReducedMotion,
       settingReducedFlash,
       settingHighContrast,
-      settingSoundEffects
+      settingMusicEnabled,
+      settingEffectsEnabled
     }));
   } catch {}
 }
@@ -357,7 +371,15 @@ function loadSettings() {
     if (obj && typeof obj.settingReducedMotion === "boolean") settingReducedMotion = obj.settingReducedMotion;
     if (obj && typeof obj.settingReducedFlash === "boolean") settingReducedFlash = obj.settingReducedFlash;
     if (obj && typeof obj.settingHighContrast === "boolean") settingHighContrast = obj.settingHighContrast;
-    if (obj && typeof obj.settingSoundEffects === "boolean") settingSoundEffects = obj.settingSoundEffects;
+    const legacyAudioEnabled = obj && typeof obj.settingSoundEffects === "boolean"
+      ? obj.settingSoundEffects
+      : null;
+    settingMusicEnabled = obj && typeof obj.settingMusicEnabled === "boolean"
+      ? obj.settingMusicEnabled
+      : legacyAudioEnabled !== null ? legacyAudioEnabled : settingMusicEnabled;
+    settingEffectsEnabled = obj && typeof obj.settingEffectsEnabled === "boolean"
+      ? obj.settingEffectsEnabled
+      : legacyAudioEnabled !== null ? legacyAudioEnabled : settingEffectsEnabled;
   } catch {}
   MAX_PARTICLES = settingMaxParticles;
   applyAccessibilitySettings();
@@ -505,41 +527,6 @@ function currentMetaSnapshot() {
     lifetime: { ...progress.lifetime }
   };
 }
-function mergeServerMetaProgress(serverMeta) {
-  if (!serverMeta || typeof serverMeta !== "object") return currentMetaSnapshot();
-  const progress = getMetaProgress();
-  const lifetime = serverMeta.lifetime && typeof serverMeta.lifetime === "object" ? serverMeta.lifetime : {};
-  progress.totalGlory = Math.max(0, Math.floor(serverMeta.totalGlory || 0));
-  progress.currentSeason.id = String(serverMeta.seasonId || CURRENT_SEASON_ID).slice(0, 40);
-  progress.currentSeason.name = String(serverMeta.seasonName || CURRENT_SEASON_NAME).slice(0, 60);
-  if (progress.currentSeason.id !== CURRENT_SEASON_ID) {
-    progress.currentSeason.id = CURRENT_SEASON_ID;
-    progress.currentSeason.name = CURRENT_SEASON_NAME;
-    progress.currentSeason.xp = 0;
-    progress.currentSeason.tier = 1;
-    progress.currentSeason.claimedRewardIds = [];
-  } else {
-    progress.currentSeason.xp = Math.max(0, Math.floor(serverMeta.seasonXP || 0));
-    progress.currentSeason.tier = currentSeasonTierForXP(progress.currentSeason.xp);
-    progress.currentSeason.claimedRewardIds = Array.isArray(serverMeta.seasonClaimedRewardIds)
-      ? Array.from(new Set(serverMeta.seasonClaimedRewardIds.map((id) => String(id).slice(0, 80)))).slice(0, 220)
-      : [];
-  }
-  progress.credits = Math.max(0, Math.floor(serverMeta.credits || 0));
-  progress.lifetime.runs = Math.max(0, Math.floor(lifetime.runs || 0));
-  progress.lifetime.score = Math.max(0, Math.floor(lifetime.score || 0));
-  progress.lifetime.kills = Math.max(0, Math.floor(lifetime.kills || 0));
-  progress.lifetime.powerups = Math.max(0, Math.floor(lifetime.powerups || 0));
-  progress.lifetime.ghostUses = Math.max(0, Math.floor(lifetime.ghostUses || 0));
-  progress.lifetime.bosses = Math.max(0, Math.floor(lifetime.bosses || 0));
-  progress.lifetime.damageTaken = Math.max(0, Math.floor(lifetime.damageTaken || 0));
-  progress.lifetime.highestCombo = Math.max(0, Math.floor(lifetime.highestCombo || 0));
-  progress.lifetime.bestScore = Math.max(0, Math.floor(lifetime.bestScore || 0));
-  progress.lifetime.bestPhase = Math.max(1, Math.floor(lifetime.bestPhase || 1));
-  progress.lastUpdatedAtMs = Date.now();
-  saveMetaProgress();
-  return currentMetaSnapshot();
-}
 function currentRunReceiptSnapshot() {
   const stats = state.runStats || {};
   const score = Math.max(0, Math.floor(state.score || 0));
@@ -633,7 +620,9 @@ function applyRunMetaProgress() {
 function getLastRunMeta() {
   return lastRunMeta ? JSON.parse(JSON.stringify(lastRunMeta)) : null;
 }
-function saveMilestone() { if (highScoreDirty) saveHighScore(); }
+function saveMilestone() {
+  if (state.runMode !== "debug" && highScoreDirty) saveHighScore();
+}
 function kickShake(amount) {
   if (!settingScreenShake) return;
   state.fx.shake = Math.max(state.fx.shake, amount);
@@ -856,11 +845,9 @@ function addScore(basePoints) {
   const surge = state.player && state.player.scoreSurge > 0 ? 1.5 : 1;
   const pts = Math.round(basePoints * state.multiplier * surge);
   state.score += pts;
-  if (state.score > highScore) { highScore = state.score; highScoreDirty = true; }
 }
 function addFlatScore(points) {
   state.score += points;
-  if (state.score > highScore) { highScore = state.score; highScoreDirty = true; }
 }
 function noteKill(basePoints) {
   state.comboKills++;
