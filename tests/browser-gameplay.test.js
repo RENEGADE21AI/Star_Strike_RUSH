@@ -339,6 +339,12 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
       state.player.hp = 1;
       pauseGame("manual");
     });
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.gameState === "playing"
+        && snapshot.player.hp === 1
+        && snapshot.ui.pauseNotice === "PAUSE NEEDS 1 SPARE HEALTH BAR";
+    });
     const refused = await debugSnapshot(page);
     assert.equal(refused.gameState, "playing");
     assert.equal(refused.player.hp, 1);
@@ -347,6 +353,12 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
     await page.evaluate(() => {
       state.player.hp = 3;
       pauseGame("visibility");
+    });
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.gameState === "paused"
+        && snapshot.player.hp === 3
+        && snapshot.ui.pauseNotice === "AUTO-PAUSE: NO HEALTH COST";
     });
     const automatic = await debugSnapshot(page);
     assert.equal(automatic.gameState, "paused");
