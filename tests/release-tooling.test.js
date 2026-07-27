@@ -13,6 +13,8 @@ test("release tooling defaults to preview and gates every production mutation", 
   assert.match(releaseScript, /\[switch\]\$CheckOnly/);
   assert.match(releaseScript, /Worktree must be clean/);
   assert.match(releaseScript, /ExpectedBranch/);
+  assert.match(releaseScript, /Node\.js 22 is required/);
+  assert.match(releaseScript, /Verified release Node runtime/);
   assert.match(releaseScript, /git fetch origin --prune/);
   assert.match(releaseScript, /Local main .* differs from origin\/main/);
   assert.match(releaseScript, /Verified Firebase project/);
