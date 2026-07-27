@@ -12,9 +12,9 @@
     "test:firebase-client": "npx firebase emulators:exec --only auth,firestore,functions \"node --test tests/firebase-client.emulator.mjs\"",
     "test:visual": "node scripts/visual_qa.js",
     "test:secret": "node scripts/secret_scan.js",
-    "release:check": "pwsh -NoProfile -File scripts/release.ps1 -CheckOnly -ExpectedBranch \"*\"",
-    "deploy:preview": "pwsh -NoProfile -File scripts/release.ps1 -ExpectedBranch main",
-    "deploy:production": "pwsh -NoProfile -File scripts/release.ps1 -Production -ExpectedBranch main"
+    "release:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -CheckOnly -ExpectedBranch \"*\"",
+    "deploy:preview": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -ExpectedBranch main",
+    "deploy:production": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Production -ExpectedBranch main"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.1",
