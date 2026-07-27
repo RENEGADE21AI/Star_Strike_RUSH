@@ -1,113 +1,135 @@
 # Build Week 2026
 
-## Comparison baseline
+## Baseline
 
-- Preserved commit: `529aca1`.
-- Published comparison branch: `pre-competition`.
-- Competition branch reconciled into `main` before this recovery pass.
-- Final polish branch: `codex/post-recovery-polish`.
+- Preserved comparison commit: `529aca1`.
+- Release-integrity starting commit:
+  `d5a298fd5cb9d653b2013c6a3e5d894342a1e5e0`.
+- Release-integrity feature branch: `codex/release-integrity-preseason`.
 
-The baseline already had a playable shooter, bosses, adaptive pressure,
-achievements, Glory/Season progression, a Codex, and Firebase scaffolding. Its
-main risks were broad collision approximations, refresh-rate-dependent runtime
-behavior, unsafe positional collision calls, input crashes, public identity
-overexposure, touch/desktop ambiguity, unreachable Debris Warden patterns, and
-visual/UI inconsistency.
+The starting game already had local play, 79 achievements, Glory/Season roads,
+music/effects, a Records Network, a Pilot Dossier, Firestore rules, callable
+Functions, and closed client/server competition gates. The release-integrity
+pass preserved working gameplay while correcting account/progression authority
+and release evidence.
 
-## Product transformation
+## Product and runtime transformation
 
 - Split gameplay responsibility across ordered asset, runtime, rules, input,
-  entity, boss, rendering, UI, session, and online modules without a risky
-  framework rewrite.
-- Added a deterministic 60 Hz fixed-step clock, high-DPI canvas backing,
+  entity, boss, rendering, session, and Firebase modules without a framework
+  rewrite.
+- Added a deterministic 60 Hz fixed-step clock, high-DPI Canvas backing,
   background-gap clamping, pause/resume countdowns, and focus-loss auto-pause.
 - Replaced positional collision calls with an object contract and per-entity
-  collision circles that remain separate from decorative artwork.
-- Added explicit sprite orientation, weapon origins, exhaust origins, and
-  anchors. The player ship now always faces forward/up; hostile ships face into
-  the playfield.
-- Imported 45 supplied source images through a reproducible transparency,
-  trim, padding, and browser-size pipeline. Hosting ships 47 optimized
-  derivatives: 26 sprites, 13 powerups, and 8 menu/PWA icons.
-- Added the supplied wingman as a compact, independently trimmed sprite with
-  its own collision radius. Player and wingmen are rotated into forward/up
-  flight; hostile fighters remain oriented into the playfield.
-- Added the supplied powerup art at ship-safe scale. Drops rotate as they fall,
-  retain compact pickup hitboxes, and no longer render the old dotted orbital
-  ring behind them.
-- Rebalanced the Debris Warden so single rows dominate, doubles remain rare and
-  reachable, every row accelerates as health falls, and rocks grow smoothly
-  from zero to their final visual/collision scale.
-- Made every boss invulnerable while entering/staging. `STAGING` remains visible
-  until the first attack begins, at which point damage is enabled.
-- Removed in-run announcement cards and popup banners. Boss state, abilities,
-  safe routes, health, and score use compact HUD or in-world communication.
-- Rebuilt title-to-game travel as a launch/arrival transition and made panels
-  expand from and collapse back into their source controls.
-- Replaced wide-screen curtain bars with irregular low-contrast space-fog
-  pockets, continuous stars, and a quick shared edge fade that can obscure
-  ships and hazards near the playfield boundary.
-- Rebuilt Account as a tabbed Pilot Dossier with an editable autosaving call
-  sign, small unique account-bound handle, public-visibility warning, restrained
-  network state, local settings, and a truthful preseason league state.
-- Added reduced-motion, reduced-flash, and high-contrast settings.
-- Reworked the Codex into categorized two-column cards with scrolling, discovery
-  state, and wrapped tactical detail.
-- Kept provider email, name, and avatar out of public game identity payloads.
-- Minimized private profile storage to game-owned fields only. Callable
-  Functions no longer duplicate provider email, display name, or avatar URL,
-  and remove legacy copies during the next legitimate profile write.
-- Kept authenticated leaderboard reads available while deliberately gating new
-  public score and weekly league writes. The callable Functions now enforce the
-  fair-play pause before authentication or payload handling, so an old or
-  modified client cannot bypass the recovery client's UI.
+  collision circles separate from decorative artwork.
+- Imported owner-supplied source art through a reproducible transparency, trim,
+  padding, and browser-size pipeline. Original files remain outside Hosting.
+- Rebalanced boss staging and Debris Warden patterns, clarified abilities, and
+  kept in-run communication compact.
+- Rebuilt title/panel transitions, progression roads, the Pilot Dossier,
+  Achievement Vault, Codex, and Records Network around compact Canvas UI.
 
-## Verification evidence
+## Release-integrity work
 
-- `npm test`: 56/56 Node and Chromium tests passing on the hardening branch.
-- `npm run test:rules`: 4/4 Firestore emulator authorization suites passing,
-  covering anonymous denial, bounded authenticated public reads, owner-only
-  private reads, browser-write denial, and callable-only identity/league data.
-- Browser coverage starts a run, moves, pauses/resumes, verifies frozen pause
-  time, exercises touch joystick/ability input, edits and autosaves a call sign,
-  collects an artwork-backed powerup with a rendered pickup burst, checks that
-  gameplay announcements remain absent, and verifies persisted reduced-motion,
-  reduced-flash, high-contrast, and sound preferences.
-- Contract coverage includes collision overlap/misses, collision spawn scale,
-  sprite orientation, fixed-step equivalence at 30/60/90/120 Hz, long-gap
-  clamping, boss staging invulnerability, 1,500 seeded debris patterns, ability
-  accounting, public identity whitelists, and the competition gate.
-- Visual QA captures 15 mobile/desktop states, including the title at
-  375×667, 390×844, 430×932, and 1440×900; Pilot Dossier; settings;
-  achievements; progression; Codex; powerup gallery; wingmen; Siphon; and
-  active/incoming Debris Warden. The incoming-boss capture asserts full HP and
-  `damageable=false` under automatic fire.
-- `npm run build` creates an allowlisted `dist/` payload. Firebase Hosting serves
-  that directory without an SPA catch-all and applies CSP, MIME-sniffing,
-  referrer, permissions, and cache headers.
-- GitHub Actions installs Chromium, syntax-checks browser/Function JavaScript,
-  runs all tests plus the Firestore emulator authorization suite, audits
-  production dependencies at high severity, builds `dist/`, loads the Function
-  module, validates Firebase JSON, and performs a secret scan.
+### Device progression and account identity
 
-## Codex evidence
+- Defined separate configuration for client competition writes, server
+  competition writes, server progression writes, and progression authority.
+- Device progression remains authoritative. Account hydration stores Firebase
+  metadata as `onlineArchiveMeta` and has no API capable of merging it into
+  local gameplay progression.
+- Signed-in and signed-out Season reward claims use one local path.
+- Call-sign publication uses UID-scoped pending state with explicit stored,
+  publishing, published, pending, and failed outcomes.
+- `onAuthStateChanged` is the sole hydration owner, with stale-UID cancellation,
+  one profile callable, one aggregate load, one archive listener, and listener
+  teardown on sign-out.
+- Google popup auth falls back to redirect where needed; boot consumes one
+  redirect result without duplicating hydration.
+- Browser runtime and test tooling use exact Firebase SDK `12.16.0`.
 
-OpenAI Codex was used to audit, implement, test, and visually inspect this
-recovery. No GPT model is embedded in or called by the shipped game.
+### Server and legacy-data boundary
+
+- `leaderboard_scores` is retained as a **LEGACY/PRESEASON ARCHIVE**.
+- Legacy score/phase fields are separated from future verified fields and never
+  seed verified/profile progression.
+- `submitRunReceipt`, `joinWeeklyLeague`, and `claimSeasonReward` reject before
+  auth, reads, or writes while server progression writes are paused.
+- Active identity callables have payload-size bounds, per-UID throttles, safe
+  errors, and a prepared-but-disabled App Check flag.
+
+### Achievement migration
+
+- One canonical JSON schema generates browser and server catalogs.
+- Build validation requires exactly 79 unique, categorized, tiered, supported
+  definitions with honest combo/boss semantics.
+- Deterministic sanity checks cover one-run reachability.
+- An Admin-only, dry-run-by-default migration reads historical unlock documents
+  once and creates an additive, idempotent aggregate with `schemaVersion`,
+  `migratedAt`, and `sourceCount` without changing original timestamps.
+- Ordinary hydration returns one sanitized aggregate rather than listing up to
+  79 documents.
+
+### Interaction, audio, and title
+
+- A reusable Canvas scroll controller powers Vault and Codex touch drag,
+  pointer capture, thresholding, clamping, restrained momentum, wheel,
+  keyboard, and visible buttons.
+- Achievement descriptions use measured two-line wrapping.
+- Music and Effects are independent settings with safe migration from the old
+  combined toggle.
+- Music loading is gesture-safe and lazy; its mix is based on real elapsed
+  seconds and is equivalent at 30, 60, 90, and 120 Hz.
+- Title flight uses `durationSeconds`, normalized progress, explicit depth
+  profiles, and one `titleFormationPositionAt` function for runtime, tangent,
+  reservation, and measurement.
+- Foreground/midground ships are readable, remain below primary controls, and
+  Reduced Motion freezes a nearly static atmospheric formation.
+- Play and Respawn use immediate activation with a short press response; the
+  misleading hold meter is gone.
+
+### Build and release safety
+
+- The build applies one commit-derived version to HTML runtime references and
+  changed assets.
+- `dist/version.json` records commit SHA, timestamp, package version,
+  progression mode, and competition mode.
+- HTML and `version.json` are no-store so new HTML cannot silently pair with an
+  incompatible old runtime.
+- The real browser Firebase client test runs against Auth, Firestore, and
+  Functions emulators.
+- Visual QA starts its own server, clicks computed debug rectangles, asserts
+  state, measures title traffic, tests touch scrolling/Reduced Motion, and
+  writes screenshots, JSON, and failure traces.
+- `scripts/release.ps1` defaults to a Hosting preview and requires an explicit
+  production switch.
+
+## Current branch evidence
+
+- `npm test`: 85/85 passing.
+- Firebase client emulator scenario: passed Accounts A/B, one-owner hydration,
+  pending call-sign retry, auth restoration, progression non-overwrite,
+  aggregate retrieval, sign-out cleanup, and all three paused callables.
+- Visual QA: 16/16 asserted cases passed across 375×667, 390×844, 430×932,
+  768×1024, and 1440×900.
+- Production build and commit-version contract: passed.
+
+Final rule tests, dependency audits, secret scan, GitHub checks, preview smoke,
+and live-account/deployment evidence must be rerun or obtained on the exact
+release commit. This document does not claim those pending steps.
+
+## Honest limitations
+
+- Public score/league submission stays disabled pending server-issued run
+  sessions, replay or telemetry verification, live App Check, and abuse review.
+- Real Google sign-in and cross-account behavior require a human smoke test
+  against the configured live project and its authorized domains.
+- The two MP3 files were supplied by the owner, but repository evidence does not
+  independently verify public-distribution license, authorship, or source URL.
+- Production is not considered deployed until live `version.json`, headers,
+  private-path 404s, identity actions, device progression, and paused callables
+  are verified against the merge commit.
 
 Codex task/session ID: `019f8668-58bb-7c72-96f2-e4fe17af834c`
 
 Playable URL: https://star-strike-rush.web.app
-
-## Honest limitations
-
-- Public score/league submission is disabled pending server-issued run sessions,
-  App Check, replay or telemetry verification, rate limits, and abuse review.
-- Real Google sign-in and cross-device persistence require a human account smoke
-  test against the configured Firebase project.
-- Music, haptics, account migration UX, offline sync/outbox behavior, and synced
-  accessibility settings are deferred.
-- Procedural rendering remains a fallback if an image fails to decode.
-- The Function dependency tree currently has no high/critical audit finding;
-  moderate transitive findings remain documented in `PROJECT_STATUS.md` rather
-  than forcing a breaking dependency downgrade.

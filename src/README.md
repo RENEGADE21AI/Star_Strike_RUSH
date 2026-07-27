@@ -55,7 +55,7 @@ after the files they depend on, because the current code intentionally shares gl
   `scenario=debris-incoming`, and `scenario=powerups` URLs create deterministic
   QA encounters; `H` toggles hitboxes, anchors, origins, and safe lanes.
 - `19-game-achievements.js`: per-run and lifetime achievement ladders, progress
-  metrics, run stat payloads, and online sync hooks called by the game loop.
+  metrics, run stat payloads, and account-identity hooks called by the game loop.
 - `20-firebase-online.js`: Firebase Auth, callable profile/handle services,
   graceful backend-unavailable state, and the explicit recovery competition
   gate. Public score/league submission and leaderboard subscription remain
