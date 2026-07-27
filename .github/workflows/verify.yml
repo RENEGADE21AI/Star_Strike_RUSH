@@ -51,11 +51,25 @@ jobs:
       - name: Local tracked-file secret scan
         run: npm run test:secret
       - name: Production build
+        env:
+          RELEASE_COMMIT_SHA: ${{ github.sha }}
         run: npm run build
+      - name: Validate exact backend release marker
+        run: |
+          node scripts/generate-backend-release.js --sha "$GITHUB_SHA"
+          node scripts/create-ci-release-report.js "$GITHUB_SHA" dist/version.json functions/release-identity.generated.js release-evidence/staged-release-report.json
       - name: Load Function module and validate Firebase config
         run: |
           node -e "require('./functions/index.js'); console.log('functions loaded')"
           node -e "JSON.parse(require('fs').readFileSync('firestore.indexes.json')); JSON.parse(require('fs').readFileSync('firebase.json')); console.log('firebase json valid')"
+      - name: Upload sanitized release-gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-${{ github.run_id }}
+          path: release-evidence/staged-release-report.json
+          if-no-files-found: error
+          retention-days: 14
 
   secret-scan:
     runs-on: ubuntu-latest

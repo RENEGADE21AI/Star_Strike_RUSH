@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "releaseSha": "",
+  "previewUrl": "",
+  "previewHostingShaVerified": false,
+  "backendShaVerified": false,
+  "accountASignInPassed": false,
+  "accountACallSignPublicationPassed": false,
+  "accountASignOutPassed": false,
+  "accountBIsolationPassed": false,
+  "accountAReentryPersistencePassed": false,
+  "deviceProgressUnchanged": false,
+  "publicIdentitySanitized": false,
+  "achievementMigration": {
+    "disposition": "incomplete",
+    "accountCount": 0,
+    "accountsNeedingChange": 0,
+    "sourceUnlockCount": 0,
+    "ignoredInvalidIdCount": 0,
+    "completedAtUtc": ""
+  },
+  "musicDistributionAuthorization": {
+    "authorizedByProjectOwner": false,
+    "approvedAtUtc": "",
+    "files": [
+      "assets/audio/hangar-bay-seven.mp3",
+      "assets/audio/gravitys-edge.mp3"
+    ]
+  },
+  "completedAtUtc": ""
+}

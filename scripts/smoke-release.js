@@ -6,8 +6,24 @@ const baseUrl = String(process.argv[2] || "").replace(/\/$/, "");
 const expectedCommit = String(process.argv[3] || "");
 const verifyCallables = process.argv.includes("--verify-callables");
 const projectId = "star-strike-rush";
+const allowHttpSmoke = process.env.ALLOW_HTTP_SMOKE === "1";
+const functionsBaseUrl = String(
+  process.env.FUNCTIONS_BASE_URL ||
+  `https://us-central1-${projectId}.cloudfunctions.net`
+).replace(/\/$/, "");
 
-if (!/^https:\/\//.test(baseUrl)) throw new Error("Usage: node scripts/smoke-release.js https://host SHA [--verify-callables]");
+if (!/^https:\/\//.test(baseUrl) && !(
+  allowHttpSmoke &&
+  /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(baseUrl)
+)) {
+  throw new Error("Usage: node scripts/smoke-release.js https://host SHA [--verify-callables]");
+}
+if (!/^https:\/\//.test(functionsBaseUrl) && !(
+  allowHttpSmoke &&
+  /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(functionsBaseUrl)
+)) {
+  throw new Error("Functions smoke base URL must use HTTPS or an explicitly allowed local test origin.");
+}
 if (!/^[0-9a-f]{40}$/i.test(expectedCommit)) throw new Error("Expected commit must be a full 40-character SHA.");
 
 async function request(url, options = {}) {
@@ -25,7 +41,7 @@ async function requirePrivate404(pathname) {
 }
 
 async function requirePausedCallable(name, data = {}) {
-  const response = await request(`https://us-central1-${projectId}.cloudfunctions.net/${name}`, {
+  const response = await request(`${functionsBaseUrl}/${name}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ data })
@@ -33,6 +49,14 @@ async function requirePausedCallable(name, data = {}) {
   const body = await response.json();
   assert.equal(body?.error?.status, "FAILED_PRECONDITION", `${name} must reject with FAILED_PRECONDITION`);
   assert.match(body.error.message, /paused|preseason/i, `${name} must use accurate preseason wording`);
+  const release = body?.error?.details?.release;
+  assert.ok(release && typeof release === "object", `${name} must return backend release metadata`);
+  assert.equal(release.commitSha, expectedCommit, `${name} backend commit SHA differs`);
+  assert.equal(release.progressionAuthority, "device_local_preseason", `${name} progression authority differs`);
+  assert.equal(release.competitionWritesEnabled, false, `${name} competition writes must remain closed`);
+  assert.equal(release.serverProgressionWritesEnabled, false, `${name} progression writes must remain closed`);
+  assert.equal(release.appCheckEnforced, false, `${name} App Check must not be claimed as enforced`);
+  return release;
 }
 
 (async () => {
@@ -70,12 +94,17 @@ async function requirePausedCallable(name, data = {}) {
     requirePrivate404("/source-art/README.md")
   ]);
 
+  let backendRelease = null;
   if (verifyCallables) {
-    await Promise.all([
+    const releases = await Promise.all([
       requirePausedCallable("submitRunReceipt"),
       requirePausedCallable("joinWeeklyLeague"),
       requirePausedCallable("claimSeasonReward", { rewardId: "season_01_tier_1" })
     ]);
+    backendRelease = releases[0];
+    for (const releaseIdentity of releases.slice(1)) {
+      assert.deepEqual(releaseIdentity, backendRelease, "paused callable backend release identities differ");
+    }
   }
   console.log(JSON.stringify({
     ok: true,
@@ -83,7 +112,8 @@ async function requirePausedCallable(name, data = {}) {
     commitSha: release.commitSha,
     progressionMode: release.progressionMode,
     competitionMode: release.competitionMode,
-    callablesVerified: verifyCallables
+    callablesVerified: verifyCallables,
+    backendCommitSha: backendRelease && backendRelease.commitSha || null
   }));
 })().catch((error) => {
   console.error(error.stack || error);
