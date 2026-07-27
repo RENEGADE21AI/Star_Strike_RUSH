@@ -259,7 +259,8 @@ async function runCase(browser, baseUrl, item) {
     evidence.playing = playing;
     if (!(playing.layout.pause?.x < 60 && playing.layout.pause?.y < 60)) errors.push("pause button is not top-left");
     if (!(playing.layout.hud?.energy?.y < playing.layout.hud?.health?.y)) errors.push("energy is not above health");
-    if (playing.layout.hud?.health?.orientation !== "vertical") errors.push("health is not a vertical-bar layout");
+    if (!(playing.layout.hud?.energy?.y > item.height * 0.58)) errors.push("energy and health are not bottom-left");
+    if (playing.layout.hud?.health?.orientation !== "horizontal") errors.push("health is not a classic horizontal layout");
     if (!(playing.layout.hud?.score?.x > item.width / 2)) errors.push("score cluster is not top-right");
     if (item.kind === "paused-hud") {
       await clickLayout(page, "pause");

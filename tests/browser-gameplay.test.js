@@ -325,7 +325,8 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
     assert.equal(paused.ui.pauseNotice, "PAUSE COST: 1 HEALTH BAR");
     assert.ok(paused.layout.pause.x < 60, "pause control must be in the top-left");
     assert.ok(paused.layout.hud.energy.y < paused.layout.hud.health.y, "energy must render above health");
-    assert.equal(paused.layout.hud.health.orientation, "vertical");
+    assert.ok(paused.layout.hud.energy.y > 400, "classic status bars must sit in the bottom-left");
+    assert.equal(paused.layout.hud.health.orientation, "horizontal");
     await page.waitForTimeout(180);
     const stillPaused = await debugSnapshot(page);
     assert.equal(stillPaused.frame, paused.frame, "simulation frames must freeze while paused");

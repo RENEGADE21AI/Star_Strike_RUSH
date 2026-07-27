@@ -49,8 +49,8 @@ function getGameplayHudLayout() {
   const offset = bossHudOffset();
   return {
     pause: { x: 10, y: 10, w: 38, h: 32 },
-    energy: { x: 12, y: 50 + offset, w: 70, h: 7 },
-    health: { x: 12, y: 70 + offset, w: 51, h: 30, orientation: "vertical" },
+    energy: { x: 12, y: H - 164, w: 98, h: 7 },
+    health: { x: 12, y: H - 145, w: 98, h: 10, orientation: "horizontal" },
     score: { x: W - 10, y: 10 + offset, w: 92, h: 38 }
   };
 }

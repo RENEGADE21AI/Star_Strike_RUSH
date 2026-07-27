@@ -97,11 +97,13 @@ test("bosses stay invulnerable until their first attack begins", () => {
   assert.match(collisionSource, /state\.boss && bossCanTakeDamage\(state\.boss\)/);
 });
 
-test("gameplay renders compact HUD without announcement popups", () => {
+test("gameplay renders compact classic HUD without announcement popups", () => {
   const sceneSource = fs.readFileSync(path.join(repoRoot, "src", "17-rendering-scene.js"), "utf8");
   const hudSource = fs.readFileSync(path.join(repoRoot, "src", "16-rendering-hud.js"), "utf8");
   assert.doesNotMatch(sceneSource, /drawEncounterCard\(\);/);
   assert.match(hudSource, /function drawHUD\(\) \{ drawLeftStatusHUD\(\); drawTopRightHUD\(\); drawGameNotices\(\); drawPauseButton\(\); drawDesktopControlHint\(\); \}/);
+  assert.match(hudSource, /orientation:\s*"horizontal"/);
+  assert.match(hudSource, /energy:\s*\{\s*x:\s*12,\s*y:\s*H\s*-\s*164/);
   assert.doesNotMatch(hudSource.match(/function drawHUD\(\).*$/m)[0], /drawAnnouncements/);
   assert.doesNotMatch(hudSource, /devStatsVisible|drawDebugHitboxes/);
 });
