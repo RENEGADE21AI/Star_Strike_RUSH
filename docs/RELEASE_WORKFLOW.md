@@ -58,6 +58,11 @@ The approval must match the exact staged SHA and preview URL and cover:
 - achievement migration disposition;
 - explicit project-owner authorization to publicly distribute both MP3 files.
 
+The 2026-07-28 owner authorization covers
+`assets/audio/hangar-bay-seven.mp3` and
+`assets/audio/gravitys-edge.mp3` for public distribution as part of Star Strike
+RUSH. It does not assert an artist, source URL, or named license.
+
 Production then uses:
 
 ```powershell
@@ -88,6 +93,16 @@ npm run migrate:public-profiles --prefix functions
 Both are dry-run by default. Review only sanitized totals. Run either command
 with `-- --apply` only after explicit owner approval, then rerun its dry-run and
 require zero remaining changes.
+
+For the currently approved achievement migration, apply is authorized only if
+the fresh production dry run remains exactly one account, 15 valid unlocks,
+zero invalid IDs, and one aggregate reconstruction. Any material difference
+stops the apply.
+
+First Flight preview staging follows the same exact-SHA flow. Tutorial browser
+and visual evidence must be green before merging, and the preview may be
+deployed after merge. Production Hosting remains withheld until the existing
+Account A/B approval gate is complete.
 
 The public-profile cleanup preserves the maximum legacy score and phase in
 `legacyBestScore` and `legacyPhase`, retains verified fields without deriving

@@ -33,6 +33,21 @@ function updateEnemies() {
       if (e.type === "purple") e.x += Math.sign(p.x - e.x) * 0.08;
       continue;
     }
+    if (e.tutorialTarget) {
+      const holdX = Number.isFinite(e.tutorialHoldX) ? e.tutorialHoldX : e.x;
+      const holdY = Number.isFinite(e.tutorialHoldY) ? e.tutorialHoldY : 210;
+      const sweep = e.tutorialPath === "slow_sweep"
+        ? Math.sin((state.frame + e.id * 17) * 0.015) * (e.type === "orange" ? 34 : 20)
+        : 0;
+      e.x += (holdX + sweep - e.x) * 0.08;
+      e.y += (holdY - e.y) * 0.08;
+      e.vx = 0;
+      e.vy = 0;
+      e.fireTimer = 99999;
+      e.shoot = 99999;
+      e.warn = 0;
+      continue;
+    }
     if (e.spawnMode === "boss") {
       if (e.spawnPhase === "emerge") {
         const t = 1 - (e.spawnTimer / 18);
@@ -281,12 +296,23 @@ function damagePlayer(amount = 1) {
   resetCombo();
   spawnParticles(p.x, p.y, amount >= 2 ? 18 : 12, "#ff8a8a", 1.05);
   if (typeof playGameSound === "function") playGameSound("player_hit", amount >= 2 ? 1.15 : 0.9);
-  if (p.hp <= 0) enterGameOver();
+  if (p.hp <= 0) {
+    if (state.runMode === "tutorial" && typeof recoverTutorialCheckpoint === "function") recoverTutorialCheckpoint();
+    else enterGameOver();
+  }
 }
 function collectPowerup(pu) {
   const p = state.player;
   state.runStats.powerups++;
+  const particlesBefore = state.particles.length;
   spawnPowerupCollectBurst(pu);
+  const pickupParticles = state.particles.slice(particlesBefore);
+  state.lastPickupFeedback = {
+    type: pu.type,
+    frame: state.frame,
+    rings: pickupParticles.filter((particle) => particle.kind === "ring").length,
+    particles: pickupParticles.length
+  };
   if (typeof applyExpansionPowerup === "function" && applyExpansionPowerup(pu)) return;
   if (pu.type === "spread") { p.spread = Math.max(p.spread, 900); showMessage("SPREAD SHOT", 90); }
   else if (pu.type === "rapid") { p.rapid = Math.max(p.rapid, 900); showMessage("RAPID FIRE", 90); }

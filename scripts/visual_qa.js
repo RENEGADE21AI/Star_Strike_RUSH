@@ -40,7 +40,22 @@ const cases = [
   { name: "gameplay-hud-375x667", width: 375, height: 667, kind: "gameplay-hud" },
   { name: "paused-hud-375x667", width: 375, height: 667, kind: "paused-hud" },
   { name: "debris-staging", width: 375, height: 667, kind: "scenario", scenario: "debris-incoming" },
-  { name: "powerup-gallery", width: 390, height: 844, kind: "scenario", scenario: "powerups" }
+  { name: "powerup-gallery", width: 390, height: 844, kind: "scenario", scenario: "powerups" },
+  { name: "first-flight-incoming-desktop", width: 1440, height: 900, kind: "tutorial-offer", scenario: "tutorial" },
+  { name: "first-flight-incoming-mobile", width: 390, height: 844, kind: "tutorial-offer", scenario: "tutorial", touch: true },
+  { name: "tutorial-navigation", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "movement", touch: true },
+  { name: "tutorial-ghost-shift", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "ghost", touch: true, activate: true },
+  { name: "tutorial-powerup", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "powerup", touch: true, activate: true },
+  { name: "tutorial-command-ship", width: 1440, height: 900, kind: "tutorial-step", scenario: "tutorial", step: "command-boss", activate: true },
+  { name: "tutorial-wraith-briefing", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "wraith", touch: true },
+  { name: "tutorial-realm-indicator", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "realm_practice", touch: true, activate: true },
+  { name: "tutorial-graduation", width: 1440, height: 900, kind: "tutorial-step", scenario: "tutorial", step: "graduation", complete: true },
+  { name: "tutorial-call-sign-confirmation", width: 390, height: 844, kind: "tutorial-callsign", scenario: "tutorial-post-callsign", touch: true },
+  { name: "tutorial-account-offer", width: 390, height: 844, kind: "tutorial-account", scenario: "tutorial-post", touch: true },
+  { name: "tutorial-launch-desktop", width: 1440, height: 900, kind: "tutorial-launch", scenario: "tutorial" },
+  { name: "tutorial-launch-mobile", width: 390, height: 844, kind: "tutorial-launch", scenario: "tutorial", touch: true },
+  { name: "tutorial-launch-reduced-motion", width: 390, height: 844, kind: "tutorial-launch", scenario: "tutorial", touch: true, reduced: true },
+  { name: "tutorial-resume-checkpoint", width: 390, height: 844, kind: "tutorial-resume", scenario: "tutorial-resume", touch: true }
 ];
 const selectedCases = caseFilter ? cases.filter((item) => item.name === caseFilter) : cases;
 if (!selectedCases.length) throw new Error(`Unknown visual QA case: ${caseFilter}`);
@@ -139,13 +154,22 @@ function titleTrafficAssertions(state, errors) {
 
 async function runCase(browser, baseUrl, item) {
   const errors = [];
+  let capturedScreenshotDataUrl = "";
   const context = await browser.newContext({
     deviceScaleFactor: 1,
-    hasTouch: item.kind === "scroll",
+    hasTouch: item.kind === "scroll" || item.touch === true,
     viewport: { width: item.width, height: item.height }
   });
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   const page = await context.newPage();
+  if (item.reduced) {
+    await page.addInitScript(() => {
+      localStorage.setItem("star_strike_rush_settings_v1", JSON.stringify({
+        settingReducedMotion: true,
+        settingReducedFlash: true
+      }));
+    });
+  }
   page.setDefaultTimeout(90000);
   page.on("console", (message) => {
     const messageText = message.text();
@@ -160,7 +184,7 @@ async function runCase(browser, baseUrl, item) {
     if (response.status() >= 400 && !expected404) errors.push(`response: ${response.status()} ${response.url()}`);
   });
 
-  const route = `/?debug=1${item.scenario ? `&scenario=${encodeURIComponent(item.scenario)}` : ""}`;
+  const route = `/?debug=1${item.scenario ? `&scenario=${encodeURIComponent(item.scenario)}` : ""}${item.step ? `&step=${encodeURIComponent(item.step)}` : ""}${item.touch ? "&input=touch" : ""}`;
   const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("canvas", { state: "visible" });
   await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent);
@@ -253,6 +277,8 @@ async function runCase(browser, baseUrl, item) {
     const effectsAfter = await snapshot(page);
     evidence.settingsBefore = settingsBefore;
     evidence.after = effectsAfter;
+    if (!effectsAfter.layout.replayTraining) errors.push("Replay Flight Training control is missing from Settings");
+    else if (effectsAfter.layout.replayTraining.y + effectsAfter.layout.replayTraining.h > item.height) errors.push("Replay Flight Training control leaves the viewport");
     if (musicAfter.ui.settingMusicEnabled === settingsBefore.ui.settingMusicEnabled) errors.push("Music control did not toggle");
     if (musicAfter.ui.settingEffectsEnabled !== settingsBefore.ui.settingEffectsEnabled) errors.push("Music control changed Effects");
     if (effectsAfter.ui.settingEffectsEnabled === musicAfter.ui.settingEffectsEnabled) errors.push("Effects control did not toggle");
@@ -290,12 +316,104 @@ async function runCase(browser, baseUrl, item) {
       if (!boss || boss.damageable || boss.hp !== boss.maxHp) errors.push("incoming boss was damageable");
     }
     if (item.scenario === "powerups" && before.counts.powerups !== 13) errors.push("powerup gallery did not show all 13 powerups");
+  } else if (item.kind === "tutorial-offer") {
+    evidence.after = await snapshot(page);
+    if (evidence.after.tutorial?.uiMode !== "first_flight_offer") errors.push("first-flight offer was not active");
+    if (!evidence.after.layout.onboardingPanel) errors.push("onboarding panel bounds were not exposed");
+    if (!(await page.getByRole("button", { name: "Begin Flight Training" }).isVisible())) errors.push("training action was not accessible");
+    if (!(await page.getByRole("button", { name: "Skip For Now" }).isVisible())) errors.push("skip action was not accessible");
+  } else if (item.kind === "tutorial-step") {
+    await page.waitForFunction((step) => {
+      const state = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return state.runMode === "tutorial" && state.tutorial?.director?.stepId === step;
+    }, item.step === "ghost" ? "ghost_shift" : item.step === "command-boss" ? "command_boss" : item.step === "wraith" ? "wraith_briefing" : item.step);
+    if (item.complete) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const state = await snapshot(page);
+        if (state.tutorial?.onboarding?.status === "completed") break;
+        await page.getByRole("button", { name: "Continue" }).click();
+        await page.waitForTimeout(90);
+      }
+    } else if (item.activate) {
+      const button = page.getByRole("button", { name: "Continue" });
+      await button.click();
+      if (await button.isVisible()) await button.click();
+      await page.waitForTimeout(180);
+    }
+    const tutorial = await snapshot(page);
+    evidence.after = tutorial;
+    const dialogue = tutorial.layout.tutorialDialogue;
+    const objective = tutorial.layout.tutorialObjective;
+    const controls = tutorial.layout.tutorialControls;
+    if (!dialogue && !objective) errors.push("tutorial has neither dialogue nor objective bounds");
+    if (dialogue && dialogue.y + dialogue.h > item.height * 0.62) errors.push("dialogue obstructs the lower playfield");
+    if (objective && objective.y + objective.h > item.height * 0.45) errors.push("objective chip obstructs the playfield");
+    if (controls && dialogue) {
+      for (const [name, rect] of Object.entries(controls)) {
+        const overlaps = !(dialogue.x + dialogue.w <= rect.x || rect.x + rect.w <= dialogue.x || dialogue.y + dialogue.h <= rect.y || rect.y + rect.h <= dialogue.y);
+        if (overlaps) errors.push(`dialogue overlaps ${name} control`);
+      }
+    }
+    if (item.complete && tutorial.tutorial?.onboarding?.status !== "completed") errors.push("graduation did not persist completion");
+    if (item.step === "command-boss" && tutorial.encounter.boss && !tutorial.encounter.boss.tutorialOverride) errors.push("Command Ship lacks tutorial override");
+    if (item.step === "realm_practice" && (!tutorial.encounter.boss || tutorial.encounter.boss.realm == null)) errors.push("realm practice lacks a realm target");
+  } else if (item.kind === "tutorial-callsign") {
+    const callSign = await snapshot(page);
+    evidence.after = callSign;
+    if (callSign.tutorial?.uiMode !== "post_callsign") errors.push("post-flight call-sign confirmation was not active");
+    if (!(await page.getByRole("button", { name: "Confirm Call Sign" }).isVisible())) errors.push("call-sign confirmation was not accessible");
+    if (!(await page.getByRole("button", { name: "Edit Call Sign" }).isVisible())) errors.push("call-sign edit was not accessible");
+  } else if (item.kind === "tutorial-account") {
+    const account = await snapshot(page);
+    evidence.after = account;
+    if (account.tutorial?.uiMode !== "post_identity") errors.push("post-flight identity offer was not active");
+    if (!(await page.getByRole("button", { name: "Connect Google Account" }).isVisible())) errors.push("Google identity option was not accessible");
+    if (!(await page.getByRole("button", { name: "Continue With Device Pilot" }).isVisible())) errors.push("device pilot option was not accessible");
+  } else if (item.kind === "tutorial-launch") {
+    await page.getByRole("button", { name: "Begin Flight Training" }).click();
+    const launchHandle = await page.waitForFunction(() => {
+      const state = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      const visibleLaunch = state.transition.mode === "title_launch" && state.transition.progress >= 0.48;
+      const reducedArrival = state.transition.lastLaunchReducedMotion && state.runMode === "tutorial";
+      if (visibleLaunch && !window.__visualLaunchFrame) {
+        window.__visualLaunchFrame = document.querySelector("canvas").toDataURL("image/png");
+      }
+      return visibleLaunch || reducedArrival ? state : false;
+    });
+    let launch = await launchHandle.jsonValue();
+    if (item.reduced) {
+      await page.waitForFunction(() => {
+        const state = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+        return state.runMode === "tutorial" && state.tutorial?.director?.dialogueReveal === 1;
+      });
+      launch = await snapshot(page);
+    }
+    capturedScreenshotDataUrl = await page.evaluate(() => window.__visualLaunchFrame || "");
+    evidence.after = launch;
+    const expectedDuration = item.reduced ? 0.42 : 1.5;
+    const actualDuration = launch.transition.lastLaunchDurationSeconds;
+    if (Math.abs(actualDuration - expectedDuration) > 0.03) errors.push(`launch duration ${actualDuration} differs from ${expectedDuration}`);
+    if (item.reduced && !launch.transition.lastLaunchReducedMotion) errors.push("Reduced Motion launch contract was not active");
+    if (item.reduced && launch.ui.settingReducedFlash !== true) errors.push("Reduced Flash launch contract was not active");
+    if (item.reduced && launch.tutorial?.director?.dialogueReveal !== 1) errors.push("Reduced Motion left tutorial text animating");
+    if (!item.reduced && launch.transition.titleUiAlpha > 0.01) errors.push("title controls remained visible through lightspeed");
+    if (launch.tutorial?.uiMode !== "none") errors.push("title onboarding UI remained active through launch");
+  } else if (item.kind === "tutorial-resume") {
+    const resumed = await snapshot(page);
+    evidence.after = resumed;
+    if (resumed.tutorial?.uiMode !== "resume_training") errors.push("checkpoint resume offer was not active");
+    if (resumed.tutorial?.onboarding?.checkpoint !== "before_wraith") errors.push("checkpoint was not preserved");
+    if (!(await page.getByRole("button", { name: "Resume Training" }).isVisible())) errors.push("resume action was not accessible");
   }
 
   const finalState = evidence.after || await snapshot(page);
   if (finalState.runtimeErrors.length) errors.push(...finalState.runtimeErrors.map((error) => `runtime: ${error}`));
   const screenshotPath = path.join(outputDir, `${item.name}.png`);
-  await page.screenshot({ path: screenshotPath, fullPage: true });
+  if (capturedScreenshotDataUrl) {
+    fs.writeFileSync(screenshotPath, Buffer.from(capturedScreenshotDataUrl.split(",", 2)[1], "base64"));
+  } else {
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+  }
   const tracePath = errors.length ? path.join(outputDir, `${item.name}-trace.zip`) : "";
   await context.tracing.stop(tracePath ? { path: tracePath } : undefined);
   await context.close();

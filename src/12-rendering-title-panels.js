@@ -576,6 +576,7 @@ function drawOnlinePanel() {
     drawOnlineActionButton(r.contrast, `HIGH CONTRAST: ${settingHighContrast ? "ON" : "OFF"}`, true);
     drawOnlineActionButton(r.music, `MUSIC: ${settingMusicEnabled ? "ON" : "OFF"}`, true);
     drawOnlineActionButton(r.effects, `EFFECTS: ${settingEffectsEnabled ? "ON" : "OFF"}`, true);
+    drawOnlineActionButton(r.replayTraining, "REPLAY FLIGHT TRAINING", true);
   }
 }
 function drawRecordsPanel() {

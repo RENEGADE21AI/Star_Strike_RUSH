@@ -27,7 +27,7 @@ function drawControls() {
   ctx.fillText(label, actCx, actCy + 2);
 }
 function drawDesktopControlHint() {
-  if (state.inputMode === "touch" || state.gameState !== "playing" || state.inputHintTimer <= 0) return;
+  if (state.inputMode === "touch" || state.inputMode === "pen" || state.gameState !== "playing" || state.inputHintTimer <= 0) return;
   const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
   const text = `MOVE  WASD / ARROWS    ${profile.label}  SPACE / SHIFT`;
   const fade = clamp(state.inputHintTimer / 42, 0, 1);
@@ -165,6 +165,15 @@ function drawGameNotices() {
 }
 function getPauseButtonRect() { return getGameplayHudLayout().pause; }
 function getPauseOverlayRects() {
+  if (state.runMode === "tutorial") {
+    return {
+      resume: { x: W / 2 - 100, y: H / 2 - 4, w: 200, h: 38 },
+      checkpoint: { x: W / 2 - 100, y: H / 2 + 40, w: 200, h: 34 },
+      restart: { x: W / 2 - 100, y: H / 2 + 80, w: 200, h: 34 },
+      skip: { x: W / 2 - 100, y: H / 2 + 120, w: 200, h: 34 },
+      title: { x: W / 2 - 100, y: H / 2 + 160, w: 200, h: 34 }
+    };
+  }
   return {
     resume: { x: W / 2 - 92, y: H / 2 + 18, w: 184, h: 42 },
     restart: { x: W / 2 - 92, y: H / 2 + 70, w: 184, h: 38 },
@@ -174,8 +183,30 @@ function getPauseOverlayRects() {
 function handlePausePointerDown(x, y) {
   const rects = getPauseOverlayRects();
   if (hitRect(rects.resume, x, y)) { resumeGame(); return true; }
+  if (state.runMode === "tutorial" && rects.checkpoint && hitRect(rects.checkpoint, x, y)) {
+    recoverTutorialCheckpoint();
+    state.gameState = "playing";
+    return true;
+  }
+  if (state.runMode === "tutorial" && hitRect(rects.restart, x, y)) {
+    setupSession("start");
+    beginTutorialTraining({ replay: true });
+    return true;
+  }
+  if (state.runMode === "tutorial" && rects.skip && hitRect(rects.skip, x, y)) {
+    requestSkipTutorialTraining("pause");
+    return true;
+  }
   if (hitRect(rects.restart, x, y)) { beginGame(); return true; }
-  if (hitRect(rects.title, x, y)) { setupSession("start"); return true; }
+  if (hitRect(rects.title, x, y)) {
+    const wasTutorial = state.runMode === "tutorial";
+    setupSession("start");
+    if (wasTutorial && typeof onboardingState !== "undefined" && onboardingState && onboardingState.status === "in_progress") {
+      onboardingUiMode = "resume_training";
+      renderOnboardingAccessibleMode();
+    }
+    return true;
+  }
   return true;
 }
 function drawPauseButton() {
@@ -218,8 +249,15 @@ function drawPauseOverlay() {
   ctx.fillText(state.pauseNotice || "", W / 2, H / 2 - 24);
   if (!resuming) {
     drawSimpleButton(rects.resume, "RESUME", "rgba(88,229,255,0.62)");
-    drawSimpleButton(rects.restart, "RESTART RUN", "rgba(255,255,255,0.28)");
-    drawSimpleButton(rects.title, "RETURN TO TITLE", "rgba(255,255,255,0.18)");
+    if (state.runMode === "tutorial") {
+      drawSimpleButton(rects.checkpoint, "RESTART CHECKPOINT", "rgba(255,255,255,0.30)");
+      drawSimpleButton(rects.restart, "RESTART TRAINING", "rgba(255,255,255,0.26)");
+      drawSimpleButton(rects.skip, "SKIP TRAINING", "rgba(255,190,116,0.28)");
+      drawSimpleButton(rects.title, "RETURN TO TITLE", "rgba(255,255,255,0.18)");
+    } else {
+      drawSimpleButton(rects.restart, "RESTART RUN", "rgba(255,255,255,0.28)");
+      drawSimpleButton(rects.title, "RETURN TO TITLE", "rgba(255,255,255,0.18)");
+    }
   }
   ctx.restore();
 }

@@ -164,10 +164,13 @@ test("input mode follows meaningful input and ignores incidental mouse movement"
   assert.equal(context.gameplayActionForKey(" "), "ability");
   const touched = context.nextGameplayInputMode("keyboard", "touch", 1000, -Infinity, 0);
   assert.equal(touched.mode, "touch");
+  const penned = context.nextGameplayInputMode("keyboard", "pen", 1000, -Infinity, 0);
+  assert.equal(penned.mode, "pen");
   assert.equal(context.nextGameplayInputMode("touch", "mouse_move", 1500, touched.lastTouchAt, 0).mode, "touch");
   assert.equal(context.nextGameplayInputMode("touch", "keyboard", 1501, touched.lastTouchAt, 0).mode, "keyboard");
   assert.equal(context.touchControlsVisible("keyboard", "playing"), false);
   assert.equal(context.touchControlsVisible("touch", "playing"), true);
+  assert.equal(context.touchControlsVisible("pen", "playing"), true);
 });
 
 test("public pilot records whitelist call sign and game stats only", () => {

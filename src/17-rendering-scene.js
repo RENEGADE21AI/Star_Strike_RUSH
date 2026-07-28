@@ -69,6 +69,9 @@ function drawScreenFogBlend() {
   // overlay made the boundary read like an aurora instead of depth.
 }
 function sceneTransitionProgress() {
+  if (state.sceneTransition.durationSeconds) {
+    return clamp(Number(state.sceneTransition.elapsedSeconds || 0) / state.sceneTransition.durationSeconds, 0, 1);
+  }
   return clamp(state.sceneTransition.frame / Math.max(1, state.sceneTransition.duration), 0, 1);
 }
 function drawTitleLaunchEffect() {
@@ -77,9 +80,10 @@ function drawTitleLaunchEffect() {
   const eased = t * t * (3 - 2 * t);
   const centerX = W / 2;
   const startY = H * 0.465;
-  const shipY = startY + (H * 0.15 - startY) * easeOutCubic(t);
+  const shipY = startY + (H * 0.80 - startY) * easeOutCubic(t);
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = `rgba(170,244,255,${settingReducedFlash ? 0.24 : 0.16 + eased * 0.5})`;
   for (let index = 0; index < 18; index++) {
     const angle = (index / 18) * TAU + 0.18;
     const inner = 36 + eased * 46 + (index % 3) * 5;
@@ -88,17 +92,13 @@ function drawTitleLaunchEffect() {
     const y1 = startY + Math.sin(angle) * inner * 0.62;
     const x2 = centerX + Math.cos(angle) * (inner + length);
     const y2 = startY + Math.sin(angle) * (inner + length) * 0.62;
-    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
-    grad.addColorStop(0, "rgba(92,238,255,0)");
-    grad.addColorStop(1, `rgba(210,249,255,${0.16 + eased * 0.5})`);
-    ctx.strokeStyle = grad;
     ctx.lineWidth = 0.7 + eased * 1.1;
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
   }
   ctx.restore();
   drawSpriteAsset(ctx, "player", centerX, shipY, { scale: 0.88 + eased * 0.42, alpha: Math.min(1, t * 4) });
   const veil = ctx.createRadialGradient(centerX, startY, 0, centerX, startY, 230);
-  veil.addColorStop(0, `rgba(190,247,255,${Math.max(0, (t - 0.55) * 0.72)})`);
+  veil.addColorStop(0, `rgba(190,247,255,${Math.min(settingReducedFlash ? 0.18 : 0.34, Math.max(0, (t - 0.55) * 0.72))})`);
   veil.addColorStop(1, "rgba(8,26,48,0)");
   ctx.fillStyle = veil;
   ctx.fillRect(0, 0, W, H);
@@ -140,6 +140,7 @@ function draw() {
 
   drawBackground();
   if (state.gameState === "playing" || state.gameState === "paused" || state.gameState === "resuming") {
+    if (typeof drawTutorialTrainingEnvironment === "function") drawTutorialTrainingEnvironment();
     if (typeof drawExpansionHazards === "function") drawExpansionHazards();
     drawPowerups();
     drawBullets();
@@ -152,6 +153,7 @@ function draw() {
     drawPlayfieldFogBlend();
     drawControls();
     drawHUD();
+    if (typeof drawTutorialPresentation === "function") drawTutorialPresentation();
     if (state.gameState === "paused" || state.gameState === "resuming") drawPauseOverlay();
     drawGameArrivalEffect();
   } else if (state.gameState === "start") {
@@ -160,8 +162,20 @@ function draw() {
     ctx.translate(W / 2, H * 0.46);
     ctx.scale(1 + launchT * 0.09, 1 + launchT * 0.09);
     ctx.translate(-W / 2, -H * 0.46);
-    ctx.globalAlpha = 1 - launchT * 0.72;
-    drawStartScreen();
+    // Lock-in owns only the opening beat. The title is fully retracted before
+    // the lightspeed streaks peak so no menu text ghosts through the warp.
+    if (launchT < 0.3) {
+      ctx.globalAlpha = Math.max(0, 1 - launchT / 0.3);
+      drawStartScreen();
+      if (typeof drawOnboardingTitleOverlay === "function") drawOnboardingTitleOverlay();
+    } else if (launchT < 0.58) {
+      // Keep only atmospheric depth for the acceleration beat. Some title
+      // controls set their own Canvas alpha, so they must not be drawn here.
+      ctx.globalAlpha = Math.max(0, 1 - (launchT - 0.3) / 0.28);
+      drawTitleSun();
+      drawMenuFlights();
+      drawPlayfieldFogBlend();
+    }
     ctx.restore();
     drawTitleLaunchEffect();
   } else if (state.gameState === "gameover") {

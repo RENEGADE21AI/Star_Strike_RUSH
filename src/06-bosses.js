@@ -1,5 +1,6 @@
 function spawnBossAdds() {
   const b = state.boss; if (!b) return;
+  if (b.tutorialNoAdds) return;
   if (state.enemies.length > 12 + state.phase) return;
   const mouthX = b.x, mouthY = b.y + b.h / 2 + 6;
   const lane = laneIndexFromX(b.x);
@@ -115,7 +116,12 @@ function startWraithShift(boss, reason = "damage") {
   if (boss.shiftTelegraph > 0 || boss.chargeTelegraph > 0) return;
   boss.shiftTelegraph = 30;
   boss.shiftReason = reason;
-  boss.nextRealm = 1 - boss.realm;
+  if (boss.tutorialOverride && Array.isArray(boss.tutorialRealmSequence)) {
+    boss.tutorialRealmIndex = ((boss.tutorialRealmIndex || 0) + 1) % boss.tutorialRealmSequence.length;
+    boss.nextRealm = boss.tutorialRealmSequence[boss.tutorialRealmIndex];
+  } else {
+    boss.nextRealm = 1 - boss.realm;
+  }
   kickShake(4);
   state.fx.flash = Math.max(state.fx.flash, 4);
 }
@@ -125,7 +131,7 @@ function finishWraithShift(boss) {
   boss.shiftReason = "";
   boss.nextRealm = null;
   boss.hitsSinceShift = 0;
-  boss.nextShiftHits = 6 + Math.floor(rand(0, 3));
+  boss.nextShiftHits = boss.tutorialOverride ? 4 : 6 + Math.floor(rand(0, 3));
   boss.passiveTimer = 0;
   boss.attackTimer = Math.min(boss.attackTimer, 38);
   boss.realmPulse = 16;
@@ -272,6 +278,7 @@ function updateBossStandard() {
   if (b.cooldown <= 0) {
     b.combatActive = true;
     b.pending = chooseBossAttackType(b, hpPct);
+    if (b.tutorialOverride && b.pending === "spawn") b.pending = "aimed";
     b.warn = b.pending === "spawn" ? (hpPct < 0.35 ? 24 : 28) : (hpPct < 0.35 ? 14 : 18);
     b.warnMax = b.warn;
     b.bay = b.warn;
@@ -334,15 +341,17 @@ function updateBossWraith() {
   if (b.attackTimer <= 0) {
     b.combatActive = true;
     const chargeChance = hpPct < 0.2 ? 0.60 : (hpPct < 0.4 ? 0.45 : hpPct < 0.7 ? 0.28 : 0.18);
-    if (Math.random() < chargeChance && b.chargeRecovery <= 0) {
-      b.chargeTelegraph = hpPct < 0.4 ? 48 : 42;
+    const tutorialCharge = b.tutorialOverride && ((b.tutorialAttackCursor || 0) % 3 === 2);
+    if ((tutorialCharge || (!b.tutorialOverride && Math.random() < chargeChance)) && b.chargeRecovery <= 0) {
+      b.chargeTelegraph = b.tutorialOverride ? 72 : (hpPct < 0.4 ? 48 : 42);
       b.chargeStartRealm = state.playerRealm;
       b.chargeDodged = false;
       b.attackTimer = wraithAttackCooldown(b) + 10;
     } else {
       fireWraithVolley(b);
-      b.attackTimer = wraithAttackCooldown(b);
+      b.attackTimer = b.tutorialOverride ? 84 : wraithAttackCooldown(b);
     }
+    if (b.tutorialOverride) b.tutorialAttackCursor = (b.tutorialAttackCursor || 0) + 1;
   }
   b.corePulse += 0.03;
   b.flicker = Math.max(0, b.flicker - 1);

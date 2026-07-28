@@ -88,11 +88,14 @@ function templateDensity(events) {
   return d;
 }
 function discoverCodex(type) {
+  if (typeof runModeAllowsCodexDiscovery === "function" && !runModeAllowsCodexDiscovery(state.runMode)) return false;
   if (!codexDiscovered[type]) {
     codexDiscovered[type] = true;
     saveCodexDiscovered();
     codexHasNew = true;
+    return true;
   }
+  return false;
 }
 function spawnWave() {
   const sel = selectWaveTemplate();

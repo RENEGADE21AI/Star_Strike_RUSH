@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited: 2026-07-27
+Last audited: 2026-07-28
 
 This is the release truth table. Disabled, configuration-dependent, previewed,
 and production-deployed are distinct states.
@@ -39,17 +39,18 @@ rewards.
 | Server preseason gates | Stable/closed | All three endpoints reject before auth or Firestore access |
 | Legacy leaderboard | Quarantined | Separate legacy/verified fields and public-only/leaderboard-only/conflict/no-record tests |
 | Achievements | Stable | One generated 79-entry catalog, browser/server parity, semantic and reachability checks |
-| Achievement migration | Ready | Admin-only, dry-run default, idempotent/additive aggregate migration |
+| Achievement migration | Applied | Production aggregate reconstructed from 15 valid historical unlocks; zero-change follow-up dry run |
 | Achievement hydration | Stable | One aggregate returned by the profile owner callable; no 79-document browser listing |
 | Vault/Codex scrolling | Stable | Touch drag at 375×667, 390×844, 430×932; wheel, keyboard, and buttons |
 | Audio | Stable | Independent Music/Effects, legacy setting migration, lazy load, time-based 30/60/90/120 Hz mix |
 | Title/traffic | Stable | Measured title bounds, normalized time paths, depth durations, UI-safe lanes, Reduced Motion |
 | Debug records/reset | Stable | Debug cannot persist records/progression; reset clears all progression-bearing local state |
 | Combat HUD | Stable | Pause top-left with one-Health deliberate cost; Energy above segmented Health bottom-left; compact score block top-right |
+| First Flight onboarding | Verified locally | Deterministic 13-step director, real desktop/touch completion, checkpoints, replay, Colonel Vega, two tutorial bosses, and no-progression assertions |
 | Production debug surface | Removed | Build strips QA scenarios/snapshots; player-facing phase skips and hitbox controls removed |
 | Firestore authorization | Stable | Emulator tests cover anonymous denial, owner privacy, bounded reads, browser-write denial |
 | Build/cache contract | Stable | Commit-versioned runtime/assets plus no-store HTML and `version.json` |
-| Visual QA | Stable | 16 asserted Chromium cases; screenshots/report and failure traces |
+| Visual QA | Stable | Existing release cases plus asserted First Flight desktop/mobile scenes, launch states, realm UI, account offer, and checkpoint resume |
 
 ## Firebase identity and archive boundary
 
@@ -87,9 +88,9 @@ preserved; it is not described as current, live, verified, or a world record.
 | --- | --- |
 | Real Google popup/redirect | Staging proves Identity Toolkit accepts the exact preview origin; actual Account A/B interaction remains a human gate |
 | Real account call-sign publication | Requires live Functions/Auth verification |
-| Production achievement archive | Dry-run found 1 account needing aggregate reconstruction from 15 valid unlocks and 0 invalid IDs; apply awaits explicit owner approval |
+| Production achievement archive | Applied 2026-07-28: 1 aggregate reconstructed from 15 valid unlocks, 0 invalid IDs; follow-up dry run found 0 remaining changes |
 | App Check | Console provider registration and direct enforcement tests have not been performed |
-| Audio distribution rights | Owner supplied MP3s; public-distribution provenance is not verified in repository evidence |
+| Audio distribution rights | Owner authorization to publicly distribute both MP3s recorded on 2026-07-28; no artist/source/license name inferred |
 | Exact-SHA backend staging | Not yet performed for this final gate branch |
 | Production deployment | Must not be claimed until Hosting SHA, backend SHA, approval, and live smoke are verified |
 
@@ -115,12 +116,31 @@ Evidence inherited from the preceding release candidate:
   all three direct gate rejections.
 - Visual QA: 16/16 asserted cases passed.
 
-The final-gate branch adds tests for cross-device server precedence,
-public-profile cleanup, stale-backend detection, full release-range planning,
-approval validation, and the three-condition future league gate. The full suite,
-GitHub checks, exact-SHA staging, Account A/B smoke, production migration
-disposition, and music authorization must still be completed on the merge
-commit; this document does not imply those results.
+Current First Flight branch evidence on Node 22:
+
+- `npm test`: 113/113 passed, including complete real-action desktop and touch
+  tutorial journeys.
+- Firestore Rules emulator: 4/4 passed.
+- Firebase client integration: one complete real-emulator browser scenario
+  passed.
+- Visual QA: 33/33 asserted cases passed and were manually inspected.
+- Production build: 100 public files generated.
+- Root production audit: 0 vulnerabilities. Functions audit: 0 high-severity
+  findings and 9 known moderate transitive findings.
+- Tracked-file secret scan: 223 files passed.
+
+GitHub checks, exact-SHA preview staging, and Account A/B smoke still remain for
+the merge commit; this document does not imply those pending results or a
+production Hosting deployment.
+
+The First Flight branch adds an isolated tutorial run mode and versioned
+`star_strike_rush_onboarding_v1` state. A new player is offered training only
+when no meaningful local gameplay history exists. Existing players receive one
+dismissible availability notice. Checkpoints survive reload; death restores
+the current training checkpoint rather than entering Game Over; skipping is
+confirmed; replay is available in Settings. First completion reveals only the
+training entities in the local Codex and never adds a standard achievement.
+The canonical achievement catalog remains exactly 79 entries.
 
 ## Release policy
 

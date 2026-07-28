@@ -1,12 +1,12 @@
 function spawnEnemy(type, x, y, extra = {}) {
   if (type === "orange" && state.phase === 1) type = "red";
-  if (type === "red") {
+  if (type === "red" && !extra.forceSpawn) {
     const nearbyReds = state.enemies.filter(e => e.type === "red" && Math.abs(e.x - x) < 90 && Math.abs(e.y - y) < 110).length;
     if (nearbyReds >= 2 && Math.random() < 0.55) return;
     if (Math.random() < 0.05) return;
   }
-  if (type === "purple" && activePurpleCount() >= (state.phase >= 8 ? 2 : 3)) return;
-  if (type === "phantom" && activePhantomCount() >= phantomCapForPhase()) return;
+  if (type === "purple" && !extra.forceSpawn && activePurpleCount() >= (state.phase >= 8 ? 2 : 3)) return;
+  if (type === "phantom" && !extra.forceSpawn && activePhantomCount() >= phantomCapForPhase()) return;
   if (typeof canSpawnExpansionEnemy === "function" && !canSpawnExpansionEnemy(type, extra)) return;
   const phaseBoost = Math.min(state.phase * 0.08, 1.35);
   const data = ENEMY_DATA[type] || ENEMY_DATA.red;
