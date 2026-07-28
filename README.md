@@ -84,8 +84,9 @@ Check-only is the safe default. Staging calculates the full release range from
 the current production `version.json` (or a reviewed explicit full SHA), deploys
 the exact-SHA Functions, deploys the tested Rules idempotently, deploys changed
 indexes, creates a commit-named Hosting preview, verifies Hosting and backend
-SHAs, then stops. Production requires a local ignored approval file tied to
-that exact SHA and preview. Hosting deploys last. See
+SHAs, proves that Google Identity accepts the exact preview origin, then stops.
+Production requires a local ignored approval file tied to that exact SHA and
+preview. Hosting deploys last. See
 `docs/RELEASE_WORKFLOW.md`.
 
 ## Architecture
@@ -164,8 +165,13 @@ Check enforcement.
 
 Google auth requires every Hosting preview/custom domain used for sign-in to be
 listed under Firebase Console → Authentication → Settings → Authorized
-domains. Popup-blocked/mobile environments fall back to redirect, and boot
-consumes `getRedirectResult()` without starting a second hydration owner.
+domains and allowed by the Firebase browser API key's referrer restrictions.
+The release smoke reads Hosting's generated Firebase config and performs a
+non-account Identity Toolkit initiation check from the exact staged origin;
+staging fails before human testing when either boundary rejects it.
+Popup-blocked/mobile environments fall back to redirect, boot consumes
+`getRedirectResult()` without starting a second hydration owner, and failed
+sign-in details remain sanitized and visible beside `SIGN IN FAILED`.
 
 ## Artwork
 

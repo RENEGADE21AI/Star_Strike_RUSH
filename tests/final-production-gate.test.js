@@ -237,6 +237,19 @@ test("release smoke fails a stale backend SHA even when paused callables return 
       }));
       return;
     }
+    if (request.url === "/__/firebase/init.json") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({
+        apiKey: "fixture-browser-key",
+        projectId: "star-strike-rush"
+      }));
+      return;
+    }
+    if (request.url.startsWith("/v1/accounts:createAuthUri")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ authUri: "https://accounts.google.com/o/oauth2/auth" }));
+      return;
+    }
     if (["/submitRunReceipt", "/joinWeeklyLeague", "/claimSeasonReward"].some((prefix) => request.url.startsWith(prefix))) {
       response.writeHead(400, { "content-type": "application/json" });
       response.end(JSON.stringify({
@@ -278,6 +291,7 @@ test("release smoke fails a stale backend SHA even when paused callables return 
     env: {
       ...process.env,
       FUNCTIONS_BASE_URL: baseUrl,
+      IDENTITY_TOOLKIT_BASE_URL: baseUrl,
       ALLOW_HTTP_SMOKE: "1"
     }
   });
@@ -286,6 +300,83 @@ test("release smoke fails a stale backend SHA even when paused callables return 
     backendSha = releaseSha;
     const success = await run();
     assert.equal(JSON.parse(success.stdout).backendCommitSha, releaseSha);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("release smoke proves the staged origin can initiate Google authentication", async () => {
+  let authRequests = 0;
+  let baseUrl = "";
+  const securityHeaders = {
+    "cache-control": "no-store",
+    "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
+    "cross-origin-opener-policy": "same-origin-allow-popups",
+    "cross-origin-resource-policy": "same-site",
+    "permissions-policy": "camera=()",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "x-content-type-options": "nosniff"
+  };
+  const server = http.createServer((request, response) => {
+    if (request.url.startsWith("/version.json")) {
+      response.writeHead(200, { ...securityHeaders, "content-type": "application/json" });
+      response.end(JSON.stringify({
+        commitSha: releaseSha,
+        progressionMode: "device_local_preseason",
+        competitionMode: "paused"
+      }));
+      return;
+    }
+    if (request.url === "/__/firebase/init.json") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({
+        apiKey: "fixture-browser-key",
+        projectId: "star-strike-rush"
+      }));
+      return;
+    }
+    if (request.url.startsWith("/v1/accounts:createAuthUri")) {
+      authRequests++;
+      assert.equal(request.headers.referer, `${baseUrl}/`);
+      let body = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk) => { body += chunk; });
+      request.on("end", () => {
+        const payload = JSON.parse(body);
+        assert.equal(payload.continueUri, `${baseUrl}/`);
+        assert.equal(payload.providerId, "google.com");
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ authUri: "https://accounts.google.com/o/oauth2/auth" }));
+      });
+      return;
+    }
+    if (request.url === "/" || request.url.startsWith("/?")) {
+      response.writeHead(200, { ...securityHeaders, "content-type": "text/html" });
+      response.end("<!doctype html><title>Star Strike RUSH</title>");
+      return;
+    }
+    response.writeHead(404);
+    response.end("Not found");
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  baseUrl = `http://127.0.0.1:${address.port}`;
+  try {
+    const result = await promisify(execFile)(process.execPath, [
+      smokeScript,
+      baseUrl,
+      releaseSha
+    ], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        IDENTITY_TOOLKIT_BASE_URL: baseUrl,
+        ALLOW_HTTP_SMOKE: "1"
+      }
+    });
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.googleAuthOriginVerified, true);
+    assert.equal(authRequests, 1);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

@@ -124,7 +124,8 @@ and release evidence.
 - `scripts/release.ps1` has explicit check-only, backend/Rules/preview staging,
   and approval-file production stages. It compares the complete last-production
   range, includes Rules and indexes, verifies backend/Hosting SHA equality, and
-  stops before production Hosting for human evidence.
+  verifies the exact Hosting origin can initiate Google Identity, and stops
+  before production Hosting for human evidence.
 
 ## Current branch evidence
 
@@ -148,8 +149,9 @@ release commit. This document does not claim those pending steps.
   against the configured live project and its authorized domains.
 - The two MP3 files were supplied by the owner, but repository evidence does not
   independently verify public-distribution license, authorship, or source URL.
-- Production achievement migration has not been dry-run against live account
-  data; repository tests establish only the migration contract.
+- Production achievement migration dry-run found 1 account needing aggregate
+  reconstruction from 15 valid unlocks and 0 invalid IDs. Apply remains blocked
+  until the project owner explicitly approves that sanitized result.
 - Production is not considered deployed until live `version.json`, headers,
   private-path 404s, identity actions, device progression, and paused callables
   are verified against the merge commit.

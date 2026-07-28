@@ -193,7 +193,7 @@ if ($StageBackendPreview) {
 
   $previewUrl = Deploy-HostingPreview -ReleaseCommit $releaseCommit
   Write-Host "Preview URL: $previewUrl"
-  Invoke-Checked -Label "Verify preview Hosting SHA, backend SHA, headers, private paths, and closed callables" -Command {
+  Invoke-Checked -Label "Verify preview Hosting/backend SHAs, Google Auth origin, headers, private paths, and closed callables" -Command {
     node scripts/smoke-release.js $previewUrl $releaseCommit --verify-callables
   }
 
@@ -233,7 +233,7 @@ $approvedPreviewUrl = [string]$approval.previewUrl
 Invoke-Checked -Label "Validate exact release human approval" -Command {
   node scripts/validate-release-approval.js $approvalPath $releaseCommit $approvedPreviewUrl
 }
-Invoke-Checked -Label "Reverify staged preview Hosting and backend SHAs" -Command {
+Invoke-Checked -Label "Reverify staged preview Hosting/backend SHAs and Google Auth origin" -Command {
   node scripts/smoke-release.js $approvedPreviewUrl $releaseCommit --verify-callables
 }
 Invoke-Checked -Label "Rebuild exact approved Hosting commit" -Command {
@@ -243,7 +243,7 @@ Invoke-Checked -Label "Rebuild exact approved Hosting commit" -Command {
 Invoke-Checked -Label "Deploy Hosting production last" -Command {
   npx firebase deploy --only hosting:app --project $ExpectedProject
 }
-Invoke-Checked -Label "Verify production Hosting SHA, backend SHA, headers, private paths, and closed callables" -Command {
+Invoke-Checked -Label "Verify production SHAs, Google Auth origin, headers, private paths, and closed callables" -Command {
   node scripts/smoke-release.js $ProductionUrl $releaseCommit --verify-callables
 }
 Write-Host ""

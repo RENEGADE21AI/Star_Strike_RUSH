@@ -85,9 +85,9 @@ preserved; it is not described as current, live, verified, or a world record.
 
 | Area | Boundary |
 | --- | --- |
-| Real Google popup/redirect | Requires Firebase authorized domains and a human account smoke test |
+| Real Google popup/redirect | Staging proves Identity Toolkit accepts the exact preview origin; actual Account A/B interaction remains a human gate |
 | Real account call-sign publication | Requires live Functions/Auth verification |
-| Production achievement archive | Admin dry-run has not yet been performed against production data |
+| Production achievement archive | Dry-run found 1 account needing aggregate reconstruction from 15 valid unlocks and 0 invalid IDs; apply awaits explicit owner approval |
 | App Check | Console provider registration and direct enforcement tests have not been performed |
 | Audio distribution rights | Owner supplied MP3s; public-distribution provenance is not verified in repository evidence |
 | Exact-SHA backend staging | Not yet performed for this final gate branch |
@@ -131,7 +131,8 @@ commit; this document does not imply those results.
    Functions first, then the exact tested Rules idempotently, then changed
    indexes, then a commit-named preview.
 4. Require intended SHA = Hosting SHA = backend SHA and smoke-test headers,
-   private 404s, and all three paused callable boundaries.
+   private 404s, Google Identity origin acceptance, and all three paused
+   callable boundaries.
 5. Complete the ignored sanitized approval file with Account A/B, unchanged
    device progress, migration disposition, and explicit owner music rights.
 6. Run `-Production -ApprovalFile ...`; deploy Hosting last.

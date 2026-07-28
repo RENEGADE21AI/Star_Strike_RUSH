@@ -74,6 +74,24 @@ test("handle claim errors distinguish validation and ownership from outages", ()
   assert.equal(context.identityErrorKind({ code: "functions/deadline-exceeded" }), "backend_unavailable");
 });
 
+test("sign-in failure keeps a sanitized account error beside its status", () => {
+  const context = loadIdentityContracts();
+  const online = {
+    lastStatus: "OPENING GOOGLE SIGN-IN",
+    lastError: ""
+  };
+
+  context.applyIdentityFailure(
+    online,
+    { message: "Firebase: Error (auth/unauthorized-domain)." },
+    "Google sign-in failed.",
+    "SIGN IN FAILED"
+  );
+
+  assert.equal(online.lastStatus, "SIGN IN FAILED");
+  assert.equal(online.lastError, "Error (auth/unauthorized-domain).");
+});
+
 test("popup success waits for the auth-owned hydration exactly once", async () => {
   const context = loadIdentityContracts();
   const calls = { popup: 0, redirect: 0, transition: 0, hydration: 0 };

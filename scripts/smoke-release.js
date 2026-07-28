@@ -11,6 +11,10 @@ const functionsBaseUrl = String(
   process.env.FUNCTIONS_BASE_URL ||
   `https://us-central1-${projectId}.cloudfunctions.net`
 ).replace(/\/$/, "");
+const identityToolkitBaseUrl = String(
+  process.env.IDENTITY_TOOLKIT_BASE_URL ||
+  "https://identitytoolkit.googleapis.com"
+).replace(/\/$/, "");
 
 if (!/^https:\/\//.test(baseUrl) && !(
   allowHttpSmoke &&
@@ -23,6 +27,12 @@ if (!/^https:\/\//.test(functionsBaseUrl) && !(
   /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(functionsBaseUrl)
 )) {
   throw new Error("Functions smoke base URL must use HTTPS or an explicitly allowed local test origin.");
+}
+if (!/^https:\/\//.test(identityToolkitBaseUrl) && !(
+  allowHttpSmoke &&
+  /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(identityToolkitBaseUrl)
+)) {
+  throw new Error("Identity Toolkit smoke base URL must use HTTPS or an explicitly allowed local test origin.");
 }
 if (!/^[0-9a-f]{40}$/i.test(expectedCommit)) throw new Error("Expected commit must be a full 40-character SHA.");
 
@@ -59,6 +69,39 @@ async function requirePausedCallable(name, data = {}) {
   return release;
 }
 
+async function requireGoogleAuthOrigin() {
+  const configResponse = await request(`${baseUrl}/__/firebase/init.json`, { cache: "no-store" });
+  assert.equal(configResponse.status, 200, "Firebase Hosting init config must return 200");
+  const config = await configResponse.json();
+  assert.equal(config.projectId, projectId, "Firebase Hosting init config project differs");
+  assert.ok(typeof config.apiKey === "string" && config.apiKey.length > 10, "Firebase browser API key is missing");
+
+  const response = await request(
+    `${identityToolkitBaseUrl}/v1/accounts:createAuthUri?key=${encodeURIComponent(config.apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        referer: `${baseUrl}/`
+      },
+      body: JSON.stringify({
+        continueUri: `${baseUrl}/`,
+        providerId: "google.com"
+      })
+    }
+  );
+  let body = {};
+  try {
+    body = await response.json();
+  } catch {}
+  assert.equal(
+    response.status,
+    200,
+    `Google Auth must accept the staged origin${body?.error?.message ? `: ${body.error.message}` : ""}`
+  );
+  assert.ok(typeof body.authUri === "string" && body.authUri.startsWith("https://accounts.google.com/"));
+}
+
 (async () => {
   const cacheBuster = `smoke=${Date.now()}`;
   const [root, version] = await Promise.all([
@@ -93,6 +136,7 @@ async function requirePausedCallable(name, data = {}) {
     requirePrivate404("/tests/release-integrity.test.js"),
     requirePrivate404("/source-art/README.md")
   ]);
+  await requireGoogleAuthOrigin();
 
   let backendRelease = null;
   if (verifyCallables) {
@@ -112,6 +156,7 @@ async function requirePausedCallable(name, data = {}) {
     commitSha: release.commitSha,
     progressionMode: release.progressionMode,
     competitionMode: release.competitionMode,
+    googleAuthOriginVerified: true,
     callablesVerified: verifyCallables,
     backendCommitSha: backendRelease && backendRelease.commitSha || null
   }));

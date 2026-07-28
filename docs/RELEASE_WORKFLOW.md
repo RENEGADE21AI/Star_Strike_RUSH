@@ -30,8 +30,8 @@ locally, and changes no resources. `-StageBackendPreview`:
 6. deploys the exact emulator-tested Rules idempotently after Functions;
 7. deploys indexes only when the complete range changed them;
 8. deploys a commit-named Hosting preview and verifies headers, private 404s,
-   all three paused callables, and equality of intended, Hosting, and backend
-   SHAs;
+   all three paused callables, Google Identity acceptance of the exact preview
+   origin, and equality of intended, Hosting, and backend SHAs;
 9. writes a sanitized ignored staging report and stops before live Hosting.
 
 If production has no readable `version.json`, pass a reviewed ancestor:
@@ -68,6 +68,12 @@ The script validates the approval, re-verifies the preview/backend SHA pair,
 rebuilds the exact commit, deploys production Hosting last, and smoke-tests the
 live URL. It never deploys production Functions or Rules from the approval
 step; those must already be the exact staged backend.
+
+The Google Identity smoke is non-account and transmits no pilot identity. It
+reads `/__/firebase/init.json`, then asks Identity Toolkit to create the Google
+authorization URI using the deployed origin as both the referrer and continue
+URI. A blocked browser-key referrer or unauthorized origin fails staging before
+the Account A/B checkpoint.
 
 ## Admin migrations
 
