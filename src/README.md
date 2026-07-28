@@ -13,6 +13,9 @@ after the files they depend on, because the current code intentionally shares gl
   aim/range calculations, and boss-specific action profiles.
 - `00-input-actions.js`: explicit gameplay actions and meaningful-input mode
   switching for keyboard, mouse, touch, and pen.
+- `00-onboarding-state.js`: versioned First Flight persistence, new-player
+  routing, checkpoint mapping, input-specific prompts, launch timing, and the
+  tutorial no-progression gates.
 - `00-runtime.js`: deterministic fixed-step simulation clock, render-rate
   independence, and long-background-gap clamping.
 - `01-core.js`: canvas handles, constants, persistent settings, global state, scoring.
@@ -25,6 +28,9 @@ after the files they depend on, because the current code intentionally shares gl
 - `05-entities.js`: enemy spawning, player shots, bullet and wingman updates.
 - `06-bosses.js`: boss spawning, boss attacks, boss death effects.
 - `07-gameplay-systems.js`: enemy movement, collisions, powerups, phase/wave loop.
+- `07-tutorial-director.js`: immutable tutorial step definitions, deterministic
+  spawn plans, action completion predicates, isolated boss overrides, recovery,
+  and one-time graduation Codex policy.
 - `08-title-screen.js`: title formations, title input geometry, menu hit testing.
 - `09-rendering-controls.js`: shared button and icon drawing helpers.
 - `10-rendering-ships.js`: enemy, boss, formation, and menu ship art.
@@ -40,6 +46,9 @@ after the files they depend on, because the current code intentionally shares gl
 - `16-rendering-hud.js`: top-left paid pause control, compact top-right score
   block, classic bottom-left Energy/Health status, warnings, and damage flash.
 - `17-rendering-scene.js`: outer fog and top-level draw orchestration.
+- `17-tutorial-onboarding.js`: First Flight runtime director, accessible
+  Colonel/objective surfaces, procedural Colonel Vega hologram, checkpoints,
+  tutorial presentation, and optional post-graduation identity flow.
 - `18-expansion-data.js`: expansion roster constants, codex metadata, spawn
   caps, and enemy setup defaults.
 - `18-expansion-enemies-powerups.js`: expansion enemy behavior, support effects,

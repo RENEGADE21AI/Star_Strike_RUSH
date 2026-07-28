@@ -1,6 +1,6 @@
 # Asset Manifest
 
-Audited on 2026-07-27 during the release-integrity pass.
+Audited on 2026-07-28 during the First Flight onboarding pass.
 
 ## Inventory
 
@@ -15,11 +15,11 @@ The public runtime contains 47 optimized PNG derivatives:
 - `assets/ui/`: 8 menu, favicon, and PWA icons.
 
 Two owner-supplied MP3 tracks live under `assets/audio/`: Hangar Bay Seven for
-title/profile navigation and Gravity's Edge for active play. The owner supplied
-the files for this project, but no public-distribution license, authorship
-record, or original source URL was available in the repository during this
-audit. Public-distribution provenance therefore remains unverified and must be
-resolved by the owner before any distribution claim is made.
+title/profile navigation and Gravity's Edge for active play. On 2026-07-28, the
+project owner explicitly confirmed that they own or are authorized to publicly
+distribute both tracks as part of the public Star Strike RUSH website. No
+artist, source URL, composition history, or formal license name was supplied,
+so this manifest makes none of those claims.
 
 The derivative count is larger because the supplied favicon generates multiple
 PWA sizes. No authorship or third-party-license claim is inferred from a file
@@ -77,3 +77,8 @@ rotation and display the canonical nose-up art.
 
 Procedural Canvas drawings remain decode-failure fallbacks; the normal runtime
 path uses the optimized supplied artwork.
+
+Colonel Vega is original procedural Canvas artwork created for First Flight.
+The source is preserved in `src/17-tutorial-onboarding.js`; it uses geometric
+helmet, high-collar, rank-bar, scanline, and hologram primitives and has no
+external portrait or likeness dependency.

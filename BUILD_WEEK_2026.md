@@ -9,6 +9,9 @@
 - Final production-gate starting commit:
   `419395afda3061754d98a74d42fcfd9aed2dc0af`.
 - Final production-gate branch: `codex/final-production-gate`.
+- First Flight onboarding starting commit:
+  `0fdb7beff47325adfc1c2259de0875f9292f45e9`.
+- First Flight onboarding branch: `codex/first-flight-onboarding`.
 
 The starting game already had local play, 79 achievements, Glory/Season roads,
 music/effects, a Records Network, a Pilot Dossier, Firestore rules, callable
@@ -129,17 +132,22 @@ and release evidence.
 
 ## Current branch evidence
 
-- `npm test`: 85/85 passing.
+- `npm test`: 113/113 passing, including full real-action desktop and touch
+  First Flight completions.
 - Firebase client emulator scenario: passed Accounts A/B, one-owner hydration,
   pending call-sign retry, auth restoration, progression non-overwrite,
   aggregate retrieval, sign-out cleanup, and all three paused callables.
-- Visual QA: 16/16 asserted cases passed across 375×667, 390×844, 430×932,
+- Firestore Rules emulator: 4/4 passed.
+- Visual QA: 33/33 asserted cases passed across 375×667, 390×844, 430×932,
   768×1024, and 1440×900.
-- Production build and commit-version contract: passed.
+- Production build and commit-version contract: passed with 100 public files.
+- Root production audit: 0 vulnerabilities. Functions production audit:
+  0 high-severity findings and 9 moderate transitive findings.
+- Tracked-file secret scan: 223 files passed.
 
-Final rule tests, dependency audits, secret scan, GitHub checks, preview smoke,
-and live-account/deployment evidence must be rerun or obtained on the exact
-release commit. This document does not claim those pending steps.
+GitHub checks, exact-SHA preview smoke, and live Account A/B evidence must still
+be obtained on the merge commit. This document does not claim those pending
+steps or a production Hosting deployment.
 
 ## Honest limitations
 
@@ -147,11 +155,12 @@ release commit. This document does not claim those pending steps.
   sessions, replay or telemetry verification, live App Check, and abuse review.
 - Real Google sign-in and cross-account behavior require a human smoke test
   against the configured live project and its authorized domains.
-- The two MP3 files were supplied by the owner, but repository evidence does not
-  independently verify public-distribution license, authorship, or source URL.
-- Production achievement migration dry-run found 1 account needing aggregate
-  reconstruction from 15 valid unlocks and 0 invalid IDs. Apply remains blocked
-  until the project owner explicitly approves that sanitized result.
+- The owner explicitly confirmed on 2026-07-28 that both supplied MP3 files may
+  be publicly distributed as part of Star Strike RUSH. No artist, source URL,
+  or formal license name was provided or inferred.
+- On 2026-07-28, the production achievement migration reconstructed the one
+  approved aggregate from 15 valid unlocks and 0 invalid IDs. The immediate
+  follow-up dry run found zero remaining changes.
 - Production is not considered deployed until live `version.json`, headers,
   private-path 404s, identity actions, device progression, and paused callables
   are verified against the merge commit.
@@ -159,3 +168,20 @@ release commit. This document does not claim those pending steps.
 Codex task/session ID: `019f8668-58bb-7c72-96f2-e4fe17af834c`
 
 Playable URL: https://star-strike-rush.web.app
+
+## First Flight onboarding
+
+- Added a versioned first-launch router that distinguishes genuinely new
+  devices from established local pilots.
+- Added an isolated 13-step tutorial director covering lightspeed launch,
+  movement beacons, autofire positioning, evasion, real Ghost Shift, a Phase
+  Shield pickup, controlled waves, a staged Command Ship, the two Wraith
+  realms, real Realm Hop, the Wraith Sovereign, and graduation.
+- Added a procedural original Colonel Vega hologram, concise transmissions,
+  semantic live-region mirroring, compact action objectives, input-adaptive
+  prompts, and reduced-motion/flash behavior.
+- Added checkpoint recovery, confirmed skip, reload resume, replay from
+  Settings, and optional Google identity only after first-time graduation.
+- Tutorial score and kills remain internal objective counters. Persistent
+  high score, device progression, achievements, receipts, public competition,
+  and Firebase progression remain untouched.

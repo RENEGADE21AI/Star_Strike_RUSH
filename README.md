@@ -10,6 +10,14 @@ during gameplay with a time-based crossfade. The first meaningful gesture
 unlocks and loads title music; gameplay music is deferred until launch. Music
 and Effects have independent persisted controls.
 
+First-time device pilots are offered **First Flight**, a four-to-six-minute
+action-driven training sortie led by Colonel Vega. It teaches movement,
+automatic weapons, Ghost Shift, a staged Command Ship, Realm Hop, and the
+Wraith Sovereign through deterministic gameplay. Training is skippable,
+checkpointed, replayable from Settings, and cannot change normal score,
+progression, achievements, receipts, competition state, or Firebase
+progression. Optional Google identity appears only after graduation.
+
 Play: https://star-strike-rush.web.app
 
 ## Controls
@@ -52,6 +60,9 @@ npm run build
 ```
 
 `npm test` runs the Node contract tests and real Chromium gameplay tests.
+Its First Flight coverage completes the entire tutorial through real keyboard
+and touch input, including actual movement, automatic-fire kills, Ghost Shift,
+pickup collision, and both bosses.
 `npm run test:rules` starts the Firestore emulator and verifies the deployed
 read/write authorization boundary with authenticated and unauthenticated users.
 `npm run test:firebase-client` runs the browser Firebase SDK against Auth,
@@ -184,6 +195,6 @@ remains a resilient fallback only.
 
 The game is deterministic/rule-based; no AI model runs inside the game.
 
-The two MP3 files were supplied by the project owner. The repository does not
-contain an independently verified public-distribution license, authorship
-record, or source URL for either track; see `docs/ASSET_MANIFEST.md`.
+On 2026-07-28, the project owner explicitly confirmed authorization to publicly
+distribute both MP3 files as part of the Star Strike RUSH website. No artist,
+source URL, or formal license name is inferred; see `docs/ASSET_MANIFEST.md`.
