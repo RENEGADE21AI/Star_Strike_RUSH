@@ -139,6 +139,16 @@ function identityErrorKind(error) {
   return "unknown";
 }
 
+function applyIdentityFailure(onlineState, error, fallback, status) {
+  if (!onlineState || typeof onlineState !== "object") return onlineState;
+  const message = error && error.message ? error.message : fallback;
+  onlineState.lastStatus = String(status || "ACCOUNT UPDATE FAILED");
+  onlineState.lastError = String(message || "Firebase account service failed.")
+    .replace(/^Firebase:\s*/i, "")
+    .slice(0, 140);
+  return onlineState;
+}
+
 function googleAuthShouldRedirect(error) {
   const code = String(error && error.code || "").toLowerCase();
   return [
@@ -170,6 +180,7 @@ async function restoreGoogleRedirect(getRedirectResult) {
 globalThis.clearAccountIdentity = clearAccountIdentity;
 globalThis.accountSyncCallSign = accountSyncCallSign;
 globalThis.identityErrorKind = identityErrorKind;
+globalThis.applyIdentityFailure = applyIdentityFailure;
 globalThis.accountIdentityStorageKey = accountIdentityStorageKey;
 globalThis.readAccountIdentityState = readAccountIdentityState;
 globalThis.savePendingAccountCallSign = savePendingAccountCallSign;

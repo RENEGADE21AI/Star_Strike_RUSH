@@ -496,8 +496,12 @@ async function signIn() {
     notify("SIGNED IN");
     return { ok: true, user: clonePublicUser(result.user) };
   } catch (error) {
-    setError(error, "Google sign-in failed. Check the authorized domain and try again.");
-    setStatus("SIGN IN FAILED");
+    window.applyIdentityFailure(
+      online,
+      error,
+      "Google sign-in failed. Check the authorized domain and try again.",
+      "SIGN IN FAILED"
+    );
     notify("SIGN IN FAILED");
     return { ok: false, reason: "sign_in_failed" };
   }
