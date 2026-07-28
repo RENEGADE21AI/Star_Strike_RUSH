@@ -85,6 +85,14 @@ function drawTitleAndButtons() {
   const accountOnline = !!titleOnline.user;
   drawSimpleButton(iconRects.account, "", accountOnline ? "rgba(120,255,180,0.62)" : "rgba(255,255,255,0.24)");
   drawAccountIcon(iconRects.account, titleSubState === "online" && titlePanelTarget === 1);
+  if (typeof onboardingAccountPulseFrames === "number" && onboardingAccountPulseFrames > 0) {
+    const pulse = settingReducedMotion ? 0.55 : 0.42 + Math.sin(state.frame * 0.12) * 0.18;
+    ctx.save();
+    ctx.strokeStyle = `rgba(112,244,255,${pulse})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(iconRects.account.x - 4, iconRects.account.y - 4, iconRects.account.w + 8, iconRects.account.h + 8);
+    ctx.restore();
+  }
 
   const playRect = getPlayButtonRect();
   drawPressButton(playRect, "PLAY", playBtnPointerDown && playBtnPointerInside, "rgba(0,180,100,0.18)");

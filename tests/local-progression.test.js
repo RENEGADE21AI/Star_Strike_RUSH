@@ -37,13 +37,15 @@ test("local achievement ids persist, reload, and merge with online unlocks", () 
   );
 });
 
-test("new-record state is based on the score captured at run start and ignores debug runs", () => {
-  const context = load("00-run-records.js");
+test("new-record state is based on the score captured at run start and ignores non-record runs", () => {
+  const context = load("00-onboarding-state.js", "00-run-records.js");
   assert.equal(context.isNewRunRecord(500, 501, "standard"), true);
   assert.equal(context.isNewRunRecord(500, 500, "standard"), false);
   assert.equal(context.isNewRunRecord(500, 9999, "debug"), false);
+  assert.equal(context.isNewRunRecord(500, 9999, "tutorial"), false);
   assert.equal(context.highScoreAfterRun(500, 800, "standard"), 800);
   assert.equal(context.highScoreAfterRun(500, 800, "debug"), 500);
+  assert.equal(context.highScoreAfterRun(500, 800, "tutorial"), 500);
 });
 
 test("Ghost Runner counts only true Ghost uses, not DASH or Realm Hop", () => {

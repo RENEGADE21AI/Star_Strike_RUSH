@@ -97,7 +97,8 @@ function getOnlineRects() {
   const audioW = Math.floor((panel.w - 40 - audioGap) / 2);
   const music = { x: innerX, y: btnY + 210, w: audioW, h: 30 };
   const effects = { x: innerX + audioW + audioGap, y: btnY + 210, w: audioW, h: 30 };
-  return { panel, closeRect, pilotTab, settingsTab, editCallSign, claimHandle, signIn, signOut, low, med, high, shake, reset, motion, flash, contrast, music, effects };
+  const replayTraining = { x: innerX, y: btnY + 252, w: panel.w - 40, h: 32 };
+  return { panel, closeRect, pilotTab, settingsTab, editCallSign, claimHandle, signIn, signOut, low, med, high, shake, reset, motion, flash, contrast, music, effects, replayTraining };
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();

@@ -548,7 +548,9 @@ function currentRunReceiptSnapshot() {
 }
 function applyRunMetaProgress() {
   const stats = state.runStats || {};
-  if (state.runMode === "debug") return { debug: true, snapshot: currentMetaSnapshot(), receipt: currentRunReceiptSnapshot() };
+  if (typeof runModeAllowsProgression === "function" && !runModeAllowsProgression(state.runMode)) {
+    return { nonProgressionRun: true, runMode: state.runMode, snapshot: currentMetaSnapshot(), receipt: null };
+  }
   if (stats.metaApplied) return lastRunMeta || { snapshot: currentMetaSnapshot(), receipt: currentRunReceiptSnapshot() };
   const progress = getMetaProgress();
   const receipt = currentRunReceiptSnapshot();
@@ -619,7 +621,10 @@ function getLastRunMeta() {
   return lastRunMeta ? JSON.parse(JSON.stringify(lastRunMeta)) : null;
 }
 function saveMilestone() {
-  if (state.runMode !== "debug" && highScoreDirty) saveHighScore();
+  const allowed = typeof runModeAllowsProgression === "function"
+    ? runModeAllowsProgression(state.runMode)
+    : state.runMode === "standard";
+  if (allowed && highScoreDirty) saveHighScore();
 }
 function kickShake(amount) {
   if (!settingScreenShake) return;

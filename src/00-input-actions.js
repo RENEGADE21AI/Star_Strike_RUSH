@@ -12,7 +12,8 @@ function gameplayActionForKey(key) {
 }
 
 function nextGameplayInputMode(currentMode, eventKind, nowMs, lastTouchAt = -Infinity, buttons = 0) {
-  if (eventKind === "touch" || eventKind === "pen") return { mode: "touch", lastTouchAt: nowMs };
+  if (eventKind === "touch") return { mode: "touch", lastTouchAt: nowMs };
+  if (eventKind === "pen") return { mode: "pen", lastTouchAt: nowMs };
   if (eventKind === "keyboard") return { mode: "keyboard", lastTouchAt };
   if (eventKind === "mouse_down") return { mode: "pointer", lastTouchAt };
   if (eventKind === "mouse_move" && buttons && nowMs - lastTouchAt > 1200) return { mode: "pointer", lastTouchAt };
@@ -20,7 +21,7 @@ function nextGameplayInputMode(currentMode, eventKind, nowMs, lastTouchAt = -Inf
 }
 
 function touchControlsVisible(inputMode, gameState) {
-  return inputMode === "touch" && gameState === "playing";
+  return (inputMode === "touch" || inputMode === "pen") && gameState === "playing";
 }
 
 globalThis.GAME_ACTION_KEYS = GAME_ACTION_KEYS;

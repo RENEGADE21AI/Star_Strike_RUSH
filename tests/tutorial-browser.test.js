@@ -1,0 +1,351 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const http = require("node:http");
+const path = require("node:path");
+const { after, before, test } = require("node:test");
+const { chromium } = require("playwright");
+
+const repoRoot = path.resolve(__dirname, "..");
+const mimeTypes = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".mp3": "audio/mpeg",
+  ".png": "image/png",
+  ".webmanifest": "application/manifest+json; charset=utf-8"
+};
+
+let browser;
+let server;
+let baseUrl;
+
+function staticResponse(request, response) {
+  const url = new URL(request.url, "http://127.0.0.1");
+  const requested = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname.slice(1));
+  const resolved = path.resolve(repoRoot, requested);
+  if (!resolved.startsWith(`${repoRoot}${path.sep}`) || !fs.existsSync(resolved) || fs.statSync(resolved).isDirectory()) {
+    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("Not found");
+    return;
+  }
+  response.writeHead(200, {
+    "Content-Type": mimeTypes[path.extname(resolved).toLowerCase()] || "application/octet-stream",
+    "Cache-Control": "no-store"
+  });
+  fs.createReadStream(resolved).pipe(response);
+}
+
+async function snapshot(page) {
+  return page.evaluate(() => JSON.parse(document.querySelector("#debugSnapshot").textContent));
+}
+
+async function pressContinue(page) {
+  const button = page.getByRole("button", { name: "Continue" });
+  if (!(await button.isVisible().catch(() => false))) return false;
+  await button.click();
+  await page.waitForTimeout(45);
+  if (await button.isVisible().catch(() => false)) await button.click();
+  await page.waitForTimeout(90);
+  return true;
+}
+
+async function desktopMove(page, current, target) {
+  const keys = [];
+  if (target.x < current.x - 8) keys.push("ArrowLeft");
+  if (target.x > current.x + 8) keys.push("ArrowRight");
+  if (target.y < current.y - 8) keys.push("ArrowUp");
+  if (target.y > current.y + 8) keys.push("ArrowDown");
+  for (const key of keys) await page.keyboard.down(key);
+  await page.waitForTimeout(130);
+  for (const key of keys) await page.keyboard.up(key);
+}
+
+async function touchMove(page, cdp, layout, current, target) {
+  const dx = Math.max(-1, Math.min(1, (target.x - current.x) / 70));
+  const dy = Math.max(-1, Math.min(1, (target.y - current.y) / 70));
+  const scale = layout.scale;
+  const origin = {
+    x: layout.offsetX + 76 * scale,
+    y: layout.offsetY + (667 - 76) * scale
+  };
+  const point = {
+    x: origin.x + dx * 46 * scale,
+    y: origin.y + dy * 46 * scale
+  };
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...origin, id: 1 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...point, id: 1 }] });
+  await page.waitForTimeout(150);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+}
+
+async function useAbility(page, mode, cdp, layout) {
+  if (mode === "desktop") {
+    await page.keyboard.press("Space");
+    return;
+  }
+  const x = layout.offsetX + (375 - 76) * layout.scale;
+  const y = layout.offsetY + (667 - 76) * layout.scale;
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y, id: 2 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+}
+
+async function completeTutorial(page, mode) {
+  const startedAt = Date.now();
+  const cdp = mode === "touch" ? await page.context().newCDPSession(page) : null;
+  const evidence = {
+    steps: new Set(),
+    commandOverrideSeen: false,
+    wraithOverrideSeen: false,
+    matchingRealmDamageSeen: false
+  };
+  await page.getByRole("button", { name: "Begin Flight Training" }).click();
+  await page.waitForFunction(() => {
+    const data = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+    return data.runMode === "tutorial" && data.tutorial?.director?.stepId === "movement";
+  }, null, { timeout: 12_000 });
+
+  const deadline = Date.now() + 150_000;
+  let lastStep = "";
+  while (Date.now() < deadline) {
+    const data = await snapshot(page);
+    const director = data.tutorial && data.tutorial.director;
+    if (!director) throw new Error("Tutorial director disappeared");
+    evidence.steps.add(director.stepId);
+    if (director.stepId === "command_boss" && data.encounter.boss?.tutorialOverride) evidence.commandOverrideSeen = true;
+    if (director.stepId === "wraith_boss" && data.encounter.boss?.tutorialOverride) evidence.wraithOverrideSeen = true;
+    if (data.tutorial.runtime?.matchingRealmDamage) evidence.matchingRealmDamageSeen = true;
+    lastStep = director.stepId;
+    if (director.dialogueVisible) {
+      await pressContinue(page);
+      continue;
+    }
+    if (director.stepId === "graduation" && director.dialogueVisible === false) break;
+
+    let target = null;
+    if (director.stepId === "movement") {
+      const beacons = [[187.5, 520], [92, 455], [283, 410]];
+      const point = beacons[data.tutorial.runtime.beaconIndex] || beacons[beacons.length - 1];
+      target = { x: point[0], y: point[1] };
+    } else if (director.stepId === "auto_weapons" || director.stepId === "controlled_wave") {
+      const enemy = data.encounter.enemies.find((item) => item.y < data.player.y - 60);
+      target = enemy ? { x: enemy.x, y: data.player.y } : { x: 187.5, y: data.player.y };
+    } else if (director.stepId === "evasion") {
+      target = { x: 290, y: data.player.y };
+    } else if (director.stepId === "ghost_shift") {
+      if (data.tutorial.runtime && data.player.energy >= 35 && data.player.x < 150) {
+        await useAbility(page, mode, cdp, data.layout);
+      }
+      target = { x: 270, y: data.player.y };
+    } else if (director.stepId === "powerup") {
+      const powerup = data.encounter.powerups[0];
+      target = powerup ? { x: powerup.x, y: powerup.y } : { x: 187.5, y: 470 };
+    } else if (director.stepId === "command_boss") {
+      target = data.encounter.boss ? { x: data.encounter.boss.x, y: data.player.y } : { x: 187.5, y: data.player.y };
+    } else if (director.stepId === "realm_practice" || director.stepId === "wraith_boss") {
+      if (data.encounter.boss && data.player.realm !== data.encounter.boss.realm && data.player.energy >= 18) {
+        await useAbility(page, mode, cdp, data.layout);
+      }
+      target = data.encounter.boss ? { x: data.encounter.boss.x, y: data.player.y } : { x: 187.5, y: data.player.y };
+    }
+
+    if (target) {
+      if (mode === "touch") await touchMove(page, cdp, data.layout, data.player, target);
+      else await desktopMove(page, data.player, target);
+    } else {
+      await page.waitForTimeout(120);
+    }
+  }
+  if (lastStep !== "graduation") throw new Error(`Tutorial did not graduate; last step ${lastStep}`);
+  await pressContinue(page);
+  await page.getByRole("button", { name: "Confirm Call Sign" }).click();
+  await page.getByRole("button", { name: "Continue With Device Pilot" }).click();
+  await page.waitForFunction(() => document.body.dataset.gameRunMode === "standard");
+  evidence.durationSeconds = (Date.now() - startedAt) / 1000;
+  return evidence;
+}
+
+before(async () => {
+  server = http.createServer(staticResponse);
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  browser = await chromium.launch({ headless: true });
+});
+
+after(async () => {
+  if (browser) await browser.close();
+  if (server) await new Promise((resolve) => server.close(resolve));
+});
+
+for (const scenario of [
+  { name: "desktop", viewport: { width: 1440, height: 900 }, context: {} },
+  { name: "touch", viewport: { width: 390, height: 844 }, context: { hasTouch: true, isMobile: true } }
+]) {
+  test(`fresh ${scenario.name} player completes First Flight through real game actions`, { timeout: 190_000 }, async () => {
+    const context = await browser.newContext({ viewport: scenario.viewport, ...scenario.context });
+    const page = await context.newPage();
+    const errors = [];
+    const progressionRequests = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("request", (request) => {
+      if (/submitRunReceipt|joinWeeklyLeague|claimSeasonReward/i.test(request.url())) progressionRequests.push(request.url());
+    });
+    try {
+      await page.goto(`${baseUrl}/?debug=1&scenario=tutorial${scenario.name === "touch" ? "&input=touch" : ""}`, { waitUntil: "commit" });
+      await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent, null, { timeout: 90_000 });
+      const before = await page.evaluate(() => ({
+        highScore: localStorage.getItem("star_strike_rush_high_score_v1"),
+        meta: localStorage.getItem("star_strike_rush_meta_v1"),
+        achievements: localStorage.getItem("star_strike_rush_achievements_v1")
+      }));
+      const evidence = await completeTutorial(page, scenario.name);
+      const afterState = await page.evaluate(() => ({
+        highScore: localStorage.getItem("star_strike_rush_high_score_v1"),
+        meta: localStorage.getItem("star_strike_rush_meta_v1"),
+        achievements: localStorage.getItem("star_strike_rush_achievements_v1"),
+        onboarding: JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1"))
+      }));
+      assert.deepEqual(
+        { highScore: afterState.highScore, meta: afterState.meta, achievements: afterState.achievements },
+        before
+      );
+      assert.equal(afterState.onboarding.status, "completed");
+      assert.equal(afterState.onboarding.checkpoint, "graduation");
+      assert.deepEqual(
+        Array.from(evidence.steps),
+        ["movement", "auto_weapons", "evasion", "ghost_shift", "powerup", "controlled_wave", "command_boss", "wraith_briefing", "realm_practice", "wraith_boss", "graduation"]
+      );
+      assert.equal(evidence.commandOverrideSeen, true);
+      assert.equal(evidence.wraithOverrideSeen, true);
+      assert.equal(evidence.matchingRealmDamageSeen, true);
+      assert.ok(evidence.durationSeconds >= 45 && evidence.durationSeconds <= 180, `unexpected tutorial duration ${evidence.durationSeconds}s`);
+      assert.deepEqual(progressionRequests, []);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test("existing pilots receive a dismissible training offer instead of forced onboarding", { timeout: 90_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => localStorage.setItem("star_strike_rush_high_score_v1", "1200"));
+  const page = await context.newPage();
+  try {
+    await page.goto(baseUrl, { waitUntil: "commit" });
+    await assert.doesNotReject(() => page.getByRole("button", { name: "Start Training" }).waitFor());
+    assert.equal(await page.getByRole("button", { name: "Later" }).isVisible(), true);
+    assert.equal(await page.getByRole("button", { name: "Begin Flight Training" }).isVisible().catch(() => false), false);
+    await page.getByRole("button", { name: "Later" }).click();
+    assert.equal(await page.getByRole("button", { name: "Start Training" }).isVisible().catch(() => false), false);
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1")).existingPlayerOfferDismissed), true);
+  } finally {
+    await context.close();
+  }
+});
+
+test("a local call sign can be edited inline before training launch", { timeout: 90_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial`, { waitUntil: "commit" });
+    await page.getByRole("button", { name: "Edit Call Sign" }).waitFor();
+    await page.getByRole("button", { name: "Edit Call Sign" }).click();
+    await page.waitForFunction(() => document.activeElement?.id === "callSignInput");
+    const input = page.locator("#callSignInput");
+    await input.fill("NOVA_7", { force: true });
+    assert.equal(await input.inputValue(), "NOVA_7");
+    await input.press("Enter");
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).ui.callSign === "NOVA_7");
+    assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_callsign_v1")), "NOVA_7");
+    await page.getByRole("button", { name: "Begin Flight Training" }).click();
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).runMode === "tutorial", null, { timeout: 12_000 });
+    assert.equal((await snapshot(page)).ui.callSign, "NOVA_7");
+  } finally {
+    await context.close();
+  }
+});
+
+test("skip requires confirmation and replay starts from Settings without account setup", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial`, { waitUntil: "commit" });
+    await page.getByRole("button", { name: "Skip For Now" }).waitFor();
+    await page.getByRole("button", { name: "Skip For Now" }).click();
+    assert.equal(await page.getByRole("button", { name: "Confirm Skip" }).isVisible(), true);
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1") || '{"status":"unseen"}').status), "unseen");
+    await page.getByRole("button", { name: "Confirm Skip" }).click();
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1")).status), "skipped");
+
+    await page.evaluate(() => localStorage.setItem("star_strike_rush_onboarding_v1", JSON.stringify({
+      schemaVersion: 1,
+      tutorialVersion: 1,
+      status: "completed",
+      checkpoint: "graduation",
+      startedAtMs: 1,
+      updatedAtMs: 2,
+      completedAtMs: 2
+    })));
+    await page.goto(`${baseUrl}/?debug=1`, { waitUntil: "commit" });
+    await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent, null, { timeout: 90_000 });
+    let data = await snapshot(page);
+    await page.mouse.click(data.layout.account.x + data.layout.account.w / 2, data.layout.account.y + data.layout.account.h / 2);
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).ui.titleSubState === "online");
+    data = await snapshot(page);
+    await page.mouse.click(data.layout.accountSettingsTab.x + data.layout.accountSettingsTab.w / 2, data.layout.accountSettingsTab.y + data.layout.accountSettingsTab.h / 2);
+    await page.waitForTimeout(150);
+    data = await snapshot(page);
+    const replay = data.layout.replayTraining;
+    assert.ok(replay);
+    await page.mouse.click(replay.x + replay.w / 2, replay.y + replay.h / 2);
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "title_launch");
+    assert.equal((await snapshot(page)).tutorial.uiMode, "none");
+  } finally {
+    await context.close();
+  }
+});
+
+test("reload after resuming preserves the checkpoint offer", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial-resume`, { waitUntil: "commit" });
+    await page.getByRole("button", { name: "Resume Training" }).waitFor();
+    await page.getByRole("button", { name: "Resume Training" }).click();
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).runMode === "tutorial", null, { timeout: 12_000 });
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1")).checkpoint), "before_wraith");
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Restart Checkpoint" }).waitFor();
+    await page.getByRole("button", { name: "Restart Checkpoint" }).click();
+    await page.waitForFunction(() => {
+      const state = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return state.gameState === "playing" &&
+        state.tutorial?.director?.stepId === "wraith_briefing" &&
+        state.tutorial?.director?.recoveryCount === 1;
+    });
+    assert.match(await page.getByRole("status").textContent(), /Training craft restored/i);
+    await page.goto(baseUrl, { waitUntil: "commit" });
+    await page.getByRole("button", { name: "Resume Training" }).waitFor();
+    assert.match(await page.getByRole("status").textContent(), /before_wraith/i);
+  } finally {
+    await context.close();
+  }
+});
+
+test("Firebase identity failure cannot block post-flight device continuation", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial-post`, { waitUntil: "commit" });
+    await page.getByRole("button", { name: "Connect Google Account" }).waitFor();
+    await page.getByRole("button", { name: "Connect Google Account" }).click();
+    await page.waitForFunction(() => /unavailable|not completed/i.test(document.querySelector("#tutorialLiveRegion")?.textContent || ""));
+    assert.equal(await page.getByRole("button", { name: "Continue With Device Pilot" }).isVisible(), true);
+    await page.getByRole("button", { name: "Continue With Device Pilot" }).click();
+    await page.waitForFunction(() => document.body.dataset.gameRunMode === "standard");
+    assert.ok((await snapshot(page)).tutorial.accountPulseFrames > 0);
+  } finally {
+    await context.close();
+  }
+});

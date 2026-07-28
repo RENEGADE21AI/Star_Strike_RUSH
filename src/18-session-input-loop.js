@@ -1,6 +1,16 @@
 function startPlayingSession() {
+  if (typeof pendingTutorialStep !== "undefined" && pendingTutorialStep) {
+    startTutorialSession(pendingTutorialStep);
+    return;
+  }
   setupSession("playing");
-  state.sceneTransition = { mode: "game_arrival", frame: 0, duration: settingReducedMotion ? 1 : 36 };
+  state.sceneTransition = {
+    mode: "game_arrival",
+    frame: 0,
+    duration: Math.max(1, Math.round((settingReducedMotion ? 0.24 : 0.45) * SIMULATION_HZ)),
+    elapsedSeconds: 0,
+    durationSeconds: settingReducedMotion ? 0.24 : 0.45
+  };
   state.player.inv = Math.max(state.player.inv, 45);
   showMessage("PHASE 1", 90);
 }
@@ -10,7 +20,15 @@ function beginGame() {
   if (state.gameState === "start") {
     if (state.sceneTransition.mode !== "idle") return;
     titlePanelTarget = 0;
-    state.sceneTransition = { mode: "title_launch", frame: 0, duration: settingReducedMotion ? 1 : 42 };
+    state.sceneTransition = {
+      mode: "title_launch",
+      frame: 0,
+      duration: Math.max(1, Math.round(tutorialLaunchDurationSeconds(settingReducedMotion) * SIMULATION_HZ)),
+      elapsedSeconds: 0,
+      durationSeconds: tutorialLaunchDurationSeconds(settingReducedMotion)
+    };
+    state.lastTitleLaunchDurationSeconds = state.sceneTransition.durationSeconds;
+    state.lastTitleLaunchReducedMotion = settingReducedMotion === true;
     clearGameplayInput();
     return;
   }
@@ -42,6 +60,7 @@ function pauseGame(reason = "manual") {
   state.pauseNotice = decision.message;
   state.resumeCountdown = 0;
   state.gameState = "paused";
+  if (state.runMode === "tutorial" && typeof showTutorialPauseAccessibility === "function") showTutorialPauseAccessibility();
   return true;
 }
 function resumeGame() {
@@ -50,6 +69,7 @@ function resumeGame() {
   state.pausedReason = "";
   state.resumeCountdown = 90;
   state.gameState = "resuming";
+  if (state.runMode === "tutorial" && typeof hideTutorialPauseAccessibility === "function") hideTutorialPauseAccessibility();
   return true;
 }
 function setupSession(mode = "start") {
@@ -96,6 +116,7 @@ function setupSession(mode = "start") {
   state.killsSinceLastDrop = 0;
   state.framesSinceLastDrop = 0;
   state.powerupDropCooldown = 0;
+  state.lastPickupFeedback = null;
   state.debrisEventTimer = 1200;
   state.debrisWarningTimer = 0;
   state.lastDebrisFrame = -9999;
@@ -134,6 +155,7 @@ function setupSession(mode = "start") {
   lastRunMeta = null;
   state.gameState = mode;
   state.runMode = "standard";
+  document.body.dataset.gameRunMode = state.runMode;
   state.pausedReason = "";
   state.pauseNotice = "";
   state.resumeCountdown = 0;
@@ -185,13 +207,20 @@ function setupSession(mode = "start") {
   refreshMultiplier();
 }
 function enterGameOver() {
+  if (state.runMode === "tutorial" && typeof recoverTutorialCheckpoint === "function") {
+    recoverTutorialCheckpoint();
+    return;
+  }
   state.gameState = "gameover";
   clearGameplayInput();
   previousHighScore = state.runStartingHighScore;
   state.newHighScore = typeof isNewRunRecord === "function"
     ? isNewRunRecord(state.runStartingHighScore, state.score, state.runMode)
-    : state.runMode !== "debug" && state.score > state.runStartingHighScore;
-  if (state.runMode !== "debug") {
+    : state.runMode === "standard" && state.score > state.runStartingHighScore;
+  const progressionAllowed = typeof runModeAllowsProgression === "function"
+    ? runModeAllowsProgression(state.runMode)
+    : state.runMode === "standard";
+  if (progressionAllowed) {
     const nextHighScore = typeof highScoreAfterRun === "function"
       ? highScoreAfterRun(highScore, state.score, state.runMode)
       : Math.max(highScore, state.score);
@@ -209,7 +238,7 @@ function enterGameOver() {
   state.gameOverShake = 6;
   state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
   if (typeof recordDifficultySample === "function") recordDifficultySample(true);
-  if (state.runMode !== "debug") finalizeLocalRunAchievements();
+  if (progressionAllowed) finalizeLocalRunAchievements();
 }
 function resize() {
   const screenW = window.innerWidth;
@@ -457,6 +486,16 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (state.gameState === "playing") {
+    if (
+      state.runMode === "tutorial" &&
+      typeof tutorialSimulationPaused === "function" &&
+      tutorialSimulationPaused() &&
+      (k === "Enter" || k === " ")
+    ) {
+      e.preventDefault();
+      advanceTutorialDialogue();
+      return;
+    }
     const action = typeof gameplayActionForKey === "function" ? gameplayActionForKey(k) : (isMoveKey(k) ? "move" : null);
     if (action === "pause") { e.preventDefault(); pauseGame("manual"); return; }
     if (action) {
@@ -493,7 +532,7 @@ document.addEventListener("visibilitychange", () => {
   if (state.gameState === "playing") pauseGame("visibility");
 });
 window.addEventListener("beforeunload", () => {
-  if (state.runMode !== "debug" && highScoreDirty) saveHighScore();
+  if ((typeof runModeAllowsProgression !== "function" ? state.runMode === "standard" : runModeAllowsProgression(state.runMode)) && highScoreDirty) saveHighScore();
   saveCallSign();
   saveSettings();
   saveCodexDiscovered();
@@ -547,10 +586,21 @@ function update() {
     return;
   }
 
+  if (
+    state.runMode === "tutorial" &&
+    typeof tutorialSimulationPaused === "function" &&
+    tutorialSimulationPaused()
+  ) {
+    updateStars();
+    updateTutorialDirectorRuntime();
+    return;
+  }
+
   state.runStats.activeFrames = Math.max(0, Math.floor(state.runStats.activeFrames || 0)) + 1;
   if (state.sceneTransition.mode === "game_arrival") {
     state.sceneTransition.frame++;
-    if (state.sceneTransition.frame >= state.sceneTransition.duration) state.sceneTransition = { mode: "idle", frame: 0, duration: 1 };
+    state.sceneTransition.elapsedSeconds = Number(state.sceneTransition.elapsedSeconds || 0) + SIMULATION_STEP_MS / 1000;
+    if (state.sceneTransition.elapsedSeconds >= state.sceneTransition.durationSeconds) state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
   }
   state.framesSinceLastDrop++;
   state.inputHintTimer = Math.max(0, (state.inputHintTimer || 0) - 1);
@@ -558,7 +608,7 @@ function update() {
   state.comboPulse = Math.max(0, state.comboPulse - 1);
 
   updateStars();
-  updateWavesAndPhaseAndPressure();
+  if (state.runMode !== "tutorial") updateWavesAndPhaseAndPressure();
   updatePlayer();
   updateWingmen();
   updateBullets();
@@ -568,6 +618,7 @@ function update() {
   updatePowerups();
   if (typeof updateExpansionHazards === "function") updateExpansionHazards();
   updateCollisions();
+  if (state.runMode === "tutorial" && typeof updateTutorialDirectorRuntime === "function") updateTutorialDirectorRuntime();
   updateParticles();
   state.notices = (state.notices || []).filter((notice) => {
     notice.age++;
@@ -626,8 +677,26 @@ function getDebugSnapshot() {
     transition: {
       mode: state.sceneTransition.mode,
       duration: state.sceneTransition.duration,
-      progress: clamp(state.sceneTransition.frame / Math.max(1, state.sceneTransition.duration), 0, 1)
+      lastLaunchDurationSeconds: Number(state.lastTitleLaunchDurationSeconds || 0),
+      lastLaunchReducedMotion: state.lastTitleLaunchReducedMotion === true,
+      titleUiAlpha: state.sceneTransition.mode === "title_launch"
+        ? Math.max(0, 1 - clamp(
+          state.sceneTransition.durationSeconds
+            ? Number(state.sceneTransition.elapsedSeconds || 0) / state.sceneTransition.durationSeconds
+            : state.sceneTransition.frame / Math.max(1, state.sceneTransition.duration),
+          0,
+          1
+        ) * 3.4)
+        : 0,
+      progress: clamp(
+        state.sceneTransition.durationSeconds
+          ? Number(state.sceneTransition.elapsedSeconds || 0) / state.sceneTransition.durationSeconds
+          : state.sceneTransition.frame / Math.max(1, state.sceneTransition.duration),
+        0,
+        1
+      )
     },
+    tutorial: typeof tutorialSnapshot === "function" ? tutorialSnapshot() : null,
     frame: state.frame,
     score: state.score,
     highScore,
@@ -642,7 +711,8 @@ function getDebugSnapshot() {
       inv: state.player.inv,
       ghostTimer: state.player.ghostTimer,
       ghostCooldown: state.player.ghostCooldown,
-      dashTimer: state.player.dashTimer
+      dashTimer: state.player.dashTimer,
+      realm: state.playerRealm
     } : null,
     counts: {
       bullets: state.bullets.length,
@@ -705,6 +775,7 @@ function getDebugSnapshot() {
     layout: {
       scale,
       offsetX,
+      offsetY,
       title: state.titleMetrics || null,
       play: debugScreenRect(typeof getPlayButtonRect === "function" ? getPlayButtonRect() : null),
       account: debugScreenRect(titleIcons.account),
@@ -713,6 +784,7 @@ function getDebugSnapshot() {
       reducedMotion: debugScreenRect(onlineRects.motion),
       music: debugScreenRect(onlineRects.music),
       effects: debugScreenRect(onlineRects.effects),
+      replayTraining: debugScreenRect(onlineRects.replayTraining),
       achievements: debugScreenRect(titleIcons.achievements),
       progress: debugScreenRect(titleIcons.progress),
       records: debugScreenRect(titleIcons.records),
@@ -725,7 +797,17 @@ function getDebugSnapshot() {
       codexScrollDown: debugScreenRect(codexRects.scrollDown)
       ,
       pause: debugScreenRect(typeof getPauseButtonRect === "function" ? getPauseButtonRect() : null),
-      hud: typeof getGameplayHudLayout === "function" ? getGameplayHudLayout() : null
+      hud: typeof getGameplayHudLayout === "function" ? getGameplayHudLayout() : null,
+      onboardingPanel: debugScreenRect(typeof getOnboardingPanelRect === "function" ? getOnboardingPanelRect() : null),
+      tutorialDialogue: debugScreenRect(
+        typeof getTutorialDialogueRect === "function" && state.runMode === "tutorial" && tutorialDirector?.dialogueVisible
+          ? getTutorialDialogueRect()
+          : null
+      ),
+      tutorialObjective: debugScreenRect(typeof getTutorialObjectiveRect === "function" ? getTutorialObjectiveRect() : null),
+      tutorialControls: typeof getTutorialControlRects === "function"
+        ? Object.fromEntries(Object.entries(getTutorialControlRects()).map(([key, rect]) => [key, debugScreenRect(rect)]))
+        : null
     },
     titleTraffic: state.titleFormations.map((formation) => ({
       depth: formation.depthLayer,
@@ -753,13 +835,29 @@ function getDebugSnapshot() {
     encounter: {
       bossMode: state.boss ? state.boss.mode : null,
       boss: state.boss ? {
+        x: Number(state.boss.x.toFixed(2)),
+        y: Number(state.boss.y.toFixed(2)),
         hp: state.boss.hp,
         maxHp: state.boss.maxHp,
         entered: state.boss.entered === true,
         combatActive: state.boss.combatActive === true,
-        damageable: typeof bossCanTakeDamage === "function" ? bossCanTakeDamage(state.boss) : true
+        damageable: typeof bossCanTakeDamage === "function" ? bossCanTakeDamage(state.boss) : true,
+        realm: state.boss.realm == null ? null : state.boss.realm,
+        tutorialOverride: state.boss.tutorialOverride === true
       } : null,
       enemyTypes: Array.from(new Set(state.enemies.map((enemy) => enemy.type))),
+      enemies: state.enemies.slice(0, 16).map((enemy) => ({
+        type: enemy.type,
+        x: Number(enemy.x.toFixed(2)),
+        y: Number(enemy.y.toFixed(2)),
+        hp: Number(enemy.hp || 0),
+        tutorialTarget: enemy.tutorialTarget === true
+      })),
+      powerups: state.powerups.slice(0, 8).map((powerup) => ({
+        type: powerup.type,
+        x: Number(powerup.x.toFixed(2)),
+        y: Number(powerup.y.toFixed(2))
+      })),
       safeLanes: (state.safeLanes || []).map((lane) => ({ row: lane.row, minX: lane.minX, maxX: lane.maxX, width: lane.width })),
       debrisScales: (state.debris || []).slice(0, 16).map((rock) => ({
         spawnScale: Number((rock.spawnScale == null ? 1 : rock.spawnScale).toFixed(3)),
@@ -807,6 +905,45 @@ function applyDevelopmentQaScenario() {
   const requestedInput = params.get("input");
   if (!scenario) {
     if (requestedInput === "touch") state.inputMode = "touch";
+    return;
+  }
+  if (
+    scenario === "tutorial" ||
+    scenario === "tutorial-resume" ||
+    scenario === "tutorial-post" ||
+    scenario === "tutorial-post-callsign"
+  ) {
+    if (scenario === "tutorial-resume") {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(transitionOnboardingState(
+        makeDefaultOnboardingState(),
+        { type: "checkpoint", checkpoint: "before_wraith" }
+      )));
+    } else if (scenario === "tutorial-post" || scenario === "tutorial-post-callsign") {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(transitionOnboardingState(
+        makeDefaultOnboardingState(),
+        { type: "complete" }
+      )));
+    }
+    else try { localStorage.removeItem(ONBOARDING_STORAGE_KEY); } catch {}
+    setupSession("start");
+    if (requestedInput === "touch") state.inputMode = "touch";
+    const tutorialStep = scenario === "tutorial" ? params.get("step") : "";
+    if (tutorialStep) {
+      const tutorialStepMap = {
+        ghost: "ghost_shift",
+        "command-boss": "command_boss",
+        wraith: "wraith_briefing",
+        graduation: "graduation"
+      };
+      window.addEventListener("DOMContentLoaded", () => {
+        beginTutorialTraining({ stepId: tutorialStepMap[tutorialStep] || tutorialStep });
+      }, { once: true });
+    } else if (scenario === "tutorial-post" || scenario === "tutorial-post-callsign") {
+      window.addEventListener("DOMContentLoaded", () => {
+        onboardingUiMode = scenario === "tutorial-post-callsign" ? "post_callsign" : "post_identity";
+        renderOnboardingAccessibleMode();
+      }, { once: true });
+    }
     return;
   }
   setupSession("playing");
@@ -864,6 +1001,14 @@ loadCodexDiscovered();
 loadMetaProgress();
 resize();
 setupSession("start");
+window.addEventListener("DOMContentLoaded", () => {
+  let debugBypass = false;
+  /* DEVELOPMENT_QA_START */
+  const params = new URLSearchParams(window.location.search);
+  debugBypass = DEBUG_SNAPSHOT_ENABLED && !String(params.get("scenario") || "").startsWith("tutorial");
+  /* DEVELOPMENT_QA_END */
+  if (typeof initializeOnboardingExperience === "function") initializeOnboardingExperience({ debugBypass });
+}, { once: true });
 /* DEVELOPMENT_QA_CALL */ if (typeof applyDevelopmentQaScenario === "function") applyDevelopmentQaScenario();
 window.addEventListener("resize", resize);
 if (typeof preloadGameAssets === "function") {

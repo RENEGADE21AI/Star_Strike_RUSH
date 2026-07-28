@@ -216,6 +216,7 @@ function handleOnlinePanelPointerDown(x, y) {
   if (accountPanelTab === "settings" && hitRect(r.contrast, x, y)) { settingHighContrast = !settingHighContrast; applyAccessibilitySettings(); saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.music, x, y)) { setMusicEnabled(!settingMusicEnabled); saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.effects, x, y)) { setEffectsEnabled(!settingEffectsEnabled); saveSettings(); return true; }
+  if (accountPanelTab === "settings" && hitRect(r.replayTraining, x, y)) { replayFirstFlightTraining(); return true; }
   if (accountPanelTab === "pilot" && hitRect(r.editCallSign, x, y)) {
     if (callSignEditing) commitCallSignDraft();
     else beginCallSignEditing();

@@ -222,8 +222,13 @@ function updateTitleFormations(elapsedSeconds = 1 / 60) {
 function updateTitleScreen() {
   if (state.sceneTransition.mode === "title_launch") {
     state.sceneTransition.frame++;
+    state.sceneTransition.elapsedSeconds = Number(state.sceneTransition.elapsedSeconds || 0) + SIMULATION_STEP_MS / 1000;
     updateTitleFormations(SIMULATION_STEP_MS / 1000);
-    if (state.sceneTransition.frame >= state.sceneTransition.duration) startPlayingSession();
+    if (
+      state.sceneTransition.durationSeconds
+        ? state.sceneTransition.elapsedSeconds >= state.sceneTransition.durationSeconds
+        : state.sceneTransition.frame >= state.sceneTransition.duration
+    ) startPlayingSession();
     return;
   }
   updateTitleFormations(SIMULATION_STEP_MS / 1000);
@@ -235,6 +240,7 @@ function updateTitleScreen() {
   titleMetaScreenTransition = settingReducedMotion ? 1 : titleMetaScreenTransition + (1 - titleMetaScreenTransition) * 0.24;
   if (titleMetaScreenTransition > 0.995) titleMetaScreenTransition = 1;
   titleProgressClaimPulse = Math.max(0, titleProgressClaimPulse - 1);
+  if (typeof onboardingAccountPulseFrames === "number" && onboardingAccountPulseFrames > 0) onboardingAccountPulseFrames--;
   callSignCursorBlink = (callSignCursorBlink + 1) % 56;
   if (titleSubState === "progress") clampTitleProgressScroll();
 }

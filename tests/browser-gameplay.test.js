@@ -58,6 +58,26 @@ before(async () => {
   browser = await chromium.launch({ headless: true });
 });
 
+test("a fresh player enters the semantic First Flight flow and launches tutorial mode", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  try {
+    await page.goto(baseUrl, { waitUntil: "commit" });
+    const begin = page.getByRole("button", { name: "Begin Flight Training" });
+    await begin.waitFor({ state: "visible", timeout: 90_000 });
+    assert.match(await page.locator("#tutorialLiveRegion").textContent(), /Colonel Vega/i);
+    await page.waitForFunction(() => document.activeElement?.textContent === "Begin Flight Training");
+    await begin.click();
+    await page.waitForFunction(() => document.body.dataset.gameRunMode === "tutorial", null, { timeout: 8_000 });
+    assert.equal(await page.locator("#tutorialLiveRegion").getAttribute("aria-live"), "polite");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("development powerup gallery loads every supplied powerup without fallback errors", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const { page, errors } = await openGame(context, "/?debug=1&scenario=powerups");
@@ -156,6 +176,11 @@ test("call sign autosaves on blur and gameplay announcements stay out of the pla
 
 test("accessibility settings persist, reduce transition motion, and apply high contrast", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 375, height: 667 } });
+  await context.addInitScript(() => {
+    // This regression exercises the established-pilot Settings flow, not
+    // first-launch routing. A prior record is meaningful local progress.
+    localStorage.setItem("star_strike_rush_high_score_v1", "100");
+  });
   const { page, errors } = await openGame(context);
   try {
     await page.mouse.click(38, 237);
@@ -184,7 +209,8 @@ test("accessibility settings persist, reduce transition motion, and apply high c
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
     snapshot = await debugSnapshot(page);
-    assert.equal(snapshot.transition.duration, 1);
+    assert.equal(snapshot.transition.lastLaunchDurationSeconds, 0.42);
+    assert.equal(snapshot.transition.lastLaunchReducedMotion, true);
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
@@ -426,11 +452,12 @@ test("collecting a powerup applies its effect and emits visible pickup feedback"
     const feedbackHandle = await page.waitForFunction(() => {
       const feedback = {
         rapid: state.player.rapid,
-        rings: state.particles.filter((particle) => particle.kind === "ring").length,
-        particles: state.particles.length
+        rings: state.lastPickupFeedback?.rings || 0,
+        particles: state.lastPickupFeedback?.particles || 0
       };
       return feedback.rapid > 0 &&
         state.powerups.length === 0 &&
+        state.lastPickupFeedback?.type === "rapid" &&
         feedback.rings >= 1 &&
         feedback.particles >= 20
         ? feedback
