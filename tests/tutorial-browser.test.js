@@ -468,7 +468,13 @@ test("tutorial manual pause is free even at one Health and remains free when rep
       return !!raw && JSON.parse(raw).runMode === "tutorial";
     }, null, { timeout: 90_000 });
     await pressContinue(page);
-    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "idle");
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return current.runMode === "tutorial" &&
+        current.gameState === "playing" &&
+        current.transition.mode === "idle" &&
+        current.input.gameplayControlEnabled === true;
+    });
     await page.evaluate(() => { state.player.hp = 1; });
     for (let count = 0; count < 2; count++) {
       await page.keyboard.press("Escape");
