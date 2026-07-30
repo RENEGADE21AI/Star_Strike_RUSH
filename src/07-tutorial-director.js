@@ -160,7 +160,7 @@ function tutorialObjectiveComplete(director, runtime = {}) {
   if (stepId === "movement") return Number(runtime.beaconIndex) >= 3;
   if (stepId === "auto_weapons") return Number(runtime.tutorialKills) >= 3;
   if (stepId === "evasion") return runtime.evasionCrossed === true;
-  if (stepId === "ghost_shift") return Number(runtime.ghostUses) >= 1 && runtime.crossedGhostLane === true;
+  if (stepId === "ghost_shift") return Number(runtime.ghostUses) >= 1 && runtime.ghostLanePhased === true;
   if (stepId === "powerup") return Number(runtime.phaseShield) >= 1;
   if (stepId === "controlled_wave") return runtime.controlledWavesCleared === true;
   if (stepId === "command_boss") return runtime.commandBossDefeated === true;
@@ -173,6 +173,27 @@ function tutorialObjectiveComplete(director, runtime = {}) {
   }
   if (stepId === "incoming" || stepId === "lightspeed" || stepId === "graduation") return runtime.confirmed === true;
   return false;
+}
+
+function tutorialReachedSide(playerX, laneX, side) {
+  return side === "left" ? Number(playerX) < Number(laneX) : Number(playerX) > Number(laneX);
+}
+
+function tutorialEvasionSucceeded(runtime = {}) {
+  return runtime.volleyActive === true &&
+    tutorialReachedSide(runtime.startX, runtime.laneX, runtime.startSide) &&
+    Number(runtime.damageTakenCurrent) === Number(runtime.damageTakenStart) &&
+    tutorialReachedSide(runtime.playerX, runtime.laneX, runtime.targetSide);
+}
+
+function tutorialGhostLaneSucceeded(runtime = {}) {
+  const previousOnStartSide = tutorialReachedSide(runtime.previousX, runtime.laneX, runtime.startSide);
+  const currentOnTargetSide = tutorialReachedSide(runtime.currentX, runtime.laneX, runtime.targetSide);
+  return Number(runtime.ghostUses) >= 1 &&
+    runtime.ghostActive === true &&
+    previousOnStartSide &&
+    currentOnTargetSide &&
+    Number(runtime.damageTakenCurrent) === Number(runtime.damageTakenStart);
 }
 
 function applyTutorialBossOverride(boss) {
@@ -216,6 +237,8 @@ Object.assign(globalThis, {
   tutorialDefinition,
   createTutorialDirector,
   tutorialObjectiveComplete,
+  tutorialEvasionSucceeded,
+  tutorialGhostLaneSucceeded,
   applyTutorialBossOverride,
   recoverTutorialRuntime,
   applyTutorialGraduationCodex

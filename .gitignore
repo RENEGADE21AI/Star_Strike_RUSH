@@ -6,6 +6,7 @@ firestore-debug.log
 ui-debug.log
 test-artifacts/
 outputs/
+tmp/
 release-approval.local.json
 release-evidence/
 dist/

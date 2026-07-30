@@ -1,6 +1,6 @@
 # Asset Manifest
 
-Audited on 2026-07-28 during the First Flight onboarding pass.
+Audited on 2026-07-29 during the First Flight onboarding refinement.
 
 ## Inventory
 
@@ -8,11 +8,12 @@ The project owner supplied 45 original PNG files. They are preserved unchanged
 under `source-art/` alongside a short archive README and are excluded from the
 Firebase Hosting payload.
 
-The public runtime contains 47 optimized PNG derivatives:
+The public runtime contains 48 optimized PNG derivatives:
 
 - `assets/sprites/`: 26 player, wingman, enemy, boss, and asteroid sprites.
 - `assets/powerups/`: 13 powerup icons.
 - `assets/ui/`: 8 menu, favicon, and PWA icons.
+- `assets/tutorial/`: 1 owner-supplied Colonel Arisaka portrait derivative.
 
 Two owner-supplied MP3 tracks live under `assets/audio/`: Hangar Bay Seven for
 title/profile navigation and Gravity's Edge for active play. On 2026-07-28, the
@@ -78,7 +79,17 @@ rotation and display the canonical nose-up art.
 Procedural Canvas drawings remain decode-failure fallbacks; the normal runtime
 path uses the optimized supplied artwork.
 
-Colonel Vega is original procedural Canvas artwork created for First Flight.
-The source is preserved in `src/17-tutorial-onboarding.js`; it uses geometric
-helmet, high-collar, rank-bar, scanline, and hologram primitives and has no
-external portrait or likeness dependency.
+Colonel Arisaka uses the owner-supplied source portrait, cropped to the helmet,
+shoulders, and upper torso and separated from its baked-in checkerboard and
+dossier panel for compact transmission UI use. The optimized project asset is
+`assets/tutorial/colonel-arisaka.png`. No web image or external likeness was
+introduced by the implementation pass; no artist, source URL, or formal license
+is inferred beyond the owner's direction to use the supplied image.
+
+The replaceable boundary is `drawTutorialInstructorPortrait()` in
+`src/17-tutorial-onboarding.js`. It selects the registered
+`tutorial_instructor` asset and adds the restrained hologram frame and scanline
+treatment. `drawColonelArisakaPlaceholder()` remains only as an original
+geometric load-failure fallback. A future portrait revision requires replacing
+the optimized PNG and its manifest metadata only; dialogue, routing, and other
+rendering files do not need modification.

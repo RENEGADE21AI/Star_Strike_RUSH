@@ -58,20 +58,75 @@ before(async () => {
   browser = await chromium.launch({ headless: true });
 });
 
-test("a fresh player enters the semantic First Flight flow and launches tutorial mode", { timeout: 120_000 }, async () => {
+test("a fresh player explicitly chooses First Flight before the separate call-sign briefing", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   try {
     await page.goto(baseUrl, { waitUntil: "commit" });
+    const yes = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
+    await yes.waitFor({ state: "visible", timeout: 90_000 });
+    assert.equal(
+      await page.locator("#tutorialLiveRegion").textContent(),
+      "COLONEL ARISAKA: Is this your first time here, pilot?"
+    );
+    assert.equal(await page.getByRole("button", { name: "NO — GO TO TITLE" }).isVisible(), true);
+    await page.waitForFunction(() => document.activeElement?.textContent === "YES — START FIRST FLIGHT");
+    await yes.click();
     const begin = page.getByRole("button", { name: "Begin Flight Training" });
-    await begin.waitFor({ state: "visible", timeout: 90_000 });
-    assert.match(await page.locator("#tutorialLiveRegion").textContent(), /Colonel Vega/i);
-    await page.waitForFunction(() => document.activeElement?.textContent === "Begin Flight Training");
+    await begin.waitFor({ state: "visible" });
+    assert.match(await page.locator("#tutorialLiveRegion").textContent(), /Colonel Arisaka/i);
     await begin.click();
     await page.waitForFunction(() => document.body.dataset.gameRunMode === "tutorial", null, { timeout: 8_000 });
     assert.equal(await page.locator("#tutorialLiveRegion").getAttribute("aria-live"), "polite");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("NO stores the one-time decision and reload returns directly to the ordinary title", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => {
+    localStorage.setItem("star_strike_rush_high_score_v1", "9000");
+    localStorage.setItem("star_strike_rush_local_achievements_v1", JSON.stringify(["first_sortie"]));
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(baseUrl, { waitUntil: "commit" });
+    const no = page.getByRole("button", { name: "NO — GO TO TITLE" });
+    await no.waitFor({ state: "visible", timeout: 90_000 });
+    await no.focus();
+    await page.keyboard.press("Enter");
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1")).status), "skipped");
+    await page.reload({ waitUntil: "commit" });
+    await page.waitForTimeout(300);
+    assert.equal(await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).isVisible().catch(() => false), false);
+    assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_high_score_v1")), "9000");
+  } finally {
+    await context.close();
+  }
+});
+
+test("held movement and ability input cannot affect the ship during game arrival", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1");
+  try {
+    await page.keyboard.down("ArrowRight");
+    await page.keyboard.down("Space");
+    await page.evaluate(() => startPlayingSession());
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "game_arrival");
+    const before = await debugSnapshot(page);
+    await page.waitForTimeout(180);
+    const during = await debugSnapshot(page);
+    assert.equal(during.player.x, before.player.x);
+    assert.equal(during.player.ghostTimer, 0);
+    assert.equal(during.score, before.score);
+    assert.equal(during.counts.enemies, before.counts.enemies);
+    await page.keyboard.up("ArrowRight");
+    await page.keyboard.up("Space");
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "idle");
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
@@ -163,7 +218,10 @@ test("call sign autosaves on blur and gameplay announcements stay out of the pla
     assert.equal(snapshot.ui.callSignEditing, false);
 
     await page.keyboard.press("Enter");
-    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.gameState === "playing" && snapshot.input.gameplayControlEnabled === true;
+    });
     await page.evaluate(() => window.showMessage("DISTRACTING POPUP", 120));
     await page.waitForTimeout(60);
     snapshot = await debugSnapshot(page);
@@ -207,7 +265,10 @@ test("accessibility settings persist, reduce transition motion, and apply high c
     assert.equal(snapshot.ui.settingHighContrast, true);
 
     await page.keyboard.press("Enter");
-    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.gameState === "playing" && snapshot.input.gameplayControlEnabled === true;
+    });
     snapshot = await debugSnapshot(page);
     assert.equal(snapshot.transition.lastLaunchDurationSeconds, 0.42);
     assert.equal(snapshot.transition.lastLaunchReducedMotion, true);
@@ -335,7 +396,10 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
   const { page, errors } = await openGame(context);
   try {
     await page.keyboard.press("Enter");
-    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.gameState === "playing" && snapshot.input.gameplayControlEnabled === true;
+    });
     const started = await debugSnapshot(page);
     await page.keyboard.down("ArrowLeft");
     await page.waitForTimeout(250);
@@ -405,7 +469,10 @@ test("touch can start a run, move with the joystick, and activate the ability wi
   const { page, errors } = await openGame(context);
   try {
     await page.touchscreen.tap(187, 310);
-    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.gameState === "playing" && snapshot.input.gameplayControlEnabled === true;
+    });
     const started = await debugSnapshot(page);
 
     await page.dispatchEvent("canvas", "pointerdown", { pointerId: 21, pointerType: "touch", clientX: 76, clientY: 591, buttons: 1 });

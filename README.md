@@ -10,8 +10,10 @@ during gameplay with a time-based crossfade. The first meaningful gesture
 unlocks and loads title music; gameplay music is deferred until launch. Music
 and Effects have independent persisted controls.
 
-First-time device pilots are offered **First Flight**, a four-to-six-minute
-action-driven training sortie led by Colonel Vega. It teaches movement,
+On devices with no saved onboarding decision, **Colonel Arisaka** asks one
+explicit question: “Is this your first time here, pilot?” Choosing Yes opens a
+separate prelaunch briefing and the four-to-six-minute **First Flight**;
+choosing No stores the decision and opens the normal title. First Flight teaches movement,
 automatic weapons, Ghost Shift, a staged Command Ship, Realm Hop, and the
 Wraith Sovereign through deterministic gameplay. Training is skippable,
 checkpointed, replayable from Settings, and cannot change normal score,
@@ -28,9 +30,9 @@ Play: https://star-strike-rush.web.app
   `DASH`; asteroids remain solid hazards.
 - Touch or pen: use the virtual joystick and ability button. They appear only
   after meaningful touch/pen gameplay input.
-- Pause: the top-left HUD control or Escape. A deliberate pause costs one
-  Health bar and reports the cost; automatic focus/visibility pauses are free.
-  Gameplay resumes through a short countdown.
+- Pause: the top-left HUD control or Escape. A deliberate standard-run pause
+  costs one Health bar and reports the cost; tutorial and automatic
+  focus/visibility pauses are free. Gameplay resumes through a short countdown.
 - HUD: Energy sits above segmented Health in the classic bottom-left layout;
   Score, Hi-Score, and Combo stay compact at the top-right.
 

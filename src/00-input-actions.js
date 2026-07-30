@@ -24,8 +24,20 @@ function touchControlsVisible(inputMode, gameState) {
   return (inputMode === "touch" || inputMode === "pen") && gameState === "playing";
 }
 
+function gameplayControlEnabled(context = {}) {
+  return context.gameState === "playing" &&
+    context.transitionMode !== "game_arrival" &&
+    context.tutorialDialogueVisible !== true;
+}
+
+function gameplaySimulationEnabled(context = {}) {
+  return gameplayControlEnabled(context);
+}
+
 globalThis.GAME_ACTION_KEYS = GAME_ACTION_KEYS;
 globalThis.gameplayActionForKey = gameplayActionForKey;
 globalThis.nextGameplayInputMode = nextGameplayInputMode;
 globalThis.touchControlsVisible = touchControlsVisible;
+globalThis.gameplayControlEnabled = gameplayControlEnabled;
+globalThis.gameplaySimulationEnabled = gameplaySimulationEnabled;
 

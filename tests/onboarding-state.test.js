@@ -15,43 +15,21 @@ function loadOnboardingModule() {
   return context;
 }
 
-test("new-player detection never forces players with meaningful local progress", () => {
+test("missing onboarding state always asks the explicit first-time question regardless of local progress", () => {
   const api = loadOnboardingModule();
-  const empty = {
-    highScore: 0,
-    meta: {
-      totalGlory: 0,
-      credits: 0,
-      currentSeason: { xp: 0, claimedRewardIds: [] },
-      lifetime: { runs: 0, score: 0, kills: 0, bosses: 0, powerups: 0, ghostUses: 0 }
-    },
-    achievementIds: [],
-    codex: {}
-  };
-  assert.equal(api.hasMeaningfulLocalProgress(empty), false);
-  assert.equal(api.onboardingRoute({ storedState: null, progress: empty }), "first_flight_offer");
-
   const variants = [
+    {},
     { highScore: 1 },
-    { meta: { lifetime: { runs: 1 } } },
     { meta: { totalGlory: 1 } },
-    { meta: { currentSeason: { xp: 1 } } },
-    { meta: { credits: 1 } },
-    { meta: { currentSeason: { claimedRewardIds: ["tier_2"] } } },
     { achievementIds: ["first_sortie"] },
     { codex: { red: true } }
   ];
-  for (const variant of variants) {
-    const progress = {
-      ...empty,
-      ...variant,
-      meta: variant.meta || empty.meta,
-      achievementIds: variant.achievementIds || empty.achievementIds,
-      codex: variant.codex || empty.codex
-    };
-    assert.equal(api.hasMeaningfulLocalProgress(progress), true);
-    assert.equal(api.onboardingRoute({ storedState: null, progress }), "existing_player_notice");
+  for (const progress of variants) {
+    assert.equal(api.onboardingRoute({ storedState: null, progress }), "first_time_question");
   }
+  assert.equal(api.TUTORIAL_INSTRUCTOR.name, "COLONEL ARISAKA");
+  assert.equal(api.TUTORIAL_INSTRUCTOR.title, "SENIOR FLIGHT INSTRUCTOR");
+  assert.equal(api.TUTORIAL_INSTRUCTOR.firstQuestion, "Is this your first time here, pilot?");
 });
 
 test("versioned onboarding state sanitizes, checkpoints, resumes, skips, completes, and replays", () => {
@@ -67,7 +45,6 @@ test("versioned onboarding state sanitizes, checkpoints, resumes, skips, complet
       startedAtMs: 0,
       updatedAtMs: 1000,
       completedAtMs: 0,
-      existingPlayerOfferDismissed: false,
       accountOfferShown: false,
       codexGraduationApplied: false
     }
@@ -104,6 +81,20 @@ test("versioned onboarding state sanitizes, checkpoints, resumes, skips, complet
   assert.equal(sanitized.status, "unseen");
   assert.equal(sanitized.checkpoint, "incoming");
   assert.equal(sanitized.completedAtMs, 0);
+});
+
+test("post-graduation identity routing removes redundant account steps", () => {
+  const api = loadOnboardingModule();
+  assert.equal(api.postTutorialIdentityRoute({ replay: true, signedIn: false, handle: "" }), "title");
+  assert.equal(api.postTutorialIdentityRoute({ replay: false, signedIn: false, handle: "" }), "post_callsign");
+  assert.equal(api.postTutorialIdentityRoute({ replay: false, signedIn: true, handle: "" }), "post_handle");
+  assert.equal(api.postTutorialIdentityRoute({ replay: false, signedIn: true, handle: "@nova" }), "identity_confirmed");
+  assert.equal(api.postTutorialIdentityRoute({
+    replay: false,
+    signedIn: true,
+    handle: "@nova",
+    pendingCallSign: true
+  }), "post_callsign");
 });
 
 test("tutorial step order and checkpoints are stable and action-oriented", () => {

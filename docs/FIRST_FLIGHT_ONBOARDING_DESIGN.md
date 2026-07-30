@@ -2,8 +2,9 @@
 
 ## Product intent
 
-First Flight is a four-to-six-minute playable certification flight. It begins
-with one short Colonel Vega transmission, moves immediately into ship control,
+First Flight is a four-to-six-minute playable certification flight. A missing
+onboarding decision first shows Colonel Arisaka's explicit Yes/No question.
+Yes opens a separate call-sign prelaunch transmission and then moves into ship control,
 teaches only mechanics the player is using, and ends with an optional identity
 offer. It is not a help screen and it never becomes a source of gameplay
 progress.
@@ -27,8 +28,8 @@ center and lower-middle playfield remain clear while those verbs are active.
   the shot kind matches the Wraith realm and normal boss staging has completed.
 - Standard and Wraith bosses remain invulnerable until `entered` and
   `combatActive` are both true.
-- The normal pause-health policy stays intact. Tutorial pause adds training
-  recovery actions but does not create a free production pause path.
+- The normal one-Health manual pause policy stays intact for standard runs.
+  Tutorial manual and automatic pauses are free, including at one Health.
 
 The director observes these real state changes. It does not award success from
 a timer or substitute a tutorial-only animation for an ability.
@@ -39,14 +40,15 @@ The implementation keeps the ordered-script Canvas architecture and adds three
 explicit boundaries:
 
 1. `00-onboarding-state.js` is a pure persistence and routing module. It
-   sanitizes versioned local state, detects meaningful existing progress,
-   chooses first-launch/resume/availability routing, and exposes prompt
+   sanitizes versioned local state, owns the explicit first-time decision,
+   chooses question/resume/title routing, and exposes prompt
    selection for keyboard, touch, pen, and hybrid input.
 2. `07-tutorial-director.js` is the only owner of tutorial sequencing,
    deterministic spawn plans, checkpoints, objective progress, dialogue state,
    recovery, and graduation. The run declares `state.runMode = "tutorial"`.
 3. Tutorial presentation is rendered from director snapshots. Canvas owns the
-   hologram, training-space art, hazards, indicators, and objective chip. A
+   replaceable instructor portrait boundary, training-space art, hazards,
+   indicators, and objective chip. A
    small semantic DOM layer owns the live region and accessible Continue, Skip,
    Resume, and Restart Checkpoint actions.
 
@@ -66,20 +68,18 @@ Persisted fields:
 - `startedAtMs`
 - `updatedAtMs`
 - `completedAtMs`
-- `existingPlayerOfferDismissed`
 - `accountOfferShown`
 - `codexGraduationApplied`
 
-A player is new only when onboarding state is absent and all meaningful
-progress indicators are empty: high score, lifetime runs/score/kills/bosses,
-Glory, Season XP, Credits, claimed rewards, local achievements, and Codex
-discovery. New players enter the incoming-transmission screen automatically.
-
-Existing players remain on the title and receive one quiet
-`FIRST FLIGHT TRAINING IS NOW AVAILABLE` invitation with Start Training and
-Later. In-progress players receive Resume Training, Restart Training, and Skip
-for Now. Completion and skip remain replayable from Pilot Dossier > Settings.
-Reset Local Data deliberately does not remove onboarding state.
+When onboarding state is absent, the game always asks exactly “Is this your
+first time here, pilot?” It does not inspect high score, runs, Glory, Season XP,
+Credits, achievements, claimed rewards, or Codex discovery. Yes stores
+`in_progress` and opens the separate call-sign prelaunch briefing. No stores
+`skipped` and immediately reveals the ordinary title. In-progress players
+receive Resume Training, Restart Training, and Skip for Now. Completion and
+skip remain replayable from Pilot Dossier > Settings. Reset Local Data
+deliberately does not remove onboarding state. Storage failure preserves the
+chosen in-memory route and reports only a quiet warning.
 
 ## Tutorial state machine
 
@@ -93,8 +93,8 @@ checkpoint, and next step. Timers control presentation cadence only.
 | 1 | `lightspeed` | The shared time-based launch reaches arrival. |
 | 2 | `movement` | Player enters three sequential beacon collision radii. |
 | 3 | `auto_weapons` | Three slow training drones are destroyed by real automatic shots. |
-| 4 | `evasion` | Player crosses the telegraphed danger area without relying on a timeout. A hit never restarts the whole tutorial. |
-| 5 | `ghost_shift` | A real Ghost Shift is used and the fighter crosses the marked danger lane while phased. |
+| 4 | `evasion` | Player crosses to the intended safe side after the identified volley becomes active and without taking volley damage. A hit resets only this lesson. |
+| 5 | `ghost_shift` | A real Ghost Shift is used and the fighter crosses the lane boundary while the production Ghost timer is active. Ordinary movement resets only this lesson. |
 | 6 | `powerup` | The player collides with one intentionally placed Phase Shield. |
 | 7 | `controlled_wave` | Two deterministic early-enemy waves are cleared. |
 | 8 | `command_boss` | A staged standard boss at 25% normal HP is defeated through normal collision and damage rules. |
@@ -129,12 +129,18 @@ Tutorial death invokes emergency recovery: clear hazards, restore health and
 energy, apply a short visible recovery shield, reconstruct the checkpoint, and
 continue. It never invokes normal Game Over.
 
-## Colonel Vega and dialogue
+## Colonel Arisaka and dialogue
 
-Colonel Vega is an original procedural Canvas hologram: a helmet/high-collar
-silhouette, restrained rank bars, cyan communication lines, limited amber
-warning accents, and low-amplitude scan noise. Its source is the renderer; no
-external portrait or training media is used.
+The instructor contract is centralized as `TUTORIAL_INSTRUCTOR`, with displayed
+name `COLONEL ARISAKA` and title `SENIOR FLIGHT INSTRUCTOR`.
+`drawTutorialInstructorPortrait()` is the only portrait-selection boundary.
+It now selects the registered owner-supplied, UI-cropped asset at
+`assets/tutorial/colonel-arisaka.png` and adds the cyan communication frame and
+scanlines. `drawColonelArisakaPlaceholder()` remains an intentionally simple
+geometric load-failure fallback so a decode or network failure cannot block the
+question or training. Replacing the portrait later requires updating the
+optimized PNG and its single manifest entry; dialogue and onboarding logic
+remain unchanged.
 
 Transmission cards contain the speaker label, at most two short lines, and a
  restrained type reveal. First confirm reveals the complete text; second
@@ -191,6 +197,12 @@ uses a 0.42-second crossfade/scale with no long streaks; Reduced Flash caps bloo
 and never draws a pure-white full-screen wipe. Audio failure cannot delay
 arrival.
 
+The short `game_arrival` segment has the same explicit lock. It advances only
+transition, background, particle, and music presentation; player, firing,
+waves, bosses, enemies, projectiles, collisions, score, progression, and
+active-run time remain frozen. Held keyboard and joystick state are cleared at
+completion before normal simulation begins.
+
 ## Graduation, Codex, and identity
 
 Graduation marks onboarding complete before opening the debrief. No standard
@@ -201,14 +213,15 @@ red/orange training fighters, Command Ship, and Wraith Sovereign. Ordinary
 Codex discovery is suppressed during training, and `codexGraduationApplied`
 makes the completion reveal idempotent.
 
-The post-flight sequence is optional:
+The post-flight sequence is optional and account-aware:
 
-1. Confirm or edit the current call sign.
-2. Connect Google or continue as a device pilot, with explicit text that Google
-   secures public identity and the legacy account archive while gameplay
-   progress stays on this device.
-3. If signed in, optionally claim one public account-bound `@handle`.
-4. Enter Hangar.
+1. Signed out: confirm or edit the local call sign, then optionally connect
+   Google or continue as a device pilot.
+2. Signed in without a handle: skip Google connection and offer only the
+   optional account-bound handle.
+3. Signed in with a handle: show `PILOT IDENTITY CONFIRMED` and enter Hangar;
+   return to call-sign confirmation only for a pending or failed publication.
+4. Settings replay: return directly to title without identity onboarding.
 
 Firebase absence produces a quiet status and never blocks Enter Hangar. A
 player who skips gets one Account-control pulse, not repeated prompts. Replays
@@ -242,13 +255,14 @@ evidence and transition timing.
 
 ## Test plan
 
-- Pure contract tests cover detection, state sanitization, checkpoint mapping,
+- Pure contract tests cover explicit decision routing, state sanitization, checkpoint mapping,
   skip/replay, step order, action gates, spawn determinism, prompt selection,
   boss override isolation, Wraith predicates, no-progression policy, launch
   timing, reduced-motion timing, and the unchanged 79-entry catalog.
 - Chromium flows complete fresh desktop and touch training through real
   movement, shooting, ability, pickup, boss, realm, recovery, graduation,
-  resume, skip, replay, account-skip, and Firebase-unavailable paths.
+  resume, skip, replay, account-state routing, free training pause,
+  arrival/dialogue input locks, and Firebase-unavailable paths.
 - Accessibility tests inspect live-region text, accessible actions, focus,
   keyboard confirmation, non-color realm labels, instant reduced-motion text,
   and mobile type size.
@@ -278,5 +292,7 @@ evidence and transition timing.
 - **Boss mechanic drift:** tutorial overrides are instance configuration only;
   staging, shot collision, realm collision, and ability functions stay
   canonical.
+- **First choice:** no progress heuristic answers for the player; both routes
+  persist only onboarding state and retain Settings replay.
 - **Skip abuse:** skip changes onboarding status only and grants no Codex,
   score, achievement, reward, or account state.
