@@ -3,13 +3,19 @@ function startPlayingSession() {
     startTutorialSession(pendingTutorialStep);
     return;
   }
-  setupSession("playing");
+  const transitionStars = state.stars;
+  setupSession("playing", { preserveStars: true });
+  state.lastArrivalContinuity = {
+    starsPreserved: state.stars === transitionStars,
+    playerX: state.player.x,
+    playerY: state.player.y
+  };
   state.sceneTransition = {
     mode: "game_arrival",
     frame: 0,
-    duration: Math.max(1, Math.round((settingReducedMotion ? 0.24 : 0.45) * SIMULATION_HZ)),
+    duration: Math.max(1, Math.round((settingReducedMotion ? 0.18 : 0.28) * SIMULATION_HZ)),
     elapsedSeconds: 0,
-    durationSeconds: settingReducedMotion ? 0.24 : 0.45
+    durationSeconds: settingReducedMotion ? 0.18 : 0.28
   };
   state.player.inv = Math.max(state.player.inv, 45);
   showMessage("PHASE 1", 90);
@@ -70,6 +76,20 @@ function pauseGame(reason = "manual") {
   clearGameplayInput();
   state.pausedReason = reason;
   state.pauseNotice = decision.message;
+  if (decision.cost > 0 && state.player.hp <= 0) {
+    if (state.runMode === "tutorial" && typeof recoverTutorialCheckpoint === "function") {
+      recoverTutorialCheckpoint();
+      state.pausedReason = reason;
+      state.pauseNotice = decision.message;
+      state.resumeCountdown = 0;
+      state.gameState = "paused";
+      if (typeof showTutorialPauseAccessibility === "function") showTutorialPauseAccessibility();
+    } else {
+      enterGameOver();
+      state.pauseNotice = decision.message;
+    }
+    return true;
+  }
   state.resumeCountdown = 0;
   state.gameState = "paused";
   if (state.runMode === "tutorial" && typeof showTutorialPauseAccessibility === "function") showTutorialPauseAccessibility();
@@ -84,7 +104,8 @@ function resumeGame() {
   if (state.runMode === "tutorial" && typeof hideTutorialPauseAccessibility === "function") hideTutorialPauseAccessibility();
   return true;
 }
-function setupSession(mode = "start") {
+function setupSession(mode = "start", options = {}) {
+  const preserveStars = options.preserveStars === true && Array.isArray(state.stars) && state.stars.length > 0;
   state.player = makePlayer();
   state.bullets = [];
   state.enemyBullets = [];
@@ -211,9 +232,11 @@ function setupSession(mode = "start") {
   callSignStatusTimer = 0;
   callSignSaveState = "idle";
   highScoreDirty = false;
-  state.stars = [];
-  for (let i = 0; i < 110; i++) {
-    state.stars.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 2 + 0.5, spd: Math.random() * 0.9 + 0.3 });
+  if (!preserveStars) {
+    state.stars = [];
+    for (let i = 0; i < 110; i++) {
+      state.stars.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 2 + 0.5, spd: Math.random() * 0.9 + 0.3 });
+    }
   }
   initTitleFormations();
   refreshMultiplier();
@@ -731,7 +754,7 @@ function getDebugSnapshot() {
             : state.sceneTransition.frame / Math.max(1, state.sceneTransition.duration),
           0,
           1
-        ) * 3.4)
+        ) / 0.16)
         : 0,
       progress: clamp(
         state.sceneTransition.durationSeconds
@@ -739,8 +762,10 @@ function getDebugSnapshot() {
           : state.sceneTransition.frame / Math.max(1, state.sceneTransition.duration),
         0,
         1
-      )
+      ),
+      continuity: state.lastArrivalContinuity || null
     },
+    renderFrame: state.renderFrameFlags || null,
     tutorial: typeof tutorialSnapshot === "function" ? tutorialSnapshot() : null,
     frame: state.frame,
     score: state.score,
@@ -857,6 +882,7 @@ function getDebugSnapshot() {
         : null
     },
     titleTraffic: state.titleFormations.map((formation) => ({
+      id: formation.id,
       depth: formation.depthLayer,
       durationSeconds: Number(formation.durationSeconds.toFixed(3)),
       ageSeconds: Number(formation.ageSeconds.toFixed(4)),

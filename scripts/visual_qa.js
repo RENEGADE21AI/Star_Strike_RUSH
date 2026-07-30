@@ -41,19 +41,21 @@ const cases = [
   { name: "paused-hud-375x667", width: 375, height: 667, kind: "paused-hud" },
   { name: "debris-staging", width: 375, height: 667, kind: "scenario", scenario: "debris-incoming" },
   { name: "powerup-gallery", width: 390, height: 844, kind: "scenario", scenario: "powerups" },
+  { name: "first-flight-galaxy-arrival", width: 390, height: 844, kind: "onboarding-arrival", scenario: "tutorial", touch: true },
   { name: "first-flight-question-375x667", width: 375, height: 667, kind: "tutorial-question", scenario: "tutorial", touch: true },
   { name: "first-flight-question-390x844", width: 390, height: 844, kind: "tutorial-question", scenario: "tutorial", touch: true },
   { name: "first-flight-question-430x932", width: 430, height: 932, kind: "tutorial-question", scenario: "tutorial", touch: true },
   { name: "first-flight-question-1440x900", width: 1440, height: 900, kind: "tutorial-question", scenario: "tutorial" },
   { name: "colonel-arisaka-call-sign-briefing", width: 390, height: 844, kind: "tutorial-prelaunch", scenario: "tutorial", touch: true },
   { name: "tutorial-navigation", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "movement", touch: true },
-  { name: "tutorial-ghost-shift", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "ghost", touch: true, activate: true },
+  { name: "tutorial-ghost-shift", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "ghost", touch: true, activate: true, ghostVisual: true },
   { name: "tutorial-evasion-retry", width: 390, height: 844, kind: "tutorial-retry", scenario: "tutorial", step: "evasion", touch: true },
   { name: "tutorial-ghost-retry", width: 390, height: 844, kind: "tutorial-retry", scenario: "tutorial", step: "ghost", touch: true },
   { name: "tutorial-powerup", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "powerup", touch: true, activate: true },
   { name: "tutorial-command-ship", width: 1440, height: 900, kind: "tutorial-step", scenario: "tutorial", step: "command-boss", activate: true },
   { name: "tutorial-wraith-briefing", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "wraith", touch: true },
   { name: "tutorial-realm-indicator", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "realm_practice", touch: true, activate: true },
+  { name: "tutorial-wraith-physical-art", width: 1440, height: 900, kind: "tutorial-step", scenario: "tutorial", step: "realm_practice", activate: true, realmOverride: 0 },
   { name: "tutorial-graduation", width: 1440, height: 900, kind: "tutorial-step", scenario: "tutorial", step: "graduation", complete: true },
   { name: "tutorial-call-sign-confirmation", width: 390, height: 844, kind: "tutorial-callsign", scenario: "tutorial-post-callsign", touch: true },
   { name: "tutorial-account-offer", width: 390, height: 844, kind: "tutorial-account", scenario: "tutorial-post", touch: true },
@@ -137,15 +139,16 @@ async function touchDrag(page, rect) {
 
 function titleTrafficAssertions(state, errors) {
   const ranges = {
-    distant: [20, 27],
-    midground: [13, 18],
-    foreground: [10, 14]
+    distant: [23, 31],
+    midground: [17, 23],
+    foreground: [13, 17]
   };
   for (const formation of state.titleTraffic) {
     const range = ranges[formation.depth];
     if (!range || formation.durationSeconds < range[0] || formation.durationSeconds > range[1]) {
       errors.push(`invalid ${formation.depth} traversal duration ${formation.durationSeconds}`);
     }
+    if (formation.scale > 1.001) errors.push(`${formation.depth} patrol exceeds normal fighter scale`);
   }
   for (let first = 0; first < state.titleTraffic.length; first++) {
     for (let second = first + 1; second < state.titleTraffic.length; second++) {
@@ -195,7 +198,7 @@ async function runCase(browser, baseUrl, item) {
   const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("canvas", { state: "visible" });
   await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent);
-  const initialSettleMs = item.scenario === "debris-incoming" ? 50 : 500;
+  const initialSettleMs = item.kind === "onboarding-arrival" ? 0 : item.scenario === "debris-incoming" ? 50 : 500;
   await page.waitForTimeout(initialSettleMs);
 
   let before = await snapshot(page);
@@ -207,6 +210,7 @@ async function runCase(browser, baseUrl, item) {
     const title = before.layout.title;
     const widthRatio = title?.screenBounds?.w / Math.max(1, title?.playableScreenWidth || 0);
     if (!title || widthRatio < 0.88) errors.push(`title width ratio ${widthRatio || 0} is below 0.88`);
+    if (!(title?.lineGap >= 4)) errors.push(`STAR STRIKE / RUSH gap ${title?.lineGap} is below 4px`);
     if (title?.screenBounds?.x < -1 || title?.screenBounds?.x + title?.screenBounds?.w > item.width + 1) {
       errors.push("title bounds leave the viewport");
     }
@@ -219,7 +223,7 @@ async function runCase(browser, baseUrl, item) {
     evidence.after = after;
     const wallWindowSeconds = Math.max(0, after.timestampMs - before.timestampMs) / 1000;
     evidence.traversalMeasurements = before.titleTraffic.map((formation) => {
-      const match = after.titleTraffic.find((candidate) => candidate.depth === formation.depth);
+      const match = after.titleTraffic.find((candidate) => candidate.id === formation.id);
       const progressDelta = match ? match.normalizedProgress - formation.normalizedProgress : 0;
       const simulationWindowSeconds = match ? Math.max(0, match.ageSeconds - formation.ageSeconds) : 0;
       return {
@@ -323,12 +327,47 @@ async function runCase(browser, baseUrl, item) {
       if (!boss || boss.damageable || boss.hp !== boss.maxHp) errors.push("incoming boss was damageable");
     }
     if (item.scenario === "powerups" && before.counts.powerups !== 13) errors.push("powerup gallery did not show all 13 powerups");
+  } else if (item.kind === "onboarding-arrival") {
+    const arrivalState = await page.evaluate(() => {
+      onboardingUiMode = "first_time_question";
+      onboardingIntroFlight.active = true;
+      onboardingIntroFlight.durationSeconds = 1.25;
+      onboardingIntroFlight.elapsedSeconds = 0.62;
+      renderOnboardingAccessibleMode();
+      draw();
+      updateDebugSnapshot();
+      window.__visualOnboardingFrame = document.querySelector("canvas").toDataURL("image/png");
+      return {
+        snapshot: JSON.parse(document.querySelector("#debugSnapshot").textContent),
+        actionCount: document.querySelectorAll("#tutorialAccessibleActions button").length
+      };
+    });
+    evidence.after = arrivalState.snapshot;
+    capturedScreenshotDataUrl = await page.evaluate(() => window.__visualOnboardingFrame || "");
+    if (evidence.after.tutorial?.uiMode !== "first_time_question") errors.push("galaxy arrival lost the first-time route");
+    if (evidence.after.renderFrame?.titleUi) errors.push("title wordmark was rendered behind onboarding arrival");
+    if (!evidence.after.renderFrame?.onboardingGalaxy) errors.push("normal galaxy arrival scene was not rendered");
+    if (arrivalState.actionCount !== 0) {
+      errors.push("Colonel question appeared before the player ship arrived");
+    }
   } else if (item.kind === "tutorial-question") {
+    await page.waitForFunction(() => (
+      typeof getAssetLoadState === "function" &&
+      getAssetLoadState().ready === true &&
+      !getAssetLoadState().failed.includes("tutorial_instructor")
+    ));
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
+      return current.tutorial?.uiMode === "first_time_question"
+        && current.tutorial?.introFlight?.active === false;
+    });
     evidence.after = await snapshot(page);
     if (evidence.after.tutorial?.uiMode !== "first_time_question") errors.push("first-time question was not active");
     if (!evidence.after.layout.onboardingPanel) errors.push("onboarding panel bounds were not exposed");
     const yes = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
     const no = page.getByRole("button", { name: "NO — GO TO TITLE" });
+    await yes.waitFor({ state: "visible" });
+    await no.waitFor({ state: "visible" });
     if (!(await yes.isVisible())) errors.push("YES action was not accessible");
     if (!(await no.isVisible())) errors.push("NO action was not accessible");
     if ((await page.getByRole("status").textContent()) !== "COLONEL ARISAKA: Is this your first time here, pilot?") {
@@ -345,6 +384,11 @@ async function runCase(browser, baseUrl, item) {
       }
     }
   } else if (item.kind === "tutorial-prelaunch") {
+    await page.waitForFunction(() => (
+      typeof getAssetLoadState === "function" &&
+      getAssetLoadState().ready === true &&
+      !getAssetLoadState().failed.includes("tutorial_instructor")
+    ));
     await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).click();
     await page.getByRole("button", { name: "Begin Flight Training" }).waitFor();
     evidence.after = await snapshot(page);
@@ -369,6 +413,25 @@ async function runCase(browser, baseUrl, item) {
       if (await button.isVisible()) await button.click();
       await page.waitForTimeout(180);
     }
+    if (item.realmOverride != null) {
+      await page.evaluate((realm) => {
+        if (state.boss && state.boss.mode === "wraith") state.boss.realm = realm;
+      }, item.realmOverride);
+      await page.waitForTimeout(80);
+    }
+    if (item.step === "command-boss") {
+      await page.waitForFunction(() => {
+        const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+        return current.encounter.boss && current.encounter.boss.y > 42;
+      });
+    }
+    if (item.ghostVisual) {
+      await page.evaluate(() => {
+        state.player.ghostTimer = 60;
+        state.player.ghostCooldown = Math.max(state.player.ghostCooldown, 60);
+      });
+      await page.waitForTimeout(80);
+    }
     const tutorial = await snapshot(page);
     evidence.after = tutorial;
     const dialogue = tutorial.layout.tutorialDialogue;
@@ -386,6 +449,8 @@ async function runCase(browser, baseUrl, item) {
     if (item.complete && tutorial.tutorial?.onboarding?.status !== "completed") errors.push("graduation did not persist completion");
     if (item.step === "command-boss" && tutorial.encounter.boss && !tutorial.encounter.boss.tutorialOverride) errors.push("Command Ship lacks tutorial override");
     if (item.step === "realm_practice" && (!tutorial.encounter.boss || tutorial.encounter.boss.realm == null)) errors.push("realm practice lacks a realm target");
+    if (item.realmOverride != null && tutorial.encounter.boss?.realm !== item.realmOverride) errors.push("Wraith realm art case did not hold the requested realm");
+    if (item.ghostVisual && tutorial.player.ghostTimer <= 0) errors.push("Ghost visual case was not active");
   } else if (item.kind === "tutorial-retry") {
     const button = page.getByRole("button", { name: "Continue" });
     await button.click();
@@ -445,13 +510,17 @@ async function runCase(browser, baseUrl, item) {
     evidence.after = await snapshot(page);
     if (evidence.after.input.gameplayControlEnabled !== false) errors.push("arrival left gameplay controls enabled");
     if (evidence.after.input.gameplaySimulationEnabled !== false) errors.push("arrival left gameplay simulation enabled");
+    if (evidence.after.transition.continuity?.starsPreserved !== true) errors.push("galaxy star field jumped at arrival");
+    if (Math.abs(evidence.after.transition.continuity?.playerX - 187.5) > 0.01) errors.push("transition ship missed gameplay X");
+    if (Math.abs(evidence.after.transition.continuity?.playerY - 533.6) > 0.01) errors.push("transition ship missed gameplay Y");
   } else if (item.kind === "tutorial-launch") {
     const yes = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
-    if (await yes.isVisible().catch(() => false)) await yes.click();
+    await yes.waitFor({ state: "visible" });
+    await yes.click();
     await page.getByRole("button", { name: "Begin Flight Training" }).click();
     const launchHandle = await page.waitForFunction(() => {
       const state = JSON.parse(document.querySelector("#debugSnapshot").textContent);
-      const visibleLaunch = state.transition.mode === "title_launch" && state.transition.progress >= 0.48;
+      const visibleLaunch = state.transition.mode === "title_launch" && state.transition.progress >= 0.78;
       const reducedArrival = state.transition.lastLaunchReducedMotion && state.runMode === "tutorial";
       if (visibleLaunch && !window.__visualLaunchFrame) {
         window.__visualLaunchFrame = document.querySelector("canvas").toDataURL("image/png");
@@ -468,13 +537,13 @@ async function runCase(browser, baseUrl, item) {
     }
     capturedScreenshotDataUrl = await page.evaluate(() => window.__visualLaunchFrame || "");
     evidence.after = launch;
-    const expectedDuration = item.reduced ? 0.42 : 1.5;
+    const expectedDuration = item.reduced ? 0.42 : 2.0;
     const actualDuration = launch.transition.lastLaunchDurationSeconds;
     if (Math.abs(actualDuration - expectedDuration) > 0.03) errors.push(`launch duration ${actualDuration} differs from ${expectedDuration}`);
     if (item.reduced && !launch.transition.lastLaunchReducedMotion) errors.push("Reduced Motion launch contract was not active");
     if (item.reduced && launch.ui.settingReducedFlash !== true) errors.push("Reduced Flash launch contract was not active");
     if (item.reduced && launch.tutorial?.director?.dialogueReveal !== 1) errors.push("Reduced Motion left tutorial text animating");
-    if (!item.reduced && launch.transition.titleUiAlpha > 0.01) errors.push("title controls remained visible through lightspeed");
+    if (!item.reduced && launch.transition.titleUiAlpha > 0.01) errors.push("title controls remained visible through galaxy transit");
     if (launch.tutorial?.uiMode !== "none") errors.push("title onboarding UI remained active through launch");
   } else if (item.kind === "tutorial-resume") {
     const resumed = await snapshot(page);

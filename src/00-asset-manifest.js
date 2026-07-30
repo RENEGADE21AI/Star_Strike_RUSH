@@ -36,6 +36,18 @@ const RAW_SPRITE_MANIFEST = {
     collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 16 }, { offsetX: 36, offsetY: 2, radius: 16 }, { offsetX: 0, offsetY: -18, radius: 14 }],
     healthBarOffset: { offsetY: -64 }
   },
+  boss_wraith_physical: {
+    source: "assets/sprites/boss-wraith-physical.png",
+    render: { width: 158, height: 70, anchorX: 0.5, anchorY: 0.5, glow: "#e8f8ff" },
+    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 16 }, { offsetX: 36, offsetY: 2, radius: 16 }, { offsetX: 0, offsetY: -18, radius: 14 }],
+    healthBarOffset: { offsetY: -64 }
+  },
+  boss_wraith_ghost: {
+    source: "assets/sprites/boss-wraith-ghost.png",
+    render: { width: 158, height: 70, anchorX: 0.5, anchorY: 0.5, glow: "#d25cff" },
+    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 16 }, { offsetX: 36, offsetY: 2, radius: 16 }, { offsetX: 0, offsetY: -18, radius: 14 }],
+    healthBarOffset: { offsetY: -64 }
+  },
   boss_debris_warden: { source: "assets/sprites/boss-debris-warden.png", render: { width: 158, height: 96, anchorX: 0.5, anchorY: 0.5, glow: "#f2a33b" }, collision: [{ offsetX: 0, offsetY: 0, radius: 28 }, { offsetX: -45, offsetY: 3, radius: 19 }, { offsetX: 45, offsetY: 3, radius: 19 }] },
   boss_mothership: { source: "assets/sprites/boss-mothership.png", render: { width: 174, height: 116, anchorX: 0.5, anchorY: 0.5, glow: "#4cf5ff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 30 }, { offsetX: -52, offsetY: 1, radius: 20 }, { offsetX: 52, offsetY: 1, radius: 20 }] },
   boss_siphon_core: { source: "assets/sprites/boss-siphon-core.png", render: { width: 144, height: 91, anchorX: 0.5, anchorY: 0.5, glow: "#61ff72" }, collision: [{ offsetX: 0, offsetY: -2, radius: 33 }, { offsetX: -39, offsetY: -2, radius: 18 }, { offsetX: 39, offsetY: -2, radius: 18 }] },
@@ -82,7 +94,7 @@ const FRIENDLY_SPRITES = new Set(["player", "wingman"]);
 const HOSTILE_SPRITES = new Set([
   "red", "orange", "purple", "phantom", "splitter", "splitter_shard", "carrier", "siphon",
   "leech", "minecaster", "shieldbearer", "railgunner", "repair_drone", "boss_standard",
-  "boss_wraith", "boss_debris_warden", "boss_mothership", "boss_siphon_core", "boss_hive_breaker",
+  "boss_wraith", "boss_wraith_physical", "boss_wraith_ghost", "boss_debris_warden", "boss_mothership", "boss_siphon_core", "boss_hive_breaker",
   "boss_rail_tyrant", "boss_gravity_well"
 ]);
 const SHIP_SPRITES = new Set([...FRIENDLY_SPRITES, ...HOSTILE_SPRITES]);
@@ -283,9 +295,9 @@ function drawSpriteAsset(targetContext, key, x, y, options = {}) {
     const flash = Math.max(0, Math.min(1, Number(options.hitFlash)));
     targetContext.filter = `brightness(${1 + flash * 1.25}) saturate(${1 - flash * 0.35})`;
   }
-  if (render.glow && options.glow !== false) {
-    targetContext.shadowColor = render.glow;
-    targetContext.shadowBlur = 10 * drawScale;
+  if ((render.glow || options.glowColor) && options.glow !== false) {
+    targetContext.shadowColor = options.glowColor || render.glow;
+    targetContext.shadowBlur = (options.glowBlur == null ? 10 : Math.max(0, Number(options.glowBlur))) * drawScale;
   }
   const orientation = meta.orientation;
   const contextRotation = options.orientationContext === "codex"

@@ -205,7 +205,10 @@ function drawEnemyGeometry(kind, opts = {}) {
   const phase = opts.phase || 0;
   const chargeTelegraph = opts.chargeTelegraph || 0;
   if (!silhouette) ctx.globalAlpha = alpha;
-  const sprite = typeof spriteMeta === "function" ? spriteMeta(kind) : null;
+  const spriteKind = kind === "boss_wraith"
+    ? (realm === 1 ? "boss_wraith_ghost" : "boss_wraith_physical")
+    : kind;
+  const sprite = typeof spriteMeta === "function" ? spriteMeta(spriteKind) : null;
   if (!silhouette && sprite && sprite.source && !String(kind).startsWith("boss_") && typeof drawEnginePlume === "function") {
     const presentationRotation = opts.orientationContext === "codex"
       ? sprite.orientation.codexRotation
@@ -233,7 +236,7 @@ function drawEnemyGeometry(kind, opts = {}) {
       phase
     });
   }
-  if (!silhouette && typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, kind, 0, 0, {
+  if (!silhouette && typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, spriteKind, 0, 0, {
     alpha,
     hitFlash: hitMix,
     orientationContext: opts.orientationContext

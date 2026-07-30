@@ -31,10 +31,17 @@ Play: https://star-strike-rush.web.app
 - Touch or pen: use the virtual joystick and ability button. They appear only
   after meaningful touch/pen gameplay input.
 - Pause: the top-left HUD control or Escape. A deliberate standard-run pause
-  costs one Health bar and reports the cost; tutorial and automatic
-  focus/visibility pauses are free. Gameplay resumes through a short countdown.
+  costs one Health bar and reports the cost. Manual pauses are free during
+  First Flight, while automatic focus/visibility pauses still cost one Health.
+  Gameplay resumes through a short countdown.
 - HUD: Energy sits above segmented Health in the classic bottom-left layout;
   Score, Hi-Score, and Combo stay compact at the top-right.
+
+Boss encounters render their supplied boss artwork. The Wraith Sovereign uses
+physical and ghost palettes derived from one canonical sprite with identical
+dimensions and alpha at every pixel, preserving the exact silhouette and weapon
+geometry while changing only realm color. Ghost Shift renders one translucent,
+brightly glowing fighter rather than a stack of afterimages.
 
 ## Run locally
 

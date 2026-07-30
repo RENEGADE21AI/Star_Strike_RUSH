@@ -54,26 +54,35 @@ function drawPlayer() {
     if (ghostActive || dashActive) {
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
-      const aura = ctx.createRadialGradient(p.x, p.y + bob, 3, p.x, p.y + bob, dashActive ? 38 : 30);
-      aura.addColorStop(0, dashActive ? "rgba(255,205,110,0.22)" : "rgba(92,238,255,0.20)");
+      const aura = ctx.createRadialGradient(p.x, p.y + bob, 3, p.x, p.y + bob, dashActive ? 38 : 34);
+      aura.addColorStop(0, dashActive ? "rgba(255,205,110,0.22)" : "rgba(92,238,255,0.30)");
       aura.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = aura;
-      ctx.beginPath(); ctx.arc(p.x, p.y + bob, dashActive ? 38 : 30, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y + bob, dashActive ? 38 : 34, 0, TAU); ctx.fill();
       ctx.restore();
+    }
+    // DASH retains a short speed echo. Ghost Shift does not: its readable
+    // contract is one translucent aircraft with a stronger cyan aura.
+    if (dashActive) {
       for (let echo = 3; echo >= 1; echo--) {
         drawSpriteAsset(ctx, "player", p.x - p.vx * echo * 1.8, p.y + bob + echo * (dashActive ? 5 : 2), {
           rotation: tilt,
-          alpha: (dashActive ? 0.12 : 0.08) * echo,
+          alpha: 0.12 * echo,
           glow: false,
-          filter: dashActive ? "sepia(1) saturate(2)" : "hue-rotate(18deg) saturate(1.4)"
+          filter: "sepia(1) saturate(2)"
         });
       }
     }
-    const realmFilter = realmActive && state.playerRealm === 1 ? "hue-rotate(48deg) saturate(1.35)" : "";
+    const realmGhost = realmActive && state.playerRealm === 1;
+    const playerFilter = ghostActive
+      ? "brightness(1.45) saturate(1.3)"
+      : realmGhost ? "hue-rotate(48deg) saturate(1.35)" : "";
     if (drawSpriteAsset(ctx, "player", p.x, p.y + bob, {
       rotation: tilt,
-      alpha: blinkAlpha,
-      filter: realmFilter
+      alpha: blinkAlpha * (ghostActive ? 0.52 : realmGhost ? 0.74 : 1),
+      filter: playerFilter,
+      glowColor: ghostActive ? "#66f7ff" : realmGhost ? "#d3a1ff" : undefined,
+      glowBlur: ghostActive ? 24 : realmGhost ? 15 : 10
     })) return;
   }
 
@@ -242,34 +251,6 @@ function drawPlayer() {
     drawExhaust(0.72, "rgba(120,255,255,0.85)", "rgba(200,255,255,0.50)");
     drawPlayerHull("rgba(180,255,255,0.90)", "rgba(80,180,200,0.62)", 0.22);
     drawCockpit("ghost", 0.80, 0.78);
-    ctx.restore();
-
-    ctx.save();
-    ctx.translate(p.x, p.y + bob);
-    ctx.rotate(tilt);
-    ctx.globalCompositeOperation = "source-over";
-    ctx.strokeStyle = "rgba(120,255,255,0.12)";
-    ctx.lineWidth = 1;
-    for (let scanY = -22; scanY <= 22; scanY += 3) {
-      ctx.beginPath(); ctx.moveTo(-22, scanY); ctx.lineTo(22, scanY); ctx.stroke();
-    }
-    ctx.restore();
-
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.shadowColor = "rgba(80,255,255,1.0)";
-    ctx.shadowBlur = 8;
-    for (let i = 0; i < 6; i++) {
-      const ang = state.frame * 0.09 + i * (TAU / 6);
-      const r = 13 + Math.sin(state.frame * 0.13 + i * 1.7) * 4;
-      const mx = p.x + Math.cos(ang) * r;
-      const my = p.y + bob + Math.sin(ang) * r * 0.45;
-      ctx.globalAlpha = clamp(0.35 + Math.sin(state.frame * 0.18 + i * 2.1) * 0.25, 0.1, 0.65);
-      ctx.fillStyle = "rgba(160,255,255,1.0)";
-      ctx.beginPath();
-      ctx.arc(mx, my, 1.6, 0, TAU);
-      ctx.fill();
-    }
     ctx.restore();
 
     ctx.globalAlpha = 1;

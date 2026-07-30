@@ -103,12 +103,13 @@ test("gameplay renders compact classic HUD without announcement popups", () => {
   assert.doesNotMatch(sceneSource, /drawEncounterCard\(\);/);
   assert.match(hudSource, /function drawHUD\(\) \{ drawLeftStatusHUD\(\); drawTopRightHUD\(\); drawGameNotices\(\); drawPauseButton\(\); drawDesktopControlHint\(\); \}/);
   assert.match(hudSource, /orientation:\s*"horizontal"/);
-  assert.match(hudSource, /energy:\s*\{\s*x:\s*12,\s*y:\s*H\s*-\s*164/);
+  assert.match(hudSource, /energy:\s*\{\s*x:\s*10,\s*y:\s*energyY,\s*w:\s*76/);
+  assert.match(hudSource, /function gameplayHudOpacity/);
   assert.doesNotMatch(hudSource.match(/function drawHUD\(\).*$/m)[0], /drawAnnouncements/);
   assert.doesNotMatch(hudSource, /devStatsVisible|drawDebugHitboxes/);
 });
 
-test("manual standard pauses cost one health while every tutorial pause is free", () => {
+test("manual training pause is free while standard and automatic pauses cost one health", () => {
   const decision = (player, reason, runMode) => JSON.parse(JSON.stringify(context.pauseHealthDecision(player, reason, runMode)));
   assert.deepEqual(
     decision({ hp: 5, maxHp: 5 }, "manual", "standard"),
@@ -116,7 +117,7 @@ test("manual standard pauses cost one health while every tutorial pause is free"
   );
   assert.deepEqual(
     decision({ hp: 5, maxHp: 5 }, "visibility", "standard"),
-    { allowed: true, cost: 0, remainingHp: 5, message: "AUTO-PAUSE: NO HEALTH COST" }
+    { allowed: true, cost: 1, remainingHp: 4, message: "AUTO-PAUSE COST: 1 HEALTH BAR" }
   );
   assert.deepEqual(
     decision({ hp: 1, maxHp: 5 }, "manual", "standard"),
@@ -129,6 +130,17 @@ test("manual standard pauses cost one health while every tutorial pause is free"
   let hp = 5;
   for (let count = 0; count < 4; count++) hp = decision({ hp, maxHp: 5 }, "manual", "tutorial").remainingHp;
   assert.equal(hp, 5);
+  assert.deepEqual(
+    decision({ hp: 3, maxHp: 5 }, "focus", "tutorial"),
+    { allowed: true, cost: 1, remainingHp: 2, message: "AUTO-PAUSE COST: 1 HEALTH BAR" }
+  );
+  assert.deepEqual(
+    decision({ hp: 1, maxHp: 5 }, "visibility", "tutorial"),
+    { allowed: true, cost: 1, remainingHp: 0, message: "AUTO-PAUSE COST: 1 HEALTH BAR" }
+  );
+  const inputSource = fs.readFileSync(path.join(repoRoot, "src", "18-session-input-loop.js"), "utf8");
+  assert.match(inputSource, /decision\.cost > 0 && state\.player\.hp <= 0/);
+  assert.match(inputSource, /recoverTutorialCheckpoint\(\);[\s\S]*state\.gameState = "paused"/);
 });
 
 test("arrival and paused tutorial dialogue block control and ordinary simulation", () => {
@@ -138,6 +150,30 @@ test("arrival and paused tutorial dialogue block control and ordinary simulation
   assert.equal(context.gameplaySimulationEnabled({ gameState: "playing", transitionMode: "idle", tutorialDialogueVisible: false }), true);
   assert.equal(context.gameplaySimulationEnabled({ gameState: "playing", transitionMode: "game_arrival", tutorialDialogueVisible: false }), false);
   assert.equal(context.gameplaySimulationEnabled({ gameState: "playing", transitionMode: "idle", tutorialDialogueVisible: true }), false);
+});
+
+test("onboarding opens on a galaxy arrival and transmissions suppress shake", () => {
+  const onboardingSource = fs.readFileSync(path.join(repoRoot, "src", "17-tutorial-onboarding.js"), "utf8");
+  const sceneSource = fs.readFileSync(path.join(repoRoot, "src", "17-rendering-scene.js"), "utf8");
+  assert.match(onboardingSource, /function beginOnboardingIntroFlight/);
+  assert.match(onboardingSource, /function drawOnboardingGalaxyScene/);
+  assert.doesNotMatch(
+    onboardingSource.match(/function drawOnboardingGalaxyScene[\s\S]*?\n\}/)[0],
+    /ellipse|CONTROLLED|RANGE/,
+    "the first-load fly-in must use the ordinary galaxy rather than a training overlay"
+  );
+  assert.match(onboardingSource, /y:\s*H \+ 58 \+ \(H \* 0\.80 - H - 58\) \* eased/);
+  assert.match(sceneSource, /if \(onboardingGalaxy\)/);
+  assert.match(sceneSource, /const shakeOn = settingScreenShake && !transmissionStill \? 1 : 0/);
+});
+
+test("Ghost Shift renders one translucent glowing ship without ghost afterimages", () => {
+  const playerSource = fs.readFileSync(path.join(repoRoot, "src", "14-rendering-player.js"), "utf8");
+  assert.match(playerSource, /if \(dashActive\) \{\s*for \(let echo/);
+  assert.match(playerSource, /ghostActive \? 0\.52/);
+  assert.match(playerSource, /glowColor: ghostActive \? "#66f7ff"/);
+  assert.doesNotMatch(playerSource, /for \(let scanY = -22/);
+  assert.doesNotMatch(playerSource, /for \(let i = 0; i < 6; i\+\+\)/);
 });
 
 test("obsolete developer gameplay skips and overlays are removed", () => {

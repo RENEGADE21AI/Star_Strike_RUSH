@@ -105,9 +105,10 @@ and release evidence.
 - The combat HUD now keeps the top-left pause control separate from compact
   top-right Score/Hi-Score/Combo text. Energy sits above segmented Health in a
   classic bottom-left stack above touch controls.
-- A deliberate pause costs one Health bar and reports the cost; focus and
-  visibility auto-pauses remain free. A pause is refused when no spare Health
-  remains.
+- A deliberate standard-run pause costs one Health bar and reports the cost;
+  manual First Flight pause is free. Focus and visibility auto-pauses cost one
+  Health in either run mode. A manual standard pause is refused when no spare
+  Health remains.
 - Player-facing phase skips, developer stats, and hitbox toggles are removed.
   Production builds also strip automated QA scenarios and debug snapshots.
 
@@ -186,3 +187,14 @@ Playable URL: https://star-strike-rush.web.app
 - Tutorial score and kills remain internal objective counters. Persistent
   high score, device progression, achievements, receipts, public competition,
   and Firebase progression remain untouched.
+- The gameplay visual pass uses supplied boss artwork, enforces movement-vector
+  fighter headings, caps title patrols at normal fighter scale, separates the
+  measured title lines, compacts the bottom-left status HUD, and renders Ghost
+  Shift as one translucent glow without afterimages.
+- Physical and ghost Wraith art is generated from the same canonical sprite
+  with identical 640×282 dimensions and byte-identical alpha. Only the RGB
+  palette changes, preserving silhouette and weapon geometry across realms.
+- First load now begins over the ordinary galaxy with the player aircraft
+  flying into position before Arisaka's transmission. Instructor dialogue
+  clears and suppresses shake. The shared Play/First Flight launch is a
+  two-second top-down galaxy transit that reaches the exact gameplay position.

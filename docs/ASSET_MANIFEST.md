@@ -8,9 +8,9 @@ The project owner supplied 45 original PNG files. They are preserved unchanged
 under `source-art/` alongside a short archive README and are excluded from the
 Firebase Hosting payload.
 
-The public runtime contains 48 optimized PNG derivatives:
+The public runtime contains 50 optimized PNG derivatives:
 
-- `assets/sprites/`: 26 player, wingman, enemy, boss, and asteroid sprites.
+- `assets/sprites/`: 28 player, wingman, enemy, boss, realm, and asteroid sprites.
 - `assets/powerups/`: 13 powerup icons.
 - `assets/ui/`: 8 menu, favicon, and PWA icons.
 - `assets/tutorial/`: 1 owner-supplied Colonel Arisaka portrait derivative.
@@ -63,6 +63,15 @@ one manifest-owned 180-degree gameplay rotation so they face down toward the
 player; title-screen patrols and Codex previews deliberately cancel that combat
 rotation and display the canonical nose-up art.
 
+`assets/sprites/boss-wraith-physical.png` and
+`assets/sprites/boss-wraith-ghost.png` are generated from the owner-supplied
+canonical `boss-wraith.png` by `scripts/build_wraith_realms.py`. The generator
+copies dimensions and alpha bytes exactly and changes RGB only. The evidence
+manifest records a shared 640×282 size and alpha SHA-256, and
+`tests/wraith-realm-art.test.js` compares all 180,480 alpha samples. Therefore
+physical/ghost shifts preserve the exact silhouette, core, hardpoints, and
+weapon geometry rather than presenting two different bosses.
+
 ## Validation
 
 - `tests/powerup-art.test.js` verifies every gameplay powerup source, size,
@@ -71,6 +80,8 @@ rotation and display the canonical nose-up art.
   orientation contracts.
 - `tests/collision-contract.test.js` verifies object-only collision calls,
   boss circles, and asteroid spawn-scale collision growth.
+- `tests/wraith-realm-art.test.js` verifies pixel-exact Wraith realm geometry
+  parity and that supplied boss artwork is the primary runtime render path.
 - The asserted visual suite uses build-excluded localhost instrumentation to
   render all 13 powerups and the compact wingman formation.
 - Collision, anchor, origin, and safe-lane contracts are verified through

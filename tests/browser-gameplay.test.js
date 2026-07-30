@@ -115,8 +115,15 @@ test("held movement and ability input cannot affect the ship during game arrival
   try {
     await page.keyboard.down("ArrowRight");
     await page.keyboard.down("Space");
-    await page.evaluate(() => startPlayingSession());
-    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "game_arrival");
+    await page.evaluate(() => {
+      startPlayingSession();
+      // Keep the real arrival policy active long enough for this browser test
+      // to inspect multiple rendered frames on slower CI workers.
+      state.sceneTransition.duration = SIMULATION_HZ;
+      state.sceneTransition.durationSeconds = 1;
+      state.sceneTransition.elapsedSeconds = 0;
+    });
+    await page.waitForFunction(() => state.sceneTransition.mode === "game_arrival");
     const before = await debugSnapshot(page);
     await page.waitForTimeout(180);
     const during = await debugSnapshot(page);
@@ -447,13 +454,22 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
     await page.waitForFunction(() => {
       const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
       return snapshot.gameState === "paused"
-        && snapshot.player.hp === 3
-        && snapshot.ui.pauseNotice === "AUTO-PAUSE: NO HEALTH COST";
+        && snapshot.player.hp === 2
+        && snapshot.ui.pauseNotice === "AUTO-PAUSE COST: 1 HEALTH BAR";
     });
     const automatic = await debugSnapshot(page);
     assert.equal(automatic.gameState, "paused");
-    assert.equal(automatic.player.hp, 3, "automatic safety pauses must not cost health");
-    assert.equal(automatic.ui.pauseNotice, "AUTO-PAUSE: NO HEALTH COST");
+    assert.equal(automatic.player.hp, 2, "automatic pauses must deduct one health bar");
+    assert.equal(automatic.ui.pauseNotice, "AUTO-PAUSE COST: 1 HEALTH BAR");
+
+    const lethalAutomatic = await page.evaluate(() => {
+      state.gameState = "playing";
+      state.player.hp = 1;
+      pauseGame("visibility");
+      return { hp: state.player.hp, gameState: state.gameState };
+    });
+    assert.equal(lethalAutomatic.hp, 0, "the final automatic-pause cost must not be silently waived");
+    assert.equal(lethalAutomatic.gameState, "gameover", "a lethal automatic-pause cost must end a standard run cleanly");
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

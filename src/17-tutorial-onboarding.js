@@ -9,6 +9,82 @@ let tutorialSkipReturnMode = "title";
 let tutorialLiveSignature = "";
 let onboardingAccountPulseFrames = 0;
 let onboardingPersistenceWarning = false;
+let onboardingIntroFlight = {
+  active: false,
+  elapsedSeconds: 0,
+  durationSeconds: 1.25
+};
+
+function beginOnboardingIntroFlight() {
+  onboardingIntroFlight = {
+    active: true,
+    elapsedSeconds: 0,
+    durationSeconds: settingReducedMotion ? 0.28 : 1.25
+  };
+}
+
+function onboardingGalaxySceneActive() {
+  return state.gameState === "start" && onboardingUiMode !== "none" && state.sceneTransition.mode !== "title_launch";
+}
+
+function updateOnboardingIntroFlight(elapsedSeconds = SIMULATION_STEP_MS / 1000) {
+  if (!onboardingIntroFlight.active) return false;
+  onboardingIntroFlight.elapsedSeconds = Math.min(
+    onboardingIntroFlight.durationSeconds,
+    onboardingIntroFlight.elapsedSeconds + Math.max(0, Number(elapsedSeconds) || 0)
+  );
+  if (onboardingIntroFlight.elapsedSeconds < onboardingIntroFlight.durationSeconds) return true;
+  onboardingIntroFlight.active = false;
+  renderOnboardingAccessibleMode();
+  return false;
+}
+
+function onboardingIntroShipPosition() {
+  const duration = Math.max(0.001, onboardingIntroFlight.durationSeconds);
+  const progress = onboardingIntroFlight.active
+    ? clamp(onboardingIntroFlight.elapsedSeconds / duration, 0, 1)
+    : 1;
+  const eased = 1 - Math.pow(1 - progress, 3);
+  return {
+    x: W / 2 + Math.sin(progress * Math.PI) * W * 0.045,
+    y: H + 58 + (H * 0.80 - H - 58) * eased,
+    progress
+  };
+}
+
+function drawOnboardingGalaxyScene() {
+  if (!onboardingGalaxySceneActive()) return;
+  const ship = onboardingIntroShipPosition();
+  if (typeof drawEnginePlume === "function") {
+    drawEnginePlume(ship.x, ship.y + 17, {
+      scale: 1.15,
+      alpha: 0.88,
+      color: "92,238,255",
+      phase: ship.progress * 9
+    });
+  }
+  drawSpriteAsset(ctx, "player", ship.x, ship.y, {
+    alpha: 1,
+    glowColor: "#73efff",
+    glowBlur: onboardingIntroFlight.active ? 14 : 9
+  });
+}
+
+function suppressTutorialTransmissionEffects() {
+  if (typeof clearGameplayInput === "function") clearGameplayInput();
+  if (state.fx) {
+    state.fx.shake = 0;
+    state.fx.flash = 0;
+  }
+}
+
+function tutorialTransmissionVisible() {
+  return (
+    state.runMode === "tutorial" &&
+    !!tutorialDirector &&
+    tutorialDirector.dialogueVisible === true
+  ) || onboardingGalaxySceneActive();
+}
 
 function loadOnboardingStateFromDevice() {
   try {
@@ -127,6 +203,7 @@ function beginTutorialTraining(options = {}) {
   onboardingUiMode = "none";
   const requestedStep = options.stepId || tutorialStepForCheckpoint(onboardingState.checkpoint);
   pendingTutorialStep = requestedStep === "incoming" || requestedStep === "lightspeed" ? "movement" : requestedStep;
+  onboardingIntroFlight.active = false;
   hideTutorialAccessibleSurface(`${TUTORIAL_INSTRUCTOR.name}: Training launch initiated.`);
   if (typeof prepareGameplayMusic === "function") prepareGameplayMusic();
   if (typeof playGameSound === "function") playGameSound("launch", 0.9);
@@ -150,11 +227,13 @@ function chooseFirstFlightRoute(startTraining) {
   );
   const stored = saveOnboardingStateToDevice(onboardingState);
   if (startTraining) {
+    onboardingIntroFlight.active = false;
     onboardingUiMode = "prelaunch_briefing";
     renderOnboardingAccessibleMode();
     return;
   }
   onboardingUiMode = "none";
+  onboardingIntroFlight.active = false;
   hideTutorialAccessibleSurface(
     stored ? "First Flight choice saved." : "Continuing to title. Onboarding choice could not be stored."
   );
@@ -201,6 +280,10 @@ function requestSkipTutorialTraining(returnMode = "title") {
 function renderOnboardingAccessibleMode() {
   const callSignText = String(callSign || "CADET");
   if (onboardingUiMode === "first_time_question") {
+    if (onboardingIntroFlight.active) {
+      hideTutorialAccessibleSurface(`${TUTORIAL_INSTRUCTOR.name}: incoming transmission.`);
+      return;
+    }
     setTutorialAccessibleSurface(
       `${TUTORIAL_INSTRUCTOR.name}: ${TUTORIAL_INSTRUCTOR.firstQuestion}`,
       [
@@ -286,12 +369,19 @@ function initializeOnboardingExperience(options = {}) {
   onboardingUiMode = debugBypass
     ? "none"
     : onboardingRoute({ storedState: stored });
+  if (onboardingUiMode === "first_time_question") beginOnboardingIntroFlight();
   renderOnboardingAccessibleMode();
   return onboardingUiMode;
 }
 
 function startTutorialSession(stepId = "incoming") {
-  setupSession("playing");
+  const transitionStars = state.stars;
+  setupSession("playing", { preserveStars: true });
+  state.lastArrivalContinuity = {
+    starsPreserved: state.stars === transitionStars,
+    playerX: state.player.x,
+    playerY: state.player.y
+  };
   state.runMode = "tutorial";
   document.body.dataset.gameRunMode = "tutorial";
   tutorialDirector = createTutorialDirector(stepId, callSign);
@@ -316,9 +406,9 @@ function startTutorialSession(stepId = "incoming") {
   state.sceneTransition = {
     mode: "game_arrival",
     frame: 0,
-    duration: Math.max(1, Math.round((settingReducedMotion ? 0.24 : 0.45) * SIMULATION_HZ)),
+    duration: Math.max(1, Math.round((settingReducedMotion ? 0.18 : 0.28) * SIMULATION_HZ)),
     elapsedSeconds: 0,
-    durationSeconds: settingReducedMotion ? 0.24 : 0.45
+    durationSeconds: settingReducedMotion ? 0.18 : 0.28
   };
   state.player.inv = Math.max(state.player.inv, 60);
   enterTutorialStep(stepId);
@@ -331,6 +421,12 @@ function tutorialSnapshot() {
     onboarding: onboardingState ? { ...onboardingState } : null,
     uiMode: onboardingUiMode,
     accountPulseFrames: onboardingAccountPulseFrames,
+    introFlight: {
+      active: onboardingIntroFlight.active,
+      elapsedSeconds: Number(onboardingIntroFlight.elapsedSeconds.toFixed(3)),
+      durationSeconds: onboardingIntroFlight.durationSeconds,
+      progress: Number(onboardingIntroShipPosition().progress.toFixed(3))
+    },
     director: tutorialDirector ? {
       stepId: tutorialDirector.stepId,
       stepIndex: tutorialDirector.stepIndex,
@@ -371,8 +467,8 @@ function enterTutorialStep(stepId) {
   tutorialRuntime.tutorialKillsStart = state.runStats.kills;
   tutorialRuntime.ghostUsesStart = state.runStats.ghostUses;
   tutorialRuntime.realmHopsStart = state.runStats.realmHops;
-  tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0;
-  if (typeof clearGameplayInput === "function") clearGameplayInput();
+  tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0.14;
+  suppressTutorialTransmissionEffects();
   if (tutorialDirector.dialogueVisible && typeof playGameSound === "function") playGameSound("ui", 0.42);
   updateTutorialLiveRegion();
 }
@@ -764,7 +860,8 @@ function resetTutorialLesson(stepId, correctionLines) {
   enterTutorialStep(stepId);
   tutorialDirector.dialogue[0] = { lines: correctionLines.slice(0, 2) };
   tutorialDirector.dialogueVisible = true;
-  tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0;
+  tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0.14;
+  suppressTutorialTransmissionEffects();
   updateTutorialLiveRegion();
 }
 
@@ -781,7 +878,8 @@ function recoverTutorialCheckpoint() {
     lines: ["Training craft restored.", "Restarting from your checkpoint."]
   };
   tutorialDirector.dialogueVisible = true;
-  tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0;
+  tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0.14;
+  suppressTutorialTransmissionEffects();
   updateTutorialLiveRegion();
   if (typeof playGameSound === "function") playGameSound("ui", 0.7);
   return true;
@@ -808,7 +906,8 @@ function completeTutorialGraduation() {
   }
   tutorialDirector.completed = true;
   tutorialDirector.dialogueVisible = true;
-  tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0;
+  tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0.14;
+  suppressTutorialTransmissionEffects();
   updateTutorialLiveRegion();
 }
 
@@ -915,12 +1014,14 @@ function drawTutorialInstructorPortrait(x, y, size = 82, alpha = 1) {
     ctx,
     "tutorial_instructor",
     x,
-    y + size * 0.06,
+    y + size * 0.18,
     {
-      scale: size / 190,
+      // Crop toward helmet and upper torso so the owner-supplied portrait
+      // remains readable in the compact mobile transmission window.
+      scale: size / 130,
       alpha,
       glow: false,
-      filter: "saturate(0.82) contrast(1.08) brightness(0.92)"
+      filter: "saturate(0.88) contrast(1.10) brightness(1.12)"
     }
   );
   ctx.restore();
@@ -949,6 +1050,7 @@ function drawTutorialInstructorPortrait(x, y, size = 82, alpha = 1) {
 
 function drawOnboardingTitleOverlay() {
   if (state.gameState !== "start" || onboardingUiMode === "none") return;
+  if (onboardingIntroFlight.active) return;
   const panel = getOnboardingPanelRect();
   ctx.save();
   ctx.fillStyle = "rgba(1,5,16,0.82)";
@@ -1062,24 +1164,32 @@ function getTutorialControlRects() {
 function drawTutorialTrainingEnvironment() {
   if (state.runMode !== "tutorial" || !tutorialDirector) return;
   ctx.save();
-  ctx.strokeStyle = "rgba(66,196,228,0.10)";
+  ctx.fillStyle = "rgba(8,54,73,0.055)";
+  ctx.fillRect(0, 82, W, H - 82);
+  ctx.strokeStyle = "rgba(66,196,228,0.09)";
   ctx.lineWidth = 1;
-  for (let y = 110; y < H; y += 54) {
+  for (let y = 118; y < H; y += 62) {
     ctx.beginPath();
     ctx.moveTo(16, y);
     ctx.lineTo(W - 16, y);
     ctx.stroke();
   }
-  for (let x = 38; x < W; x += 50) {
+  for (let x = 38; x < W; x += 58) {
     ctx.beginPath();
     ctx.moveTo(x, 100);
     ctx.lineTo(W / 2 + (x - W / 2) * 1.8, H);
     ctx.stroke();
   }
+  ctx.strokeStyle = "rgba(112,231,255,0.13)";
+  for (let ring = 0; ring < 4; ring++) {
+    ctx.beginPath();
+    ctx.ellipse(W / 2, H * 0.82, 70 + ring * 64, 18 + ring * 22, 0, Math.PI, TAU);
+    ctx.stroke();
+  }
   ctx.font = "900 8px Arial, sans-serif";
-  ctx.fillStyle = "rgba(102,222,255,0.36)";
+  ctx.fillStyle = "rgba(120,232,255,0.44)";
   ctx.textAlign = "left";
-  ctx.fillText("CONTROLLED SECTOR 07", 12, 58);
+  ctx.fillText("ARISAKA RANGE  //  SECTOR 07", 12, 58);
 
   if (tutorialDirector.stepId === "movement" && tutorialRuntime) {
     const beacons = tutorialRuntime.plan.movement;
@@ -1129,8 +1239,8 @@ function drawTutorialRealmIndicator() {
   ctx.textBaseline = "middle";
   for (const item of labels) {
     const ghost = item.realm === 1;
-    ctx.fillStyle = ghost ? "rgba(117,73,180,0.78)" : "rgba(42,119,155,0.78)";
-    ctx.strokeStyle = ghost ? "#edc6ff" : "#bcecff";
+    ctx.fillStyle = ghost ? "rgba(117,48,175,0.82)" : "rgba(228,237,242,0.88)";
+    ctx.strokeStyle = ghost ? "#f0b8ff" : "#ffffff";
     ctx.beginPath();
     if (ghost) {
       ctx.moveTo(item.x, indicatorY - 8);
@@ -1234,6 +1344,10 @@ Object.assign(globalThis, {
   tutorialSnapshot,
   showTutorialPauseAccessibility,
   hideTutorialPauseAccessibility,
+  onboardingGalaxySceneActive,
+  updateOnboardingIntroFlight,
+  drawOnboardingGalaxyScene,
+  tutorialTransmissionVisible,
   drawTutorialInstructorPortrait,
   drawColonelArisakaPlaceholder,
   drawOnboardingTitleOverlay,

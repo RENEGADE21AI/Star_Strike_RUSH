@@ -46,7 +46,8 @@ after the files they depend on, because the current code intentionally shares gl
 - `15-rendering-entities.js`: wingmen, bullets, enemies, bosses, powerups, particles.
 - `16-rendering-hud.js`: top-left paid pause control, compact top-right score
   block, classic bottom-left Energy/Health status, warnings, and damage flash.
-- `17-rendering-scene.js`: outer fog and top-level draw orchestration.
+- `17-rendering-scene.js`: outer fog, top-level draw orchestration, and the
+  time-based top-down galaxy transit shared by title Play and First Flight.
 - `17-tutorial-onboarding.js`: First Flight runtime director, accessible
   Colonel/objective surfaces, replaceable Colonel Arisaka portrait boundary
   with the registered owner-supplied portrait and geometric load-failure

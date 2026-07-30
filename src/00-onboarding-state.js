@@ -133,7 +133,7 @@ function tutorialInputPrompt(inputMode, objectiveKind) {
 }
 
 function tutorialLaunchDurationSeconds(reducedMotion = false) {
-  return reducedMotion ? 0.42 : 1.5;
+  return reducedMotion ? 0.42 : 2.0;
 }
 
 function tutorialLaunchSnapshot(elapsedSeconds, options = {}) {
@@ -142,6 +142,8 @@ function tutorialLaunchSnapshot(elapsedSeconds, options = {}) {
   const durationSeconds = tutorialLaunchDurationSeconds(reducedMotion);
   const progress = Math.max(0, Number(elapsedSeconds) || 0) / durationSeconds;
   const clamped = Math.min(1, progress);
+  const approach = Math.max(0, Math.min(1, (clamped - 0.48) / 0.52));
+  const approachEased = approach * approach * (3 - 2 * approach);
   let stage = "lock_in";
   if (clamped >= 0.84) stage = "arrival";
   else if (clamped >= 0.62) stage = "lightspeed";
@@ -152,10 +154,11 @@ function tutorialLaunchSnapshot(elapsedSeconds, options = {}) {
     clampedProgress: clamped,
     stage,
     complete: progress >= 1,
-    streaks: reducedMotion ? 0 : Math.round(12 + clamped * 28),
-    bloom: Math.min(reducedFlash ? 0.22 : 0.58, clamped * (reducedFlash ? 0.24 : 0.62)),
-    titleUiAlpha: Math.max(0, 1 - clamped * 1.8),
-    shipNormalizedY: 0.465 + (0.8 - 0.465) * (1 - Math.pow(1 - clamped, 3))
+    cameraMode: "top_down_galaxy_transit",
+    streaks: reducedMotion ? 0 : 30,
+    bloom: Math.min(reducedFlash ? 0.12 : 0.20, Math.sin(Math.PI * clamped) * (reducedFlash ? 0.12 : 0.20)),
+    titleUiAlpha: Math.max(0, 1 - clamped / 0.16),
+    shipNormalizedY: 0.54 + 0.26 * approachEased
   };
 }
 

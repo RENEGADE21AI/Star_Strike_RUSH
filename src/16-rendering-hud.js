@@ -47,12 +47,21 @@ function drawDesktopControlHint() {
 }
 function getGameplayHudLayout() {
   const offset = bossHudOffset();
+  const touchLike = state.inputMode === "touch" || state.inputMode === "pen";
+  const energyY = touchLike ? H - 194 : H - 50;
   return {
-    pause: { x: 10, y: 10, w: 38, h: 32 },
-    energy: { x: 12, y: H - 164, w: 98, h: 7 },
-    health: { x: 12, y: H - 145, w: 98, h: 10, orientation: "horizontal" },
+    pause: { x: 10, y: 10, w: 52, h: 32 },
+    energy: { x: 10, y: energyY, w: 76, h: 5 },
+    health: { x: 10, y: energyY + 17, w: 76, h: 7, orientation: "horizontal" },
     score: { x: W - 10, y: 10 + offset, w: 92, h: 38 }
   };
+}
+function gameplayHudOpacity(player, layout) {
+  if (!player || !layout) return 0.9;
+  const centerX = layout.health.x + layout.health.w / 2;
+  const centerY = (layout.energy.y + layout.health.y + layout.health.h) / 2;
+  const distance = Math.hypot(player.x - centerX, player.y - centerY);
+  return distance < 96 ? 0.38 : distance < 142 ? 0.62 : 0.9;
 }
 function drawLeftStatusHUD() {
   const p = state.player;
@@ -62,11 +71,12 @@ function drawLeftStatusHUD() {
   const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: isWraithActive() ? "HOP" : "GHOST", cost: isWraithActive() ? 18 : 35 };
   const enough = p.energy >= actionProfile.cost && p.ghostCooldown <= 0;
   ctx.save();
+  ctx.globalAlpha = gameplayHudOpacity(p, layout);
   ctx.font = "900 7px 'Arial Narrow', Arial, sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "bottom";
   ctx.fillStyle = enough ? "rgba(127,255,199,0.88)" : "rgba(220,238,248,0.60)";
-  ctx.fillText(`ENERGY ${Math.round(p.energy)}  ${actionProfile.label}`, energy.x, energy.y - 3);
+  ctx.fillText(`${actionProfile.label}  ${Math.round(p.energy)}`, energy.x, energy.y - 3);
   ctx.fillStyle = "rgba(255,255,255,0.16)";
   ctx.fillRect(energy.x, energy.y, energy.w, energy.h);
   ctx.fillStyle = enough ? "#ff0" : "#f44";
@@ -75,11 +85,11 @@ function drawLeftStatusHUD() {
   ctx.strokeRect(energy.x, energy.y, energy.w, energy.h);
 
   const segments = Math.max(1, Math.floor(p.maxHp || 5));
-  const gap = 3;
+  const gap = 2;
   const segmentW = Math.max(5, (health.w - gap * (segments - 1)) / segments);
   ctx.textBaseline = "top";
   ctx.fillStyle = "rgba(235,245,255,0.60)";
-  ctx.fillText("HEALTH", health.x, health.y - 9);
+  ctx.fillText("HP", health.x, health.y - 8);
   for (let i = 0; i < segments; i++) {
     const sx = health.x + i * (segmentW + gap);
     ctx.fillStyle = i < p.hp ? (p.hp <= 1 ? "#ff6464" : "#e34955") : "rgba(100,116,126,0.26)";
@@ -222,8 +232,11 @@ function drawPauseButton() {
   ctx.font = "900 7px 'Arial Narrow', Arial, sans-serif";
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = state.player && state.player.hp > 1 ? "rgba(255,126,136,0.88)" : "rgba(190,205,215,0.42)";
-  ctx.fillText("-1", r.x + r.w - 5, r.y + r.h / 2);
+  const trainingFree = state.runMode === "tutorial";
+  ctx.fillStyle = trainingFree
+    ? "rgba(126,240,210,0.78)"
+    : state.player && state.player.hp > 1 ? "rgba(255,126,136,0.88)" : "rgba(190,205,215,0.42)";
+  ctx.fillText(trainingFree ? "FREE" : "-1", r.x + r.w - 4, r.y + r.h / 2);
   ctx.restore();
 }
 function drawPauseOverlay() {
@@ -283,3 +296,4 @@ function drawDamageFlash() {
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
 }
+globalThis.gameplayHudOpacity = gameplayHudOpacity;

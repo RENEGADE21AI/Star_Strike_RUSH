@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "source": "boss-wraith.png",
+  "physical": "boss-wraith-physical.png",
+  "ghost": "boss-wraith-ghost.png",
+  "width": 640,
+  "height": 282,
+  "alphaSha256": "3a4ee376c997785d42f5891892ef181c4d5214bfe54f99cc8a33d35b68f0f606",
+  "geometryContract": "identical_dimensions_and_alpha_mask"
+}

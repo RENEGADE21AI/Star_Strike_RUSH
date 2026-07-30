@@ -1,25 +1,26 @@
 const TITLE_MAX_FORMATIONS = 2;
 const TITLE_FORMATION_MIN_GAP = 18;
+let titleFormationIdCounter = 0;
 const TITLE_DEPTH_PROFILES = Object.freeze({
   distant: Object.freeze({
-    duration: [20, 27],
-    scale: [0.62, 0.78],
+    duration: [23, 31],
+    scale: [0.32, 0.48],
     alpha: [0.28, 0.40],
     blur: 1.0,
     order: 0,
     curve: [10, 24]
   }),
   midground: Object.freeze({
-    duration: [13, 18],
-    scale: [0.92, 1.16],
+    duration: [17, 23],
+    scale: [0.56, 0.78],
     alpha: [0.50, 0.68],
     blur: 0.25,
     order: 1,
     curve: [18, 38]
   }),
   foreground: Object.freeze({
-    duration: [10, 14],
-    scale: [1.38, 1.72],
+    duration: [13, 17],
+    scale: [0.82, 1.00],
     alpha: [0.72, 0.88],
     blur: 0,
     order: 2,
@@ -62,7 +63,9 @@ function titleFormationTangentAt(formation, normalizedTime) {
   return {
     x: after.x - before.x,
     y: after.y - before.y,
-    angle: Math.atan2(after.y - before.y, after.x - before.x) - Math.PI / 2
+    // Title presentation cancels the hostile sprite's combat rotation, leaving
+    // its canonical nose-up artwork. Rotate that nose into the path tangent.
+    angle: Math.atan2(after.y - before.y, after.x - before.x) + Math.PI / 2
   };
 }
 
@@ -87,6 +90,7 @@ function makeTitleFormation(lane = 0, dir = 1, spawnAbove = false, forcedLayer =
     curveSign: Math.random() < 0.5 ? -1 : 1
   };
   const formation = {
+    id: `title-formation-${++titleFormationIdCounter}`,
     dir: direction,
     pattern,
     kind: ["red", "orange", "purple"][Math.floor(Math.random() * 3)],
@@ -141,6 +145,7 @@ function formationSpawnWouldOverlap(formation) {
 }
 
 function initTitleFormations() {
+  titleFormationIdCounter = 0;
   state.titleFormations = [];
   state.titleLaneCooldowns = [0, 0, 0, 0];
   state.titleLaneCursor = 0;
@@ -231,6 +236,11 @@ function updateTitleScreen() {
     ) startPlayingSession();
     return;
   }
+  if (typeof onboardingGalaxySceneActive === "function" && onboardingGalaxySceneActive()) {
+    if (typeof updateOnboardingIntroFlight === "function") updateOnboardingIntroFlight(SIMULATION_STEP_MS / 1000);
+    callSignCursorBlink = (callSignCursorBlink + 1) % 56;
+    return;
+  }
   updateTitleFormations(SIMULATION_STEP_MS / 1000);
   if (titlePanelTarget === 0 && titlePanelAnim < 0.02) {
     titleSubState = "main";
@@ -247,3 +257,4 @@ function updateTitleScreen() {
 
 globalThis.titleFormationPositionAt = titleFormationPositionAt;
 globalThis.titleFormationTangentAt = titleFormationTangentAt;
+globalThis.TITLE_DEPTH_PROFILES = TITLE_DEPTH_PROFILES;

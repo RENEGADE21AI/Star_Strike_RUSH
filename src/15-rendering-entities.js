@@ -122,6 +122,16 @@ function drawBullets() {
     }
   }
 }
+function enemyHeadingRotation(dx, dy, fallbackY = 1) {
+  const resolvedDx = Number(dx) || 0;
+  const resolvedDy = Number(dy) || 0;
+  const moving = Math.abs(resolvedDx) + Math.abs(resolvedDy) > 0.001;
+  const headingX = moving ? resolvedDx : 0;
+  const headingY = moving ? resolvedDy : (fallbackY < 0 ? -1 : 1);
+  // Hostile sprites are normalized nose-down for combat. Rotate that forward
+  // vector into the entity's actual movement direction.
+  return Math.atan2(headingY, headingX) - Math.PI / 2;
+}
 function drawEnemies() {
   for (const e of state.enemies) {
     const scale = 1 + Math.min(0.12, (e.hitPulse || 0) * 0.08);
@@ -138,10 +148,10 @@ function drawEnemies() {
     ctx.scale(scale * typeScale, scale * typeScale);
     const dx = e.x - (e.prevX || e.x);
     const dy = e.y - (e.prevY || e.y);
-    const bank = clamp(dx * 0.06, -0.28, 0.28);
+    const heading = enemyHeadingRotation(dx, dy, e.escape ? -1 : 1);
+    const bank = clamp(dx * 0.018, -0.12, 0.12);
     const sway = Math.sin(state.frame * 0.10 + e.loopPhase) * 0.05;
-    ctx.rotate((e.escape ? bank : -bank) + sway);
-    if (!e.escape) ctx.scale(1, -1);
+    ctx.rotate(heading + bank + sway);
     drawEnemyGeometry(e.type, {
       hitMix,
       alpha: entityAlpha,
@@ -187,7 +197,9 @@ function drawBoss() {
   if (typeof drawExpansionBoss === "function" && drawExpansionBoss(b)) return;
   if (b.mode === "wraith") {
     const hpPct = b.hp / b.maxHp;
-    const alphaBase = 0.50 + (1 - hpPct) * 0.18;
+    const alphaBase = b.realm === 1
+      ? 0.58 + (1 - hpPct) * 0.14
+      : 0.84 + (1 - hpPct) * 0.10;
     const flicker = b.shiftTelegraph > 0 ? (0.35 + Math.sin(state.frame * 0.8) * 0.25) : 1;
     const visibleAlpha = alphaBase * flicker;
     const wobble = Math.sin(state.frame * 0.045 + b.movePhase) * 2.2;
@@ -195,7 +207,14 @@ function drawBoss() {
     ctx.save();
     ctx.translate(b.x, b.y + wobble);
     ctx.rotate(tilt);
-    drawBossWraithShip(false, visibleAlpha, b.realm, b.chargeTelegraph);
+    const realmSprite = b.realm === 1 ? "boss_wraith_ghost" : "boss_wraith_physical";
+    const drewRealmArt = typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, realmSprite, 0, 0, {
+      alpha: visibleAlpha,
+      hitFlash: clamp((b.hitFlash || 0) / 10, 0, 1),
+      glowColor: b.realm === 1 ? "#dc64ff" : "#9fc9d6",
+      glowBlur: b.realm === 1 ? 14 : 1.5
+    });
+    if (!drewRealmArt) drawBossWraithShip(false, visibleAlpha, b.realm, b.chargeTelegraph);
     ctx.restore();
     drawBossImpactFeedback(b, wobble);
     for (let i = 0; i < 4; i++) {
@@ -204,12 +223,12 @@ function drawBoss() {
       const px = b.x + Math.cos(ang) * r;
       const py = b.y + Math.sin(ang) * 8 + wobble;
       ctx.save();
-      ctx.globalAlpha = 0.22;
-      ctx.strokeStyle = i === 0 ? "rgba(200,235,255,0.8)" : i === 1 ? "rgba(200,170,255,0.8)" : "rgba(255,255,255,0.6)";
+      ctx.globalAlpha = b.realm === 1 ? 0.18 : 0.11;
+      ctx.strokeStyle = b.realm === 1 ? "rgba(218,112,255,0.74)" : "rgba(226,244,250,0.60)";
       ctx.beginPath(); ctx.arc(px, py, 5 + (i % 2) * 2, 0, TAU); ctx.stroke();
       ctx.restore();
     }
-    if (typeof drawBossHealthBar === "function") drawBossHealthBar(b, "#d9b6ff");
+    if (typeof drawBossHealthBar === "function") drawBossHealthBar(b, b.realm === 1 ? "#d76cff" : "#edf9ff");
     if (b.shiftTelegraph > 0) {
       ctx.save();
       ctx.globalAlpha = 0.9;
@@ -228,7 +247,11 @@ function drawBoss() {
   ctx.save();
   ctx.translate(b.x, b.y + bob);
   ctx.rotate(tilt);
-  drawBossStandardShip(false, 1);
+  const drewBossArt = typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "boss_standard", 0, 0, {
+    hitFlash: clamp((b.hitFlash || 0) / 10, 0, 1),
+    glowBlur: 12
+  });
+  if (!drewBossArt) drawBossStandardShip(false, 1);
   ctx.restore();
   drawBossImpactFeedback(b, bob);
   for (let i = 0; i < 4; i++) {
@@ -244,6 +267,7 @@ function drawBoss() {
   }
   if (typeof drawBossHealthBar === "function") drawBossHealthBar(b, "#63efff");
 }
+globalThis.enemyHeadingRotation = enemyHeadingRotation;
 function drawBossDeath() {
   const d = state.bossDeath; if (!d) return;
   const t = d.timer;

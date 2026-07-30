@@ -74,31 +74,60 @@ function sceneTransitionProgress() {
   }
   return clamp(state.sceneTransition.frame / Math.max(1, state.sceneTransition.duration), 0, 1);
 }
+function galaxyTransitShipAt(normalizedTime) {
+  const t = clamp(Number(normalizedTime) || 0, 0, 1);
+  const approach = clamp((t - 0.48) / 0.52, 0, 1);
+  const eased = approach * approach * (3 - 2 * approach);
+  return {
+    x: W * (0.57 - eased * 0.07),
+    y: H * (0.54 + eased * 0.26),
+    scale: 0.28 + eased * 0.72,
+    alpha: clamp(approach * 3, 0, 1)
+  };
+}
 function drawTitleLaunchEffect() {
-  if (state.sceneTransition.mode !== "title_launch" || settingReducedMotion) return;
+  if (state.sceneTransition.mode !== "title_launch") return;
   const t = sceneTransitionProgress();
   const eased = t * t * (3 - 2 * t);
-  const centerX = W / 2;
-  const startY = H * 0.465;
-  const shipY = startY + (H * 0.80 - startY) * easeOutCubic(t);
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = `rgba(170,244,255,${settingReducedFlash ? 0.24 : 0.16 + eased * 0.5})`;
-  for (let index = 0; index < 18; index++) {
-    const angle = (index / 18) * TAU + 0.18;
-    const inner = 36 + eased * 46 + (index % 3) * 5;
-    const length = 18 + eased * 96 + (index % 4) * 8;
-    const x1 = centerX + Math.cos(angle) * inner;
-    const y1 = startY + Math.sin(angle) * inner * 0.62;
-    const x2 = centerX + Math.cos(angle) * (inner + length);
-    const y2 = startY + Math.sin(angle) * (inner + length) * 0.62;
-    ctx.lineWidth = 0.7 + eased * 1.1;
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const velocity = Math.sin(Math.PI * t);
+  if (!settingReducedMotion) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let index = 0; index < 30; index++) {
+      const depth = 0.34 + (index % 7) / 9;
+      const x = ((index * 89 + 31) % 389) / 389 * W;
+      const travel = (state.sceneTransition.elapsedSeconds * (92 + depth * 210) + index * 47) % (H + 120);
+      const y = travel - 60;
+      const length = 8 + velocity * (22 + depth * 54);
+      ctx.globalAlpha = (settingReducedFlash ? 0.18 : 0.20 + velocity * 0.30) * depth;
+      ctx.strokeStyle = index % 5 === 0 ? "#b58cff" : index % 3 === 0 ? "#63e9ff" : "#eefaff";
+      ctx.lineWidth = 0.55 + depth * 0.75;
+      ctx.beginPath();
+      ctx.moveTo(x, y - length);
+      ctx.lineTo(x, y + length * 0.28);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
-  ctx.restore();
-  drawSpriteAsset(ctx, "player", centerX, shipY, { scale: 0.88 + eased * 0.42, alpha: Math.min(1, t * 4) });
-  const veil = ctx.createRadialGradient(centerX, startY, 0, centerX, startY, 230);
-  veil.addColorStop(0, `rgba(190,247,255,${Math.min(settingReducedFlash ? 0.18 : 0.34, Math.max(0, (t - 0.55) * 0.72))})`);
+  const ship = galaxyTransitShipAt(t);
+  if (ship.alpha > 0) {
+    if (typeof drawEnginePlume === "function") {
+      drawEnginePlume(ship.x, ship.y + 17 * ship.scale, {
+        scale: ship.scale * (1.1 + velocity * 0.5),
+        alpha: ship.alpha,
+        color: "92,238,255",
+        phase: t * 12
+      });
+    }
+    drawSpriteAsset(ctx, "player", ship.x, ship.y, {
+      scale: ship.scale,
+      alpha: ship.alpha,
+      glowColor: "#73efff",
+      glowBlur: 10 + velocity * 10
+    });
+  }
+  const veil = ctx.createRadialGradient(ship.x, ship.y, 0, ship.x, ship.y, 170);
+  veil.addColorStop(0, `rgba(104,224,255,${Math.min(settingReducedFlash ? 0.10 : 0.20, velocity * 0.18)})`);
   veil.addColorStop(1, "rgba(8,26,48,0)");
   ctx.fillStyle = veil;
   ctx.fillRect(0, 0, W, H);
@@ -120,10 +149,12 @@ function drawGameArrivalEffect() {
   ctx.restore();
 }
 function draw() {
+  state.renderFrameFlags = { titleUi: false, onboardingGalaxy: false, galaxyTransit: false };
   ctx.setTransform(renderDpr, 0, 0, renderDpr, 0, 0);
   drawOuterFog();
 
-  const shakeOn = settingScreenShake ? 1 : 0;
+  const transmissionStill = typeof tutorialTransmissionVisible === "function" && tutorialTransmissionVisible();
+  const shakeOn = settingScreenShake && !transmissionStill ? 1 : 0;
   const baseShake = (state.fx.shake + (state.gameState === "gameover" ? state.gameOverShake : 0)) * shakeOn;
   const gameOverT = state.gameState === "gameover" ? clamp(state.gameOverShakeTimer / 180, 0, 1) : 0;
   const freqScale = state.gameState === "gameover" ? (0.55 + 0.45 * gameOverT) : 1;
@@ -158,26 +189,25 @@ function draw() {
     drawGameArrivalEffect();
   } else if (state.gameState === "start") {
     const launchT = state.sceneTransition.mode === "title_launch" ? sceneTransitionProgress() : 0;
+    const onboardingGalaxy = typeof onboardingGalaxySceneActive === "function" && onboardingGalaxySceneActive();
     ctx.save();
-    ctx.translate(W / 2, H * 0.46);
-    ctx.scale(1 + launchT * 0.09, 1 + launchT * 0.09);
-    ctx.translate(-W / 2, -H * 0.46);
-    // Lock-in owns only the opening beat. The title is fully retracted before
-    // the lightspeed streaks peak so no menu text ghosts through the warp.
-    if (launchT < 0.3) {
-      ctx.globalAlpha = Math.max(0, 1 - launchT / 0.3);
+    // The title retracts quickly, revealing a continuous top-down galaxy
+    // flyover. No perspective flip or radial wipe interrupts spatial context.
+    if (onboardingGalaxy) {
+      state.renderFrameFlags.onboardingGalaxy = true;
+      if (typeof drawOnboardingGalaxyScene === "function") drawOnboardingGalaxyScene();
+      if (typeof drawOnboardingTitleOverlay === "function") drawOnboardingTitleOverlay();
+    } else if (launchT < 0.16) {
+      state.renderFrameFlags.titleUi = true;
+      ctx.globalAlpha = Math.max(0, 1 - launchT / 0.16);
       drawStartScreen();
       if (typeof drawOnboardingTitleOverlay === "function") drawOnboardingTitleOverlay();
-    } else if (launchT < 0.58) {
-      // Keep only atmospheric depth for the acceleration beat. Some title
-      // controls set their own Canvas alpha, so they must not be drawn here.
-      ctx.globalAlpha = Math.max(0, 1 - (launchT - 0.3) / 0.28);
-      drawTitleSun();
-      drawMenuFlights();
-      drawPlayfieldFogBlend();
     }
     ctx.restore();
-    drawTitleLaunchEffect();
+    if (!onboardingGalaxy) {
+      state.renderFrameFlags.galaxyTransit = state.sceneTransition.mode === "title_launch";
+      drawTitleLaunchEffect();
+    }
   } else if (state.gameState === "gameover") {
     drawGameOverScreen();
   }
@@ -196,3 +226,4 @@ function draw() {
     ctx.restore();
   }
 }
+globalThis.galaxyTransitShipAt = galaxyTransitShipAt;
