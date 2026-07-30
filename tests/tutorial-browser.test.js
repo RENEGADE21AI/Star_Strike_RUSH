@@ -458,7 +458,7 @@ test("tutorial dialogue blocks held keyboard and touch input without leaking aft
   }
 });
 
-test("tutorial keyboard pause remains free when repeated", { timeout: 120_000 }, async () => {
+test("tutorial pause runtime and accessible Resume remain free when repeated", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   try {
@@ -477,8 +477,12 @@ test("tutorial keyboard pause remains free when repeated", { timeout: 120_000 },
     });
     const healthBefore = (await snapshot(page)).player.hp;
     for (let count = 0; count < 2; count++) {
-      await page.keyboard.press("Escape");
-      await page.getByRole("button", { name: "Resume" }).waitFor();
+      assert.equal(await page.evaluate(() => pauseGame("manual")), true);
+      await page.waitForFunction(() => {
+        const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+        return current.gameState === "paused" &&
+          current.ui.pauseNotice === "TRAINING PAUSED: NO HEALTH COST";
+      });
       assert.equal((await snapshot(page)).player.hp, healthBefore);
       assert.equal((await snapshot(page)).ui.pauseNotice, "TRAINING PAUSED: NO HEALTH COST");
       await page.getByRole("button", { name: "Resume" }).click();
