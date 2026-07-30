@@ -13,8 +13,9 @@ after the files they depend on, because the current code intentionally shares gl
   aim/range calculations, and boss-specific action profiles.
 - `00-input-actions.js`: explicit gameplay actions and meaningful-input mode
   switching for keyboard, mouse, touch, and pen.
-- `00-onboarding-state.js`: versioned First Flight persistence, new-player
-  routing, checkpoint mapping, input-specific prompts, launch timing, and the
+- `00-onboarding-state.js`: versioned First Flight persistence, explicit
+  one-time choice routing, centralized instructor identity, checkpoint mapping,
+  post-graduation identity routing, input-specific prompts, launch timing, and the
   tutorial no-progression gates.
 - `00-runtime.js`: deterministic fixed-step simulation clock, render-rate
   independence, and long-background-gap clamping.
@@ -47,8 +48,10 @@ after the files they depend on, because the current code intentionally shares gl
   block, classic bottom-left Energy/Health status, warnings, and damage flash.
 - `17-rendering-scene.js`: outer fog and top-level draw orchestration.
 - `17-tutorial-onboarding.js`: First Flight runtime director, accessible
-  Colonel/objective surfaces, procedural Colonel Vega hologram, checkpoints,
-  tutorial presentation, and optional post-graduation identity flow.
+  Colonel/objective surfaces, replaceable Colonel Arisaka portrait boundary
+  with the registered owner-supplied portrait and geometric load-failure
+  fallback, checkpoints, tutorial presentation, and adaptive optional
+  post-graduation identity flow.
 - `18-expansion-data.js`: expansion roster constants, codex metadata, spawn
   caps, and enemy setup defaults.
 - `18-expansion-enemies-powerups.js`: expansion enemy behavior, support effects,
@@ -59,7 +62,8 @@ after the files they depend on, because the current code intentionally shares gl
   hazard drawing, overlays, and expansion wave template registration.
 - `18-title-input.js`: title-screen meta panel routing, account/settings actions,
   progress-road drag/claim input, and reset-progress confirmation.
-- `18-session-input-loop.js`: session setup, resize, input events, update loop,
+- `18-session-input-loop.js`: session setup, resize, input events, arrival and
+  dialogue control/simulation locks, update loop,
   and localhost-only automated QA instrumentation. The production build removes
   scenarios and hidden snapshots. Player-facing phase skips, hitbox toggles,
   and developer stat controls are not part of the runtime.

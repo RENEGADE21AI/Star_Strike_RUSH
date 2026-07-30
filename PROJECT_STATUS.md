@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited: 2026-07-28
+Last audited: 2026-07-29
 
 This is the release truth table. Disabled, configuration-dependent, previewed,
 and production-deployed are distinct states.
@@ -46,7 +46,7 @@ rewards.
 | Title/traffic | Stable | Measured title bounds, normalized time paths, depth durations, UI-safe lanes, Reduced Motion |
 | Debug records/reset | Stable | Debug cannot persist records/progression; reset clears all progression-bearing local state |
 | Combat HUD | Stable | Pause top-left with one-Health deliberate cost; Energy above segmented Health bottom-left; compact score block top-right |
-| First Flight onboarding | Verified locally | Deterministic 13-step director, real desktop/touch completion, checkpoints, replay, Colonel Vega, two tutorial bosses, and no-progression assertions |
+| First Flight onboarding | PR #14 merged; focused refinement locally verified | Deterministic 13-step director, explicit one-time Yes/No route, owner-supplied Colonel Arisaka portrait, arrival/dialogue input locks, free tutorial pause, checkpoints, replay, two tutorial bosses, and no-progression assertions |
 | Production debug surface | Removed | Build strips QA scenarios/snapshots; player-facing phase skips and hitbox controls removed |
 | Firestore authorization | Stable | Emulator tests cover anonymous denial, owner privacy, bounded reads, browser-write denial |
 | Build/cache contract | Stable | Commit-versioned runtime/assets plus no-store HTML and `version.json` |
@@ -91,8 +91,8 @@ preserved; it is not described as current, live, verified, or a world record.
 | Production achievement archive | Applied 2026-07-28: 1 aggregate reconstructed from 15 valid unlocks, 0 invalid IDs; follow-up dry run found 0 remaining changes |
 | App Check | Console provider registration and direct enforcement tests have not been performed |
 | Audio distribution rights | Owner authorization to publicly distribute both MP3s recorded on 2026-07-28; no artist/source/license name inferred |
-| Exact-SHA backend staging | Not yet performed for this final gate branch |
-| Production deployment | Must not be claimed until Hosting SHA, backend SHA, approval, and live smoke are verified |
+| Exact-SHA backend staging | PR #14 merge `0b1ef8f8eff38962580b9b8e0c0d5884d948c1f8` staged with matching Hosting/backend SHA at its preview |
+| Production deployment | Production Hosting remains unchanged; Account A/B approval is incomplete |
 
 ## Verification commands
 
@@ -116,31 +116,42 @@ Evidence inherited from the preceding release candidate:
   all three direct gate rejections.
 - Visual QA: 16/16 asserted cases passed.
 
-Current First Flight branch evidence on Node 22:
+Current onboarding-entry refinement evidence on Node 22:
 
-- `npm test`: 113/113 passed, including complete real-action desktop and touch
+- `npm test`: 123/123 passed, including complete real-action desktop and touch
   tutorial journeys.
 - Firestore Rules emulator: 4/4 passed.
 - Firebase client integration: one complete real-emulator browser scenario
   passed.
-- Visual QA: 33/33 asserted cases passed and were manually inspected.
-- Production build: 100 public files generated.
+- Visual QA: 40/40 asserted cases passed; the Arisaka question and prelaunch
+  portrait scenes were manually inspected at mobile size.
+- Production build: 101 public files generated.
 - Root production audit: 0 vulnerabilities. Functions audit: 0 high-severity
-  findings and 9 known moderate transitive findings.
-- Tracked-file secret scan: 223 files passed.
+  findings and 8 known moderate transitive findings.
+- Tracked-file secret scan: 231 files passed.
 
-GitHub checks, exact-SHA preview staging, and Account A/B smoke still remain for
-the merge commit; this document does not imply those pending results or a
-production Hosting deployment.
+PR #14 merged with green `verify` and `secret-scan`; its exact-SHA preview was
+staged and smoke-tested. Account A/B smoke remains incomplete, and this
+document does not imply a production Hosting deployment.
 
-The First Flight branch adds an isolated tutorial run mode and versioned
-`star_strike_rush_onboarding_v1` state. A new player is offered training only
-when no meaningful local gameplay history exists. Existing players receive one
-dismissible availability notice. Checkpoints survive reload; death restores
+The focused onboarding-entry refinement replaces local-progress guessing with a
+one-time explicit Yes/No decision whenever `star_strike_rush_onboarding_v1` is
+absent. High score, Glory, achievements, and Codex data do not answer that
+question. Yes opens a separate call-sign prelaunch briefing; No stores
+`skipped` and opens the normal title. Checkpoints survive reload; death restores
 the current training checkpoint rather than entering Game Over; skipping is
-confirmed; replay is available in Settings. First completion reveals only the
+available in flight; replay is available in Settings. First completion reveals only the
 training entities in the local Codex and never adds a standard achievement.
 The canonical achievement catalog remains exactly 79 entries.
+
+The refinement also keeps normal manual pause at its deliberate one-Health
+cost while making every tutorial pause free, freezes control and ordinary
+simulation through warp arrival and paused instructor dialogue, requires a
+damage-free evasion crossing, requires the Ghost lane boundary to be crossed
+while real Ghost protection is active, and skips redundant post-graduation
+account steps according to current sign-in and handle state. This section is
+local evidence only until the focused PR is merged and a new exact-SHA preview
+is staged.
 
 ## Release policy
 

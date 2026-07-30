@@ -132,18 +132,18 @@ and release evidence.
 
 ## Current branch evidence
 
-- `npm test`: 113/113 passing, including full real-action desktop and touch
+- `npm test`: 123/123 passing, including full real-action desktop and touch
   First Flight completions.
 - Firebase client emulator scenario: passed Accounts A/B, one-owner hydration,
   pending call-sign retry, auth restoration, progression non-overwrite,
   aggregate retrieval, sign-out cleanup, and all three paused callables.
 - Firestore Rules emulator: 4/4 passed.
-- Visual QA: 33/33 asserted cases passed across 375×667, 390×844, 430×932,
+- Visual QA: 40/40 asserted cases passed across 375×667, 390×844, 430×932,
   768×1024, and 1440×900.
-- Production build and commit-version contract: passed with 100 public files.
+- Production build and commit-version contract: passed with 101 public files.
 - Root production audit: 0 vulnerabilities. Functions production audit:
   0 high-severity findings and 9 moderate transitive findings.
-- Tracked-file secret scan: 223 files passed.
+- Tracked-file secret scan: 231 files passed.
 
 GitHub checks, exact-SHA preview smoke, and live Account A/B evidence must still
 be obtained on the merge commit. This document does not claim those pending
@@ -171,13 +171,14 @@ Playable URL: https://star-strike-rush.web.app
 
 ## First Flight onboarding
 
-- Added a versioned first-launch router that distinguishes genuinely new
-  devices from established local pilots.
+- Added a versioned first-launch router with a one-time explicit Yes/No choice;
+  it never guesses from high score, Glory, achievements, or Codex data.
 - Added an isolated 13-step tutorial director covering lightspeed launch,
   movement beacons, autofire positioning, evasion, real Ghost Shift, a Phase
   Shield pickup, controlled waves, a staged Command Ship, the two Wraith
   realms, real Realm Hop, the Wraith Sovereign, and graduation.
-- Added a procedural original Colonel Vega hologram, concise transmissions,
+- Added centralized Colonel Arisaka identity and a replaceable owner-supplied
+  portrait asset with a geometric load-failure fallback, concise transmissions,
   semantic live-region mirroring, compact action objectives, input-adaptive
   prompts, and reduced-motion/flash behavior.
 - Added checkpoint recovery, confirmed skip, reload resume, replay from
