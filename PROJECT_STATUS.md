@@ -43,10 +43,11 @@ rewards.
 | Achievement hydration | Stable | One aggregate returned by the profile owner callable; no 79-document browser listing |
 | Vault/Codex scrolling | Stable | Touch drag at 375×667, 390×844, 430×932; wheel, keyboard, and buttons |
 | Audio | Stable | Independent Music/Effects, legacy setting migration, lazy load, time-based 30/60/90/120 Hz mix |
-| Title/traffic | Stable | Measured title bounds, normalized time paths, depth durations, UI-safe lanes, Reduced Motion |
+| Title/traffic | Stable | Measured title gap/bounds, normalized time paths, depth durations, correctly oriented patrols capped at normal fighter scale, UI-safe lanes, Reduced Motion |
 | Debug records/reset | Stable | Debug cannot persist records/progression; reset clears all progression-bearing local state |
-| Combat HUD | Stable | Pause top-left with one-Health deliberate cost; Energy above segmented Health bottom-left; compact score block top-right |
-| First Flight onboarding | PR #14 merged; focused refinement locally verified | Deterministic 13-step director, explicit one-time Yes/No route, owner-supplied Colonel Arisaka portrait, arrival/dialogue input locks, free tutorial pause, checkpoints, replay, two tutorial bosses, and no-progression assertions |
+| Combat HUD | Stable | Pause top-left; standard manual and all automatic pauses cost one Health; First Flight manual pause is free; Energy above segmented Health bottom-left; compact score block top-right |
+| Boss/realm presentation | Focused pass locally verified | Supplied boss sprites are the primary render path; Wraith physical/ghost variants share the canonical 640×282 alpha mask exactly |
+| First Flight onboarding | PR #14 merged; focused visual pass locally verified | Deterministic 13-step director, explicit one-time Yes/No route, owner-supplied Colonel Arisaka portrait, fresh-galaxy arrival, arrival/dialogue input locks and shake suppression, free manual training pause, checkpoints, replay, two tutorial bosses, and no-progression assertions |
 | Production debug surface | Removed | Build strips QA scenarios/snapshots; player-facing phase skips and hitbox controls removed |
 | Firestore authorization | Stable | Emulator tests cover anonymous denial, owner privacy, bounded reads, browser-write denial |
 | Build/cache contract | Stable | Commit-versioned runtime/assets plus no-store HTML and `version.json` |
@@ -127,7 +128,7 @@ Current onboarding-entry refinement evidence on Node 22:
   portrait scenes were manually inspected at mobile size.
 - Production build: 101 public files generated.
 - Root production audit: 0 vulnerabilities. Functions audit: 0 high-severity
-  findings and 8 known moderate transitive findings.
+  findings and 9 known moderate transitive findings.
 - Tracked-file secret scan: 231 files passed.
 
 PR #14 merged with green `verify` and `secret-scan`; its exact-SHA preview was
@@ -145,13 +146,25 @@ training entities in the local Codex and never adds a standard achievement.
 The canonical achievement catalog remains exactly 79 entries.
 
 The refinement also keeps normal manual pause at its deliberate one-Health
-cost while making every tutorial pause free, freezes control and ordinary
+cost, makes tutorial manual pause free, and charges one Health for automatic
+focus/visibility pause in either run mode. It freezes control and ordinary
 simulation through warp arrival and paused instructor dialogue, requires a
 damage-free evasion crossing, requires the Ghost lane boundary to be crossed
 while real Ghost protection is active, and skips redundant post-graduation
 account steps according to current sign-in and handle state. This section is
 local evidence only until the focused PR is merged and a new exact-SHA preview
 is staged.
+
+The current gameplay-visual pass uses the supplied Command Ship and Wraith art
+as the normal boss-rendering path, fixes combat/title fighter headings, caps
+title patrol scale at 1.0, separates the two title lines by measured bounds,
+reduces the bottom-left HUD footprint, replaces Ghost Shift afterimages with a
+single translucent glow, suppresses shake during instructor transmissions, and
+uses a two-second top-down galaxy transit into the exact gameplay position. The
+Wraith realm sprites are deterministic RGB recolors of one canonical source;
+their dimensions and every alpha byte match, so realm changes cannot alter the
+silhouette or weapon geometry. These changes remain local evidence until their
+focused PR and exact-SHA preview are complete.
 
 ## Release policy
 

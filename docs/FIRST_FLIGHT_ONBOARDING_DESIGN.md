@@ -29,7 +29,10 @@ center and lower-middle playfield remain clear while those verbs are active.
 - Standard and Wraith bosses remain invulnerable until `entered` and
   `combatActive` are both true.
 - The normal one-Health manual pause policy stays intact for standard runs.
-  Tutorial manual and automatic pauses are free, including at one Health.
+  Tutorial manual pauses are free, including at one Health. Automatic
+  focus/visibility pauses cost one Health in both standard and tutorial modes;
+  a lethal cost resolves immediately through Game Over or tutorial checkpoint
+  recovery instead of leaving a live zero-Health session.
 
 The director observes these real state changes. It does not award success from
 a timer or substitute a tutorial-only animation for an ability.
@@ -125,6 +128,12 @@ Realm Hop, presents one labeled realm-specific threat, and changes realm on a fi
 sequence. The same shot-kind, realm, staging, and collision rules used by normal
 play decide damage.
 
+Both realms render from deterministic derivatives of the canonical Wraith
+sprite. The physical and ghost files are 640×282 and copy the source alpha byte
+for byte. Only RGB values differ: cold white/cyan emission identifies physical,
+while purple/magenta emission identifies ghost. This keeps the hull silhouette,
+core, hardpoints, and weapon geometry mechanically identical during a shift.
+
 Tutorial death invokes emergency recovery: clear hazards, restore health and
 energy, apply a short visible recovery shield, reconstruct the checkpoint, and
 continue. It never invokes normal Game Over.
@@ -177,19 +186,18 @@ there is no failure copy.
 Realm instructions include icon shape and text (`PHYSICAL` / `GHOST`) as well
 as color. Current player and Wraith realms are shown together.
 
-## Lightspeed transition
+## Galaxy transit
 
-The transition is time-based, not frame-count based. Normal duration is 1.5
-seconds:
+The transition is time-based, not frame-count based. Normal duration is 2.0
+seconds and retains the game's bird's-eye view:
 
-- lock-in, 0–20%: controls stop accepting input, title UI retracts, traffic
-  fades, and the title fighter becomes the focal ship;
-- acceleration, 20–62%: camera push, depth-separated stars, engine plume, and
-  title-music fade;
-- lightspeed, 62–84%: directional streaks converge on a stable vanishing point
-  with capped cyan bloom;
-- arrival, 84–100%: streaks compress, gameplay resolves, the visible ship
-  position becomes the player position, and controls/objective fade in.
+- lock-in, 0–16%: controls stop accepting input and title UI retracts;
+- transit, 16–48%: the same galaxy field accelerates vertically beneath the
+  top-down camera while music crosses over;
+- acquisition, 48–84%: the player aircraft enters view with a growing engine
+  plume as the camera closes the distance;
+- arrival, 84–100%: streaks shorten and the rendered aircraft reaches the exact
+  gameplay position and scale before controls/objectives enable.
 
 At 30, 60, 90, and 120 Hz the elapsed-second model reaches the same stage at the
 same wall-clock time. Focus loss freezes progression safely. Reduced Motion
@@ -202,6 +210,13 @@ transition, background, particle, and music presentation; player, firing,
 waves, bosses, enemies, projectiles, collisions, score, progression, and
 active-run time remain frozen. Held keyboard and joystick state are cleared at
 completion before normal simulation begins.
+
+The first-ever onboarding route does not draw title typography, title controls,
+or patrol traffic. It opens on the ordinary galaxy, flies the local fighter into
+its starting position, and only then reveals Colonel Arisaka's transmission.
+Opening any instructor transmission clears shake, flash, keyboard, joystick,
+and ability input; rendering also suppresses residual shake until dialogue is
+closed.
 
 ## Graduation, Codex, and identity
 
