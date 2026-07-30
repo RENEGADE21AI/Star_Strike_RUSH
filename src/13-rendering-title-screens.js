@@ -25,8 +25,9 @@ function drawTitleAndButtons() {
   const rushMeasure = ctx.measureText(rush);
   const rushTargetWidth = Math.min(W - 34, Math.max(W * 0.66, rushMeasure.width));
   const rushFit = rushTargetWidth / Math.max(1, rushMeasure.width);
+  const rushOffsetY = 92;
   ctx.save();
-  ctx.translate(0, 54);
+  ctx.translate(0, rushOffsetY);
   ctx.scale(rushFit, rushFit);
   ctx.shadowColor = "rgba(255,150,70,0.65)";
   ctx.fillStyle = "#ffbd5b";
@@ -34,11 +35,27 @@ function drawTitleAndButtons() {
   ctx.fillText(rush, 0, 0);
   ctx.restore();
   ctx.restore();
+  const nameAscent = Number(nameMeasure.actualBoundingBoxAscent || 48) * nameFit;
+  const nameDescent = Number(nameMeasure.actualBoundingBoxDescent || 12) * nameFit;
+  const rushAscent = Number(rushMeasure.actualBoundingBoxAscent || 62) * rushFit;
+  const rushDescent = Number(rushMeasure.actualBoundingBoxDescent || 16) * rushFit;
+  const nameBounds = {
+    x: (W - nameTargetWidth) / 2,
+    y: titleCenterY - nameAscent,
+    w: nameTargetWidth,
+    h: nameAscent + nameDescent
+  };
+  const rushBounds = {
+    x: (W - rushTargetWidth) / 2,
+    y: titleCenterY + rushOffsetY - rushAscent,
+    w: rushTargetWidth,
+    h: rushAscent + rushDescent
+  };
   const titleLogicalBounds = {
     x: (W - nameTargetWidth) / 2,
-    y: titleCenterY - 38,
+    y: Math.min(nameBounds.y, rushBounds.y),
     w: nameTargetWidth,
-    h: 145
+    h: Math.max(nameBounds.y + nameBounds.h, rushBounds.y + rushBounds.h) - Math.min(nameBounds.y, rushBounds.y)
   };
   state.titleMetrics = {
     logicalBounds: titleLogicalBounds,
@@ -50,6 +67,9 @@ function drawTitleAndButtons() {
     },
     nameWidth: nameTargetWidth,
     rushWidth: rushTargetWidth,
+    nameBounds,
+    rushBounds,
+    lineGap: rushBounds.y - (nameBounds.y + nameBounds.h),
     playableScreenWidth: W * scale
   };
 

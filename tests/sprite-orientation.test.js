@@ -28,7 +28,7 @@ test("friendly and hostile artwork have coherent forward, weapon, and exhaust di
   const hostileKeys = [
     "red", "orange", "purple", "phantom", "splitter", "splitter_shard", "carrier", "siphon",
     "leech", "minecaster", "shieldbearer", "railgunner", "repair_drone", "boss_standard",
-    "boss_wraith", "boss_debris_warden", "boss_mothership", "boss_siphon_core", "boss_hive_breaker",
+    "boss_wraith", "boss_wraith_physical", "boss_wraith_ghost", "boss_debris_warden", "boss_mothership", "boss_siphon_core", "boss_hive_breaker",
     "boss_rail_tyrant", "boss_gravity_well"
   ];
   const player = context.SPRITE_MANIFEST.player;
@@ -66,4 +66,16 @@ test("canonical nose-up artwork is centralized instead of scattered through rend
   assert.doesNotMatch(dossierRenderer, /rotation:\s*Math\.PI/);
   assert.match(shipRenderer, /orientationContext:\s*"title"/);
   assert.match(shipRenderer, /orientationContext:\s*"codex"/);
+});
+
+test("combat fighters point into their measured movement vector", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "src/15-rendering-entities.js"), "utf8");
+  const entityContext = { console, Math, Number, globalThis: null };
+  entityContext.globalThis = entityContext;
+  vm.createContext(entityContext);
+  vm.runInContext(source, entityContext);
+  assert.equal(entityContext.enemyHeadingRotation(0, 3), 0, "downward travel uses hostile forward art");
+  assert.equal(Math.abs(entityContext.enemyHeadingRotation(0, -3)), Math.PI, "escape travel points upward");
+  assert.equal(entityContext.enemyHeadingRotation(3, 0), -Math.PI / 2, "rightward travel points right");
+  assert.doesNotMatch(source, /if \(!e\.escape\) ctx\.scale\(1,\s*-1\)/);
 });

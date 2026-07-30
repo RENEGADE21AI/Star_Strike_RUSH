@@ -23,6 +23,17 @@ test("ambient title traffic is visible, depth-calibrated, and path-reserved", ()
   assert.match(title, /function titleFormationPositionAt/);
   assert.match(render, /titleFormationVisualRadius/);
   assert.match(render, /overPrimaryUi \? 0\.04/);
+  assert.match(title, /scale:\s*\[0\.82,\s*1\.00\]/);
+  assert.doesNotMatch(title, /scale:\s*\[[^\]]*,\s*1\.(?!00)[0-9]/);
+  assert.match(title, /Math\.atan2\(after\.y - before\.y, after\.x - before\.x\) \+ Math\.PI \/ 2/);
+});
+
+test("title wordmark measures a real gap between STAR STRIKE and RUSH", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "src", "13-rendering-title-screens.js"), "utf8");
+  assert.match(source, /const rushOffsetY = 92/);
+  assert.match(source, /nameBounds/);
+  assert.match(source, /rushBounds/);
+  assert.match(source, /lineGap:/);
 });
 
 test("signed-out Pilot Dossier hides irrelevant account actions", () => {

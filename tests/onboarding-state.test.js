@@ -134,14 +134,15 @@ test("input prompts follow meaningful keyboard, touch, and pen input", () => {
 
 test("lightspeed pacing is elapsed-time based across refresh rates with accessible alternatives", () => {
   const api = loadOnboardingModule();
-  assert.equal(api.tutorialLaunchDurationSeconds(false), 1.5);
+  assert.equal(api.tutorialLaunchDurationSeconds(false), 2.0);
   assert.equal(api.tutorialLaunchDurationSeconds(true), 0.42);
   for (const hz of [30, 60, 90, 120]) {
     let elapsed = 0;
-    while (elapsed < 1.5) elapsed += 1 / hz;
+    while (elapsed < 2.0) elapsed += 1 / hz;
     const snapshot = api.tutorialLaunchSnapshot(elapsed, { reducedMotion: false, reducedFlash: false });
     assert.equal(snapshot.complete, true);
     assert.equal(snapshot.stage, "arrival");
+    assert.equal(snapshot.cameraMode, "top_down_galaxy_transit");
     assert.ok(snapshot.progress >= 1);
     assert.ok(snapshot.bloom <= 0.58);
     assert.equal(snapshot.titleUiAlpha, 0);

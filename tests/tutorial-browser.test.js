@@ -168,7 +168,8 @@ async function completeTutorial(page, mode) {
     matchingRealmDamageSeen: false
   };
   const explicitChoice = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
-  if (await explicitChoice.isVisible().catch(() => false)) await explicitChoice.click();
+  await explicitChoice.waitFor({ state: "visible" });
+  await explicitChoice.click();
   await page.getByRole("button", { name: "Begin Flight Training" }).click();
   await page.waitForFunction(() => {
     const data = JSON.parse(document.querySelector("#debugSnapshot").textContent);
