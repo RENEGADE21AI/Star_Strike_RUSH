@@ -356,12 +356,18 @@ async function runCase(browser, baseUrl, item) {
       getAssetLoadState().ready === true &&
       !getAssetLoadState().failed.includes("tutorial_instructor")
     ));
-    await page.waitForTimeout(60);
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
+      return current.tutorial?.uiMode === "first_time_question"
+        && current.tutorial?.introFlight?.active === false;
+    });
     evidence.after = await snapshot(page);
     if (evidence.after.tutorial?.uiMode !== "first_time_question") errors.push("first-time question was not active");
     if (!evidence.after.layout.onboardingPanel) errors.push("onboarding panel bounds were not exposed");
     const yes = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
     const no = page.getByRole("button", { name: "NO — GO TO TITLE" });
+    await yes.waitFor({ state: "visible" });
+    await no.waitFor({ state: "visible" });
     if (!(await yes.isVisible())) errors.push("YES action was not accessible");
     if (!(await no.isVisible())) errors.push("NO action was not accessible");
     if ((await page.getByRole("status").textContent()) !== "COLONEL ARISAKA: Is this your first time here, pilot?") {
