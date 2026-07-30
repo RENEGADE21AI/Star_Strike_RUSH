@@ -2,6 +2,11 @@ const ONBOARDING_STORAGE_KEY = "star_strike_rush_onboarding_v1";
 const ONBOARDING_SCHEMA_VERSION = 1;
 const ONBOARDING_TUTORIAL_VERSION = 1;
 const ONBOARDING_STATUSES = Object.freeze(["unseen", "in_progress", "completed", "skipped"]);
+const TUTORIAL_INSTRUCTOR = Object.freeze({
+  name: "COLONEL ARISAKA",
+  title: "SENIOR FLIGHT INSTRUCTOR",
+  firstQuestion: "Is this your first time here, pilot?"
+});
 const TUTORIAL_STEP_IDS = Object.freeze([
   "incoming",
   "lightspeed",
@@ -41,7 +46,6 @@ function makeDefaultOnboardingState(nowMs = Date.now()) {
     startedAtMs: 0,
     updatedAtMs: onboardingTimestamp(nowMs),
     completedAtMs: 0,
-    existingPlayerOfferDismissed: false,
     accountOfferShown: false,
     codexGraduationApplied: false
   };
@@ -57,35 +61,24 @@ function sanitizeOnboardingState(raw, nowMs = Date.now()) {
   state.startedAtMs = onboardingTimestamp(source.startedAtMs);
   state.updatedAtMs = onboardingTimestamp(source.updatedAtMs, nowMs);
   state.completedAtMs = onboardingTimestamp(source.completedAtMs);
-  state.existingPlayerOfferDismissed = source.existingPlayerOfferDismissed === true;
   state.accountOfferShown = source.accountOfferShown === true;
   state.codexGraduationApplied = source.codexGraduationApplied === true;
   if (state.status !== "completed") state.completedAtMs = 0;
   return state;
 }
 
-function positiveNumber(value) {
-  return Number.isFinite(Number(value)) && Number(value) > 0;
-}
-
-function hasMeaningfulLocalProgress(snapshot = {}) {
-  const meta = snapshot.meta && typeof snapshot.meta === "object" ? snapshot.meta : {};
-  const season = meta.currentSeason && typeof meta.currentSeason === "object" ? meta.currentSeason : {};
-  const lifetime = meta.lifetime && typeof meta.lifetime === "object" ? meta.lifetime : {};
-  if (positiveNumber(snapshot.highScore) || positiveNumber(meta.totalGlory) || positiveNumber(meta.credits) || positiveNumber(season.xp)) return true;
-  if (Array.isArray(season.claimedRewardIds) && season.claimedRewardIds.length > 0) return true;
-  if (["runs", "score", "kills", "bosses", "powerups", "ghostUses", "bestScore"].some((key) => positiveNumber(lifetime[key]))) return true;
-  if (Array.isArray(snapshot.achievementIds) && snapshot.achievementIds.length > 0) return true;
-  return !!(snapshot.codex && typeof snapshot.codex === "object" && Object.values(snapshot.codex).some(Boolean));
-}
-
 function onboardingRoute(options = {}) {
-  if (!options.storedState) {
-    return hasMeaningfulLocalProgress(options.progress || {}) ? "existing_player_notice" : "first_flight_offer";
-  }
+  if (!options.storedState) return "first_time_question";
   const state = sanitizeOnboardingState(options.storedState);
   if (state.status === "in_progress") return "resume_training";
   return "title";
+}
+
+function postTutorialIdentityRoute(options = {}) {
+  if (options.replay === true) return "title";
+  if (options.signedIn !== true) return "post_callsign";
+  if (options.pendingCallSign === true || options.failedCallSign === true) return "post_callsign";
+  return String(options.handle || "").trim() ? "identity_confirmed" : "post_handle";
 }
 
 function transitionOnboardingState(current, event = {}, nowMs = Date.now()) {
@@ -109,8 +102,6 @@ function transitionOnboardingState(current, event = {}, nowMs = Date.now()) {
     next.status = "completed";
     next.checkpoint = "graduation";
     next.completedAtMs = onboardingTimestamp(nowMs);
-  } else if (event.type === "dismiss_existing_offer") {
-    next.existingPlayerOfferDismissed = true;
   } else if (event.type === "account_offer_shown") {
     next.accountOfferShown = true;
   } else if (event.type === "codex_graduation_applied") {
@@ -188,11 +179,12 @@ Object.assign(globalThis, {
   ONBOARDING_STORAGE_KEY,
   ONBOARDING_SCHEMA_VERSION,
   ONBOARDING_TUTORIAL_VERSION,
+  TUTORIAL_INSTRUCTOR,
   TUTORIAL_STEP_IDS,
   makeDefaultOnboardingState,
   sanitizeOnboardingState,
-  hasMeaningfulLocalProgress,
   onboardingRoute,
+  postTutorialIdentityRoute,
   transitionOnboardingState,
   tutorialStepForCheckpoint,
   tutorialInputPrompt,

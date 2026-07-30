@@ -44,10 +44,22 @@ function clearGameplayInput() {
   state.joystick.ax = 0;
   state.joystick.ay = 0;
 }
+function currentGameplayPolicyContext() {
+  return {
+    gameState: state.gameState,
+    transitionMode: state.sceneTransition && state.sceneTransition.mode,
+    tutorialDialogueVisible: state.runMode === "tutorial" && !!(tutorialDirector && tutorialDirector.dialogueVisible)
+  };
+}
+function currentGameplayControlEnabled() {
+  return typeof gameplayControlEnabled === "function"
+    ? gameplayControlEnabled(currentGameplayPolicyContext())
+    : state.gameState === "playing";
+}
 function pauseGame(reason = "manual") {
   if (state.gameState !== "playing" && state.gameState !== "resuming") return false;
   const decision = typeof pauseHealthDecision === "function"
-    ? pauseHealthDecision(state.player, reason)
+    ? pauseHealthDecision(state.player, reason, state.runMode)
     : { allowed: true, cost: 0, remainingHp: state.player.hp, message: "" };
   if (!decision.allowed) {
     state.pauseNotice = decision.message;
@@ -300,6 +312,10 @@ canvas.addEventListener("pointerdown", (e) => {
   }
   if (state.gameState === "playing") {
     if (hitRect(getPauseButtonRect(), x, y)) { pauseGame("manual"); return; }
+    if (!currentGameplayControlEnabled()) {
+      clearGameplayInput();
+      return;
+    }
     const pointerKind = e.pointerType === "touch" || e.pointerType === "pen" ? e.pointerType : "mouse_down";
     const nextMode = nextGameplayInputMode(state.inputMode, pointerKind, Date.now(), state.lastTouchAt, e.buttons || 1);
     state.inputMode = nextMode.mode;
@@ -307,6 +323,7 @@ canvas.addEventListener("pointerdown", (e) => {
     state.inputHintTimer = 144;
   }
   if (state.gameState !== "playing") {
+    if (state.gameState === "start" && typeof onboardingUiMode !== "undefined" && onboardingUiMode !== "none") return;
     if (handleTitlePointerDown(x, y, e.pointerId)) { e.preventDefault(); return; }
     return;
   }
@@ -341,6 +358,10 @@ canvas.addEventListener("pointermove", (e) => {
       const respawnRect = getGameOverButtons().respawn;
       respawnPointerInside = hitRect(respawnRect, x, y);
     }
+    return;
+  }
+  if (!currentGameplayControlEnabled()) {
+    clearGameplayInput();
     return;
   }
   if (e.pointerType === "touch" || e.pointerType === "pen" || (e.pointerType === "mouse" && e.buttons)) {
@@ -455,6 +476,17 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   const k = e.key;
+  if (state.gameState === "start" && typeof onboardingUiMode !== "undefined" && onboardingUiMode !== "none") {
+    const focusedAction = document.activeElement && document.activeElement.dataset
+      ? document.activeElement.dataset.onboardingAction
+      : "";
+    if ((k === "Enter" || k === " ") && focusedAction) return;
+    if (k === "Escape") {
+      e.preventDefault();
+      return;
+    }
+    return;
+  }
   if ((state.gameState === "paused" || state.gameState === "resuming") && k === "Escape") {
     e.preventDefault();
     if (state.gameState === "paused") resumeGame();
@@ -498,6 +530,11 @@ window.addEventListener("keydown", (e) => {
     }
     const action = typeof gameplayActionForKey === "function" ? gameplayActionForKey(k) : (isMoveKey(k) ? "move" : null);
     if (action === "pause") { e.preventDefault(); pauseGame("manual"); return; }
+    if (!currentGameplayControlEnabled()) {
+      if (action) e.preventDefault();
+      clearGameplayInput();
+      return;
+    }
     if (action) {
       const nextMode = nextGameplayInputMode(state.inputMode, "keyboard", Date.now(), state.lastTouchAt, 0);
       state.inputMode = nextMode.mode;
@@ -586,6 +623,19 @@ function update() {
     return;
   }
 
+  if (state.sceneTransition.mode === "game_arrival") {
+    state.sceneTransition.frame++;
+    state.sceneTransition.elapsedSeconds = Number(state.sceneTransition.elapsedSeconds || 0) + SIMULATION_STEP_MS / 1000;
+    updateStars();
+    updateParticles();
+    if (state.sceneTransition.elapsedSeconds >= state.sceneTransition.durationSeconds) {
+      clearGameplayInput();
+      state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
+      if (state.runMode === "tutorial" && tutorialRuntime) tutorialRuntime.stepStartFrame = state.frame;
+    }
+    return;
+  }
+
   if (
     state.runMode === "tutorial" &&
     typeof tutorialSimulationPaused === "function" &&
@@ -597,11 +647,6 @@ function update() {
   }
 
   state.runStats.activeFrames = Math.max(0, Math.floor(state.runStats.activeFrames || 0)) + 1;
-  if (state.sceneTransition.mode === "game_arrival") {
-    state.sceneTransition.frame++;
-    state.sceneTransition.elapsedSeconds = Number(state.sceneTransition.elapsedSeconds || 0) + SIMULATION_STEP_MS / 1000;
-    if (state.sceneTransition.elapsedSeconds >= state.sceneTransition.durationSeconds) state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
-  }
   state.framesSinceLastDrop++;
   state.inputHintTimer = Math.max(0, (state.inputHintTimer || 0) - 1);
   if (state.powerupDropCooldown > 0) state.powerupDropCooldown--;
@@ -799,6 +844,8 @@ function getDebugSnapshot() {
       pause: debugScreenRect(typeof getPauseButtonRect === "function" ? getPauseButtonRect() : null),
       hud: typeof getGameplayHudLayout === "function" ? getGameplayHudLayout() : null,
       onboardingPanel: debugScreenRect(typeof getOnboardingPanelRect === "function" ? getOnboardingPanelRect() : null),
+      onboardingPortrait: debugScreenRect(typeof getOnboardingInstructorPortraitRect === "function" ? getOnboardingInstructorPortraitRect() : null),
+      onboardingQuestion: debugScreenRect(typeof getOnboardingQuestionRect === "function" ? getOnboardingQuestionRect() : null),
       tutorialDialogue: debugScreenRect(
         typeof getTutorialDialogueRect === "function" && state.runMode === "tutorial" && tutorialDirector?.dialogueVisible
           ? getTutorialDialogueRect()
@@ -830,7 +877,11 @@ function getDebugSnapshot() {
       mode: state.inputMode,
       action: actionProfile.label,
       hintTimer: state.inputHintTimer,
-      touchControlsVisible: typeof touchControlsVisible === "function" ? touchControlsVisible(state.inputMode, state.gameState) : null
+      touchControlsVisible: typeof touchControlsVisible === "function" ? touchControlsVisible(state.inputMode, state.gameState) : null,
+      gameplayControlEnabled: currentGameplayControlEnabled(),
+      gameplaySimulationEnabled: typeof gameplaySimulationEnabled === "function"
+        ? gameplaySimulationEnabled(currentGameplayPolicyContext())
+        : state.gameState === "playing"
     },
     encounter: {
       bossMode: state.boss ? state.boss.mode : null,
@@ -911,14 +962,15 @@ function applyDevelopmentQaScenario() {
     scenario === "tutorial" ||
     scenario === "tutorial-resume" ||
     scenario === "tutorial-post" ||
-    scenario === "tutorial-post-callsign"
+    scenario === "tutorial-post-callsign" ||
+    scenario === "tutorial-identity-confirmed"
   ) {
     if (scenario === "tutorial-resume") {
       localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(transitionOnboardingState(
         makeDefaultOnboardingState(),
         { type: "checkpoint", checkpoint: "before_wraith" }
       )));
-    } else if (scenario === "tutorial-post" || scenario === "tutorial-post-callsign") {
+    } else if (scenario === "tutorial-post" || scenario === "tutorial-post-callsign" || scenario === "tutorial-identity-confirmed") {
       localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(transitionOnboardingState(
         makeDefaultOnboardingState(),
         { type: "complete" }
@@ -938,9 +990,13 @@ function applyDevelopmentQaScenario() {
       window.addEventListener("DOMContentLoaded", () => {
         beginTutorialTraining({ stepId: tutorialStepMap[tutorialStep] || tutorialStep });
       }, { once: true });
-    } else if (scenario === "tutorial-post" || scenario === "tutorial-post-callsign") {
+    } else if (scenario === "tutorial-post" || scenario === "tutorial-post-callsign" || scenario === "tutorial-identity-confirmed") {
       window.addEventListener("DOMContentLoaded", () => {
-        onboardingUiMode = scenario === "tutorial-post-callsign" ? "post_callsign" : "post_identity";
+        onboardingUiMode = scenario === "tutorial-post-callsign"
+          ? "post_callsign"
+          : scenario === "tutorial-identity-confirmed"
+            ? "identity_confirmed"
+            : "post_identity";
         renderOnboardingAccessibleMode();
       }, { once: true });
     }

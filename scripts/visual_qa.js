@@ -41,10 +41,15 @@ const cases = [
   { name: "paused-hud-375x667", width: 375, height: 667, kind: "paused-hud" },
   { name: "debris-staging", width: 375, height: 667, kind: "scenario", scenario: "debris-incoming" },
   { name: "powerup-gallery", width: 390, height: 844, kind: "scenario", scenario: "powerups" },
-  { name: "first-flight-incoming-desktop", width: 1440, height: 900, kind: "tutorial-offer", scenario: "tutorial" },
-  { name: "first-flight-incoming-mobile", width: 390, height: 844, kind: "tutorial-offer", scenario: "tutorial", touch: true },
+  { name: "first-flight-question-375x667", width: 375, height: 667, kind: "tutorial-question", scenario: "tutorial", touch: true },
+  { name: "first-flight-question-390x844", width: 390, height: 844, kind: "tutorial-question", scenario: "tutorial", touch: true },
+  { name: "first-flight-question-430x932", width: 430, height: 932, kind: "tutorial-question", scenario: "tutorial", touch: true },
+  { name: "first-flight-question-1440x900", width: 1440, height: 900, kind: "tutorial-question", scenario: "tutorial" },
+  { name: "colonel-arisaka-call-sign-briefing", width: 390, height: 844, kind: "tutorial-prelaunch", scenario: "tutorial", touch: true },
   { name: "tutorial-navigation", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "movement", touch: true },
   { name: "tutorial-ghost-shift", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "ghost", touch: true, activate: true },
+  { name: "tutorial-evasion-retry", width: 390, height: 844, kind: "tutorial-retry", scenario: "tutorial", step: "evasion", touch: true },
+  { name: "tutorial-ghost-retry", width: 390, height: 844, kind: "tutorial-retry", scenario: "tutorial", step: "ghost", touch: true },
   { name: "tutorial-powerup", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "powerup", touch: true, activate: true },
   { name: "tutorial-command-ship", width: 1440, height: 900, kind: "tutorial-step", scenario: "tutorial", step: "command-boss", activate: true },
   { name: "tutorial-wraith-briefing", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "wraith", touch: true },
@@ -52,6 +57,8 @@ const cases = [
   { name: "tutorial-graduation", width: 1440, height: 900, kind: "tutorial-step", scenario: "tutorial", step: "graduation", complete: true },
   { name: "tutorial-call-sign-confirmation", width: 390, height: 844, kind: "tutorial-callsign", scenario: "tutorial-post-callsign", touch: true },
   { name: "tutorial-account-offer", width: 390, height: 844, kind: "tutorial-account", scenario: "tutorial-post", touch: true },
+  { name: "tutorial-identity-confirmed", width: 390, height: 844, kind: "tutorial-identity-confirmed", scenario: "tutorial-identity-confirmed", touch: true },
+  { name: "tutorial-arrival-input-lock", width: 390, height: 844, kind: "tutorial-arrival-lock", scenario: "tutorial", touch: true },
   { name: "tutorial-launch-desktop", width: 1440, height: 900, kind: "tutorial-launch", scenario: "tutorial" },
   { name: "tutorial-launch-mobile", width: 390, height: 844, kind: "tutorial-launch", scenario: "tutorial", touch: true },
   { name: "tutorial-launch-reduced-motion", width: 390, height: 844, kind: "tutorial-launch", scenario: "tutorial", touch: true, reduced: true },
@@ -316,12 +323,34 @@ async function runCase(browser, baseUrl, item) {
       if (!boss || boss.damageable || boss.hp !== boss.maxHp) errors.push("incoming boss was damageable");
     }
     if (item.scenario === "powerups" && before.counts.powerups !== 13) errors.push("powerup gallery did not show all 13 powerups");
-  } else if (item.kind === "tutorial-offer") {
+  } else if (item.kind === "tutorial-question") {
     evidence.after = await snapshot(page);
-    if (evidence.after.tutorial?.uiMode !== "first_flight_offer") errors.push("first-flight offer was not active");
+    if (evidence.after.tutorial?.uiMode !== "first_time_question") errors.push("first-time question was not active");
     if (!evidence.after.layout.onboardingPanel) errors.push("onboarding panel bounds were not exposed");
-    if (!(await page.getByRole("button", { name: "Begin Flight Training" }).isVisible())) errors.push("training action was not accessible");
-    if (!(await page.getByRole("button", { name: "Skip For Now" }).isVisible())) errors.push("skip action was not accessible");
+    const yes = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
+    const no = page.getByRole("button", { name: "NO — GO TO TITLE" });
+    if (!(await yes.isVisible())) errors.push("YES action was not accessible");
+    if (!(await no.isVisible())) errors.push("NO action was not accessible");
+    if ((await page.getByRole("status").textContent()) !== "COLONEL ARISAKA: Is this your first time here, pilot?") {
+      errors.push("first-time question copy was not exact");
+    }
+    const portrait = evidence.after.layout.onboardingPortrait;
+    const question = evidence.after.layout.onboardingQuestion;
+    if (!portrait || !question) errors.push("portrait or question bounds were not exposed");
+    else if (!(portrait.y + portrait.h <= question.y)) errors.push("placeholder overlaps the first-time question");
+    for (const [name, button] of [["YES", yes], ["NO", no]]) {
+      const bounds = await button.boundingBox();
+      if (!bounds || bounds.x < 0 || bounds.y < 0 || bounds.x + bounds.width > item.width || bounds.y + bounds.height > item.height) {
+        errors.push(`${name} button leaves the viewport`);
+      }
+    }
+  } else if (item.kind === "tutorial-prelaunch") {
+    await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).click();
+    await page.getByRole("button", { name: "Begin Flight Training" }).waitFor();
+    evidence.after = await snapshot(page);
+    if (evidence.after.tutorial?.uiMode !== "prelaunch_briefing") errors.push("call-sign prelaunch briefing was not active");
+    if (!(await page.getByRole("button", { name: "Edit Call Sign" }).isVisible())) errors.push("call-sign edit was not accessible");
+    if ((await page.getByRole("status").textContent()).includes("Vega")) errors.push("stale instructor name was visible");
   } else if (item.kind === "tutorial-step") {
     await page.waitForFunction((step) => {
       const state = JSON.parse(document.querySelector("#debugSnapshot").textContent);
@@ -357,6 +386,36 @@ async function runCase(browser, baseUrl, item) {
     if (item.complete && tutorial.tutorial?.onboarding?.status !== "completed") errors.push("graduation did not persist completion");
     if (item.step === "command-boss" && tutorial.encounter.boss && !tutorial.encounter.boss.tutorialOverride) errors.push("Command Ship lacks tutorial override");
     if (item.step === "realm_practice" && (!tutorial.encounter.boss || tutorial.encounter.boss.realm == null)) errors.push("realm practice lacks a realm target");
+  } else if (item.kind === "tutorial-retry") {
+    const button = page.getByRole("button", { name: "Continue" });
+    await button.click();
+    if (await button.isVisible()) await button.click();
+    await page.waitForTimeout(120);
+    if (item.step === "evasion") {
+      await page.evaluate(() => { state.runStats.damageTaken += 1; });
+    } else {
+      await page.evaluate(() => {
+        tutorialRuntime.ghostPreviousX = tutorialRuntime.plan.ghost_shift.laneX - 2;
+        state.player.x = tutorialRuntime.plan.ghost_shift.laneX + 2;
+        state.player.ghostTimer = 0;
+      });
+    }
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return current.tutorial?.director?.dialogueVisible === true;
+    });
+    evidence.after = await snapshot(page);
+    const correction = await page.getByRole("status").textContent();
+    if (item.step === "evasion" && !/lane was live/i.test(correction)) errors.push("evasion correction was not shown");
+    if (item.step === "ghost" && !/Ghost must cover/i.test(correction)) errors.push("Ghost correction was not shown");
+    const health = evidence.after.layout.hud?.health;
+    if (
+      health &&
+      evidence.after.player.x >= health.x - 14 &&
+      evidence.after.player.x <= health.x + health.w + 14 &&
+      evidence.after.player.y >= health.y - 14 &&
+      evidence.after.player.y <= health.y + health.h + 14
+    ) errors.push("lesson retry places the fighter over the Health HUD");
   } else if (item.kind === "tutorial-callsign") {
     const callSign = await snapshot(page);
     evidence.after = callSign;
@@ -369,7 +428,26 @@ async function runCase(browser, baseUrl, item) {
     if (account.tutorial?.uiMode !== "post_identity") errors.push("post-flight identity offer was not active");
     if (!(await page.getByRole("button", { name: "Connect Google Account" }).isVisible())) errors.push("Google identity option was not accessible");
     if (!(await page.getByRole("button", { name: "Continue With Device Pilot" }).isVisible())) errors.push("device pilot option was not accessible");
+  } else if (item.kind === "tutorial-identity-confirmed") {
+    const account = await snapshot(page);
+    evidence.after = account;
+    if (account.tutorial?.uiMode !== "identity_confirmed") errors.push("identity-confirmed graduation was not active");
+    if (!(await page.getByRole("button", { name: "Enter Hangar" }).isVisible())) errors.push("Enter Hangar was not accessible");
+    if (await page.getByRole("button", { name: "Connect Google Account" }).isVisible().catch(() => false)) errors.push("redundant Google connection was visible");
+    if (await page.getByRole("button", { name: "Claim Unique Handle" }).isVisible().catch(() => false)) errors.push("redundant handle claim was visible");
+  } else if (item.kind === "tutorial-arrival-lock") {
+    await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).click();
+    await page.getByRole("button", { name: "Begin Flight Training" }).click();
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return current.runMode === "tutorial" && current.transition.mode === "game_arrival";
+    });
+    evidence.after = await snapshot(page);
+    if (evidence.after.input.gameplayControlEnabled !== false) errors.push("arrival left gameplay controls enabled");
+    if (evidence.after.input.gameplaySimulationEnabled !== false) errors.push("arrival left gameplay simulation enabled");
   } else if (item.kind === "tutorial-launch") {
+    const yes = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
+    if (await yes.isVisible().catch(() => false)) await yes.click();
     await page.getByRole("button", { name: "Begin Flight Training" }).click();
     const launchHandle = await page.waitForFunction(() => {
       const state = JSON.parse(document.querySelector("#debugSnapshot").textContent);

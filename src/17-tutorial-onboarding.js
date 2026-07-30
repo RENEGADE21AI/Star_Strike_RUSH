@@ -8,6 +8,7 @@ let tutorialDom = null;
 let tutorialSkipReturnMode = "title";
 let tutorialLiveSignature = "";
 let onboardingAccountPulseFrames = 0;
+let onboardingPersistenceWarning = false;
 
 function loadOnboardingStateFromDevice() {
   try {
@@ -22,19 +23,12 @@ function saveOnboardingStateToDevice(nextState) {
   onboardingState = sanitizeOnboardingState(nextState);
   try {
     localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(onboardingState));
+    onboardingPersistenceWarning = false;
     return true;
   } catch {
+    onboardingPersistenceWarning = true;
     return false;
   }
-}
-
-function localProgressForOnboarding() {
-  return {
-    highScore: typeof getLocalHighScore === "function" ? getLocalHighScore() : 0,
-    meta: typeof getMetaProgress === "function" ? getMetaProgress() : {},
-    achievementIds: typeof getLocalAchievementIds === "function" ? getLocalAchievementIds() : [],
-    codex: typeof codexDiscovered === "object" ? codexDiscovered : {}
-  };
 }
 
 function createTutorialDom() {
@@ -133,7 +127,7 @@ function beginTutorialTraining(options = {}) {
   onboardingUiMode = "none";
   const requestedStep = options.stepId || tutorialStepForCheckpoint(onboardingState.checkpoint);
   pendingTutorialStep = requestedStep === "incoming" || requestedStep === "lightspeed" ? "movement" : requestedStep;
-  hideTutorialAccessibleSurface("Colonel Vega: Training launch initiated.");
+  hideTutorialAccessibleSurface(`${TUTORIAL_INSTRUCTOR.name}: Training launch initiated.`);
   if (typeof prepareGameplayMusic === "function") prepareGameplayMusic();
   if (typeof playGameSound === "function") playGameSound("launch", 0.9);
   titlePanelTarget = 0;
@@ -147,6 +141,24 @@ function beginTutorialTraining(options = {}) {
   state.lastTitleLaunchDurationSeconds = state.sceneTransition.durationSeconds;
   state.lastTitleLaunchReducedMotion = settingReducedMotion === true;
   clearGameplayInput();
+}
+
+function chooseFirstFlightRoute(startTraining) {
+  onboardingState = transitionOnboardingState(
+    onboardingState || makeDefaultOnboardingState(),
+    { type: startTraining ? "begin" : "skip" }
+  );
+  const stored = saveOnboardingStateToDevice(onboardingState);
+  if (startTraining) {
+    onboardingUiMode = "prelaunch_briefing";
+    renderOnboardingAccessibleMode();
+    return;
+  }
+  onboardingUiMode = "none";
+  hideTutorialAccessibleSurface(
+    stored ? "First Flight choice saved." : "Continuing to title. Onboarding choice could not be stored."
+  );
+  setupSession("start");
 }
 
 function skipTutorialTraining() {
@@ -169,7 +181,7 @@ function requestSkipTutorialTraining(returnMode = "title") {
         handler: () => {
           if (tutorialSkipReturnMode === "pause") showTutorialPauseAccessibility();
           else {
-            onboardingUiMode = "first_flight_offer";
+            onboardingUiMode = "prelaunch_briefing";
             renderOnboardingAccessibleMode();
           }
         }
@@ -186,27 +198,39 @@ function requestSkipTutorialTraining(returnMode = "title") {
   );
 }
 
-function dismissExistingPlayerTrainingOffer() {
-  onboardingState = transitionOnboardingState(onboardingState || makeDefaultOnboardingState(), { type: "dismiss_existing_offer" });
-  saveOnboardingStateToDevice(onboardingState);
-  onboardingUiMode = "none";
-  hideTutorialAccessibleSurface("First Flight training remains available in Settings.");
-}
-
 function renderOnboardingAccessibleMode() {
   const callSignText = String(callSign || "CADET");
-  if (onboardingUiMode === "first_flight_offer") {
+  if (onboardingUiMode === "first_time_question") {
     setTutorialAccessibleSurface(
-      `Incoming transmission. Colonel Vega: Command has you listed as ${callSignText}. Begin First Flight training or skip for now.`,
+      `${TUTORIAL_INSTRUCTOR.name}: ${TUTORIAL_INSTRUCTOR.firstQuestion}`,
+      [
+        {
+          label: "YES — START FIRST FLIGHT",
+          action: "first-flight-yes",
+          primary: true,
+          handler: () => chooseFirstFlightRoute(true)
+        },
+        {
+          label: "NO — GO TO TITLE",
+          action: "first-flight-no",
+          handler: () => chooseFirstFlightRoute(false)
+        }
+      ]
+    );
+  } else if (onboardingUiMode === "prelaunch_briefing") {
+    const persistenceNotice = onboardingPersistenceWarning
+      ? " Device storage is unavailable; this session will continue."
+      : "";
+    setTutorialAccessibleSurface(
+      `Incoming transmission. ${TUTORIAL_INSTRUCTOR.name}: Command has you listed as ${callSignText}.${persistenceNotice}`,
       [
         { label: "Begin Flight Training", action: "begin", primary: true, handler: () => beginTutorialTraining() },
-        { label: "Edit Call Sign", action: "edit-call-sign", handler: beginCallSignEditing },
-        { label: "Skip For Now", action: "skip", handler: () => requestSkipTutorialTraining("title") }
+        { label: "Edit Call Sign", action: "edit-call-sign", handler: beginCallSignEditing }
       ]
     );
   } else if (onboardingUiMode === "resume_training") {
     setTutorialAccessibleSurface(
-      `Colonel Vega: Training checkpoint ${onboardingState.checkpoint} is ready.`,
+      `${TUTORIAL_INSTRUCTOR.name}: Training checkpoint ${onboardingState.checkpoint} is ready.`,
       [
         {
           label: "Resume Training",
@@ -218,17 +242,9 @@ function renderOnboardingAccessibleMode() {
         { label: "Skip For Now", action: "skip", handler: () => requestSkipTutorialTraining("title") }
       ]
     );
-  } else if (onboardingUiMode === "existing_player_notice") {
-    setTutorialAccessibleSurface(
-      "First Flight training is now available.",
-      [
-        { label: "Start Training", action: "begin", primary: true, handler: () => beginTutorialTraining() },
-        { label: "Later", action: "later", handler: dismissExistingPlayerTrainingOffer }
-      ]
-    );
   } else if (onboardingUiMode === "post_callsign") {
     setTutorialAccessibleSurface(
-      `Colonel Vega: Confirm call sign ${callSign}. It becomes public only when an account is connected.`,
+      `${TUTORIAL_INSTRUCTOR.name}: Confirm call sign ${callSign}. It becomes public only when an account is connected.`,
       [
         { label: "Confirm Call Sign", action: "confirm-call-sign", primary: true, handler: showPostTutorialIdentityChoice },
         { label: "Edit Call Sign", action: "edit-call-sign", handler: beginCallSignEditing }
@@ -244,11 +260,16 @@ function renderOnboardingAccessibleMode() {
     );
   } else if (onboardingUiMode === "post_handle") {
     setTutorialAccessibleSurface(
-      "A unique public handle is account-bound and can currently be claimed only once.",
+      "Pilot identity active. A unique public handle is account-bound and can currently be claimed only once.",
       [
         { label: "Claim Unique Handle", action: "claim-handle", primary: true, handler: beginHandleEditing },
-        { label: "Claim Later In Pilot Dossier", action: "handle-later", handler: enterPostTutorialHangar }
+        { label: "Claim Later", action: "handle-later", handler: enterPostTutorialHangar }
       ]
+    );
+  } else if (onboardingUiMode === "identity_confirmed") {
+    setTutorialAccessibleSurface(
+      "PILOT IDENTITY CONFIRMED",
+      [{ label: "Enter Hangar", action: "enter-hangar", primary: true, handler: () => enterPostTutorialHangar(false) }]
     );
   } else if (onboardingUiMode === "skip_confirm") {
     // requestSkipTutorialTraining owns the confirmation controls so it can
@@ -264,7 +285,7 @@ function initializeOnboardingExperience(options = {}) {
   const debugBypass = options.debugBypass === true;
   onboardingUiMode = debugBypass
     ? "none"
-    : onboardingRoute({ storedState: stored, progress: localProgressForOnboarding() });
+    : onboardingRoute({ storedState: stored });
   renderOnboardingAccessibleMode();
   return onboardingUiMode;
 }
@@ -327,6 +348,9 @@ function tutorialSnapshot() {
     runtime: tutorialRuntime ? {
       beaconIndex: tutorialRuntime.beaconIndex,
       controlledWaveIndex: tutorialRuntime.controlledWaveIndex,
+      evasionCrossed: tutorialRuntime.evasionCrossed === true,
+      evasionVolleyId: tutorialRuntime.evasionVolleyId || "",
+      ghostLanePhased: tutorialRuntime.ghostLanePhased === true,
       realmThreatAvoided: tutorialRuntime.realmThreatAvoided,
       realmsMatched: tutorialRuntime.realmsMatched,
       matchingRealmDamage: tutorialRuntime.matchingRealmDamage,
@@ -348,6 +372,7 @@ function enterTutorialStep(stepId) {
   tutorialRuntime.ghostUsesStart = state.runStats.ghostUses;
   tutorialRuntime.realmHopsStart = state.runStats.realmHops;
   tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0;
+  if (typeof clearGameplayInput === "function") clearGameplayInput();
   if (tutorialDirector.dialogueVisible && typeof playGameSound === "function") playGameSound("ui", 0.42);
   updateTutorialLiveRegion();
 }
@@ -360,7 +385,7 @@ function updateTutorialLiveRegion() {
     ? tutorialInputPrompt(state.inputMode, definition.objectiveKind)
     : "";
   const message = tutorialDirector.dialogueVisible
-    ? `Colonel Vega. ${lines}`
+    ? `${TUTORIAL_INSTRUCTOR.name}. ${lines}`
     : `${definition.objective}. ${prompt}`;
   const dom = createTutorialDom();
   const signature = `${tutorialDirector.stepId}|${tutorialDirector.dialogueVisible}|${state.inputMode}|${message}`;
@@ -386,21 +411,34 @@ function advanceTutorialDialogue() {
     return true;
   }
   if (tutorialDirector.stepId === "graduation" && tutorialDirector.completed) {
+    if (typeof clearGameplayInput === "function") clearGameplayInput();
     tutorialDirector.dialogueVisible = false;
-    if (tutorialRuntime && tutorialRuntime.replay) enterPostTutorialHangar(false);
-    else beginPostTutorialIdentityFlow();
+    beginPostTutorialIdentityFlow();
     return true;
   }
+  if (typeof clearGameplayInput === "function") clearGameplayInput();
   tutorialDirector.dialogueReveal = 1;
   tutorialDirector.dialogueVisible = false;
   activateTutorialStep();
+  if (typeof clearGameplayInput === "function") clearGameplayInput();
   updateTutorialLiveRegion();
   return true;
 }
 
 function beginPostTutorialIdentityFlow() {
   setupSession("start");
-  onboardingUiMode = "post_callsign";
+  const account = accountIdentitySnapshot();
+  onboardingUiMode = postTutorialIdentityRoute({
+    replay: tutorialRuntime && tutorialRuntime.replay,
+    signedIn: !!account.user,
+    handle: account.profileHandle,
+    pendingCallSign: account.pendingCallSign === true,
+    failedCallSign: callSignSaveState === "error"
+  });
+  if (onboardingUiMode === "title") {
+    enterPostTutorialHangar(false);
+    return;
+  }
   onboardingState = transitionOnboardingState(onboardingState, { type: "account_offer_shown" });
   saveOnboardingStateToDevice(onboardingState);
   renderOnboardingAccessibleMode();
@@ -408,7 +446,16 @@ function beginPostTutorialIdentityFlow() {
 
 function showPostTutorialIdentityChoice() {
   if (callSignEditing) commitCallSignDraft(true);
-  onboardingUiMode = "post_identity";
+  const account = accountIdentitySnapshot();
+  onboardingUiMode = account.user
+    ? postTutorialIdentityRoute({
+      replay: false,
+      signedIn: true,
+      handle: account.profileHandle,
+      pendingCallSign: false,
+      failedCallSign: false
+    })
+    : "post_identity";
   renderOnboardingAccessibleMode();
 }
 
@@ -424,7 +471,12 @@ function connectPostTutorialIdentity() {
   Promise.resolve(online.signIn()).then(() => {
     const snapshot = typeof online.getState === "function" ? online.getState() : {};
     if (snapshot.user) {
-      onboardingUiMode = "post_handle";
+      onboardingUiMode = postTutorialIdentityRoute({
+        replay: false,
+        signedIn: true,
+        handle: snapshot.profileHandle,
+        pendingCallSign: snapshot.pendingCallSign === true
+      });
       renderOnboardingAccessibleMode();
     } else {
       dom.live.textContent = "Identity connection was not completed. Device play remains ready.";
@@ -465,15 +517,33 @@ function activateTutorialStep() {
     }
     tutorialDirector.objectiveTarget = 3;
   } else if (step === "evasion") {
-    state.player.x = 78;
+    state.player.x = 145;
+    tutorialRuntime.evasionStartX = state.player.x;
+    tutorialRuntime.evasionStartSide = "left";
+    tutorialRuntime.evasionTargetSide = "right";
+    tutorialRuntime.evasionLaneX = 220;
+    tutorialRuntime.evasionDamageTakenStart = state.runStats.damageTaken;
+    tutorialRuntime.evasionVolleyId = `evasion-${state.frame}`;
+    tutorialRuntime.evasionVolleyActive = true;
     for (const shot of tutorialRuntime.plan.evasion) {
-      state.enemyBullets.push({ ...shot, life: 420, age: 0, tutorialShot: true });
+      state.enemyBullets.push({
+        ...shot,
+        life: 420,
+        age: 0,
+        tutorialShot: true,
+        tutorialVolleyId: tutorialRuntime.evasionVolleyId
+      });
     }
   } else if (step === "ghost_shift") {
-    state.player.x = 108;
+    state.player.x = 145;
     state.player.energy = state.player.maxEnergy;
     state.player.ghostCooldown = 0;
     const lane = tutorialRuntime.plan.ghost_shift;
+    tutorialRuntime.ghostStartSide = lane.startSide;
+    tutorialRuntime.ghostTargetSide = lane.targetSide;
+    tutorialRuntime.ghostPreviousX = state.player.x;
+    tutorialRuntime.ghostDamageTakenStart = state.runStats.damageTaken;
+    tutorialRuntime.ghostLanePhased = false;
     for (let index = 0; index < 7; index++) {
       state.enemyBullets.push({
         x: lane.laneX,
@@ -607,11 +677,46 @@ function updateTutorialDirectorRuntime() {
     tutorialDirector.objectiveProgress = tutorialRuntime.tutorialKills;
     if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
   } else if (step === "evasion") {
-    tutorialRuntime.evasionCrossed = state.player.x > 245;
+    const tookDamage = state.runStats.damageTaken > tutorialRuntime.evasionDamageTakenStart;
+    if (tookDamage) {
+      resetTutorialLesson("evasion", ["That lane was live.", "Cross after the volley opens."]);
+      return;
+    }
+    tutorialRuntime.evasionCrossed = tutorialEvasionSucceeded({
+      startSide: tutorialRuntime.evasionStartSide,
+      targetSide: tutorialRuntime.evasionTargetSide,
+      laneX: tutorialRuntime.evasionLaneX,
+      startX: tutorialRuntime.evasionStartX,
+      volleyActive: tutorialRuntime.evasionVolleyActive,
+      damageTakenStart: tutorialRuntime.evasionDamageTakenStart,
+      damageTakenCurrent: state.runStats.damageTaken,
+      playerX: state.player.x
+    });
     if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
   } else if (step === "ghost_shift") {
     tutorialRuntime.ghostUses = state.runStats.ghostUses - tutorialRuntime.ghostUsesStart;
-    tutorialRuntime.crossedGhostLane = tutorialRuntime.ghostUses > 0 && state.player.x > 230;
+    const lane = tutorialRuntime.plan.ghost_shift;
+    const crossedNow = tutorialGhostLaneSucceeded({
+      startSide: tutorialRuntime.ghostStartSide,
+      targetSide: tutorialRuntime.ghostTargetSide,
+      laneX: lane.laneX,
+      previousX: tutorialRuntime.ghostPreviousX,
+      currentX: state.player.x,
+      ghostActive: state.player.ghostTimer > 0,
+      ghostUses: tutorialRuntime.ghostUses,
+      damageTakenStart: tutorialRuntime.ghostDamageTakenStart,
+      damageTakenCurrent: state.runStats.damageTaken
+    });
+    if (crossedNow) tutorialRuntime.ghostLanePhased = true;
+    const crossedWithoutGhost = tutorialRuntime.ghostPreviousX < lane.laneX &&
+      state.player.x > lane.laneX &&
+      !tutorialRuntime.ghostLanePhased;
+    const tookDamage = state.runStats.damageTaken > tutorialRuntime.ghostDamageTakenStart;
+    tutorialRuntime.ghostPreviousX = state.player.x;
+    if (crossedWithoutGhost || tookDamage) {
+      resetTutorialLesson("ghost_shift", ["Ghost must cover the crossing.", "Shift first, then pierce the lane."]);
+      return;
+    }
     if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
   } else if (step === "powerup") {
     tutorialRuntime.phaseShield = state.player.phaseShield || 0;
@@ -646,6 +751,20 @@ function updateTutorialDirectorRuntime() {
     if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
   }
   if (tutorialDirector && tutorialDirector.elapsedFrames > 540) tutorialDirector.hintLevel = 1;
+  updateTutorialLiveRegion();
+}
+
+function resetTutorialLesson(stepId, correctionLines) {
+  clearTutorialThreats();
+  state.player.hp = state.player.maxHp;
+  state.player.energy = state.player.maxEnergy;
+  state.player.ghostCooldown = 0;
+  state.player.ghostTimer = 0;
+  state.player.inv = 60;
+  enterTutorialStep(stepId);
+  tutorialDirector.dialogue[0] = { lines: correctionLines.slice(0, 2) };
+  tutorialDirector.dialogueVisible = true;
+  tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0;
   updateTutorialLiveRegion();
 }
 
@@ -748,7 +867,7 @@ function hideTutorialPauseAccessibility() {
   updateTutorialLiveRegion();
 }
 
-function drawColonelVegaHologram(x, y, size = 82, alpha = 1) {
+function drawColonelArisakaPlaceholder(x, y, size = 82, alpha = 1) {
   const scanOffset = settingReducedMotion ? 0 : (state.frame % 18);
   ctx.save();
   ctx.translate(x, y);
@@ -767,27 +886,62 @@ function drawColonelVegaHologram(x, y, size = 82, alpha = 1) {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  ctx.strokeRect(-size * 0.14, -size * 0.24, size * 0.28, size * 0.25);
   ctx.beginPath();
-  ctx.moveTo(-size * 0.22, -size * 0.18);
-  ctx.lineTo(-size * 0.10, -size * 0.30);
-  ctx.lineTo(size * 0.10, -size * 0.30);
-  ctx.lineTo(size * 0.22, -size * 0.18);
-  ctx.lineTo(size * 0.14, -size * 0.03);
-  ctx.lineTo(-size * 0.14, -size * 0.03);
-  ctx.closePath();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-size * 0.18, size * 0.10);
-  ctx.quadraticCurveTo(0, size * 0.23, size * 0.18, size * 0.10);
+  ctx.moveTo(-size * 0.24, size * 0.08);
+  ctx.lineTo(-size * 0.10, size * 0.20);
+  ctx.lineTo(size * 0.10, size * 0.20);
+  ctx.lineTo(size * 0.24, size * 0.08);
   ctx.stroke();
   ctx.fillStyle = "rgba(255,184,92,0.82)";
-  for (let index = 0; index < 3; index++) ctx.fillRect(-size * 0.26 + index * 9, size * 0.29, 6, 2);
+  ctx.fillRect(-size * 0.25, size * 0.29, size * 0.18, 3);
   ctx.shadowBlur = 0;
   ctx.strokeStyle = "rgba(182,247,255,0.14)";
   for (let sy = -size * 0.42 + scanOffset; sy < size * 0.44; sy += 9) {
     ctx.beginPath();
     ctx.moveTo(-size * 0.34, sy);
     ctx.lineTo(size * 0.34, sy);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTutorialInstructorPortrait(x, y, size = 82, alpha = 1) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x - size * 0.48, y - size * 0.48, size * 0.96, size * 0.96, size * 0.12);
+  ctx.clip();
+  const drewPortrait = typeof drawSpriteAsset === "function" && drawSpriteAsset(
+    ctx,
+    "tutorial_instructor",
+    x,
+    y + size * 0.06,
+    {
+      scale: size / 190,
+      alpha,
+      glow: false,
+      filter: "saturate(0.82) contrast(1.08) brightness(0.92)"
+    }
+  );
+  ctx.restore();
+  if (!drewPortrait) {
+    drawColonelArisakaPlaceholder(x, y, size, alpha);
+    return;
+  }
+  const scanOffset = settingReducedMotion ? 0 : (state.frame % 12);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = "rgba(98,235,255,0.58)";
+  ctx.lineWidth = 1;
+  ctx.shadowColor = "rgba(82,225,255,0.55)";
+  ctx.shadowBlur = settingReducedFlash ? 2 : 6;
+  ctx.strokeRect(x - size * 0.48, y - size * 0.48, size * 0.96, size * 0.96);
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(156,244,255,0.11)";
+  for (let sy = y - size * 0.46 + scanOffset; sy < y + size * 0.46; sy += 8) {
+    ctx.beginPath();
+    ctx.moveTo(x - size * 0.46, sy);
+    ctx.lineTo(x + size * 0.46, sy);
     ctx.stroke();
   }
   ctx.restore();
@@ -811,7 +965,7 @@ function drawOnboardingTitleOverlay() {
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 10);
   ctx.fill();
   ctx.stroke();
-  drawColonelVegaHologram(panel.x + 70, panel.y + 80, 96);
+  drawTutorialInstructorPortrait(panel.x + 70, panel.y + 80, 96);
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
@@ -819,14 +973,17 @@ function drawOnboardingTitleOverlay() {
   ctx.fillText("INCOMING TRANSMISSION", panel.x + 132, panel.y + 28);
   ctx.font = "900 17px 'Arial Narrow', Arial, sans-serif";
   ctx.fillStyle = "#effcff";
-  ctx.fillText("COLONEL VEGA", panel.x + 132, panel.y + 48);
+  ctx.fillText(TUTORIAL_INSTRUCTOR.name, panel.x + 132, panel.y + 48);
   ctx.font = "800 8px Arial, sans-serif";
   ctx.fillStyle = "rgba(211,240,250,0.58)";
-  ctx.fillText("SENIOR FLIGHT INSTRUCTOR", panel.x + 132, panel.y + 71);
+  ctx.fillText(TUTORIAL_INSTRUCTOR.title, panel.x + 132, panel.y + 71);
   ctx.font = "800 12px Arial, sans-serif";
   ctx.fillStyle = "#ffffff";
   const displayedCallSign = String(callSignEditing ? callSignDraft : (callSign || "CADET"));
-  if (onboardingUiMode === "post_callsign") {
+  if (onboardingUiMode === "first_time_question") {
+    ctx.font = "900 15px Arial, sans-serif";
+    ctx.fillText(TUTORIAL_INSTRUCTOR.firstQuestion, panel.x + 24, panel.y + 146);
+  } else if (onboardingUiMode === "post_callsign") {
     ctx.fillText(`Flight identity: ${displayedCallSign}${callSignEditing ? "|" : "."}`, panel.x + 24, panel.y + 142);
     ctx.fillText(callSignEditing ? "Type, then press Enter to save." : "Confirm it, or make one final edit.", panel.x + 24, panel.y + 163);
   } else if (onboardingUiMode === "post_identity") {
@@ -838,18 +995,19 @@ function drawOnboardingTitleOverlay() {
   } else if (onboardingUiMode === "resume_training") {
     ctx.fillText("Your training checkpoint is secure.", panel.x + 24, panel.y + 142);
     ctx.fillText("Resume when ready.", panel.x + 24, panel.y + 163);
-  } else if (onboardingUiMode === "existing_player_notice") {
-    ctx.fillText("First Flight training is now available.", panel.x + 24, panel.y + 142);
-    ctx.fillText("Your existing device progress is untouched.", panel.x + 24, panel.y + 163);
+  } else if (onboardingUiMode === "identity_confirmed") {
+    ctx.fillText("PILOT IDENTITY CONFIRMED", panel.x + 24, panel.y + 151);
   } else {
     ctx.fillText(`Command has you listed as ${displayedCallSign}${callSignEditing ? "|" : "."}`, panel.x + 24, panel.y + 142);
     ctx.fillText(callSignEditing ? "Type, then press Enter to save." : "Change it now, or after your flight.", panel.x + 24, panel.y + 163);
   }
-  ctx.font = "900 9px Arial, sans-serif";
-  ctx.fillStyle = "rgba(120,255,202,0.84)";
-  ctx.fillText("CONTROLLED RANGE  •  NO PROGRESSION AWARDED", panel.x + 24, panel.y + 203);
-  ctx.fillStyle = "rgba(210,237,247,0.50)";
-  ctx.fillText("SKIPPABLE  •  REPLAYABLE IN SETTINGS", panel.x + 24, panel.y + 222);
+  if (onboardingUiMode !== "first_time_question") {
+    ctx.font = "900 9px Arial, sans-serif";
+    ctx.fillStyle = "rgba(120,255,202,0.84)";
+    ctx.fillText("CONTROLLED RANGE  •  NO PROGRESSION AWARDED", panel.x + 24, panel.y + 203);
+    ctx.fillStyle = "rgba(210,237,247,0.50)";
+    ctx.fillText("SKIPPABLE  •  REPLAYABLE IN SETTINGS", panel.x + 24, panel.y + 222);
+  }
   ctx.restore();
 }
 
@@ -867,6 +1025,16 @@ function tutorialObjectiveText() {
 function getOnboardingPanelRect() {
   const compact = H < 700;
   return { x: 24, y: compact ? 170 : 220, w: W - 48, h: compact ? 260 : 280 };
+}
+
+function getOnboardingInstructorPortraitRect() {
+  const panel = getOnboardingPanelRect();
+  return { x: panel.x + 25, y: panel.y + 32, w: 90, h: 96 };
+}
+
+function getOnboardingQuestionRect() {
+  const panel = getOnboardingPanelRect();
+  return { x: panel.x + 20, y: panel.y + 132, w: panel.w - 40, h: 48 };
 }
 
 function getTutorialDialogueRect() {
@@ -993,12 +1161,12 @@ function drawTutorialTransmission() {
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 8);
   ctx.fill();
   ctx.stroke();
-  drawColonelVegaHologram(panel.x + 52, panel.y + 58, 74);
+  drawTutorialInstructorPortrait(panel.x + 52, panel.y + 58, 74);
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillStyle = "#70eeff";
   ctx.font = "900 8px Arial, sans-serif";
-  ctx.fillText("COLONEL VEGA  •  FLIGHT INSTRUCTOR", panel.x + 98, panel.y + 18);
+  ctx.fillText(`${TUTORIAL_INSTRUCTOR.name}  •  ${TUTORIAL_INSTRUCTOR.title}`, panel.x + 98, panel.y + 18);
   ctx.fillStyle = "#ffffff";
   ctx.font = "800 11px Arial, sans-serif";
   const joined = lines.join(" ");
@@ -1054,6 +1222,7 @@ function drawTutorialPresentation() {
 
 Object.assign(globalThis, {
   initializeOnboardingExperience,
+  chooseFirstFlightRoute,
   beginTutorialTraining,
   skipTutorialTraining,
   startTutorialSession,
@@ -1065,10 +1234,14 @@ Object.assign(globalThis, {
   tutorialSnapshot,
   showTutorialPauseAccessibility,
   hideTutorialPauseAccessibility,
+  drawTutorialInstructorPortrait,
+  drawColonelArisakaPlaceholder,
   drawOnboardingTitleOverlay,
   drawTutorialTrainingEnvironment,
   drawTutorialPresentation,
   getOnboardingPanelRect,
+  getOnboardingInstructorPortraitRect,
+  getOnboardingQuestionRect,
   getTutorialDialogueRect,
   getTutorialObjectiveRect,
   getTutorialControlRects

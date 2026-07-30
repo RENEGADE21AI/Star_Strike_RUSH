@@ -108,20 +108,36 @@ test("gameplay renders compact classic HUD without announcement popups", () => {
   assert.doesNotMatch(hudSource, /devStatsVisible|drawDebugHitboxes/);
 });
 
-test("manual pauses cost one health while automatic safety pauses are free", () => {
-  const decision = (player, reason) => JSON.parse(JSON.stringify(context.pauseHealthDecision(player, reason)));
+test("manual standard pauses cost one health while every tutorial pause is free", () => {
+  const decision = (player, reason, runMode) => JSON.parse(JSON.stringify(context.pauseHealthDecision(player, reason, runMode)));
   assert.deepEqual(
-    decision({ hp: 5, maxHp: 5 }, "manual"),
+    decision({ hp: 5, maxHp: 5 }, "manual", "standard"),
     { allowed: true, cost: 1, remainingHp: 4, message: "PAUSE COST: 1 HEALTH BAR" }
   );
   assert.deepEqual(
-    decision({ hp: 5, maxHp: 5 }, "visibility"),
+    decision({ hp: 5, maxHp: 5 }, "visibility", "standard"),
     { allowed: true, cost: 0, remainingHp: 5, message: "AUTO-PAUSE: NO HEALTH COST" }
   );
   assert.deepEqual(
-    decision({ hp: 1, maxHp: 5 }, "manual"),
+    decision({ hp: 1, maxHp: 5 }, "manual", "standard"),
     { allowed: false, cost: 0, remainingHp: 1, message: "PAUSE NEEDS 1 SPARE HEALTH BAR" }
   );
+  assert.deepEqual(
+    decision({ hp: 1, maxHp: 5 }, "manual", "tutorial"),
+    { allowed: true, cost: 0, remainingHp: 1, message: "TRAINING PAUSED: NO HEALTH COST" }
+  );
+  let hp = 5;
+  for (let count = 0; count < 4; count++) hp = decision({ hp, maxHp: 5 }, "manual", "tutorial").remainingHp;
+  assert.equal(hp, 5);
+});
+
+test("arrival and paused tutorial dialogue block control and ordinary simulation", () => {
+  assert.equal(context.gameplayControlEnabled({ gameState: "playing", transitionMode: "idle", tutorialDialogueVisible: false }), true);
+  assert.equal(context.gameplayControlEnabled({ gameState: "playing", transitionMode: "game_arrival", tutorialDialogueVisible: false }), false);
+  assert.equal(context.gameplayControlEnabled({ gameState: "playing", transitionMode: "idle", tutorialDialogueVisible: true }), false);
+  assert.equal(context.gameplaySimulationEnabled({ gameState: "playing", transitionMode: "idle", tutorialDialogueVisible: false }), true);
+  assert.equal(context.gameplaySimulationEnabled({ gameState: "playing", transitionMode: "game_arrival", tutorialDialogueVisible: false }), false);
+  assert.equal(context.gameplaySimulationEnabled({ gameState: "playing", transitionMode: "idle", tutorialDialogueVisible: true }), false);
 });
 
 test("obsolete developer gameplay skips and overlays are removed", () => {

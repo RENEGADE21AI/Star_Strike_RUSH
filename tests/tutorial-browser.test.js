@@ -86,8 +86,76 @@ async function useAbility(page, mode, cdp, layout) {
   }
   const x = layout.offsetX + (375 - 76) * layout.scale;
   const y = layout.offsetY + (667 - 76) * layout.scale;
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y, id: 2 }] });
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await page.touchscreen.tap(x, y);
+  await page.waitForTimeout(80);
+}
+
+async function desktopGhostCross(page) {
+  await page.keyboard.down("ArrowRight");
+  await page.keyboard.press("Space");
+  await page.waitForFunction(() => {
+    const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+    return current.tutorial?.director?.stepId !== "ghost_shift" || current.player.x > 225;
+  }, null, { timeout: 2500 }).catch(() => {});
+  await page.keyboard.up("ArrowRight");
+}
+
+async function touchGhostCross(page, cdp, layout) {
+  const scale = layout.scale;
+  const joystickOrigin = {
+    x: layout.offsetX + 76 * scale,
+    y: layout.offsetY + (667 - 76) * scale
+  };
+  const joystickRight = { x: joystickOrigin.x + 46 * scale, y: joystickOrigin.y };
+  const action = {
+    x: layout.offsetX + (375 - 76) * scale,
+    y: layout.offsetY + (667 - 76) * scale
+  };
+  await page.dispatchEvent("canvas", "pointerdown", {
+    pointerId: 31,
+    pointerType: "touch",
+    clientX: joystickOrigin.x,
+    clientY: joystickOrigin.y,
+    buttons: 1,
+    isPrimary: true
+  });
+  await page.dispatchEvent("canvas", "pointermove", {
+    pointerId: 31,
+    pointerType: "touch",
+    clientX: joystickRight.x,
+    clientY: joystickRight.y,
+    buttons: 1,
+    isPrimary: true
+  });
+  await page.waitForTimeout(45);
+  await page.dispatchEvent("canvas", "pointerdown", {
+    pointerId: 32,
+    pointerType: "touch",
+    clientX: action.x,
+    clientY: action.y,
+    buttons: 1,
+    isPrimary: false
+  });
+  await page.waitForFunction(() => {
+    const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+    return current.tutorial?.director?.stepId !== "ghost_shift" || current.player.x > 225;
+  }, null, { timeout: 2500 }).catch(() => {});
+  await page.dispatchEvent("canvas", "pointerup", {
+    pointerId: 32,
+    pointerType: "touch",
+    clientX: action.x,
+    clientY: action.y,
+    buttons: 0,
+    isPrimary: false
+  });
+  await page.dispatchEvent("canvas", "pointerup", {
+    pointerId: 31,
+    pointerType: "touch",
+    clientX: joystickRight.x,
+    clientY: joystickRight.y,
+    buttons: 0,
+    isPrimary: true
+  });
 }
 
 async function completeTutorial(page, mode) {
@@ -99,6 +167,8 @@ async function completeTutorial(page, mode) {
     wraithOverrideSeen: false,
     matchingRealmDamageSeen: false
   };
+  const explicitChoice = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
+  if (await explicitChoice.isVisible().catch(() => false)) await explicitChoice.click();
   await page.getByRole("button", { name: "Begin Flight Training" }).click();
   await page.waitForFunction(() => {
     const data = JSON.parse(document.querySelector("#debugSnapshot").textContent);
@@ -133,10 +203,15 @@ async function completeTutorial(page, mode) {
     } else if (director.stepId === "evasion") {
       target = { x: 290, y: data.player.y };
     } else if (director.stepId === "ghost_shift") {
-      if (data.tutorial.runtime && data.player.energy >= 35 && data.player.x < 150) {
-        await useAbility(page, mode, cdp, data.layout);
+      if (mode === "touch" && data.player.x >= 150 && data.player.x < 188 && data.player.energy >= 35) {
+        await touchGhostCross(page, cdp, data.layout);
+        target = null;
+      } else if (mode === "desktop" && data.player.x >= 150 && data.player.x < 188 && data.player.energy >= 35) {
+        await desktopGhostCross(page);
+        target = null;
+      } else {
+        target = { x: data.player.x < 150 ? 160 : 270, y: data.player.y };
       }
-      target = { x: 270, y: data.player.y };
     } else if (director.stepId === "powerup") {
       const powerup = data.encounter.powerups[0];
       target = powerup ? { x: powerup.x, y: powerup.y } : { x: 187.5, y: 470 };
@@ -227,18 +302,16 @@ for (const scenario of [
   });
 }
 
-test("existing pilots receive a dismissible training offer instead of forced onboarding", { timeout: 90_000 }, async () => {
+test("existing local progress does not answer the one-time first-flight question", { timeout: 90_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await context.addInitScript(() => localStorage.setItem("star_strike_rush_high_score_v1", "1200"));
   const page = await context.newPage();
   try {
     await page.goto(baseUrl, { waitUntil: "commit" });
-    await assert.doesNotReject(() => page.getByRole("button", { name: "Start Training" }).waitFor());
-    assert.equal(await page.getByRole("button", { name: "Later" }).isVisible(), true);
-    assert.equal(await page.getByRole("button", { name: "Begin Flight Training" }).isVisible().catch(() => false), false);
-    await page.getByRole("button", { name: "Later" }).click();
-    assert.equal(await page.getByRole("button", { name: "Start Training" }).isVisible().catch(() => false), false);
-    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1")).existingPlayerOfferDismissed), true);
+    await assert.doesNotReject(() => page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).waitFor());
+    assert.equal(await page.getByRole("button", { name: "NO — GO TO TITLE" }).isVisible(), true);
+    await page.getByRole("button", { name: "NO — GO TO TITLE" }).click();
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1")).status), "skipped");
   } finally {
     await context.close();
   }
@@ -249,6 +322,9 @@ test("a local call sign can be edited inline before training launch", { timeout:
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}/?debug=1&scenario=tutorial`, { waitUntil: "commit" });
+    const yes = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
+    await yes.waitFor({ state: "visible", timeout: 90_000 });
+    await yes.click();
     await page.getByRole("button", { name: "Edit Call Sign" }).waitFor();
     await page.getByRole("button", { name: "Edit Call Sign" }).click();
     await page.waitForFunction(() => document.activeElement?.id === "callSignInput");
@@ -266,16 +342,13 @@ test("a local call sign can be edited inline before training launch", { timeout:
   }
 });
 
-test("skip requires confirmation and replay starts from Settings without account setup", { timeout: 120_000 }, async () => {
+test("NO is immediate and replay starts from Settings without account setup", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}/?debug=1&scenario=tutorial`, { waitUntil: "commit" });
-    await page.getByRole("button", { name: "Skip For Now" }).waitFor();
-    await page.getByRole("button", { name: "Skip For Now" }).click();
-    assert.equal(await page.getByRole("button", { name: "Confirm Skip" }).isVisible(), true);
-    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1") || '{"status":"unseen"}').status), "unseen");
-    await page.getByRole("button", { name: "Confirm Skip" }).click();
+    await page.getByRole("button", { name: "NO — GO TO TITLE" }).waitFor();
+    await page.getByRole("button", { name: "NO — GO TO TITLE" }).click();
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1")).status), "skipped");
 
     await page.evaluate(() => localStorage.setItem("star_strike_rush_onboarding_v1", JSON.stringify({
@@ -345,6 +418,128 @@ test("Firebase identity failure cannot block post-flight device continuation", {
     await page.getByRole("button", { name: "Continue With Device Pilot" }).click();
     await page.waitForFunction(() => document.body.dataset.gameRunMode === "standard");
     assert.ok((await snapshot(page)).tutorial.accountPulseFrames > 0);
+  } finally {
+    await context.close();
+  }
+});
+
+test("tutorial dialogue blocks held keyboard and touch input without leaking after Continue", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  const cdp = await context.newCDPSession(page);
+  try {
+    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial&step=movement&input=touch`, { waitUntil: "commit" });
+    await page.waitForFunction(() => {
+      const raw = document.querySelector("#debugSnapshot")?.textContent;
+      if (!raw) return false;
+      const current = JSON.parse(raw);
+      return current.runMode === "tutorial" && current.tutorial?.director?.dialogueVisible;
+    }, null, { timeout: 90_000 });
+    const before = await snapshot(page);
+    await page.keyboard.down("ArrowRight");
+    const origin = {
+      x: before.layout.offsetX + 76 * before.layout.scale,
+      y: before.layout.offsetY + (667 - 76) * before.layout.scale
+    };
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ ...origin, id: 1 }] });
+    await page.waitForTimeout(160);
+    const blocked = await snapshot(page);
+    assert.equal(blocked.player.x, before.player.x);
+    assert.equal(blocked.input.gameplayControlEnabled, false);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await pressContinue(page);
+    await page.keyboard.up("ArrowRight");
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "idle");
+    const released = await snapshot(page);
+    await page.waitForTimeout(120);
+    assert.equal((await snapshot(page)).player.x, released.player.x);
+  } finally {
+    await context.close();
+  }
+});
+
+test("tutorial manual pause is free even at one Health and remains free when repeated", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial&step=movement`, { waitUntil: "commit" });
+    await page.waitForFunction(() => {
+      const raw = document.querySelector("#debugSnapshot")?.textContent;
+      return !!raw && JSON.parse(raw).runMode === "tutorial";
+    }, null, { timeout: 90_000 });
+    await pressContinue(page);
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "idle");
+    await page.evaluate(() => { state.player.hp = 1; });
+    for (let count = 0; count < 2; count++) {
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: "Resume" }).waitFor();
+      assert.equal((await snapshot(page)).player.hp, 1);
+      assert.equal((await snapshot(page)).ui.pauseNotice, "TRAINING PAUSED: NO HEALTH COST");
+      await page.getByRole("button", { name: "Resume" }).click();
+      await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
+    }
+    assert.equal((await snapshot(page)).player.hp, 1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("post-graduation identity routing adapts to signed-out, no-handle, and confirmed accounts", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial-post-callsign`, { waitUntil: "commit" });
+    await page.getByRole("button", { name: "Confirm Call Sign" }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Confirm Call Sign" }).isVisible(), true);
+
+    await page.evaluate(() => {
+      window.starStrikeOnline = { getState: () => ({ user: { account: true }, profileHandle: "", pendingCallSign: false }) };
+      tutorialRuntime = { replay: false };
+      beginPostTutorialIdentityFlow();
+    });
+    await page.getByRole("button", { name: "Claim Unique Handle" }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Connect Google Account" }).isVisible().catch(() => false), false);
+
+    await page.evaluate(() => {
+      window.starStrikeOnline = { getState: () => ({ user: { account: true }, profileHandle: "NOVA", pendingCallSign: false }) };
+      tutorialRuntime = { replay: false };
+      beginPostTutorialIdentityFlow();
+    });
+    await page.getByRole("button", { name: "Enter Hangar" }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Claim Unique Handle" }).isVisible().catch(() => false), false);
+  } finally {
+    await context.close();
+  }
+});
+
+test("touch ability reaches the real Ghost lesson action control", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  const cdp = await context.newCDPSession(page);
+  try {
+    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial&step=ghost&input=touch`, { waitUntil: "commit" });
+    await page.waitForFunction(() => {
+      const raw = document.querySelector("#debugSnapshot")?.textContent;
+      return !!raw && JSON.parse(raw).tutorial?.director?.stepId === "ghost_shift";
+    }, null, { timeout: 90_000 });
+    await pressContinue(page);
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "idle");
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let before = await snapshot(page);
+      while (before.tutorial?.director?.stepId === "ghost_shift" && before.player.x < 150) {
+        await touchMove(page, cdp, before.layout, before.player, { x: 160, y: before.player.y });
+        before = await snapshot(page);
+      }
+      if (before.tutorial?.director?.dialogueVisible) await pressContinue(page);
+      if (before.tutorial?.director?.stepId !== "ghost_shift") break;
+      await touchGhostCross(page, cdp, before.layout);
+      await page.waitForTimeout(100);
+      const after = await snapshot(page);
+      if (after.tutorial?.director?.stepId === "powerup") break;
+      if (after.tutorial?.director?.dialogueVisible) await pressContinue(page);
+    }
+    const completed = await snapshot(page);
+    assert.equal(completed.tutorial?.director?.stepId, "powerup");
   } finally {
     await context.close();
   }
