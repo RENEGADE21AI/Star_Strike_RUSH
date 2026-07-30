@@ -416,9 +416,20 @@ test("Firebase identity failure cannot block post-flight device continuation", {
     await page.getByRole("button", { name: "Connect Google Account" }).click();
     await page.waitForFunction(() => /unavailable|not completed/i.test(document.querySelector("#tutorialLiveRegion")?.textContent || ""));
     assert.equal(await page.getByRole("button", { name: "Continue With Device Pilot" }).isVisible(), true);
+    const progressBefore = await page.evaluate(() => JSON.stringify(currentMetaSnapshot()));
     await page.getByRole("button", { name: "Continue With Device Pilot" }).click();
-    await page.waitForFunction(() => document.body.dataset.gameRunMode === "standard");
-    assert.ok((await snapshot(page)).tutorial.accountPulseFrames > 0);
+    const continuation = await page.evaluate(() => ({
+      runMode: document.body.dataset.gameRunMode,
+      gameState: state.gameState,
+      uiMode: onboardingUiMode,
+      accountPulseFrames: onboardingAccountPulseFrames,
+      progress: JSON.stringify(currentMetaSnapshot())
+    }));
+    assert.equal(continuation.runMode, "standard");
+    assert.equal(continuation.gameState, "start");
+    assert.equal(continuation.uiMode, "none");
+    assert.ok(continuation.accountPulseFrames > 0);
+    assert.equal(continuation.progress, progressBefore);
   } finally {
     await context.close();
   }
