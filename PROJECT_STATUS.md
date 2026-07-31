@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited: 2026-07-29
+Last audited: 2026-07-30
 
 This is the release truth table. Disabled, configuration-dependent, previewed,
 and production-deployed are distinct states.
@@ -41,17 +41,18 @@ rewards.
 | Achievements | Stable | One generated 79-entry catalog, browser/server parity, semantic and reachability checks |
 | Achievement migration | Applied | Production aggregate reconstructed from 15 valid historical unlocks; zero-change follow-up dry run |
 | Achievement hydration | Stable | One aggregate returned by the profile owner callable; no 79-document browser listing |
-| Vault/Codex scrolling | Stable | Touch drag at 375×667, 390×844, 430×932; wheel, keyboard, and buttons |
+| Vault/Codex scrolling | Stable | Touch drag at 375×667, 390×844, 430×932; readable single-column mobile achievement cards; wheel, keyboard, and buttons |
 | Audio | Stable | Independent Music/Effects, legacy setting migration, lazy load, time-based 30/60/90/120 Hz mix |
 | Title/traffic | Stable | Measured title gap/bounds, normalized time paths, depth durations, correctly oriented patrols capped at normal fighter scale, UI-safe lanes, Reduced Motion |
 | Debug records/reset | Stable | Debug cannot persist records/progression; reset clears all progression-bearing local state |
-| Combat HUD | Stable | Pause top-left; standard manual and all automatic pauses cost one Health; First Flight manual pause is free; Energy above segmented Health bottom-left; compact score block top-right |
+| Combat HUD | Stable | Pause top-left; standard manual and all automatic pauses cost one Health; First Flight manual pause is free; compact Energy/Hull instrument above touch controls bottom-left; backed score block top-right |
 | Boss/realm presentation | Focused pass locally verified | Supplied boss sprites are the primary render path; Wraith physical/ghost variants share the canonical 640×282 alpha mask exactly |
 | First Flight onboarding | PR #14 merged; focused visual pass locally verified | Deterministic 13-step director, explicit one-time Yes/No route, owner-supplied Colonel Arisaka portrait, fresh-galaxy arrival, arrival/dialogue input locks and shake suppression, free manual training pause, checkpoints, replay, two tutorial bosses, and no-progression assertions |
 | Production debug surface | Removed | Build strips QA scenarios/snapshots; player-facing phase skips and hitbox controls removed |
 | Firestore authorization | Stable | Emulator tests cover anonymous denial, owner privacy, bounded reads, browser-write denial |
 | Build/cache contract | Stable | Commit-versioned runtime/assets plus no-store HTML and `version.json` |
-| Visual QA | Stable | Existing release cases plus asserted First Flight desktop/mobile scenes, launch states, realm UI, account offer, and checkpoint resume |
+| Player-facing UI | Focused polish locally verified | Shared glass-edged buttons/panels, explicit settings toggles, isolated destructive actions, clearer title identity, and a score-focused Game Over summary |
+| Visual QA | Stable | 49 asserted scenes spanning title viewports, panels, reset, HUD/touch clearance, Game Over, First Flight, launch states, realm UI, account offer, and checkpoint resume |
 
 ## Firebase identity and archive boundary
 
@@ -135,6 +136,24 @@ PR #14 merged with green `verify` and `secret-scan`; its exact-SHA preview was
 staged and smoke-tested. Account A/B smoke remains incomplete, and this
 document does not imply a production Hosting deployment.
 
+Current experience-polish branch evidence on Node 22:
+
+- `npm test`: 131/131 passed, including real-action desktop and touch First
+  Flight journeys and the complete release-integrity contract suite.
+- Firestore Rules emulator: 4/4 passed.
+- Firebase client integration: one complete real-emulator browser scenario
+  passed.
+- Visual QA: 49/49 asserted scenes passed with zero runtime/layout failures
+  across 375×667, 390×844, 430×932, 768×1024, and 1440×900.
+- Production build: 104 allowlisted public files generated.
+- Root production audit: 0 vulnerabilities. Functions audit: 0 high-severity
+  findings and 8 known moderate transitive findings.
+- Tracked-file secret scan: 236 files passed.
+
+This focused pass is local branch evidence until its PR is merged and a new
+exact-SHA preview is staged. Production Hosting and Account A/B status remain
+unchanged.
+
 The focused onboarding-entry refinement replaces local-progress guessing with a
 one-time explicit Yes/No decision whenever `star_strike_rush_onboarding_v1` is
 absent. High score, Glory, achievements, and Codex data do not answer that
@@ -155,7 +174,7 @@ account steps according to current sign-in and handle state. This section is
 local evidence only until the focused PR is merged and a new exact-SHA preview
 is staged.
 
-The current gameplay-visual pass uses the supplied Command Ship and Wraith art
+PR #16 merged the gameplay-visual pass. It uses the supplied Command Ship and Wraith art
 as the normal boss-rendering path, fixes combat/title fighter headings, caps
 title patrol scale at 1.0, separates the two title lines by measured bounds,
 reduces the bottom-left HUD footprint, replaces Ghost Shift afterimages with a
@@ -163,8 +182,14 @@ single translucent glow, suppresses shake during instructor transmissions, and
 uses a two-second top-down galaxy transit into the exact gameplay position. The
 Wraith realm sprites are deterministic RGB recolors of one canonical source;
 their dimensions and every alpha byte match, so realm changes cannot alter the
-silhouette or weapon geometry. These changes remain local evidence until their
-focused PR and exact-SHA preview are complete.
+silhouette or weapon geometry.
+
+The current experience-polish pass unifies controls and panels around one
+readable interaction hierarchy; gives mobile achievements a legible
+single-column rhythm; makes device settings and destructive reset intent
+explicit; reduces combat HUD obstruction; and replaces the sparse end state
+with a clear flight-record summary. It changes no combat balance, tutorial
+sequence, account authority, achievement definition, or Firebase gate.
 
 ## Release policy
 

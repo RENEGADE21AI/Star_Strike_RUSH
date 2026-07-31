@@ -33,19 +33,23 @@ after the files they depend on, because the current code intentionally shares gl
   spawn plans, action completion predicates, isolated boss overrides, recovery,
   and one-time graduation Codex policy.
 - `08-title-screen.js`: title formations, title input geometry, menu hit testing.
-- `09-rendering-controls.js`: shared button and icon drawing helpers.
+- `09-rendering-controls.js`: shared rounded glass button, pressed-state, and
+  icon drawing helpers used across title panels and terminal states.
 - `10-rendering-ships.js`: enemy, boss, formation, and menu ship art.
 - `11-rendering-title-effects.js`: title sun, menu flights, encounter cards.
-- `12-rendering-title-panels.js`: identity/settings, global and weekly records,
-  the categorized achievement vault, Codex, and reset-confirm panels.
+- `12-rendering-title-panels.js`: identity/settings, explicit ON/OFF controls,
+  global and weekly records, the categorized achievement vault, Codex, and
+  isolated destructive reset confirmation.
 - `12-progress-road-data.js`: Glory Road and Season Road reward tables, detail
   payloads, and local reward claim logic.
 - `12-rendering-progress-road.js`: Glory Road and Season Road layout and rendering.
-- `13-rendering-title-screens.js`: title screen and game-over screen composition.
+- `13-rendering-title-screens.js`: title identity hierarchy and the score-first
+  end-of-run flight-record composition.
 - `14-rendering-player.js`: background and player ship rendering.
 - `15-rendering-entities.js`: wingmen, bullets, enemies, bosses, powerups, particles.
-- `16-rendering-hud.js`: top-left paid pause control, compact top-right score
-  block, classic bottom-left Energy/Health status, warnings, and damage flash.
+- `16-rendering-hud.js`: top-left paid pause control, compact backed top-right
+  score block, edge-safe bottom-left Energy/Hull instrument, touch controls,
+  warnings, and damage flash.
 - `17-rendering-scene.js`: outer fog, top-level draw orchestration, and the
   time-based top-down galaxy transit shared by title Play and First Flight.
 - `17-tutorial-onboarding.js`: First Flight runtime director, accessible
