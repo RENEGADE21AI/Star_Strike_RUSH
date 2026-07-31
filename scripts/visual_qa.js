@@ -28,6 +28,7 @@ const cases = [
   { name: "title-430x932", width: 430, height: 932, kind: "title" },
   { name: "title-768x1024", width: 768, height: 1024, kind: "title" },
   { name: "title-1440x900", width: 1440, height: 900, kind: "title" },
+  { name: "title-landscape-844x390", width: 844, height: 390, kind: "title" },
   { name: "vault-touch-375x667", width: 375, height: 667, kind: "scroll", target: "achievements" },
   { name: "vault-touch-390x844", width: 390, height: 844, kind: "scroll", target: "achievements" },
   { name: "vault-touch-430x932", width: 430, height: 932, kind: "scroll", target: "achievements" },
@@ -36,6 +37,7 @@ const cases = [
   { name: "codex-touch-430x932", width: 430, height: 932, kind: "scroll", target: "codex" },
   { name: "reduced-motion", width: 390, height: 844, kind: "reduced-motion" },
   { name: "audio-settings", width: 390, height: 844, kind: "audio-settings" },
+  { name: "settings-mobile-375x667", width: 375, height: 667, kind: "audio-settings" },
   { name: "reset-local-data-confirmation", width: 390, height: 844, kind: "reset-confirmation" },
   { name: "pilot-dossier", width: 390, height: 844, kind: "panel", target: "account" },
   { name: "codex-overview", width: 390, height: 844, kind: "panel", target: "codex" },
@@ -297,6 +299,18 @@ async function runCase(browser, baseUrl, item) {
     evidence.after = effectsAfter;
     if (!effectsAfter.layout.replayTraining) errors.push("Replay Flight Training control is missing from Settings");
     else if (effectsAfter.layout.replayTraining.y + effectsAfter.layout.replayTraining.h > item.height) errors.push("Replay Flight Training control leaves the viewport");
+    if (!effectsAfter.layout.resetData) errors.push("Reset Local Data control is missing from Settings");
+    else {
+      if (effectsAfter.layout.resetData.y <= effectsAfter.layout.replayTraining.y + effectsAfter.layout.replayTraining.h) {
+        errors.push("Reset Local Data is not isolated below Replay Flight Training");
+      }
+      if (Math.abs(effectsAfter.layout.resetData.w - effectsAfter.layout.screenShake.w) > 1) {
+        errors.push("Reset Local Data is not a deliberate full-width danger action");
+      }
+      if (effectsAfter.layout.resetData.y + effectsAfter.layout.resetData.h > item.height) {
+        errors.push("Reset Local Data leaves the viewport");
+      }
+    }
     if (musicAfter.ui.settingMusicEnabled === settingsBefore.ui.settingMusicEnabled) errors.push("Music control did not toggle");
     if (musicAfter.ui.settingEffectsEnabled !== settingsBefore.ui.settingEffectsEnabled) errors.push("Music control changed Effects");
     if (effectsAfter.ui.settingEffectsEnabled === musicAfter.ui.settingEffectsEnabled) errors.push("Effects control did not toggle");

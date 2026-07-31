@@ -88,8 +88,7 @@ function getOnlineRects() {
   const low = { x: innerX, y: btnY, w: btnW, h: btnH };
   const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
   const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
-  const shake = { x: innerX, y: btnY + 50, w: 150, h: 30 };
-  const reset = { x: panel.x + panel.w - 180, y: btnY + 50, w: 160, h: 30 };
+  const shake = { x: innerX, y: btnY + 50, w: panel.w - 40, h: 30 };
   const motion = { x: innerX, y: btnY + 96, w: panel.w - 40, h: 30 };
   const flash = { x: innerX, y: btnY + 134, w: panel.w - 40, h: 30 };
   const contrast = { x: innerX, y: btnY + 172, w: panel.w - 40, h: 30 };
@@ -98,6 +97,7 @@ function getOnlineRects() {
   const music = { x: innerX, y: btnY + 210, w: audioW, h: 30 };
   const effects = { x: innerX + audioW + audioGap, y: btnY + 210, w: audioW, h: 30 };
   const replayTraining = { x: innerX, y: btnY + 252, w: panel.w - 40, h: 32 };
+  const reset = { x: innerX, y: btnY + 304, w: panel.w - 40, h: 32 };
   return { panel, closeRect, pilotTab, settingsTab, editCallSign, claimHandle, signIn, signOut, low, med, high, shake, reset, motion, flash, contrast, music, effects, replayTraining };
 }
 function getRecordsRects() {
