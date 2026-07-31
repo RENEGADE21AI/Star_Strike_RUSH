@@ -638,19 +638,19 @@ function drawOnlinePanel() {
     }
     ctx.restore();
     drawSettingsToggle(r.shake, "SCREEN SHAKE", settingScreenShake);
-    drawDangerActionButton(r.reset, "RESET LOCAL DATA");
     drawSettingsToggle(r.motion, "REDUCED MOTION", settingReducedMotion);
     drawSettingsToggle(r.flash, "REDUCED FLASH", settingReducedFlash);
     drawSettingsToggle(r.contrast, "HIGH CONTRAST", settingHighContrast);
     drawSettingsToggle(r.music, "MUSIC", settingMusicEnabled);
     drawSettingsToggle(r.effects, "EFFECTS", settingEffectsEnabled);
     drawOnlineActionButton(r.replayTraining, "REPLAY FLIGHT TRAINING", true);
+    drawDangerActionButton(r.reset, "RESET LOCAL DATA");
     ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.font = "800 8px Arial, sans-serif";
     ctx.fillStyle = "rgba(185,220,233,0.42)";
-    ctx.fillText("SETTINGS SAVE ON THIS DEVICE AND APPLY IMMEDIATELY", panel.x + panel.w / 2, r.replayTraining.y + r.replayTraining.h + 17);
+    ctx.fillText("SETTINGS SAVE ON THIS DEVICE AND APPLY IMMEDIATELY", panel.x + panel.w / 2, r.reset.y + r.reset.h + 16);
     ctx.restore();
   }
 }
@@ -692,7 +692,7 @@ function drawRecordsPanel() {
     ctx.fillText(
       league
         ? `${league.memberCount || 0}/${league.capacity || 30} PILOTS  •  PERFORMANCE MATCHED`
-        : (competitionEnabled ? "UP TO 30 PILOTS • MATCHED BY PRIOR BEST" : "VERIFIED WEEKLY SCORING IS CURRENTLY PAUSED"),
+        : (competitionEnabled ? "UP TO 30 PILOTS • MATCHED BY VERIFIED BEST" : "VERIFIED WEEKLY SCORING IS CURRENTLY PAUSED"),
       card.x + 16,
       card.y + 75
     );
@@ -746,7 +746,7 @@ function drawRecordsPanel() {
       });
       ctx.textAlign = "left";
       const rules = [
-        ["01", "PERFORMANCE MATCHING", "PRIOR BEST SCORE SETS YOUR DIVISION"],
+        ["01", "PERFORMANCE MATCHING", "VERIFIED BEST SETS YOUR DIVISION"],
         ["02", "SEVEN-DAY RESET", "A FRESH GROUP AND CLIMB EVERY MONDAY"],
         ["03", "VERIFIED FLIGHT POINTS", "ACCEPTED RUN RECEIPTS POWER THE LADDER"]
       ];
@@ -780,7 +780,7 @@ function drawRecordsPanel() {
   ctx.textBaseline = "top";
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.48)";
-  ctx.fillText("LEGACY/PRESEASON ARCHIVE", summary.x + 16, summary.y + 15);
+  ctx.fillText("DEVICE RECORD • THIS DEVICE", summary.x + 16, summary.y + 15);
   ctx.font = "900 24px 'Arial Narrow', Arial, sans-serif";
   ctx.fillStyle = "#dffcff";
   ctx.fillText("DEVICE BEST", summary.x + 16, summary.y + 33);
@@ -789,11 +789,14 @@ function drawRecordsPanel() {
   ctx.fillText(Number(highScore || 0).toLocaleString(), summary.x + summary.w - 16, summary.y + 33);
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.48)";
-  ctx.fillText("NEW PUBLIC WRITES PAUSED", summary.x + summary.w - 16, summary.y + 66);
+  ctx.fillText("PUBLIC ARCHIVE WRITES PAUSED", summary.x + summary.w - 16, summary.y + 66);
   ctx.textAlign = "left";
   let listY = panel.y + 198;
   ctx.font = FONT_TINY;
   if (leaderboard.length) {
+    ctx.fillStyle = "rgba(255,255,255,0.48)";
+    ctx.fillText("LEGACY/PRESEASON ARCHIVE • UNVERIFIED", panel.x + 22, listY);
+    listY += 22;
     leaderboard.slice(0, 10).forEach((row, index) => {
       const who = String(row.callSign || "PILOT").slice(0, 12);
       const handle = row.handle ? ` @${String(row.handle).slice(0, 16)}` : "";
@@ -853,7 +856,7 @@ function drawRecordsPanel() {
       ctx.font = FONT_TINY;
     });
     ctx.fillStyle = "rgba(120,255,180,0.54)";
-    ctx.fillText("LOCAL PROGRESS IS ACTIVE • CONNECT TO PUBLISH RECORDS", archive.x + 16, archive.y + archive.h - 22);
+    ctx.fillText("DEVICE PROGRESS ACTIVE • PUBLIC WRITES PAUSED", archive.x + 16, archive.y + archive.h - 22);
   }
   ctx.restore();
   drawPanelCloseButton(r.closeRect);

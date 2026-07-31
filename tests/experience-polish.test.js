@@ -51,12 +51,31 @@ test("phone achievement cards use a readable single-column rhythm", () => {
 
 test("settings and destructive actions use distinct, truthful controls", () => {
   const source = fs.readFileSync(path.join(repoRoot, "src", "12-rendering-title-panels.js"), "utf8");
+  const layoutSource = fs.readFileSync(path.join(repoRoot, "src", "08-title-screen.js"), "utf8");
+  const context = { W: 390, H: 667 };
+  vm.createContext(context);
+  vm.runInContext(layoutSource, context);
+  const layout = vm.runInContext("getOnlineRects()", context);
   assert.match(source, /function drawSettingsToggle/);
   assert.match(source, /function drawDangerActionButton/);
   assert.match(source, /RESET LOCAL DATA/);
   assert.match(source, /SETTINGS SAVE ON THIS DEVICE AND APPLY IMMEDIATELY/);
   assert.match(source, /drawSimpleButton\(r\.no, "KEEP DATA"/);
   assert.match(source, /drawPressButton\(r\.yes, "ERASE DATA"/);
+  assert.equal(layout.shake.w, layout.reset.w, "Screen Shake and the danger action should use the full content width");
+  assert.ok(layout.reset.y > layout.replayTraining.y + layout.replayTraining.h, "Reset must be isolated below routine settings");
+  assert.ok(layout.reset.y + layout.reset.h < layout.panel.y + layout.panel.h, "Reset must remain inside the panel");
+});
+
+test("Records separates this device's best from the unverified public archive", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "src", "12-rendering-title-panels.js"), "utf8");
+  assert.match(source, /DEVICE RECORD • THIS DEVICE/);
+  assert.match(source, /LEGACY\/PRESEASON ARCHIVE • UNVERIFIED/);
+  assert.match(source, /PUBLIC ARCHIVE WRITES PAUSED/);
+  assert.match(source, /DEVICE PROGRESS ACTIVE • PUBLIC WRITES PAUSED/);
+  assert.match(source, /VERIFIED BEST SETS YOUR DIVISION/);
+  assert.doesNotMatch(source, /CONNECT TO PUBLISH RECORDS/);
+  assert.doesNotMatch(source, /PRIOR BEST SCORE SETS YOUR DIVISION/);
 });
 
 test("visual QA covers the full player journey and polished terminal states", () => {
@@ -66,6 +85,8 @@ test("visual QA covers the full player journey and polished terminal states", ()
     "codex-overview",
     "records-network",
     "progress-road",
+    "title-landscape-844x390",
+    "settings-mobile-375x667",
     "gameplay-hud-touch-390x844",
     "game-over-summary",
     "reset-local-data-confirmation"
