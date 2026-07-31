@@ -145,7 +145,7 @@ and release evidence.
 - Production build and commit-version contract: passed with 104 public files.
 - Root production audit: 0 vulnerabilities. Functions production audit:
   0 high-severity findings and 8 moderate transitive findings.
-- Tracked-file secret scan: 236 files passed.
+- Tracked-file secret scan: 237 files passed.
 
 GitHub checks, exact-SHA preview smoke, and live Account A/B evidence must still
 be obtained on the merge commit. This document does not claim those pending

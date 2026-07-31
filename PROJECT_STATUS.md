@@ -148,7 +148,7 @@ Current experience-polish branch evidence on Node 22:
 - Production build: 104 allowlisted public files generated.
 - Root production audit: 0 vulnerabilities. Functions audit: 0 high-severity
   findings and 8 known moderate transitive findings.
-- Tracked-file secret scan: 236 files passed.
+- Tracked-file secret scan: 237 files passed.
 
 This focused pass is local branch evidence until its PR is merged and a new
 exact-SHA preview is staged. Production Hosting and Account A/B status remain
