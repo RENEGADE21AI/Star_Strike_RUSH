@@ -825,6 +825,10 @@ test("resize clears held joystick and armed canvas actions before coordinates ch
       buttons: 1
     });
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return current.layout.scale > 1.03 && current.layout.offsetY > 70;
+    });
     await page.dispatchEvent("canvas", "pointerup", {
       pointerId: 61,
       pointerType: "touch",
@@ -865,6 +869,14 @@ test("resize clears held joystick and armed canvas actions before coordinates ch
     assert.ok(snapshot.input.joystick.ax > 0.2);
 
     await page.setViewportSize({ width: 844, height: 390 });
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return current.layout.scale < 0.59
+        && current.layout.offsetX > 300
+        && current.input.joystick.active === false
+        && current.input.joystick.ax === 0
+        && current.input.joystick.ay === 0;
+    });
     snapshot = await debugSnapshot(page);
     const xAfterResize = snapshot.player.x;
     assert.deepEqual(snapshot.input.joystick, { active: false, ax: 0, ay: 0 });
