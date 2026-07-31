@@ -33,7 +33,11 @@ Play: https://star-strike-rush.web.app
 - Pause: the top-left HUD control or Escape. A deliberate standard-run pause
   costs one Health bar and reports the cost. Manual pauses are free during
   First Flight, while automatic focus/visibility pauses still cost one Health.
-  Gameplay resumes through a short countdown.
+  Gameplay resumes through a short countdown; cancelling that countdown is
+  free. Restart Run and Return to Title require a second explicit confirmation.
+- Keyboard navigation: Tab moves through title, panel, pause, reset, and Game
+  Over actions; Enter or Space activates the focused control and Escape backs
+  out safely. Focus outlines track the matching Canvas control.
 - HUD: Energy sits above segmented Health in the classic bottom-left layout;
   Score, Hi-Score, and Combo stay compact at the top-right.
 
@@ -51,6 +55,13 @@ apply immediately on this device. Reset Local Data remains a separate,
 plain-language destructive confirmation. Records distinguishes the best score
 stored on this device from the unverified public preseason archive and states
 when public writes are paused.
+
+Short landscape phone windows keep the portrait playfield intact and show a
+static gutter-only rotation cue. Resizing or rotating clears held touch input so
+the fighter cannot drift under a changed coordinate transform. Large desktop
+and television displays retain crisp rendering against a fixed backing-store
+pixel target, and artwork that fell back during a transient outage retries when
+the browser reconnects.
 
 ## Run locally
 

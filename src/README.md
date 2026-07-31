@@ -5,6 +5,8 @@ after the files they depend on, because the current code intentionally shares gl
 
 - `00-asset-manifest.js`: sprite render metadata, anchors, projectile origins,
   tuned collision circles, preload state, and procedural fallback bridge.
+- `00-accessible-surface.js`: semantic action overlays, live status, modal focus
+  containment, and focus restoration for the Canvas interface.
 - `00-competition.js`: public-handle normalization, UTC weekly windows,
   performance bands, and league labels shared by client UI rules.
 - `00-identity.js`: call-sign validation, neutral identity generation, and the
@@ -18,7 +20,7 @@ after the files they depend on, because the current code intentionally shares gl
   post-graduation identity routing, input-specific prompts, launch timing, and the
   tutorial no-progression gates.
 - `00-runtime.js`: deterministic fixed-step simulation clock, render-rate
-  independence, and long-background-gap clamping.
+  independence, long-background-gap clamping, and bounded backing-canvas DPR.
 - `01-core.js`: canvas handles, constants, persistent settings, global state, scoring.
 - `02-audio.js`: throttled procedural Web Audio effects, gesture-safe looping
   title/gameplay music with state crossfades, and the persisted audio preference.
@@ -47,9 +49,9 @@ after the files they depend on, because the current code intentionally shares gl
   end-of-run flight-record composition.
 - `14-rendering-player.js`: background and player ship rendering.
 - `15-rendering-entities.js`: wingmen, bullets, enemies, bosses, powerups, particles.
-- `16-rendering-hud.js`: top-left paid pause control, compact backed top-right
-  score block, edge-safe bottom-left Energy/Hull instrument, touch controls,
-  warnings, and damage flash.
+- `16-rendering-hud.js`: top-left paid pause control, guarded restart/exit
+  confirmation, compact backed top-right score block, edge-safe bottom-left
+  Energy/Hull instrument, touch controls, warnings, and damage flash.
 - `17-rendering-scene.js`: outer fog, top-level draw orchestration, and the
   time-based top-down galaxy transit shared by title Play and First Flight.
 - `17-tutorial-onboarding.js`: First Flight runtime director, accessible
@@ -67,8 +69,11 @@ after the files they depend on, because the current code intentionally shares gl
   hazard drawing, overlays, and expansion wave template registration.
 - `18-title-input.js`: title-screen meta panel routing, account/settings actions,
   progress-road drag/claim input, and reset-progress confirmation.
+- `18-accessible-actions.js`: semantic keyboard and assistive-technology routes
+  that invoke the existing title, panel, pause, reset, and Game Over actions.
 - `18-session-input-loop.js`: session setup, resize, input events, arrival and
-  dialogue control/simulation locks, update loop,
+  dialogue control/simulation locks, reconnect asset recovery, resize-safe
+  pointer cancellation, update loop,
   and localhost-only automated QA instrumentation. The production build removes
   scenarios and hidden snapshots. Player-facing phase skips, hitbox toggles,
   and developer stat controls are not part of the runtime.
