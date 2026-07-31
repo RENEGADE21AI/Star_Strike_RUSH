@@ -432,8 +432,17 @@ async function runCase(browser, baseUrl, item) {
       getAssetLoadState().ready === true &&
       !getAssetLoadState().failed.includes("tutorial_instructor")
     ));
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
+      return current.tutorial?.uiMode === "first_time_question"
+        && current.tutorial?.introFlight?.active === false;
+    });
     await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).click();
-    await page.getByRole("button", { name: "Begin Flight Training" }).waitFor();
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
+      return current.tutorial?.uiMode === "prelaunch_briefing";
+    });
+    await page.getByRole("button", { name: "Begin Flight Training" }).waitFor({ state: "visible" });
     evidence.after = await snapshot(page);
     if (evidence.after.tutorial?.uiMode !== "prelaunch_briefing") errors.push("call-sign prelaunch briefing was not active");
     if (!(await page.getByRole("button", { name: "Edit Call Sign" }).isVisible())) errors.push("call-sign edit was not accessible");
