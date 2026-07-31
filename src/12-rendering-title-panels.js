@@ -29,21 +29,37 @@ function drawTitleMetaStrip(x, y, w) {
 }
 function drawTitlePanelFrame(panel, title, showMetaStrip = true) {
   ctx.save();
-  ctx.fillStyle = "#080a14";
+  const fill = ctx.createLinearGradient(panel.x, panel.y, panel.x + panel.w, panel.y + panel.h);
+  fill.addColorStop(0, "rgba(8,15,29,0.98)");
+  fill.addColorStop(0.55, "rgba(6,8,18,0.98)");
+  fill.addColorStop(1, "rgba(14,8,19,0.98)");
+  ctx.fillStyle = fill;
   ctx.beginPath();
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 10);
   ctx.fill();
-  ctx.fillStyle = "rgba(0,0,0,0.12)";
-  ctx.fillRect(panel.x, panel.y, 8, panel.h);
-  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  const edge = ctx.createLinearGradient(panel.x, panel.y, panel.x, panel.y + panel.h);
+  edge.addColorStop(0, "rgba(87,225,255,0.42)");
+  edge.addColorStop(0.45, "rgba(87,225,255,0.06)");
+  edge.addColorStop(1, "rgba(255,116,120,0.24)");
+  ctx.fillStyle = edge;
+  ctx.fillRect(panel.x, panel.y + 10, 3, panel.h - 20);
+  ctx.strokeStyle = "rgba(168,218,235,0.24)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 10);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(100,228,255,0.16)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(panel.x + 76, panel.y + 1);
+  ctx.lineTo(panel.x + panel.w - 76, panel.y + 1);
   ctx.stroke();
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
   ctx.font = FONT_HUD;
   ctx.fillStyle = "#fff";
+  ctx.shadowColor = "rgba(94,225,255,0.24)";
+  ctx.shadowBlur = 8;
   ctx.fillText(title, panel.x + panel.w / 2, panel.y + 14);
   ctx.restore();
   if (showMetaStrip) drawTitleMetaStrip(panel.x + 18, panel.y + 42, panel.w - 36);
@@ -289,9 +305,11 @@ function drawCodexPanel() {
   const r = getCodexRects();
   const panel = r.panel;
   drawTitlePanelFrame(panel, "CODEX");
-  drawPanelCloseButton(r.closeRect);
   if (codexDetailType) drawCodexDetail(panel, codexDetailType);
   else drawCodexGrid(panel);
+  // Keep navigation above scroll content and lock badges at every scroll
+  // position; the Codex grid is intentionally rendered first.
+  drawPanelCloseButton(r.closeRect);
 }
 
 function drawResetProgressConfirm() {
@@ -321,20 +339,9 @@ function drawResetProgressConfirm() {
   ctx.fillStyle = "rgba(150,255,205,0.80)";
   ctx.fillText("PRESERVES: ACCESSIBILITY, AUDIO, CALL SIGN,", r.box.x + r.box.w / 2, r.box.y + 124);
   ctx.fillText("ACCOUNT IDENTITY AND FIREBASE AUTH", r.box.x + r.box.w / 2, r.box.y + 140);
-  ctx.font = FONT_BUTTON;
-  ctx.fillStyle = "rgba(255,255,255,0.88)";
-  ctx.fillRect(r.no.x, r.no.y, r.no.w, r.no.h);
-  ctx.strokeStyle = "rgba(255,255,255,0.28)";
-  ctx.strokeRect(r.no.x, r.no.y, r.no.w, r.no.h);
-  ctx.fillStyle = "#000";
-  ctx.fillText("NO", r.no.x + r.no.w / 2, r.no.y + r.no.h / 2 + 1);
-  ctx.fillStyle = "rgba(255,90,90,0.94)";
-  ctx.fillRect(r.yes.x, r.yes.y, r.yes.w, r.yes.h);
-  ctx.strokeStyle = "rgba(255,160,160,0.55)";
-  ctx.strokeRect(r.yes.x, r.yes.y, r.yes.w, r.yes.h);
-  ctx.fillStyle = "#fff";
-  ctx.fillText("YES", r.yes.x + r.yes.w / 2, r.yes.y + r.yes.h / 2 + 1);
   ctx.restore();
+  drawSimpleButton(r.no, "KEEP DATA", "rgba(205,232,242,0.42)");
+  drawPressButton(r.yes, "ERASE DATA", false, "rgba(125,22,32,0.52)", "rgba(255,118,128,0.72)");
 }
 
 function onlineState() {
@@ -353,11 +360,18 @@ function onlineState() {
 }
 function drawOnlineActionButton(rect, label, active = true) {
   ctx.save();
-  ctx.fillStyle = active ? "rgba(120,255,180,0.14)" : "rgba(255,255,255,0.06)";
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  const fill = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+  fill.addColorStop(0, active ? "rgba(120,255,180,0.17)" : "rgba(255,255,255,0.07)");
+  fill.addColorStop(1, active ? "rgba(18,70,61,0.22)" : "rgba(255,255,255,0.025)");
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, Math.min(7, rect.h * 0.22));
+  ctx.fill();
   ctx.strokeStyle = active ? "rgba(120,255,180,0.55)" : "rgba(255,255,255,0.18)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.lineWidth = active ? 1.5 : 1;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, Math.min(7, rect.h * 0.22));
+  ctx.stroke();
   ctx.fillStyle = active ? "#fff" : "rgba(255,255,255,0.45)";
   ctx.font = FONT_BUTTON;
   ctx.textAlign = "center";
@@ -365,12 +379,66 @@ function drawOnlineActionButton(rect, label, active = true) {
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
   ctx.restore();
 }
+function drawSettingsToggle(rect, label, enabled) {
+  ctx.save();
+  const fill = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+  fill.addColorStop(0, "rgba(255,255,255,0.075)");
+  fill.addColorStop(1, "rgba(255,255,255,0.025)");
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7);
+  ctx.fill();
+  ctx.strokeStyle = enabled ? "rgba(120,255,180,0.48)" : "rgba(151,193,210,0.24)";
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7);
+  ctx.stroke();
+  ctx.font = `900 ${rect.w < 180 ? 9 : 10}px 'Arial Narrow', Arial, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(233,247,252,0.84)";
+  ctx.fillText(label, rect.x + 12, rect.y + rect.h / 2 + 1);
+  const pillWidth = rect.w < 180 ? 32 : 38;
+  const pill = { x: rect.x + rect.w - pillWidth - 10, y: rect.y + 6, w: pillWidth, h: rect.h - 12 };
+  ctx.fillStyle = enabled ? "rgba(83,220,158,0.18)" : "rgba(122,148,158,0.11)";
+  ctx.beginPath();
+  ctx.roundRect(pill.x, pill.y, pill.w, pill.h, pill.h / 2);
+  ctx.fill();
+  ctx.strokeStyle = enabled ? "rgba(120,255,180,0.52)" : "rgba(182,209,218,0.20)";
+  ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.font = "900 8px Arial, sans-serif";
+  ctx.fillStyle = enabled ? "#86ffc2" : "rgba(215,232,238,0.54)";
+  ctx.fillText(enabled ? "ON" : "OFF", pill.x + pill.w / 2, rect.y + rect.h / 2 + 1);
+  ctx.restore();
+}
+function drawDangerActionButton(rect, label) {
+  ctx.save();
+  ctx.fillStyle = "rgba(92,19,28,0.20)";
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 7);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,117,128,0.42)";
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,214,218,0.84)";
+  ctx.font = "900 10px 'Arial Narrow', Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
+  ctx.restore();
+}
 function drawPanelCloseButton(rect) {
   ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.10)";
-  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  const fill = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+  fill.addColorStop(0, "rgba(170,226,242,0.14)");
+  fill.addColorStop(1, "rgba(255,255,255,0.045)");
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 5);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(196,236,248,0.42)";
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 5);
+  ctx.stroke();
   ctx.fillStyle = "#fff";
   ctx.font = "900 10px 'Arial Narrow', Arial, sans-serif";
   ctx.textAlign = "center";
@@ -569,14 +637,21 @@ function drawOnlinePanel() {
       ctx.fillText(item.label, item.rect.x + item.rect.w / 2, item.rect.y + item.rect.h / 2 + 1);
     }
     ctx.restore();
-    drawOnlineActionButton(r.shake, `SHAKE: ${settingScreenShake ? "ON" : "OFF"}`, true);
-    drawOnlineActionButton(r.reset, "RESET LOCAL DATA", true);
-    drawOnlineActionButton(r.motion, `REDUCED MOTION: ${settingReducedMotion ? "ON" : "OFF"}`, true);
-    drawOnlineActionButton(r.flash, `REDUCED FLASH: ${settingReducedFlash ? "ON" : "OFF"}`, true);
-    drawOnlineActionButton(r.contrast, `HIGH CONTRAST: ${settingHighContrast ? "ON" : "OFF"}`, true);
-    drawOnlineActionButton(r.music, `MUSIC: ${settingMusicEnabled ? "ON" : "OFF"}`, true);
-    drawOnlineActionButton(r.effects, `EFFECTS: ${settingEffectsEnabled ? "ON" : "OFF"}`, true);
+    drawSettingsToggle(r.shake, "SCREEN SHAKE", settingScreenShake);
+    drawDangerActionButton(r.reset, "RESET LOCAL DATA");
+    drawSettingsToggle(r.motion, "REDUCED MOTION", settingReducedMotion);
+    drawSettingsToggle(r.flash, "REDUCED FLASH", settingReducedFlash);
+    drawSettingsToggle(r.contrast, "HIGH CONTRAST", settingHighContrast);
+    drawSettingsToggle(r.music, "MUSIC", settingMusicEnabled);
+    drawSettingsToggle(r.effects, "EFFECTS", settingEffectsEnabled);
     drawOnlineActionButton(r.replayTraining, "REPLAY FLIGHT TRAINING", true);
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = "800 8px Arial, sans-serif";
+    ctx.fillStyle = "rgba(185,220,233,0.42)";
+    ctx.fillText("SETTINGS SAVE ON THIS DEVICE AND APPLY IMMEDIATELY", panel.x + panel.w / 2, r.replayTraining.y + r.replayTraining.h + 17);
+    ctx.restore();
   }
 }
 function drawRecordsPanel() {
@@ -781,6 +856,7 @@ function drawRecordsPanel() {
     ctx.fillText("LOCAL PROGRESS IS ACTIVE • CONNECT TO PUBLISH RECORDS", archive.x + 16, archive.y + archive.h - 22);
   }
   ctx.restore();
+  drawPanelCloseButton(r.closeRect);
 }
 function achievementTierColor(tier) {
   return ["#8ea4b8", "#5ceeff", "#78ffb4", "#ffe070", "#ff69ec"][clamp(Math.floor(tier || 1) - 1, 0, 4)];
@@ -894,15 +970,13 @@ function drawAchievementsPanel() {
   ctx.beginPath();
   ctx.rect(r.contentRect.x, r.contentRect.y, r.contentRect.w, r.contentRect.h);
   ctx.clip();
-  const gap = 7;
-  const cardW = Math.floor((r.contentRect.w - gap) / 2);
-  const cardH = 67;
+  const gap = 10;
+  const cardW = r.contentRect.w - 4;
+  const cardH = 82;
   visibleDefinitions.forEach((achievement, index) => {
     const unlocked = earned.has(achievement.id);
-    const column = index % 2;
-    const row = Math.floor(index / 2);
-    const x = r.contentRect.x + column * (cardW + gap);
-    const y = r.contentRect.y + row * 74 - achievementScroll;
+    const x = r.contentRect.x + 1;
+    const y = r.contentRect.y + index * (cardH + gap) - achievementScroll;
     if (y + cardH < r.contentRect.y || y > r.contentRect.y + r.contentRect.h) return;
     const color = achievementTierColor(achievement.tier);
     const pulse = unlocked ? 0.04 + Math.sin((state.frame + index * 13) * 0.035) * 0.018 : 0;
@@ -912,23 +986,24 @@ function drawAchievementsPanel() {
     ctx.globalAlpha = unlocked ? 0.58 : 1;
     ctx.stroke();
     ctx.globalAlpha = 1;
-    drawAchievementGlyph(x + 18, y + 19, achievement.tier, unlocked);
+    drawAchievementGlyph(x + 20, y + 21, achievement.tier, unlocked);
     ctx.textAlign = "left";
-    ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
+    ctx.font = "900 11px 'Arial Narrow', Arial, sans-serif";
     ctx.fillStyle = unlocked ? "#fff" : "rgba(255,255,255,0.68)";
-    ctx.fillText(String(achievement.name || achievement.id).toUpperCase().slice(0, 22), x + 34, y + 10);
-    ctx.font = "700 7px Arial, sans-serif";
+    ctx.fillText(String(achievement.name || achievement.id).toUpperCase().slice(0, 38), x + 40, y + 11);
+    ctx.font = "700 8px Arial, sans-serif";
     ctx.fillStyle = unlocked ? color : "rgba(255,255,255,0.38)";
-    ctx.fillText(unlocked ? `TIER ${achievement.tier} • UNLOCKED` : `TIER ${achievement.tier} • IN PROGRESS`, x + 34, y + 24);
+    ctx.fillText(unlocked ? `TIER ${achievement.tier} • UNLOCKED` : `TIER ${achievement.tier} • IN PROGRESS`, x + 40, y + 28);
     ctx.fillStyle = "rgba(255,255,255,0.44)";
-    drawMeasuredTwoLineText(achievement.description, x + 9, y + 37, cardW - 18, 8);
+    ctx.font = "700 8px Arial, sans-serif";
+    drawMeasuredTwoLineText(achievement.description, x + 12, y + 43, cardW - 24, 10);
     const progress = typeof achievementProgressForMeta === "function"
       ? achievementProgressForMeta(achievement, meta)
       : { ratio: 0, label: "LOCKED" };
-    drawMetaBar(x + 9, y + 54, cardW - 58, unlocked ? 1 : progress.ratio, unlocked ? color : "rgba(92,238,255,0.50)");
+    drawMetaBar(x + 12, y + 68, cardW - 92, unlocked ? 1 : progress.ratio, unlocked ? color : "rgba(92,238,255,0.50)");
     ctx.textAlign = "right";
     ctx.fillStyle = unlocked ? color : "rgba(255,255,255,0.46)";
-    ctx.fillText(unlocked ? "DONE" : progress.label, x + cardW - 8, y + 53);
+    ctx.fillText(unlocked ? "DONE" : progress.label, x + cardW - 10, y + 67);
   });
   ctx.restore();
 

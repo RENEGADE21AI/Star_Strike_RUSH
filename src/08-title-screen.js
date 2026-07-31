@@ -88,7 +88,7 @@ function getOnlineRects() {
   const low = { x: innerX, y: btnY, w: btnW, h: btnH };
   const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
   const high = { x: innerX + 2 * (btnW + gap), y: btnY, w: btnW, h: btnH };
-  const shake = { x: innerX, y: btnY + 50, w: 134, h: 30 };
+  const shake = { x: innerX, y: btnY + 50, w: 150, h: 30 };
   const reset = { x: panel.x + panel.w - 180, y: btnY + 50, w: 160, h: 30 };
   const motion = { x: innerX, y: btnY + 96, w: panel.w - 40, h: 30 };
   const flash = { x: innerX, y: btnY + 134, w: panel.w - 40, h: 30 };
@@ -120,7 +120,7 @@ function getAchievementsRects() {
   categories.forEach((category, index) => {
     tabs[category] = { x: panel.x + 20 + index * (tabW + gap), y: panel.y + 52, w: tabW, h: 25 };
   });
-  const contentRect = { x: panel.x + 16, y: panel.y + 176, w: panel.w - 32, h: panel.h - 230 };
+  const contentRect = { x: panel.x + 16, y: panel.y + 170, w: panel.w - 32, h: panel.h - 224 };
   const scrollUp = { x: panel.x + panel.w - 60, y: panel.y + panel.h - 43, w: 20, h: 20 };
   const scrollDown = { x: panel.x + panel.w - 34, y: panel.y + panel.h - 43, w: 20, h: 20 };
   return { panel, closeRect, tabs, contentRect, scrollUp, scrollDown };
@@ -132,7 +132,7 @@ function achievementsForCurrentCategory() {
     : definitions.filter((achievement) => achievement.category === achievementCategory);
 }
 function getAchievementContentHeight() {
-  return Math.ceil(achievementsForCurrentCategory().length / 2) * 74;
+  return achievementsForCurrentCategory().length * 92;
 }
 function getAchievementMaxScroll() {
   return Math.max(0, getAchievementContentHeight() - getAchievementsRects().contentRect.h);

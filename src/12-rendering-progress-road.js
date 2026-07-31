@@ -522,4 +522,5 @@ function drawProgressPanel() {
   const interactionLabel = atEnd ? "ROAD START" : titleProgressDragActive ? "DRAGGING ROAD" : titleProgressSelectedNode ? "NODE SELECTED" : "DRAG, WHEEL, OR TAP NODES";
   ctx.fillText(titleProgressTab === "season" ? `REWARDS STORED ON THIS DEVICE • ${interactionLabel}` : interactionLabel, panel.x + panel.w / 2, panel.y + panel.h - 26);
   ctx.restore();
+  drawPanelCloseButton(r.closeRect);
 }

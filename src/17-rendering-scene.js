@@ -18,11 +18,23 @@ function drawOuterFog() {
   // these points before the logical scene is drawn.
   ctx.fillStyle = "#01040b";
   ctx.fillRect(0, 0, screenW, screenH);
+  if (gx > 1) {
+    const leftDust = ctx.createRadialGradient(gx * 0.58, screenH * 0.34, 0, gx * 0.58, screenH * 0.34, Math.max(230, gx * 0.82));
+    leftDust.addColorStop(0, "rgba(28,108,142,0.065)");
+    leftDust.addColorStop(1, "rgba(2,7,16,0)");
+    ctx.fillStyle = leftDust;
+    ctx.fillRect(0, 0, gx, screenH);
+    const rightDust = ctx.createRadialGradient(screenW - gx * 0.46, screenH * 0.67, 0, screenW - gx * 0.46, screenH * 0.67, Math.max(250, gx * 0.88));
+    rightDust.addColorStop(0, "rgba(126,50,72,0.045)");
+    rightDust.addColorStop(1, "rgba(2,7,16,0)");
+    ctx.fillStyle = rightDust;
+    ctx.fillRect(gx + gw, 0, Math.max(0, screenW - gx - gw), screenH);
+  }
   ctx.fillStyle = "rgba(230,240,255,0.34)";
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 54; i++) {
     const px = ((i * 97 + 41) % 997) / 997 * screenW;
     const py = ((i * 193 + 73) % 991) / 991 * screenH;
-    const size = i % 9 === 0 ? 1.3 : 0.8;
+    const size = i % 11 === 0 ? 1.3 : i % 5 === 0 ? 1 : 0.7;
     ctx.fillRect(px, py, size, size);
   }
 
