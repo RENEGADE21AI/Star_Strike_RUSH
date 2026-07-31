@@ -1,5 +1,15 @@
 const SIMULATION_HZ = 60;
 const SIMULATION_STEP_MS = 1000 / SIMULATION_HZ;
+const DEFAULT_MAX_CANVAS_PIXELS = 8_388_608;
+
+function effectiveCanvasDpr(width, height, deviceDpr = 1, maxDpr = 2, maxPixels = DEFAULT_MAX_CANVAS_PIXELS) {
+  const safeWidth = Math.max(1, Number(width) || 1);
+  const safeHeight = Math.max(1, Number(height) || 1);
+  const desired = Math.max(0.5, Math.min(Math.max(0.5, Number(maxDpr) || 2), Number(deviceDpr) || 1));
+  const pixelBudget = Math.max(1, Number(maxPixels) || DEFAULT_MAX_CANVAS_PIXELS);
+  const budgetDpr = Math.sqrt(pixelBudget / (safeWidth * safeHeight));
+  return Math.min(desired, budgetDpr);
+}
 
 function createFixedStepClock(options = {}) {
   return {
@@ -53,6 +63,8 @@ function advanceFixedStep(clock, timestamp, simulate) {
 
 globalThis.SIMULATION_HZ = SIMULATION_HZ;
 globalThis.SIMULATION_STEP_MS = SIMULATION_STEP_MS;
+globalThis.DEFAULT_MAX_CANVAS_PIXELS = DEFAULT_MAX_CANVAS_PIXELS;
+globalThis.effectiveCanvasDpr = effectiveCanvasDpr;
 globalThis.createFixedStepClock = createFixedStepClock;
 globalThis.resetFixedStepClock = resetFixedStepClock;
 globalThis.advanceFixedStep = advanceFixedStep;

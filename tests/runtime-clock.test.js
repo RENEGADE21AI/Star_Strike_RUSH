@@ -15,6 +15,20 @@ test("fixed-step runtime is available", () => {
   assert.equal(typeof context.advanceFixedStep, "function");
 });
 
+test("canvas DPR preserves normal displays and caps ultra-wide backing-store memory", () => {
+  assert.equal(context.effectiveCanvasDpr(390, 844, 2), 2);
+  assert.equal(context.effectiveCanvasDpr(1440, 900, 2), 2);
+  const dpr4k = context.effectiveCanvasDpr(3840, 2160, 2);
+  assert.ok(dpr4k >= 1 && dpr4k < 1.01, `unexpected 4K DPR ${dpr4k}`);
+  assert.ok(3840 * 2160 * dpr4k * dpr4k <= context.DEFAULT_MAX_CANVAS_PIXELS + 1);
+  const dpr8k = context.effectiveCanvasDpr(7680, 4320, 2);
+  assert.ok(dpr8k >= 0.5 && dpr8k < 0.51, `unexpected 8K DPR ${dpr8k}`);
+  assert.ok(7680 * 4320 * dpr8k * dpr8k <= context.DEFAULT_MAX_CANVAS_PIXELS + 1);
+  const dprExtreme = context.effectiveCanvasDpr(20_000, 20_000, 2);
+  assert.ok(dprExtreme > 0 && dprExtreme < 0.5, `unexpected extreme DPR ${dprExtreme}`);
+  assert.ok(20_000 * 20_000 * dprExtreme * dprExtreme <= context.DEFAULT_MAX_CANVAS_PIXELS + 1);
+});
+
 function simulateAt(renderFps, durationMs = 10_000) {
   const clock = context.createFixedStepClock();
   let steps = 0;

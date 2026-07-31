@@ -994,12 +994,12 @@ function drawAchievementsPanel() {
     ctx.font = "900 11px 'Arial Narrow', Arial, sans-serif";
     ctx.fillStyle = unlocked ? "#fff" : "rgba(255,255,255,0.68)";
     ctx.fillText(String(achievement.name || achievement.id).toUpperCase().slice(0, 38), x + 40, y + 11);
-    ctx.font = "700 8px Arial, sans-serif";
+    ctx.font = "700 9px Arial, sans-serif";
     ctx.fillStyle = unlocked ? color : "rgba(255,255,255,0.38)";
     ctx.fillText(unlocked ? `TIER ${achievement.tier} • UNLOCKED` : `TIER ${achievement.tier} • IN PROGRESS`, x + 40, y + 28);
     ctx.fillStyle = "rgba(255,255,255,0.44)";
-    ctx.font = "700 8px Arial, sans-serif";
-    drawMeasuredTwoLineText(achievement.description, x + 12, y + 43, cardW - 24, 10);
+    ctx.font = "700 9px Arial, sans-serif";
+    drawMeasuredTwoLineText(achievement.description, x + 12, y + 43, cardW - 24, 11);
     const progress = typeof achievementProgressForMeta === "function"
       ? achievementProgressForMeta(achievement, meta)
       : { ratio: 0, label: "LOCKED" };

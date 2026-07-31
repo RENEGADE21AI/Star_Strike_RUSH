@@ -30,6 +30,30 @@ test("combat HUD protects touch controls and keeps the classic status order", ()
   assert.equal(desktop.status.y + desktop.status.h < 637, true, "status must not collide with the transient desktop hint");
 });
 
+test("boss Health HUD reserves the top-left Pause control", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "src", "09-rendering-controls.js"), "utf8");
+  const pause = { x: 10, y: 10, w: 52, h: 32 };
+  const context = { W: 375, getPauseButtonRect: () => pause };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  const layout = vm.runInContext("getBossHealthBarLayout()", context);
+  assert.ok(layout.frame.x >= pause.x + pause.w + 8, "boss frame must clear Pause by at least eight pixels");
+  assert.equal(layout.frame.x + layout.frame.w, 375 - layout.frame.x, "boss frame should remain centered");
+});
+
+test("short landscape viewports receive gutter-only portrait guidance", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "src", "17-rendering-scene.js"), "utf8");
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  const landscape = vm.runInContext("getLandscapeOrientationHintLayout(844, 390, 312, 219.27)", context);
+  assert.ok(landscape, "landscape guidance should be active at 844x390");
+  assert.ok(landscape.icon.x + landscape.icon.w <= landscape.gameRect.x, "icon must stay in the left gutter");
+  assert.ok(landscape.copy.x >= landscape.gameRect.x + landscape.gameRect.w, "copy must stay in the right gutter");
+  assert.equal(vm.runInContext("getLandscapeOrientationHintLayout(390, 844, 0, 390)", context), null);
+  assert.equal(vm.runInContext("getLandscapeOrientationHintLayout(1440, 900, 467, 506)", context), null);
+});
+
 test("phone achievement cards use a readable single-column rhythm", () => {
   const source = fs.readFileSync(path.join(repoRoot, "src", "08-title-screen.js"), "utf8");
   const context = {
@@ -46,6 +70,8 @@ test("phone achievement cards use a readable single-column rhythm", () => {
   );
   assert.match(achievementRenderer, /const cardW = r\.contentRect\.w - 4/);
   assert.match(achievementRenderer, /index \* \(cardH \+ gap\)/);
+  assert.match(achievementRenderer, /700 9px Arial/);
+  assert.doesNotMatch(achievementRenderer, /700 8px Arial/);
   assert.doesNotMatch(achievementRenderer, /index % 2|Math\.floor\(index \/ 2\)/);
 });
 
@@ -86,6 +112,7 @@ test("visual QA covers the full player journey and polished terminal states", ()
     "records-network",
     "progress-road",
     "title-landscape-844x390",
+    "pause-restart-confirmation",
     "settings-mobile-375x667",
     "gameplay-hud-touch-390x844",
     "game-over-summary",

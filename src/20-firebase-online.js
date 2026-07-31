@@ -102,6 +102,10 @@ function getState() {
   };
 }
 
+function getAccessibilityKey() {
+  return `${online.user ? "signed-in" : "signed-out"}|${safeHandle(online.profileHandle)}`;
+}
+
 function setStatus(message) {
   online.lastStatus = String(message || "");
   online.lastError = "";
@@ -256,6 +260,15 @@ async function loadFirebaseConfig() {
   throw new Error("Firebase config is not configured.");
 }
 
+function beginAuthTransitionGeneration() {
+  authGeneration++;
+  // Every promise created before this auth transition is now stale. Removing
+  // only the registry entries lets the guarded promises finish harmlessly
+  // while allowing a returning UID to start current-generation hydration.
+  hydrationPromises.clear();
+  return authGeneration;
+}
+
 function isHydrationCurrent(uid, generation) {
   return (
     authGeneration === generation &&
@@ -378,7 +391,9 @@ async function syncProfile(explicitCallSign = "", generation = authGeneration) {
 async function hydrateAccount(user, options = {}) {
   const uid = user && user.uid;
   if (!uid) return null;
-  if (!options.force && hydrationPromises.has(uid)) return hydrationPromises.get(uid);
+  // `force` requests a fresh hydration once this UID is idle; it must never
+  // create a second callable/read sequence while one is already in flight.
+  if (hydrationPromises.has(uid)) return hydrationPromises.get(uid);
   const generation = authGeneration;
   const hydration = (async () => {
     online.developmentCounters.hydrationSequences++;
@@ -588,6 +603,7 @@ async function devSignInAccount(accountName = "account-a") {
 
 window.starStrikeOnline = {
   getState,
+  getAccessibilityKey,
   signIn,
   signOut: signOutOnline,
   refresh,
@@ -641,7 +657,7 @@ async function bootFirebase() {
     setStatus("Firebase identity ready.");
 
     authModule.onAuthStateChanged(auth, (user) => {
-      authGeneration++;
+      beginAuthTransitionGeneration();
       lastAuthTransitionUid = user && user.uid ? user.uid : "";
       online.developmentCounters.authTransitions++;
       online.user = user || null;
