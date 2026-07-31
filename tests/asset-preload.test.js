@@ -59,3 +59,23 @@ test("failed images can retry and become available", async () => {
   assert.equal(result.failed.length, 0);
   assert.ok(attempts > 1);
 });
+
+test("failed-only reconnect retry recovers transient asset outages without reloading successful state", async () => {
+  let available = false;
+  let attempts = 0;
+  class ReconnectImage {
+    set src(_value) {
+      attempts++;
+      queueMicrotask(() => available ? this.onload?.() : this.onerror?.());
+    }
+  }
+  const context = loadManifest(ReconnectImage);
+  const initial = await context.preloadGameAssets({ ImageCtor: ReconnectImage, timeoutMs: 20, retries: 0 });
+  assert.ok(initial.failed.length > 0);
+  const initialAttempts = attempts;
+  available = true;
+  const recovered = await context.retryFailedAssets({ ImageCtor: ReconnectImage, timeoutMs: 20, retries: 0 });
+  assert.equal(recovered.failed.length, 0);
+  assert.equal(attempts - initialAttempts, initial.failed.length, "retry should request only the failed manifest entries");
+  assert.equal(context.getAssetLoadState().status, "ready");
+});

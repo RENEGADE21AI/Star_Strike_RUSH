@@ -26,6 +26,7 @@
 <script defer src="src/00-competition.js"></script>
 <script defer src="src/00-gameplay-rules.js"></script>
 <script defer src="src/00-input-actions.js"></script>
+<script defer src="src/00-accessible-surface.js"></script>
 <script defer src="src/00-pause-policy.js"></script>
 <script defer src="src/00-canvas-scroll.js"></script>
 <script defer src="src/00-achievement-catalog.js"></script>
@@ -57,18 +58,21 @@
 <script defer src="src/18-expansion-hazards-bosses.js"></script>
 <script defer src="src/18-expansion-rendering-waves.js"></script>
 <script defer src="src/18-title-input.js"></script>
+<script defer src="src/18-accessible-actions.js"></script>
 <script defer src="src/18-session-input-loop.js"></script>
 <script defer src="src/19-game-achievements.js"></script>
 <script type="module" src="src/20-firebase-online.js"></script>
 </head>
 <body>
-<canvas id="game" role="application" aria-label="Star Strike RUSH game canvas"></canvas>
+<canvas id="game" role="application" aria-label="Star Strike RUSH game canvas" tabindex="-1"></canvas>
 <input type="text" id="callSignInput"
   aria-label="Public call sign"
+  tabindex="-1"
   style="position:fixed;left:-9999px;top:0;opacity:0;width:1px;height:1px;"
   maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
 <input type="text" id="handleInput"
   aria-label="Unique public handle"
+  tabindex="-1"
   style="position:fixed;left:-9999px;top:0;opacity:0;width:1px;height:1px;"
   maxlength="16" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
 </body>

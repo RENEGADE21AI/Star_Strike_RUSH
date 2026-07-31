@@ -12,6 +12,7 @@ let VIEW_W = GAME_W;
 let VIEW_H = GAME_H;
 let renderDpr = 1;
 const MAX_RENDER_DPR = 2;
+const MAX_RENDER_PIXELS = typeof DEFAULT_MAX_CANVAS_PIXELS === "number" ? DEFAULT_MAX_CANVAS_PIXELS : 8_388_608;
 
 let W = GAME_W, H = GAME_H;
 let MAX_PARTICLES = 900;
@@ -95,6 +96,8 @@ let codexDetailType = null;
 let codexCategory = "enemies";
 let codexScroll = 0;
 let resetProgressConfirm = false;
+let pauseConfirmAction = "";
+let pauseConfirmPreviousNotice = "";
 
 const FONT_TITLE = "900 52px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
 const FONT_HUGE = "900 58px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
@@ -195,6 +198,12 @@ function accountIdentitySnapshot() {
   const service = window.starStrikeOnline;
   return service && typeof service.getState === "function" ? service.getState() : {};
 }
+function accountIdentityAccessibilityKey() {
+  const service = window.starStrikeOnline;
+  return service && typeof service.getAccessibilityKey === "function"
+    ? service.getAccessibilityKey()
+    : "signed-out|";
+}
 function editableCallSign() {
   const online = accountIdentitySnapshot();
   return online.user ? sanitizeCallSign(online.profileCallSign || "") : callSign;
@@ -203,6 +212,7 @@ function beginCallSignEditing() {
   callSignEditing = true;
   callSignDraft = editableCallSign();
   callSignInputEl.value = callSignDraft;
+  callSignInputEl.tabIndex = 0;
   setCallSignStatus("", "editing", 0);
   callSignInputEl.focus();
 }
@@ -211,6 +221,7 @@ function cancelCallSignEditing() {
   callSignDraft = editableCallSign();
   callSignInputEl.value = callSignDraft;
   setCallSignStatus("", "idle", 0);
+  callSignInputEl.tabIndex = -1;
   callSignInputEl.blur();
 }
 function commitCallSignDraft(fromBlur = false) {
@@ -222,6 +233,7 @@ function commitCallSignDraft(fromBlur = false) {
       callSignEditing = false;
       callSignDraft = editableCallSign();
       callSignInputEl.value = callSignDraft;
+      callSignInputEl.tabIndex = -1;
       setCallSignStatus(result.message || "INVALID CALL SIGN", "error", 150);
       return false;
     }
@@ -238,11 +250,13 @@ function commitCallSignDraft(fromBlur = false) {
     callSign = result.callSign;
     const stored = saveCallSign();
     callSignEditing = false;
+    callSignInputEl.tabIndex = -1;
     callSignInputEl.blur();
     setCallSignStatus(stored ? "SAVED ON THIS DEVICE" : "LOCAL SAVE FAILED", stored ? "success" : "error", 180);
     return stored;
   }
   callSignEditing = false;
+  callSignInputEl.tabIndex = -1;
   callSignInputEl.blur();
   const onlineService = window.starStrikeOnline;
   if (savingAccountIdentity && onlineService && typeof onlineService.updateCallSign === "function") {
@@ -287,6 +301,7 @@ function beginHandleEditing() {
   handleEditing = true;
   handleDraft = "";
   handleInputEl.value = "";
+  handleInputEl.tabIndex = 0;
   setHandleStatus("PUBLIC • CLAIM ONCE", 0);
   handleInputEl.focus();
   return true;
@@ -296,6 +311,7 @@ function cancelHandleEditing() {
   handleDraft = "";
   handleInputEl.value = "";
   setHandleStatus("HANDLE CLAIM CANCELLED", 70);
+  handleInputEl.tabIndex = -1;
   handleInputEl.blur();
 }
 function commitPublicHandleDraft() {
@@ -317,6 +333,7 @@ function commitPublicHandleDraft() {
   Promise.resolve(onlineService.claimHandle(validation.handle)).then((result) => {
     if (!result || !result.ok) throw new Error((result && result.message) || "Handle claim failed.");
     handleEditing = false;
+    handleInputEl.tabIndex = -1;
     handleInputEl.blur();
     setHandleStatus(`@${result.handle} IS YOURS`, 180);
   }).catch((error) => {

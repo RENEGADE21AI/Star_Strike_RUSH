@@ -9,6 +9,7 @@ let tutorialSkipReturnMode = "title";
 let tutorialLiveSignature = "";
 let onboardingAccountPulseFrames = 0;
 let onboardingPersistenceWarning = false;
+let tutorialFocusReturnTarget = null;
 let onboardingIntroFlight = {
   active: false,
   elapsedSeconds: 0,
@@ -117,7 +118,7 @@ function createTutorialDom() {
     "inset:0",
     "z-index:5",
     "pointer-events:none",
-    "display:none",
+    "display:block",
     "font-family:Arial,sans-serif"
   ].join(";");
 
@@ -135,7 +136,7 @@ function createTutorialDom() {
     "left:50%",
     "bottom:max(24px,env(safe-area-inset-bottom))",
     "transform:translateX(-50%)",
-    "display:flex",
+    "display:none",
     "gap:10px",
     "flex-wrap:wrap",
     "justify-content:center",
@@ -143,10 +144,39 @@ function createTutorialDom() {
     "pointer-events:auto"
   ].join(";");
 
+  root.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab" || root.getAttribute("aria-modal") !== "true") return;
+    const buttons = Array.from(actions.querySelectorAll("button:not([disabled])"));
+    if (!buttons.length) {
+      event.preventDefault();
+      return;
+    }
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || !actions.contains(active))) {
+      event.preventDefault();
+      last.focus({ preventScroll: true });
+    } else if (!event.shiftKey && (active === last || !actions.contains(active))) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    }
+  });
+
   root.append(live, actions);
   document.body.appendChild(root);
   tutorialDom = { root, live, actions };
   return tutorialDom;
+}
+
+function restoreTutorialFocus(dom) {
+  const target = tutorialFocusReturnTarget;
+  tutorialFocusReturnTarget = null;
+  if (!target || !target.isConnected || typeof target.focus !== "function") return;
+  requestAnimationFrame(() => {
+    if (dom.root.getAttribute("aria-modal") === "true") return;
+    try { target.focus({ preventScroll: true }); } catch {}
+  });
 }
 
 function tutorialAccessibleButton(label, action, primary = false) {
@@ -171,6 +201,12 @@ function tutorialAccessibleButton(label, action, primary = false) {
 
 function setTutorialAccessibleSurface(message, actions = []) {
   const dom = createTutorialDom();
+  const wasModal = dom.root.getAttribute("aria-modal") === "true";
+  const hasActions = actions.length > 0;
+  if (hasActions && !wasModal) {
+    const active = document.activeElement;
+    tutorialFocusReturnTarget = active && !dom.root.contains(active) ? active : null;
+  }
   dom.live.textContent = message;
   dom.actions.replaceChildren();
   for (const item of actions) {
@@ -178,16 +214,37 @@ function setTutorialAccessibleSurface(message, actions = []) {
     button.addEventListener("click", item.handler);
     dom.actions.appendChild(button);
   }
-  dom.root.style.display = actions.length ? "block" : "none";
+  dom.actions.style.display = hasActions ? "flex" : "none";
+  if (hasActions) {
+    dom.root.setAttribute("role", "dialog");
+    dom.root.setAttribute("aria-modal", "true");
+    dom.root.setAttribute("aria-describedby", dom.live.id);
+  } else {
+    dom.root.removeAttribute("role");
+    dom.root.removeAttribute("aria-modal");
+    dom.root.removeAttribute("aria-describedby");
+    if (wasModal) restoreTutorialFocus(dom);
+  }
   const focusTarget = dom.actions.querySelector("[data-onboarding-action]");
-  if (focusTarget) requestAnimationFrame(() => focusTarget.focus({ preventScroll: true }));
+  if (focusTarget) {
+    requestAnimationFrame(() => {
+      if (focusTarget.isConnected && dom.actions.contains(focusTarget)) {
+        focusTarget.focus({ preventScroll: true });
+      }
+    });
+  }
 }
 
 function hideTutorialAccessibleSurface(message = "") {
   const dom = createTutorialDom();
+  const wasModal = dom.root.getAttribute("aria-modal") === "true";
   dom.live.textContent = message;
   dom.actions.replaceChildren();
-  dom.root.style.display = "none";
+  dom.actions.style.display = "none";
+  dom.root.removeAttribute("role");
+  dom.root.removeAttribute("aria-modal");
+  dom.root.removeAttribute("aria-describedby");
+  if (wasModal) restoreTutorialFocus(dom);
   tutorialLiveSignature = "";
 }
 
@@ -483,20 +540,15 @@ function updateTutorialLiveRegion() {
   const message = tutorialDirector.dialogueVisible
     ? `${TUTORIAL_INSTRUCTOR.name}. ${lines}`
     : `${definition.objective}. ${prompt}`;
-  const dom = createTutorialDom();
   const signature = `${tutorialDirector.stepId}|${tutorialDirector.dialogueVisible}|${state.inputMode}|${message}`;
   if (signature === tutorialLiveSignature) return;
   tutorialLiveSignature = signature;
-  dom.live.textContent = message;
-  dom.root.style.display = "block";
-  dom.actions.replaceChildren();
   if (tutorialDirector.dialogueVisible) {
-    const button = tutorialAccessibleButton("Continue", "continue", true);
-    button.addEventListener("click", advanceTutorialDialogue);
-    dom.actions.appendChild(button);
-    requestAnimationFrame(() => button.focus({ preventScroll: true }));
+    setTutorialAccessibleSurface(message, [
+      { label: "Continue", action: "continue", primary: true, handler: advanceTutorialDialogue }
+    ]);
   } else {
-    dom.root.style.pointerEvents = "none";
+    setTutorialAccessibleSurface(message);
   }
 }
 
@@ -922,10 +974,8 @@ function replayFirstFlightTraining() {
 
 function showTutorialPauseAccessibility() {
   if (state.runMode !== "tutorial") return;
-  const resume = () => {
-    resumeGame();
-    hideTutorialAccessibleSurface("Training resuming.");
-  };
+  tutorialLiveSignature = "";
+  const resume = () => resumeGame();
   setTutorialAccessibleSurface("First Flight training paused.", [
     { label: "Resume", action: "resume", primary: true, handler: resume },
     {

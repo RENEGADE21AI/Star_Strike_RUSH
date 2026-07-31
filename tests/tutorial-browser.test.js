@@ -318,6 +318,87 @@ test("existing local progress does not answer the one-time first-flight question
   }
 });
 
+test("First Flight actions expose modal semantics and keep keyboard focus contained", { timeout: 90_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(baseUrl, { waitUntil: "commit" });
+    const root = page.locator("#tutorialAccessibility");
+    const yes = page.locator('[data-onboarding-action="first-flight-yes"]');
+    const no = page.locator('[data-onboarding-action="first-flight-no"]');
+    await yes.waitFor({ state: "visible", timeout: 90_000 });
+    await page.waitForFunction(() => document.activeElement?.dataset?.onboardingAction === "first-flight-yes");
+
+    assert.equal(await root.getAttribute("role"), "dialog");
+    assert.equal(await root.getAttribute("aria-modal"), "true");
+    assert.equal(await root.getAttribute("aria-describedby"), "tutorialLiveRegion");
+
+    await page.keyboard.press("Shift+Tab");
+    assert.equal(await page.evaluate(() => document.activeElement?.dataset?.onboardingAction), "first-flight-no");
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => document.activeElement?.dataset?.onboardingAction), "first-flight-yes");
+    await no.focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => document.activeElement?.dataset?.onboardingAction), "first-flight-yes");
+  } finally {
+    await context.close();
+  }
+});
+
+test("First Flight keeps status mounted and restores focus when actions dismiss", { timeout: 90_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => {
+    localStorage.setItem("star_strike_rush_onboarding_v1", JSON.stringify({
+      schemaVersion: 1,
+      status: "completed",
+      checkpoint: "graduation",
+      startedAtMs: 1,
+      updatedAtMs: 2,
+      completedAtMs: 2
+    }));
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/?debug=1`, { waitUntil: "commit" });
+    await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent, null, { timeout: 90_000 });
+    await page.evaluate(() => {
+      const probe = document.createElement("button");
+      probe.id = "tutorialFocusReturnProbe";
+      probe.textContent = "Focus return probe";
+      document.body.appendChild(probe);
+      probe.focus();
+      setTutorialAccessibleSurface("Modal focus test", [
+        { label: "Confirm", action: "focus-test", primary: true, handler: () => {} }
+      ]);
+    });
+    await page.waitForFunction(() => document.activeElement?.dataset?.onboardingAction === "focus-test");
+    await page.evaluate(() => hideTutorialAccessibleSurface("Modal closed; status remains available."));
+    await page.waitForFunction(() => document.activeElement?.id === "tutorialFocusReturnProbe");
+
+    const state = await page.evaluate(() => {
+      const root = document.querySelector("#tutorialAccessibility");
+      const actions = document.querySelector("#tutorialAccessibleActions");
+      const live = document.querySelector("#tutorialLiveRegion");
+      return {
+        rootDisplay: getComputedStyle(root).display,
+        actionsDisplay: getComputedStyle(actions).display,
+        role: root.getAttribute("role"),
+        modal: root.getAttribute("aria-modal"),
+        liveRole: live.getAttribute("role"),
+        liveText: live.textContent
+      };
+    });
+    assert.equal(state.rootDisplay, "block");
+    assert.equal(state.actionsDisplay, "none");
+    assert.equal(state.role, null);
+    assert.equal(state.modal, null);
+    assert.equal(state.liveRole, "status");
+    assert.equal(state.liveText, "Modal closed; status remains available.");
+  } finally {
+    await context.close();
+  }
+});
+
 test("a local call sign can be edited inline before training launch", { timeout: 90_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
@@ -497,7 +578,7 @@ test("tutorial pause runtime and accessible Resume remain free when repeated", {
       });
       assert.equal((await snapshot(page)).player.hp, healthBefore);
       assert.equal((await snapshot(page)).ui.pauseNotice, "TRAINING PAUSED: NO HEALTH COST");
-      await page.getByRole("button", { name: "Resume" }).click();
+      await page.getByRole("button", { name: "Resume", exact: true }).click();
       await page.waitForFunction(() => {
         const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
         return current.gameState === "playing" && current.input.gameplayControlEnabled === true;

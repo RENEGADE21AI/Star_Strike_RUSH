@@ -1,3 +1,74 @@
+function getLandscapeOrientationHintLayout(
+  screenW = VIEW_W,
+  screenH = VIEW_H,
+  gameX = offsetX,
+  gameW = GAME_W * scale
+) {
+  const rightEdge = gameX + gameW;
+  const leftGutter = Math.max(0, gameX);
+  const rightGutter = Math.max(0, screenW - rightEdge);
+  const landscape = screenW / Math.max(1, screenH) >= 1.55;
+  if (!landscape || screenH > 500 || Math.min(leftGutter, rightGutter) < 140) return null;
+  const centerY = screenH / 2;
+  return {
+    gameRect: { x: gameX, y: 0, w: gameW, h: screenH },
+    icon: {
+      x: leftGutter / 2 - 24,
+      y: centerY - 38,
+      w: 48,
+      h: 76
+    },
+    copy: {
+      x: rightEdge + 22,
+      y: centerY - 34,
+      w: Math.max(1, rightGutter - 44),
+      h: 68
+    }
+  };
+}
+
+function drawLandscapeOrientationHint(layout) {
+  if (!layout) return;
+  const icon = layout.icon;
+  const copy = layout.copy;
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  ctx.strokeStyle = "rgba(116,225,255,0.56)";
+  ctx.fillStyle = "rgba(8,22,36,0.34)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(icon.x + 9, icon.y + 2, icon.w - 18, icon.h - 4, 7);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(205,245,255,0.42)";
+  ctx.beginPath();
+  ctx.moveTo(icon.x + 18, icon.y + 11);
+  ctx.lineTo(icon.x + icon.w - 18, icon.y + 11);
+  ctx.moveTo(icon.x + 19, icon.y + icon.h - 11);
+  ctx.lineTo(icon.x + icon.w - 19, icon.y + icon.h - 11);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(122,239,255,0.72)";
+  ctx.beginPath();
+  ctx.arc(icon.x + icon.w / 2, icon.y + icon.h - 7, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(124,231,255,0.72)";
+  ctx.font = "900 10px 'Arial Narrow', Arial, sans-serif";
+  ctx.fillText("PORTRAIT FLIGHT MODE", copy.x + copy.w / 2, copy.y + 15);
+  ctx.fillStyle = "rgba(232,249,255,0.90)";
+  ctx.font = "900 15px 'Arial Narrow', Arial, sans-serif";
+  ctx.fillText("ROTATE FOR FULL VIEW", copy.x + copy.w / 2, copy.y + 38);
+  ctx.strokeStyle = "rgba(116,225,255,0.28)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(copy.x + copy.w * 0.28, copy.y + 57);
+  ctx.lineTo(copy.x + copy.w * 0.72, copy.y + 57);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawOuterFog() {
   const screenW = VIEW_W;
   const screenH = VIEW_H;
@@ -57,6 +128,8 @@ function drawOuterFog() {
     ctx.fillStyle = rightSeam;
     ctx.fillRect(gx + gw, gy, Math.min(tightSeam, screenW - gx - gw), gh);
   }
+
+  drawLandscapeOrientationHint(getLandscapeOrientationHintLayout(screenW, screenH, gx, gw));
 
 }
 function drawPlayfieldFogBlend() {

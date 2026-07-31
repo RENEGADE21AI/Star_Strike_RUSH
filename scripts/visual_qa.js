@@ -47,6 +47,7 @@ const cases = [
   { name: "gameplay-hud-375x667", width: 375, height: 667, kind: "gameplay-hud" },
   { name: "gameplay-hud-touch-390x844", width: 390, height: 844, kind: "gameplay-hud", touch: true },
   { name: "paused-hud-375x667", width: 375, height: 667, kind: "paused-hud" },
+  { name: "pause-restart-confirmation", width: 375, height: 667, kind: "pause-confirm" },
   { name: "game-over-summary", width: 390, height: 844, kind: "scenario", scenario: "gameover" },
   { name: "debris-staging", width: 375, height: 667, kind: "scenario", scenario: "debris-incoming" },
   { name: "powerup-gallery", width: 390, height: 844, kind: "scenario", scenario: "powerups" },
@@ -217,6 +218,25 @@ async function runCase(browser, baseUrl, item) {
 
   if (item.kind === "title") {
     const title = before.layout.title;
+    const orientationHint = await page.evaluate(() => typeof getLandscapeOrientationHintLayout === "function"
+      ? getLandscapeOrientationHintLayout()
+      : null);
+    evidence.orientationHint = orientationHint;
+    if (item.name === "title-landscape-844x390") {
+      if (!orientationHint) errors.push("landscape viewport did not show portrait-flight guidance");
+      else {
+        const game = orientationHint.gameRect;
+        for (const [name, rect] of [["icon", orientationHint.icon], ["copy", orientationHint.copy]]) {
+          const overlaps = !(rect.x + rect.w <= game.x || game.x + game.w <= rect.x);
+          if (overlaps) errors.push(`landscape ${name} entered the playfield`);
+          if (rect.x < 0 || rect.y < 0 || rect.x + rect.w > item.width || rect.y + rect.h > item.height) {
+            errors.push(`landscape ${name} left the viewport`);
+          }
+        }
+      }
+    } else if (orientationHint) {
+      errors.push("portrait viewport showed landscape orientation guidance");
+    }
     const widthRatio = title?.screenBounds?.w / Math.max(1, title?.playableScreenWidth || 0);
     if (!title || widthRatio < 0.88) errors.push(`title width ratio ${widthRatio || 0} is below 0.88`);
     if (!(title?.lineGap >= 4)) errors.push(`STAR STRIKE / RUSH gap ${title?.lineGap} is below 4px`);
@@ -343,7 +363,7 @@ async function runCase(browser, baseUrl, item) {
     });
     await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
     evidence.after = await snapshot(page);
-  } else if (item.kind === "gameplay-hud" || item.kind === "paused-hud") {
+  } else if (item.kind === "gameplay-hud" || item.kind === "paused-hud" || item.kind === "pause-confirm") {
     await clickLayout(page, "play");
     await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
     const playing = await snapshot(page);
@@ -363,13 +383,22 @@ async function runCase(browser, baseUrl, item) {
       const status = playing.layout.hud?.status;
       if (!status || status.y + status.h > 535) errors.push("touch HUD overlaps the virtual joystick zone");
     }
-    if (item.kind === "paused-hud") {
+    if (item.kind === "paused-hud" || item.kind === "pause-confirm") {
       await clickLayout(page, "pause");
       await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "paused");
+      if (item.kind === "pause-confirm") {
+        await page.evaluate(() => {
+          const restart = getPauseOverlayRects().restart;
+          handlePausePointerDown(restart.x + restart.w / 2, restart.y + restart.h / 2);
+        });
+        await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).ui.pauseConfirmAction === "restart");
+      }
       const paused = await snapshot(page);
       evidence.after = paused;
       if (paused.player.hp !== playing.player.hp - 1) errors.push("manual pause did not cost exactly one health bar");
-      if (paused.ui.pauseNotice !== "PAUSE COST: 1 HEALTH BAR") errors.push("pause cost was not explained");
+      if (item.kind === "pause-confirm") {
+        if (paused.gameState !== "paused" || paused.ui.pauseConfirmAction !== "restart") errors.push("restart confirmation did not preserve the active paused run");
+      } else if (paused.ui.pauseNotice !== "PAUSE COST: 1 HEALTH BAR") errors.push("pause cost was not explained");
     } else {
       evidence.after = playing;
     }
@@ -500,6 +529,19 @@ async function runCase(browser, baseUrl, item) {
     }
     const tutorial = await snapshot(page);
     evidence.after = tutorial;
+    if (tutorial.encounter.boss) {
+      const bossHud = await page.evaluate(() => typeof getBossHealthBarLayout === "function" ? getBossHealthBarLayout() : null);
+      evidence.bossHud = bossHud;
+      const pause = tutorial.layout.pause;
+      const frame = bossHud && bossHud.frame;
+      if (!frame) errors.push("boss Health HUD layout was not exposed");
+      else if (pause && !(
+        pause.x + pause.w <= frame.x ||
+        frame.x + frame.w <= pause.x ||
+        pause.y + pause.h <= frame.y ||
+        frame.y + frame.h <= pause.y
+      )) errors.push("boss Health HUD overlaps the Pause control");
+    }
     const dialogue = tutorial.layout.tutorialDialogue;
     const objective = tutorial.layout.tutorialObjective;
     const controls = tutorial.layout.tutorialControls;

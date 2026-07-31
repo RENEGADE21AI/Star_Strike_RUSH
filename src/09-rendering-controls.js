@@ -134,6 +134,27 @@ function drawBossAura(x, y, width, color) {
   ctx.restore();
 }
 
+function getBossHealthBarLayout() {
+  const pause = typeof getPauseButtonRect === "function"
+    ? getPauseButtonRect()
+    : { x: 10, y: 10, w: 52, h: 32 };
+  const framePadding = 5;
+  const edgeClearance = 8;
+  const reservedInset = Math.max(
+    edgeClearance,
+    Number(pause.x || 0) + Number(pause.w || 0) + edgeClearance
+  );
+  const frameW = Math.min(268, Math.max(1, W - reservedInset * 2));
+  const frameX = (W - frameW) / 2;
+  return {
+    x: frameX + framePadding,
+    y: 7,
+    w: Math.max(1, frameW - framePadding * 2),
+    h: 27,
+    frame: { x: frameX, y: 7, w: frameW, h: 27 }
+  };
+}
+
 function drawBossHealthBar(boss, color = "#ff455c") {
   if (!boss) return;
   const hpPct = clamp(Number(boss.hp || 0) / Math.max(1, Number(boss.maxHp || 1)), 0, 1);
@@ -141,14 +162,15 @@ function drawBossHealthBar(boss, color = "#ff455c") {
   const key = boss.mode === "standard" ? "boss_standard" : boss.mode === "wraith" ? "boss_wraith" : `boss_${boss.mode}`;
   const meta = typeof getCodexMeta === "function" ? getCodexMeta(key) : null;
   const label = String((meta && meta.name) || boss.mode || "BOSS").replace(/_/g, " ").toUpperCase();
-  const barW = Math.min(258, W - 116);
-  const x = (W - barW) / 2;
-  const y = 7;
+  const layout = getBossHealthBarLayout();
+  const barW = layout.w;
+  const x = layout.x;
+  const y = layout.y;
   ctx.save();
   ctx.fillStyle = "rgba(3,6,14,0.88)";
-  ctx.beginPath(); ctx.roundRect(x - 5, y, barW + 10, 27, 5); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(layout.frame.x, layout.frame.y, layout.frame.w, layout.frame.h, 5); ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.18)";
-  ctx.beginPath(); ctx.roundRect(x - 5, y, barW + 10, 27, 5); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(layout.frame.x, layout.frame.y, layout.frame.w, layout.frame.h, 5); ctx.stroke();
   ctx.font = "900 8px 'Arial Narrow', Arial, sans-serif";
   ctx.textBaseline = "top";
   ctx.textAlign = "left";

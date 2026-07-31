@@ -95,14 +95,25 @@ function updateTitleProgressDrag(pointerId, x, y) {
   return true;
 }
 
-function endTitleProgressDrag(pointerId) {
+function endTitleProgressDrag(pointerId, cancelled = false) {
   if (!titleProgressDragActive) return false;
   if (titleProgressDragPointerId !== null && titleProgressDragPointerId !== pointerId) return false;
-  if (!titleProgressDragMoved) titleProgressSelectedNode = titleProgressPointerDownNode;
+  if (!cancelled && !titleProgressDragMoved) titleProgressSelectedNode = titleProgressPointerDownNode;
+  if (titleProgressDragPointerId !== null && titleProgressDragPointerId !== undefined) {
+    try { canvas.releasePointerCapture(titleProgressDragPointerId); } catch {}
+  }
   titleProgressDragActive = false;
   titleProgressDragPointerId = null;
   titleProgressPointerDownNode = null;
+  titleProgressDragMoved = false;
   return true;
+}
+
+function cancelTitlePointerInteractions() {
+  codexScrollController.cancel();
+  achievementScrollController.cancel();
+  titleScrollablePendingAction = null;
+  if (titleProgressDragActive) endTitleProgressDrag(titleProgressDragPointerId, true);
 }
 
 function openTitleProgressRoad(tab = null) {

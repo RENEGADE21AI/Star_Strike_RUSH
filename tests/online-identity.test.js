@@ -17,6 +17,45 @@ function loadIdentityContracts() {
   return context;
 }
 
+function loadHydrationContract(overrides = {}) {
+  const source = fs.readFileSync(path.join(repoRoot, "src", "20-firebase-online.js"), "utf8");
+  const generationStart = source.indexOf("function beginAuthTransitionGeneration");
+  const generationEnd = source.indexOf("\nfunction isHydrationCurrent", generationStart);
+  const start = source.indexOf("async function hydrateAccount");
+  const end = source.indexOf("\nasync function updateCallSign", start);
+  assert.ok(generationStart >= 0 && generationEnd > generationStart, "auth generation source boundary is available");
+  assert.ok(start >= 0 && end > start, "hydrateAccount source boundary is available");
+  const context = {
+    Map,
+    Promise,
+    hydrationPromises: new Map(),
+    authGeneration: 1,
+    localStorage: {},
+    navigator: { onLine: true },
+    online: {
+      developmentCounters: { hydrationSequences: 0 },
+      identityService: "available",
+      accountArchive: "not_loaded",
+      networkState: "online",
+      pendingCallSign: false,
+      profileCallSign: ""
+    },
+    window: {
+      readAccountIdentityState: () => ({ pending: false, desiredCallSign: "" })
+    },
+    isHydrationCurrent: () => true,
+    subscribeLegacyArchive: () => {},
+    setStatus: () => {},
+    setError: () => {},
+    ...overrides
+  };
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(source.slice(generationStart, generationEnd), context);
+  vm.runInContext(source.slice(start, end), context);
+  return context;
+}
+
 test("sign-out clears every account-scoped identity field without touching guest identity", () => {
   const context = loadIdentityContracts();
   const online = {
@@ -139,4 +178,80 @@ test("redirect restoration consumes one result and leaves hydration to auth stat
   });
   assert.equal(restored.user.uid, "account-r");
   assert.equal(resultCalls, 1);
+});
+
+test("forced refreshes coalesce with an in-flight UID hydration and refresh again once idle", async () => {
+  const pendingResolvers = [];
+  let syncCalls = 0;
+  let listenerCalls = 0;
+  const context = loadHydrationContract({
+    syncProfile: () => {
+      syncCalls++;
+      return new Promise((resolve) => pendingResolvers.push(resolve));
+    },
+    subscribeLegacyArchive: () => { listenerCalls++; }
+  });
+  const user = { uid: "account-a" };
+
+  const initial = context.hydrateAccount(user);
+  const reconnect = context.hydrateAccount(user, { force: true });
+  const manualRefresh = context.hydrateAccount(user, { force: true });
+  assert.equal(syncCalls, 1, "concurrent force requests must reuse the active callable sequence");
+  assert.equal(context.online.developmentCounters.hydrationSequences, 1);
+
+  pendingResolvers.shift()({ ok: true });
+  await Promise.all([initial, reconnect, manualRefresh]);
+  assert.equal(listenerCalls, 1);
+  assert.equal(context.hydrationPromises.size, 0, "the settled UID must leave the in-flight registry");
+
+  const laterRefresh = context.hydrateAccount(user, { force: true });
+  assert.equal(syncCalls, 2, "force must still start a new hydration after the active one settles");
+  pendingResolvers.shift()({ ok: true });
+  await laterRefresh;
+  assert.equal(listenerCalls, 2);
+  assert.equal(context.hydrationPromises.size, 0);
+});
+
+test("an auth generation change releases a stale UID promise without letting it delete the returning UID hydration", async () => {
+  const source = fs.readFileSync(path.join(repoRoot, "src", "20-firebase-online.js"), "utf8");
+  assert.match(source, /onAuthStateChanged\(auth, \(user\) => \{\s*beginAuthTransitionGeneration\(\);/);
+
+  const pendingResolvers = [];
+  let syncCalls = 0;
+  let listenerCalls = 0;
+  let context;
+  context = loadHydrationContract({
+    syncProfile: (_callSign, generation) => {
+      syncCalls++;
+      return new Promise((resolve) => pendingResolvers.push({ generation, resolve }));
+    },
+    isHydrationCurrent: (_uid, generation) => generation === context.authGeneration,
+    subscribeLegacyArchive: () => { listenerCalls++; }
+  });
+  const accountA = { uid: "account-a" };
+
+  const staleHydration = context.hydrateAccount(accountA);
+  assert.equal(syncCalls, 1);
+  assert.equal(context.hydrationPromises.size, 1);
+  context.beginAuthTransitionGeneration();
+  assert.equal(context.authGeneration, 2);
+  assert.equal(context.hydrationPromises.size, 0, "auth transition must release stale registry entries");
+
+  const currentHydration = context.hydrateAccount(accountA);
+  assert.equal(syncCalls, 2, "returning Account A must start a current-generation hydration");
+  assert.equal(context.hydrationPromises.size, 1);
+
+  const stale = pendingResolvers.shift();
+  assert.equal(stale.generation, 1);
+  stale.resolve({ ok: true });
+  assert.equal((await staleHydration).stale, true);
+  assert.equal(context.hydrationPromises.size, 1, "stale finally must preserve the newer Account A promise");
+  assert.equal(listenerCalls, 0);
+
+  const current = pendingResolvers.shift();
+  assert.equal(current.generation, 2);
+  current.resolve({ ok: true });
+  assert.equal((await currentHydration).ok, true);
+  assert.equal(listenerCalls, 1);
+  assert.equal(context.hydrationPromises.size, 0);
 });

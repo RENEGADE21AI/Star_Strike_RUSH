@@ -267,8 +267,49 @@ function getPauseOverlayRects() {
     title: { x: W / 2 - 92, y: H / 2 + 116, w: 184, h: 38 }
   };
 }
+function getPauseConfirmRects() {
+  return {
+    cancel: { x: W / 2 - 100, y: H / 2 + 30, w: 200, h: 40 },
+    confirm: { x: W / 2 - 100, y: H / 2 + 80, w: 200, h: 40 }
+  };
+}
+function requestPauseDestructiveAction(action) {
+  if (state.runMode === "tutorial" || !["restart", "title"].includes(action)) return false;
+  pauseConfirmPreviousNotice = state.pauseNotice;
+  pauseConfirmAction = action;
+  state.pauseNotice = action === "restart" ? "CURRENT RUN WILL RESTART" : "CURRENT RUN WILL END";
+  clearGameplayInput();
+  return true;
+}
+function cancelPauseDestructiveAction() {
+  if (!pauseConfirmAction) return false;
+  pauseConfirmAction = "";
+  state.pauseNotice = pauseConfirmPreviousNotice;
+  pauseConfirmPreviousNotice = "";
+  clearGameplayInput();
+  return true;
+}
+function confirmPauseDestructiveAction() {
+  const action = pauseConfirmAction;
+  pauseConfirmAction = "";
+  pauseConfirmPreviousNotice = "";
+  if (action === "restart") beginGame();
+  else if (action === "title") setupSession("start");
+  return action === "restart" || action === "title";
+}
 function handlePausePointerDown(x, y) {
   const rects = getPauseOverlayRects();
+  if (state.gameState === "resuming") {
+    if (hitRect(rects.resume, x, y)) cancelResumeCountdown();
+    return true;
+  }
+  if (state.gameState !== "paused") return true;
+  if (pauseConfirmAction) {
+    const confirmRects = getPauseConfirmRects();
+    if (hitRect(confirmRects.cancel, x, y)) cancelPauseDestructiveAction();
+    else if (hitRect(confirmRects.confirm, x, y)) confirmPauseDestructiveAction();
+    return true;
+  }
   if (hitRect(rects.resume, x, y)) { resumeGame(); return true; }
   if (state.runMode === "tutorial" && rects.checkpoint && hitRect(rects.checkpoint, x, y)) {
     recoverTutorialCheckpoint();
@@ -284,9 +325,13 @@ function handlePausePointerDown(x, y) {
     requestSkipTutorialTraining("pause");
     return true;
   }
-  if (hitRect(rects.restart, x, y)) { beginGame(); return true; }
+  if (hitRect(rects.restart, x, y)) { requestPauseDestructiveAction("restart"); return true; }
   if (hitRect(rects.title, x, y)) {
     const wasTutorial = state.runMode === "tutorial";
+    if (!wasTutorial) {
+      requestPauseDestructiveAction("title");
+      return true;
+    }
     setupSession("start");
     if (wasTutorial && typeof onboardingState !== "undefined" && onboardingState && onboardingState.status === "in_progress") {
       onboardingUiMode = "resume_training";
@@ -322,6 +367,7 @@ function drawPauseButton() {
 function drawPauseOverlay() {
   const rects = getPauseOverlayRects();
   const resuming = state.gameState === "resuming";
+  const confirming = state.gameState === "paused" && !!pauseConfirmAction;
   ctx.save();
   ctx.fillStyle = "rgba(1,4,13,0.78)";
   ctx.fillRect(0, 0, W, H);
@@ -334,13 +380,28 @@ function drawPauseOverlay() {
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#eafaff";
   ctx.font = "700 24px system-ui, sans-serif";
-  ctx.fillText(resuming ? String(Math.max(1, Math.ceil(state.resumeCountdown / 30))) : "FLIGHT PAUSED", W / 2, H / 2 - 70);
+  const heading = resuming
+    ? String(Math.max(1, Math.ceil(state.resumeCountdown / 30)))
+    : confirming
+      ? pauseConfirmAction === "restart" ? "RESTART RUN?" : "RETURN TO TITLE?"
+      : "FLIGHT PAUSED";
+  ctx.fillText(heading, W / 2, H / 2 - 70);
   ctx.font = "600 10px system-ui, sans-serif";
   ctx.fillStyle = "rgba(194,231,244,0.62)";
-  ctx.fillText(resuming ? "RE-ENGAGING CONTROLS" : "SIMULATION FROZEN", W / 2, H / 2 - 42);
+  ctx.fillText(resuming ? "RE-ENGAGING CONTROLS" : confirming ? "THIS RUN'S PROGRESS WILL BE LOST" : "SIMULATION FROZEN", W / 2, H / 2 - 42);
   ctx.fillStyle = state.pausedReason === "manual" ? "rgba(255,142,150,0.86)" : "rgba(132,238,204,0.78)";
   ctx.fillText(state.pauseNotice || "", W / 2, H / 2 - 24);
-  if (!resuming) {
+  if (resuming) {
+    drawSimpleButton(rects.resume, "STAY PAUSED", "rgba(88,229,255,0.44)");
+  } else if (confirming) {
+    const confirmRects = getPauseConfirmRects();
+    drawSimpleButton(confirmRects.cancel, "KEEP RUN", "rgba(88,229,255,0.52)");
+    drawSimpleButton(
+      confirmRects.confirm,
+      pauseConfirmAction === "restart" ? "CONFIRM RESTART" : "CONFIRM EXIT",
+      "rgba(255,126,136,0.48)"
+    );
+  } else {
     drawSimpleButton(rects.resume, "RESUME", "rgba(88,229,255,0.62)");
     if (state.runMode === "tutorial") {
       drawSimpleButton(rects.checkpoint, "RESTART CHECKPOINT", "rgba(255,255,255,0.30)");

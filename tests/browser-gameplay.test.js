@@ -476,6 +476,306 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
   }
 });
 
+test("resume countdown can be cancelled without hidden actions or an additional health charge", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
+  const { page, errors } = await openGame(context);
+  try {
+    const initial = await page.evaluate(() => {
+      startPlayingSession();
+      state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
+      state.player.hp = 4;
+      pauseGame("manual");
+      return getDebugSnapshot();
+    });
+    assert.equal(initial.gameState, "paused");
+    assert.equal(initial.player.hp, 3, "the original deliberate pause should charge exactly once");
+
+    const overlay = await page.evaluate(() => {
+      resumeGame();
+      const rects = getPauseOverlayRects();
+      const screenRect = (rect) => ({
+        x: offsetX + rect.x * scale,
+        y: offsetY + rect.y * scale,
+        w: rect.w * scale,
+        h: rect.h * scale
+      });
+      return { restart: screenRect(rects.restart), resume: screenRect(rects.resume) };
+    });
+    await page.dispatchEvent("canvas", "pointerdown", {
+      pointerId: 51,
+      pointerType: "touch",
+      clientX: overlay.restart.x + overlay.restart.w / 2,
+      clientY: overlay.restart.y + overlay.restart.h / 2,
+      buttons: 1
+    });
+    await page.dispatchEvent("canvas", "pointerup", {
+      pointerId: 51,
+      pointerType: "touch",
+      clientX: overlay.restart.x + overlay.restart.w / 2,
+      clientY: overlay.restart.y + overlay.restart.h / 2,
+      buttons: 0
+    });
+    await page.waitForTimeout(60);
+    let snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.gameState, "resuming", "invisible restart and title hit areas must be inert during countdown");
+    assert.equal(snapshot.player.hp, 3);
+
+    await page.dispatchEvent("canvas", "pointerdown", {
+      pointerId: 52,
+      pointerType: "touch",
+      clientX: overlay.resume.x + overlay.resume.w / 2,
+      clientY: overlay.resume.y + overlay.resume.h / 2,
+      buttons: 1
+    });
+    await page.dispatchEvent("canvas", "pointerup", {
+      pointerId: 52,
+      pointerType: "touch",
+      clientX: overlay.resume.x + overlay.resume.w / 2,
+      clientY: overlay.resume.y + overlay.resume.h / 2,
+      buttons: 0
+    });
+    await page.waitForFunction(() => state.gameState === "paused");
+    snapshot = await page.evaluate(() => getDebugSnapshot());
+    assert.equal(snapshot.gameState, "paused", "the visible Stay Paused action should cancel the countdown");
+    assert.equal(snapshot.player.hp, 3);
+    assert.equal(snapshot.ui.pauseNotice, "RESUME CANCELLED — NO ADDITIONAL HEALTH COST");
+
+    await page.evaluate(() => resumeGame());
+    await page.keyboard.press("Escape");
+    snapshot = await page.evaluate(() => getDebugSnapshot());
+    assert.equal(snapshot.gameState, "paused", "Escape should return to the pause menu");
+    assert.equal(snapshot.player.hp, 3, "cancelling resume must never charge another health bar");
+    const pauseExplanationBeforeConfirm = snapshot.ui.pauseNotice;
+
+    const destructiveRequest = await page.evaluate(() => {
+      const restart = getPauseOverlayRects().restart;
+      const handled = handlePausePointerDown(restart.x + restart.w / 2, restart.y + restart.h / 2);
+      return { handled, gameState: state.gameState, runMode: state.runMode, pauseConfirmAction };
+    });
+    assert.deepEqual(destructiveRequest, { handled: true, gameState: "paused", runMode: "standard", pauseConfirmAction: "restart" });
+    snapshot = await page.evaluate(() => getDebugSnapshot());
+    assert.equal(snapshot.gameState, "paused", "the first destructive pause action must not discard the run");
+    assert.equal(snapshot.ui.pauseConfirmAction, "restart");
+    assert.equal(snapshot.player.hp, 3);
+    await page.keyboard.press("Escape");
+    snapshot = await page.evaluate(() => getDebugSnapshot());
+    assert.equal(snapshot.gameState, "paused");
+    assert.equal(snapshot.ui.pauseConfirmAction, "");
+    assert.equal(snapshot.ui.pauseNotice, pauseExplanationBeforeConfirm, "cancelling a destructive action must restore the current pause explanation");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("title panels and reset confirmation absorb launch keys and close predictably with Escape", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context);
+  try {
+    await page.evaluate(() => {
+      setupSession("start");
+      state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
+      openTitleMetaScreen("online");
+      titlePanelAnim = 1;
+      titlePanelTarget = 1;
+    });
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Space");
+    let snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.gameState, "start");
+    assert.equal(snapshot.transition.mode, "idle", "launch keys must not start a run through an open title panel");
+    assert.equal(snapshot.ui.titlePanelTarget, 1);
+
+    await page.keyboard.press("Escape");
+    snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.ui.titlePanelTarget, 0, "Escape should close the active title panel");
+
+    await page.evaluate(() => {
+      openTitleMetaScreen("online");
+      titlePanelAnim = 1;
+      titlePanelTarget = 1;
+      resetProgressConfirm = true;
+    });
+    await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "reset-confirmation");
+    await page.keyboard.press("Enter");
+    snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.gameState, "start");
+    assert.equal(snapshot.transition.mode, "idle");
+    assert.equal(snapshot.ui.resetProgressConfirm, false, "the safely focused Keep Data action should cancel without erasing or launching");
+
+    await page.evaluate(() => { resetProgressConfirm = true; });
+    await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "reset-confirmation");
+    await page.keyboard.press("Escape");
+    snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.ui.resetProgressConfirm, false, "Escape should cancel reset without closing the parent settings panel");
+    assert.equal(snapshot.ui.titlePanelTarget, 1);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("semantic title, settings, reset, pause, and game-over actions are keyboard operable", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context);
+  try {
+    await page.getByRole("button", { name: "Play" }).waitFor({ state: "attached" });
+    const titleAccessibilitySnapshots = await page.evaluate(() => {
+      const original = accountIdentitySnapshot;
+      let calls = 0;
+      accountIdentitySnapshot = (...args) => {
+        calls++;
+        return original(...args);
+      };
+      lastGameAccessibilitySyncKey = "";
+      syncGameAccessibleSurface();
+      accountIdentitySnapshot = original;
+      return calls;
+    });
+    assert.equal(titleAccessibilitySnapshots, 0, "the title accessibility path must not clone the full account archive");
+    const editingSurface = await page.evaluate(() => {
+      callSignEditing = true;
+      lastGameAccessibilitySyncKey = "";
+      syncGameAccessibleSurface();
+      const callSign = gameAccessibilitySnapshot();
+      callSignEditing = false;
+      handleEditing = true;
+      syncGameAccessibleSurface();
+      const handle = gameAccessibilitySnapshot();
+      handleEditing = false;
+      lastGameAccessibilitySyncKey = "";
+      syncGameAccessibleSurface();
+      return { callSign, handle };
+    });
+    assert.equal(editingSurface.callSign.hidden, true, "call-sign editing must hide stale Canvas actions");
+    assert.equal(editingSurface.handle.hidden, true, "handle editing must hide stale Canvas actions");
+    assert.deepEqual(await page.evaluate(() => ({
+      callSignTabIndex: document.querySelector("#callSignInput").tabIndex,
+      handleTabIndex: document.querySelector("#handleInput").tabIndex
+    })), { callSignTabIndex: -1, handleTabIndex: -1 });
+
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Play");
+    const dossier = page.getByRole("button", { name: "Open Pilot Dossier" });
+    await dossier.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => titleSubState === "online" && titlePanelAnim >= 0.9);
+    let snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.gameState, "start", "activating a semantic title control must not leak through to Play");
+    assert.equal(snapshot.transition.mode, "idle");
+
+    const settings = page.getByRole("button", { name: "Settings tab" });
+    await settings.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => accountPanelTab === "settings");
+    const musicWasEnabled = (await debugSnapshot(page)).ui.settingMusicEnabled;
+    const music = page.getByRole("button", { name: musicWasEnabled ? "Disable music" : "Enable music" });
+    await music.focus();
+    await page.keyboard.press("Space");
+    await page.waitForFunction((before) => JSON.parse(document.querySelector("#debugSnapshot").textContent).ui.settingMusicEnabled !== before, musicWasEnabled);
+
+    const reset = page.getByRole("button", { name: "Reset local gameplay data" });
+    await reset.focus();
+    await page.keyboard.press("Enter");
+    const keep = page.getByRole("button", { name: "Keep data" });
+    const erase = page.getByRole("button", { name: "Erase local gameplay data" });
+    await keep.waitFor({ state: "attached" });
+    assert.equal(await page.locator("#gameAccessibility").getAttribute("aria-modal"), "true");
+    await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Keep data");
+    await erase.focus();
+    await page.keyboard.press("Tab");
+    assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Keep data", "modal Tab should wrap to its safe first action");
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => resetProgressConfirm === false);
+    await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Reset local gameplay data");
+    snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.gameState, "start");
+
+    await page.evaluate(() => {
+      startPlayingSession();
+      state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
+      state.player.hp = 4;
+    });
+    await page.keyboard.press("Escape");
+    const resume = page.getByRole("button", { name: "Resume flight" });
+    await resume.waitFor({ state: "attached" });
+    await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Resume flight");
+    assert.equal((await debugSnapshot(page)).player.hp, 3);
+    const restartRun = page.getByRole("button", { name: "Restart run" });
+    await restartRun.focus();
+    await page.keyboard.press("Enter");
+    const keepRun = page.getByRole("button", { name: "Keep run" });
+    await keepRun.waitFor({ state: "attached" });
+    assert.equal((await debugSnapshot(page)).gameState, "paused");
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => pauseConfirmAction === "" && gameAccessibilitySnapshot().mode === "pause");
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "resuming");
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "paused");
+    assert.equal((await debugSnapshot(page)).player.hp, 3, "semantic modal Escape must not double-charge pause Health");
+
+    await page.evaluate(() => {
+      setupSession("playing");
+      state.runMode = "debug";
+      state.gameState = "gameover";
+      state.score = 12345;
+    });
+    const road = page.getByRole("button", { name: "Open Progress Road" });
+    await road.waitFor({ state: "attached" });
+    await road.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => state.gameState === "start" && titleSubState === "progress" && titlePanelAnim > 0.02);
+    await page.keyboard.press("PageDown");
+    assert.ok(await page.evaluate(() => titleProgressScroll > 0), "Progress Road must scroll from the keyboard");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("online recovery waits for active preload and then retries only failed artwork", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context);
+  try {
+    const result = await page.evaluate(async () => {
+      const originalGetState = getAssetLoadState;
+      const originalRetry = retryFailedAssets;
+      const originalStartup = startupAssetPreloadPromise;
+      let status = "loading";
+      let failed = [];
+      let retryCalls = 0;
+      let resolveInitial;
+      startupAssetPreloadPromise = new Promise((resolve) => { resolveInitial = resolve; });
+      getAssetLoadState = () => ({ ready: status !== "loading", status, total: 2, completed: status === "loading" ? 1 : 2, failed: failed.slice() });
+      retryFailedAssets = async () => {
+        retryCalls++;
+        failed = [];
+        status = "ready";
+        return getAssetLoadState();
+      };
+      const recovery = retryFailedGameAssetsAfterReconnect();
+      await Promise.resolve();
+      const callsBeforeSettle = retryCalls;
+      failed = ["enemy_scout"];
+      status = "fallback";
+      resolveInitial(getAssetLoadState());
+      const settled = await recovery;
+      getAssetLoadState = originalGetState;
+      retryFailedAssets = originalRetry;
+      startupAssetPreloadPromise = originalStartup;
+      return { callsBeforeSettle, retryCalls, settled };
+    });
+    assert.equal(result.callsBeforeSettle, 0, "recovery must not race the active preload");
+    assert.equal(result.retryCalls, 1, "recovery should retry once after preload settles with failures");
+    assert.equal(result.settled.status, "ready");
+    assert.deepEqual(result.settled.failed, []);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("touch can start a run, move with the joystick, and activate the ability without runtime errors", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({
     viewport: { width: 375, height: 667 },
@@ -507,6 +807,71 @@ test("touch can start a run, move with the joystick, and activate the ability wi
     assert.ok(activated.player.energy < energyBefore, "touch action should spend ability energy");
     assert.deepEqual(errors, []);
     assert.deepEqual(activated.runtimeErrors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("resize clears held joystick and armed canvas actions before coordinates change", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
+  const { page, errors } = await openGame(context);
+  try {
+    const play = (await debugSnapshot(page)).layout.play;
+    await page.dispatchEvent("canvas", "pointerdown", {
+      pointerId: 61,
+      pointerType: "touch",
+      clientX: play.x + play.w / 2,
+      clientY: play.y + play.h / 2,
+      buttons: 1
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.dispatchEvent("canvas", "pointerup", {
+      pointerId: 61,
+      pointerType: "touch",
+      clientX: play.x + play.w / 2,
+      clientY: play.y + play.h / 2,
+      buttons: 0
+    });
+    let snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.gameState, "start", "a stale Play pointer must not launch after the layout changes");
+    assert.equal(snapshot.transition.mode, "idle");
+
+    await page.evaluate(() => {
+      startPlayingSession();
+      state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
+    });
+    const touchLayout = await page.evaluate(() => ({
+      x: offsetX + 76 * scale,
+      y: offsetY + (H - 76) * scale,
+      scale
+    }));
+    await page.dispatchEvent("canvas", "pointerdown", {
+      pointerId: 62,
+      pointerType: "touch",
+      clientX: touchLayout.x,
+      clientY: touchLayout.y,
+      buttons: 1
+    });
+    await page.dispatchEvent("canvas", "pointermove", {
+      pointerId: 62,
+      pointerType: "touch",
+      clientX: touchLayout.x + 50 * touchLayout.scale,
+      clientY: touchLayout.y,
+      buttons: 1
+    });
+    await page.waitForTimeout(80);
+    snapshot = await debugSnapshot(page);
+    assert.equal(snapshot.input.joystick.active, true);
+    assert.ok(snapshot.input.joystick.ax > 0.2);
+
+    await page.setViewportSize({ width: 844, height: 390 });
+    snapshot = await debugSnapshot(page);
+    const xAfterResize = snapshot.player.x;
+    assert.deepEqual(snapshot.input.joystick, { active: false, ax: 0, ay: 0 });
+    await page.waitForTimeout(180);
+    const settled = await debugSnapshot(page);
+    assert.equal(settled.player.x, xAfterResize, "the ship must not drift from a pointer held through orientation change");
+    assert.deepEqual(errors, []);
   } finally {
     await context.close();
   }

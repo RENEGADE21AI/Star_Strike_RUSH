@@ -21,10 +21,10 @@ function startPlayingSession() {
   showMessage("PHASE 1", 90);
 }
 function beginGame() {
+  if (state.gameState === "start" && state.sceneTransition.mode !== "idle") return false;
   if (typeof prepareGameplayMusic === "function") prepareGameplayMusic();
   if (typeof playGameSound === "function") playGameSound("launch", 0.9);
   if (state.gameState === "start") {
-    if (state.sceneTransition.mode !== "idle") return;
     titlePanelTarget = 0;
     state.sceneTransition = {
       mode: "title_launch",
@@ -36,9 +36,10 @@ function beginGame() {
     state.lastTitleLaunchDurationSeconds = state.sceneTransition.durationSeconds;
     state.lastTitleLaunchReducedMotion = settingReducedMotion === true;
     clearGameplayInput();
-    return;
+    return true;
   }
   startPlayingSession();
+  return true;
 }
 function clearGameplayInput() {
   state.keyboard.up = false;
@@ -49,6 +50,14 @@ function clearGameplayInput() {
   state.joystick.id = null;
   state.joystick.ax = 0;
   state.joystick.ay = 0;
+}
+function clearTransientPointerInput() {
+  clearGameplayInput();
+  playBtnPointerDown = false;
+  playBtnPointerInside = false;
+  respawnPointerDown = false;
+  respawnPointerInside = false;
+  if (typeof cancelTitlePointerInteractions === "function") cancelTitlePointerInteractions();
 }
 function currentGameplayPolicyContext() {
   return {
@@ -73,6 +82,8 @@ function pauseGame(reason = "manual") {
     return false;
   }
   state.player.hp = decision.remainingHp;
+  pauseConfirmAction = "";
+  pauseConfirmPreviousNotice = "";
   clearGameplayInput();
   state.pausedReason = reason;
   state.pauseNotice = decision.message;
@@ -98,10 +109,24 @@ function pauseGame(reason = "manual") {
 function resumeGame() {
   if (state.gameState !== "paused") return false;
   clearGameplayInput();
+  pauseConfirmAction = "";
+  pauseConfirmPreviousNotice = "";
   state.pausedReason = "";
   state.resumeCountdown = 90;
   state.gameState = "resuming";
   if (state.runMode === "tutorial" && typeof hideTutorialPauseAccessibility === "function") hideTutorialPauseAccessibility();
+  return true;
+}
+function cancelResumeCountdown() {
+  if (state.gameState !== "resuming") return false;
+  clearGameplayInput();
+  pauseConfirmAction = "";
+  pauseConfirmPreviousNotice = "";
+  state.resumeCountdown = 0;
+  state.pausedReason = "resume_cancelled";
+  state.pauseNotice = "RESUME CANCELLED — NO ADDITIONAL HEALTH COST";
+  state.gameState = "paused";
+  if (state.runMode === "tutorial" && typeof showTutorialPauseAccessibility === "function") showTutorialPauseAccessibility();
   return true;
 }
 function setupSession(mode = "start", options = {}) {
@@ -192,6 +217,8 @@ function setupSession(mode = "start", options = {}) {
   state.pausedReason = "";
   state.pauseNotice = "";
   state.resumeCountdown = 0;
+  pauseConfirmAction = "";
+  pauseConfirmPreviousNotice = "";
   if (mode === "start") state.sceneTransition = { mode: "idle", frame: 0, duration: 1 };
   state.keyboard.up = false;
   state.keyboard.down = false;
@@ -276,11 +303,18 @@ function enterGameOver() {
   if (progressionAllowed) finalizeLocalRunAchievements();
 }
 function resize() {
+  clearTransientPointerInput();
+  if (state.player) {
+    state.player.vx = 0;
+    state.player.vy = 0;
+  }
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
   VIEW_W = screenW;
   VIEW_H = screenH;
-  renderDpr = clamp(Number(window.devicePixelRatio || 1), 1, MAX_RENDER_DPR);
+  renderDpr = typeof effectiveCanvasDpr === "function"
+    ? effectiveCanvasDpr(screenW, screenH, window.devicePixelRatio || 1, MAX_RENDER_DPR, MAX_RENDER_PIXELS)
+    : clamp(Number(window.devicePixelRatio || 1), 1, MAX_RENDER_DPR);
   canvas.style.width = `${screenW}px`;
   canvas.style.height = `${screenH}px`;
   canvas.width = Math.max(1, Math.round(screenW * renderDpr));
@@ -490,6 +524,7 @@ function isMoveKey(key) {
          key === "W" || key === "A" || key === "S" || key === "D";
 }
 window.addEventListener("keydown", (e) => {
+  if (e.defaultPrevented) return;
   if (handleEditing) {
     setHandleFromInputKey(e);
     return;
@@ -499,6 +534,10 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   const k = e.key;
+  const focusedGameAction = document.activeElement && document.activeElement.dataset
+    ? document.activeElement.dataset.gameAction
+    : "";
+  if (focusedGameAction && (k === "Enter" || k === " ")) return;
   if (state.gameState === "start" && typeof onboardingUiMode !== "undefined" && onboardingUiMode !== "none") {
     const focusedAction = document.activeElement && document.activeElement.dataset
       ? document.activeElement.dataset.onboardingAction
@@ -512,18 +551,40 @@ window.addEventListener("keydown", (e) => {
   }
   if ((state.gameState === "paused" || state.gameState === "resuming") && k === "Escape") {
     e.preventDefault();
-    if (state.gameState === "paused") resumeGame();
-    else pauseGame("manual");
+    if (state.gameState === "paused" && pauseConfirmAction) cancelPauseDestructiveAction();
+    else if (state.gameState === "paused") resumeGame();
+    else cancelResumeCountdown();
     return;
   }
   if (state.gameState === "start") {
-    if ((titleSubState === "codex" || titleSubState === "achievements") && titlePanelAnim > 0.02 && (k === "ArrowUp" || k === "ArrowDown" || k === "PageUp" || k === "PageDown")) {
+    if (["codex", "achievements", "progress"].includes(titleSubState) && titlePanelAnim > 0.02 && (k === "ArrowUp" || k === "ArrowDown" || k === "PageUp" || k === "PageDown")) {
       e.preventDefault();
       const delta = (k === "ArrowUp" || k === "PageUp") ? -148 : 148;
       if (titleSubState === "codex") {
         codexScrollController.scrollBy(delta);
-      } else {
+      } else if (titleSubState === "achievements") {
         achievementScrollController.scrollBy(delta);
+      } else {
+        titleProgressScroll += delta;
+        clampTitleProgressScroll();
+      }
+      return;
+    }
+    if (resetProgressConfirm) {
+      if (k === "Escape") {
+        e.preventDefault();
+        resetProgressConfirm = false;
+      } else if (k === "Enter" || k === " ") {
+        e.preventDefault();
+      }
+      return;
+    }
+    if (titlePanelAnim > 0.02 || titlePanelTarget > 0) {
+      if (k === "Escape") {
+        e.preventDefault();
+        closeTitleMetaScreen();
+      } else if (k === "Enter" || k === " ") {
+        e.preventDefault();
       }
       return;
     }
@@ -583,13 +644,15 @@ window.addEventListener("keyup", (e) => {
   if (k === "ArrowRight" || k === "d" || k === "D") state.keyboard.right = false;
 });
 window.addEventListener("blur", () => {
-  clearGameplayInput();
+  clearTransientPointerInput();
   if (state.gameState === "playing") pauseGame("focus");
+  else if (state.gameState === "resuming") cancelResumeCountdown();
 });
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) return;
-  clearGameplayInput();
+  clearTransientPointerInput();
   if (state.gameState === "playing") pauseGame("visibility");
+  else if (state.gameState === "resuming") cancelResumeCountdown();
 });
 window.addEventListener("beforeunload", () => {
   if ((typeof runModeAllowsProgression !== "function" ? state.runMode === "standard" : runModeAllowsProgression(state.runMode)) && highScoreDirty) saveHighScore();
@@ -807,6 +870,7 @@ function getDebugSnapshot() {
       handleEditing,
       message: state.message,
       pauseNotice: state.pauseNotice,
+      pauseConfirmAction,
       settingMaxParticles,
       settingScreenShake,
       settingReducedMotion,
@@ -905,6 +969,11 @@ function getDebugSnapshot() {
       mode: state.inputMode,
       action: actionProfile.label,
       hintTimer: state.inputHintTimer,
+      joystick: {
+        active: state.joystick.active === true,
+        ax: Number((state.joystick.ax || 0).toFixed(4)),
+        ay: Number((state.joystick.ay || 0).toFixed(4))
+      },
       touchControlsVisible: typeof touchControlsVisible === "function" ? touchControlsVisible(state.inputMode, state.gameState) : null,
       gameplayControlEnabled: currentGameplayControlEnabled(),
       gameplaySimulationEnabled: typeof gameplaySimulationEnabled === "function"
@@ -972,6 +1041,7 @@ function loop(timestamp) {
   const frameTiming = advanceFixedStep(simulationClock, timestamp, update);
   if (typeof updateGameMusic === "function") updateGameMusic(frameTiming.deltaMs / 1000);
   draw();
+  if (typeof syncGameAccessibleSurface === "function") syncGameAccessibleSurface();
   /* DEVELOPMENT_QA_CALL */ if (typeof updateDebugSnapshot === "function") updateDebugSnapshot();
   requestAnimationFrame(loop);
 }
@@ -1111,9 +1181,36 @@ window.addEventListener("DOMContentLoaded", () => {
 }, { once: true });
 /* DEVELOPMENT_QA_CALL */ if (typeof applyDevelopmentQaScenario === "function") applyDevelopmentQaScenario();
 window.addEventListener("resize", resize);
+let assetReconnectRetryPromise = null;
+let startupAssetPreloadPromise = null;
+function retryFailedGameAssetsAfterReconnect() {
+  if (typeof getAssetLoadState !== "function" || typeof retryFailedAssets !== "function") return Promise.resolve(null);
+  if (assetReconnectRetryPromise) return assetReconnectRetryPromise;
+  const snapshot = getAssetLoadState();
+  if (snapshot.status !== "loading" && (!snapshot.failed || snapshot.failed.length === 0)) return Promise.resolve(snapshot);
+  const initialLoad = snapshot.status === "loading" && startupAssetPreloadPromise
+    ? startupAssetPreloadPromise.catch(() => null)
+    : Promise.resolve(null);
+  assetReconnectRetryPromise = initialLoad
+    .then(() => {
+      const settled = getAssetLoadState();
+      if (!settled.failed || settled.failed.length === 0) return settled;
+      return retryFailedAssets({ timeoutMs: 5000, retries: 1 });
+    })
+    .catch((error) => {
+      state.debugErrors.push(`Asset reconnect retry fallback: ${String(error && error.message || error).slice(0, 120)}`);
+      return getAssetLoadState();
+    })
+    .finally(() => { assetReconnectRetryPromise = null; });
+  return assetReconnectRetryPromise;
+}
+window.addEventListener("online", () => { retryFailedGameAssetsAfterReconnect(); });
 if (typeof preloadGameAssets === "function") {
-  Promise.resolve(preloadGameAssets()).catch((error) => {
-    state.debugErrors.push(`Asset preload fallback: ${String(error && error.message || error).slice(0, 120)}`);
-  });
+  startupAssetPreloadPromise = Promise.resolve(preloadGameAssets())
+    .catch((error) => {
+      state.debugErrors.push(`Asset preload fallback: ${String(error && error.message || error).slice(0, 120)}`);
+      return typeof getAssetLoadState === "function" ? getAssetLoadState() : null;
+    })
+    .finally(() => { startupAssetPreloadPromise = null; });
 }
 requestAnimationFrame(loop);
