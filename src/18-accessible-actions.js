@@ -168,7 +168,7 @@ function syncGameAccessibleSurface() {
           accessibleRectAction("keep-run", "Keep run", confirmRects.cancel, cancelPauseDestructiveAction),
           accessibleRectAction("confirm", restart ? "Confirm restart" : "Confirm return to title", confirmRects.confirm, confirmPauseDestructiveAction)
         ],
-        onEscape: cancelPauseDestructiveAction
+        onEscape: handlePauseEscape
       });
       return;
     }
@@ -191,7 +191,7 @@ function syncGameAccessibleSurface() {
       message: resuming ? "Re-engaging controls. Stay Paused is available." : "Flight paused. Simulation frozen.",
       modal: true,
       actions,
-      onEscape: resuming ? cancelResumeCountdown : resumeGame
+      onEscape: handlePauseEscape
     });
     return;
   }

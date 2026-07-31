@@ -129,6 +129,12 @@ function cancelResumeCountdown() {
   if (state.runMode === "tutorial" && typeof showTutorialPauseAccessibility === "function") showTutorialPauseAccessibility();
   return true;
 }
+function handlePauseEscape() {
+  if (state.gameState === "paused" && pauseConfirmAction) return cancelPauseDestructiveAction();
+  if (state.gameState === "paused") return resumeGame();
+  if (state.gameState === "resuming") return cancelResumeCountdown();
+  return false;
+}
 function setupSession(mode = "start", options = {}) {
   const preserveStars = options.preserveStars === true && Array.isArray(state.stars) && state.stars.length > 0;
   state.player = makePlayer();
@@ -551,9 +557,7 @@ window.addEventListener("keydown", (e) => {
   }
   if ((state.gameState === "paused" || state.gameState === "resuming") && k === "Escape") {
     e.preventDefault();
-    if (state.gameState === "paused" && pauseConfirmAction) cancelPauseDestructiveAction();
-    else if (state.gameState === "paused") resumeGame();
-    else cancelResumeCountdown();
+    handlePauseEscape();
     return;
   }
   if (state.gameState === "start") {

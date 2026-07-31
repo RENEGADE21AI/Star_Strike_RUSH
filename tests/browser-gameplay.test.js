@@ -492,6 +492,7 @@ test("resume countdown can be cancelled without hidden actions or an additional 
 
     const overlay = await page.evaluate(() => {
       resumeGame();
+      state.resumeCountdown = 99999;
       const rects = getPauseOverlayRects();
       const screenRect = (rect) => ({
         x: offsetX + rect.x * scale,
@@ -540,7 +541,10 @@ test("resume countdown can be cancelled without hidden actions or an additional 
     assert.equal(snapshot.player.hp, 3);
     assert.equal(snapshot.ui.pauseNotice, "RESUME CANCELLED — NO ADDITIONAL HEALTH COST");
 
-    await page.evaluate(() => resumeGame());
+    await page.evaluate(() => {
+      resumeGame();
+      state.resumeCountdown = 99999;
+    });
     await page.keyboard.press("Escape");
     snapshot = await page.evaluate(() => getDebugSnapshot());
     assert.equal(snapshot.gameState, "paused", "Escape should return to the pause menu");
