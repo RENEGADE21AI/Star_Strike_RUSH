@@ -37,8 +37,12 @@ test("Pilot Dossier does not expose manual sync or refresh controls", () => {
 
 test("primary title hierarchy hides unused Credits", () => {
   const titleSource = fs.readFileSync(path.join(repoRoot, "src/13-rendering-title-screens.js"), "utf8");
-  assert.doesNotMatch(titleSource, /CREDITS/);
-  assert.match(titleSource, /HIGH SCORE/);
+  const primaryTitle = titleSource.slice(
+    titleSource.indexOf("function drawTitleAndButtons"),
+    titleSource.indexOf("function drawStartScreen")
+  );
+  assert.doesNotMatch(primaryTitle, /CREDITS/);
+  assert.match(primaryTitle, /DEVICE BEST/);
 });
 
 test("Codex uses categorized two-column cards with scrollable wrapped detail", () => {

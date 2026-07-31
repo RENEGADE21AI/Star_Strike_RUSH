@@ -133,18 +133,19 @@ and release evidence.
 
 ## Current branch evidence
 
-- `npm test`: 123/123 passing, including full real-action desktop and touch
+- `npm test`: 131/131 passing, including full real-action desktop and touch
   First Flight completions.
 - Firebase client emulator scenario: passed Accounts A/B, one-owner hydration,
   pending call-sign retry, auth restoration, progression non-overwrite,
   aggregate retrieval, sign-out cleanup, and all three paused callables.
 - Firestore Rules emulator: 4/4 passed.
-- Visual QA: 40/40 asserted cases passed across 375×667, 390×844, 430×932,
-  768×1024, and 1440×900.
-- Production build and commit-version contract: passed with 101 public files.
+- Visual QA: 49/49 asserted cases passed across 375×667, 390×844, 430×932,
+  768×1024, and 1440×900, including title, panel, HUD, reset, Game Over, and
+  First Flight states.
+- Production build and commit-version contract: passed with 104 public files.
 - Root production audit: 0 vulnerabilities. Functions production audit:
-  0 high-severity findings and 9 moderate transitive findings.
-- Tracked-file secret scan: 231 files passed.
+  0 high-severity findings and 8 moderate transitive findings.
+- Tracked-file secret scan: 237 files passed.
 
 GitHub checks, exact-SHA preview smoke, and live Account A/B evidence must still
 be obtained on the merge commit. This document does not claim those pending
@@ -198,3 +199,19 @@ Playable URL: https://star-strike-rush.web.app
   flying into position before Arisaka's transmission. Instructor dialogue
   clears and suppresses shake. The shared Play/First Flight launch is a
   two-second top-down galaxy transit that reaches the exact gameplay position.
+
+## Experience polish
+
+- Unified common buttons, title panels, settings toggles, navigation, and
+  destructive actions around one restrained glass-and-edge-light language.
+- Rebalanced the title identity block and device-best summary without changing
+  patrol size or flight behavior.
+- Gave mobile Achievement Vault entries a readable single-column layout with
+  measured description wrapping and clear progress.
+- Kept the classic bottom-left Energy/Hull hierarchy while shrinking its
+  footprint and explicitly protecting the touch joystick and ability control.
+- Rebuilt Game Over as an end-of-run flight record with final score, device
+  best, earned currencies, rank, season tier, and clear next actions.
+- Extended asserted visual QA to the Pilot Dossier, Settings, reset
+  confirmation, Records, Codex overview, progression road, touch HUD, and Game
+  Over rather than treating screenshot creation alone as success.

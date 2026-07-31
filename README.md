@@ -43,6 +43,13 @@ dimensions and alpha at every pixel, preserving the exact silhouette and weapon
 geometry while changing only realm color. Ghost Shift renders one translucent,
 brightly glowing fighter rather than a stack of afterimages.
 
+The presentation uses one compact visual language from first launch through
+Game Over: glass-edged panels, clear primary and destructive actions, readable
+single-column mobile achievement cards, an unobtrusive combat HUD, and a
+score-focused end-of-run summary. Settings expose explicit ON/OFF state and
+apply immediately on this device. Reset Local Data remains a separate,
+plain-language destructive confirmation.
+
 ## Run locally
 
 Install dependencies, start the repository's safe static server, then open
@@ -79,7 +86,8 @@ Firestore, and Functions emulators. It verifies account switching, one-owner
 hydration, pending call-sign publication, the achievement aggregate, and that
 account actions never replace device progress. `npm run test:visual` starts its
 own local server, drives layout-derived controls in Chromium, asserts touch
-scrolling and motion behavior, and writes screenshots plus a JSON report under
+scrolling, HUD clearance, terminal states, panel navigation, and motion
+behavior, and writes screenshots plus a JSON report under
 `test-artifacts/visual-qa/` (with traces on failure).
 `npm run build` creates a deployment-only `dist/` directory containing the
 runtime, optimized assets, manifest, styles, and `version.json`. HTML, scripts,

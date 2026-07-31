@@ -103,7 +103,10 @@ test("gameplay renders compact classic HUD without announcement popups", () => {
   assert.doesNotMatch(sceneSource, /drawEncounterCard\(\);/);
   assert.match(hudSource, /function drawHUD\(\) \{ drawLeftStatusHUD\(\); drawTopRightHUD\(\); drawGameNotices\(\); drawPauseButton\(\); drawDesktopControlHint\(\); \}/);
   assert.match(hudSource, /orientation:\s*"horizontal"/);
-  assert.match(hudSource, /energy:\s*\{\s*x:\s*10,\s*y:\s*energyY,\s*w:\s*76/);
+  assert.match(hudSource, /status:\s*\{\s*x:\s*8,\s*y:\s*energyY - 17,\s*w:\s*112,\s*h:\s*56/);
+  assert.match(hudSource, /energy:\s*\{\s*x:\s*18,\s*y:\s*energyY \+ 3,\s*w:\s*92/);
+  assert.match(hudSource, /health:\s*\{\s*x:\s*18,\s*y:\s*energyY \+ 25,\s*w:\s*92/);
+  assert.match(hudSource, /touchLike \? H - 214 : H - 78/);
   assert.match(hudSource, /function gameplayHudOpacity/);
   assert.doesNotMatch(hudSource.match(/function drawHUD\(\).*$/m)[0], /drawAnnouncements/);
   assert.doesNotMatch(hudSource, /devStatsVisible|drawDebugHitboxes/);

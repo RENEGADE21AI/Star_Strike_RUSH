@@ -36,9 +36,16 @@ const cases = [
   { name: "codex-touch-430x932", width: 430, height: 932, kind: "scroll", target: "codex" },
   { name: "reduced-motion", width: 390, height: 844, kind: "reduced-motion" },
   { name: "audio-settings", width: 390, height: 844, kind: "audio-settings" },
+  { name: "reset-local-data-confirmation", width: 390, height: 844, kind: "reset-confirmation" },
+  { name: "pilot-dossier", width: 390, height: 844, kind: "panel", target: "account" },
+  { name: "codex-overview", width: 390, height: 844, kind: "panel", target: "codex" },
+  { name: "records-network", width: 390, height: 844, kind: "panel", target: "records" },
+  { name: "progress-road", width: 390, height: 844, kind: "panel", target: "progress" },
   { name: "play-immediate", width: 390, height: 844, kind: "play" },
   { name: "gameplay-hud-375x667", width: 375, height: 667, kind: "gameplay-hud" },
+  { name: "gameplay-hud-touch-390x844", width: 390, height: 844, kind: "gameplay-hud", touch: true },
   { name: "paused-hud-375x667", width: 375, height: 667, kind: "paused-hud" },
+  { name: "game-over-summary", width: 390, height: 844, kind: "scenario", scenario: "gameover" },
   { name: "debris-staging", width: 375, height: 667, kind: "scenario", scenario: "debris-incoming" },
   { name: "powerup-gallery", width: 390, height: 844, kind: "scenario", scenario: "powerups" },
   { name: "first-flight-galaxy-arrival", width: 390, height: 844, kind: "onboarding-arrival", scenario: "tutorial", touch: true },
@@ -293,6 +300,27 @@ async function runCase(browser, baseUrl, item) {
     if (musicAfter.ui.settingMusicEnabled === settingsBefore.ui.settingMusicEnabled) errors.push("Music control did not toggle");
     if (musicAfter.ui.settingEffectsEnabled !== settingsBefore.ui.settingEffectsEnabled) errors.push("Music control changed Effects");
     if (effectsAfter.ui.settingEffectsEnabled === musicAfter.ui.settingEffectsEnabled) errors.push("Effects control did not toggle");
+  } else if (item.kind === "reset-confirmation") {
+    await openPanel(page, "account");
+    await clickLayout(page, "accountSettingsTab");
+    await page.waitForTimeout(120);
+    await page.evaluate(() => {
+      resetProgressConfirm = true;
+      updateDebugSnapshot();
+    });
+    const confirmation = await snapshot(page);
+    evidence.after = confirmation;
+    if (confirmation.ui.resetProgressConfirm !== true) errors.push("reset confirmation did not open");
+    if (confirmation.runtimeErrors.length) errors.push("reset confirmation produced a runtime error");
+  } else if (item.kind === "panel") {
+    await openPanel(page, item.target, item.touch === true);
+    const panelState = await snapshot(page);
+    evidence.after = panelState;
+    const expected = item.target === "account" ? "online" : item.target;
+    if (panelState.ui.titleSubState !== expected || panelState.ui.titlePanelAnim < 0.94) {
+      errors.push(`${item.target} panel did not finish opening`);
+    }
+    if (panelState.runtimeErrors.length) errors.push(`${item.target} panel produced a runtime error`);
   } else if (item.kind === "play") {
     await clickLayout(page, "play");
     await page.waitForFunction(() => {
@@ -306,11 +334,21 @@ async function runCase(browser, baseUrl, item) {
     await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "playing");
     const playing = await snapshot(page);
     evidence.playing = playing;
-    if (!(playing.layout.pause?.x < 60 && playing.layout.pause?.y < 60)) errors.push("pause button is not top-left");
+    const playfieldTopLeftLimit = {
+      x: Number(playing.layout.offsetX || 0) + Number(playing.layout.scale || 1) * 60,
+      y: Number(playing.layout.offsetY || 0) + Number(playing.layout.scale || 1) * 60
+    };
+    if (!(playing.layout.pause?.x < playfieldTopLeftLimit.x && playing.layout.pause?.y < playfieldTopLeftLimit.y)) {
+      errors.push("pause button is not top-left");
+    }
     if (!(playing.layout.hud?.energy?.y < playing.layout.hud?.health?.y)) errors.push("energy is not above health");
-    if (!(playing.layout.hud?.energy?.y > item.height * 0.58)) errors.push("energy and health are not bottom-left");
+    if (!(playing.layout.hud?.energy?.y > 667 * 0.58)) errors.push("energy and health are not bottom-left");
     if (playing.layout.hud?.health?.orientation !== "horizontal") errors.push("health is not a classic horizontal layout");
-    if (!(playing.layout.hud?.score?.x > item.width / 2)) errors.push("score cluster is not top-right");
+    if (!(playing.layout.hud?.score?.x > 375 / 2)) errors.push("score cluster is not top-right");
+    if (item.touch) {
+      const status = playing.layout.hud?.status;
+      if (!status || status.y + status.h > 535) errors.push("touch HUD overlaps the virtual joystick zone");
+    }
     if (item.kind === "paused-hud") {
       await clickLayout(page, "pause");
       await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).gameState === "paused");
@@ -327,6 +365,11 @@ async function runCase(browser, baseUrl, item) {
       if (!boss || boss.damageable || boss.hp !== boss.maxHp) errors.push("incoming boss was damageable");
     }
     if (item.scenario === "powerups" && before.counts.powerups !== 13) errors.push("powerup gallery did not show all 13 powerups");
+    if (item.scenario === "gameover") {
+      if (before.gameState !== "gameover") errors.push("game-over summary did not open");
+      if (before.score !== 48250 || before.highScore !== 48250) errors.push("game-over summary lost score evidence");
+      if (before.runtimeErrors.length) errors.push("game-over summary produced a runtime error");
+    }
   } else if (item.kind === "onboarding-arrival") {
     const arrivalState = await page.evaluate(() => {
       onboardingUiMode = "first_time_question";
@@ -389,8 +432,17 @@ async function runCase(browser, baseUrl, item) {
       getAssetLoadState().ready === true &&
       !getAssetLoadState().failed.includes("tutorial_instructor")
     ));
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
+      return current.tutorial?.uiMode === "first_time_question"
+        && current.tutorial?.introFlight?.active === false;
+    });
     await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).click();
-    await page.getByRole("button", { name: "Begin Flight Training" }).waitFor();
+    await page.waitForFunction(() => {
+      const current = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
+      return current.tutorial?.uiMode === "prelaunch_briefing";
+    });
+    await page.getByRole("button", { name: "Begin Flight Training" }).waitFor({ state: "visible" });
     evidence.after = await snapshot(page);
     if (evidence.after.tutorial?.uiMode !== "prelaunch_briefing") errors.push("call-sign prelaunch briefing was not active");
     if (!(await page.getByRole("button", { name: "Edit Call Sign" }).isVisible())) errors.push("call-sign edit was not accessible");

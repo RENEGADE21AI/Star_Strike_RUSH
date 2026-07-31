@@ -1048,6 +1048,16 @@ function drawTutorialInstructorPortrait(x, y, size = 82, alpha = 1) {
   ctx.restore();
 }
 
+function tutorialHeaderFont(text, maxWidth, preferredSize, minimumSize, weight = 900, family = "'Arial Narrow', Arial, sans-serif") {
+  let fontSize = preferredSize;
+  do {
+    ctx.font = `${weight} ${fontSize}px ${family}`;
+    if (ctx.measureText(String(text || "")).width <= maxWidth) break;
+    fontSize -= 1;
+  } while (fontSize > minimumSize);
+  return ctx.font;
+}
+
 function drawOnboardingTitleOverlay() {
   if (state.gameState !== "start" || onboardingUiMode === "none") return;
   if (onboardingIntroFlight.active) return;
@@ -1060,31 +1070,53 @@ function drawOnboardingTitleOverlay() {
   glow.addColorStop(1, "rgba(33,177,220,0)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, panel.y - 30, W, panel.h + 60);
-  ctx.fillStyle = "rgba(5,17,36,0.94)";
+  const panelFill = ctx.createLinearGradient(panel.x, panel.y, panel.x + panel.w, panel.y + panel.h);
+  panelFill.addColorStop(0, "rgba(7,25,46,0.96)");
+  panelFill.addColorStop(0.54, "rgba(4,14,31,0.96)");
+  panelFill.addColorStop(1, "rgba(14,8,25,0.94)");
+  ctx.fillStyle = panelFill;
   ctx.strokeStyle = "rgba(113,226,255,0.50)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 10);
   ctx.fill();
   ctx.stroke();
+  ctx.strokeStyle = "rgba(126,235,255,0.20)";
+  ctx.beginPath();
+  ctx.moveTo(panel.x + 112, panel.y + 15);
+  ctx.lineTo(panel.x + panel.w - 16, panel.y + 15);
+  ctx.stroke();
   drawTutorialInstructorPortrait(panel.x + 70, panel.y + 80, 96);
+  const headerX = panel.x + 128;
+  const headerWidth = panel.x + panel.w - 18 - headerX;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
+  tutorialHeaderFont("INCOMING TRANSMISSION", headerWidth, 9, 7, 900);
   ctx.fillStyle = "#79efff";
-  ctx.fillText("INCOMING TRANSMISSION", panel.x + 132, panel.y + 28);
-  ctx.font = "900 17px 'Arial Narrow', Arial, sans-serif";
+  ctx.fillText("INCOMING TRANSMISSION", headerX, panel.y + 28);
+  tutorialHeaderFont(TUTORIAL_INSTRUCTOR.name, headerWidth, 16, 12, 900);
   ctx.fillStyle = "#effcff";
-  ctx.fillText(TUTORIAL_INSTRUCTOR.name, panel.x + 132, panel.y + 48);
-  ctx.font = "800 8px Arial, sans-serif";
+  ctx.fillText(TUTORIAL_INSTRUCTOR.name, headerX, panel.y + 48);
+  tutorialHeaderFont(TUTORIAL_INSTRUCTOR.title, headerWidth, 8, 6, 800, "Arial, sans-serif");
   ctx.fillStyle = "rgba(211,240,250,0.58)";
-  ctx.fillText(TUTORIAL_INSTRUCTOR.title, panel.x + 132, panel.y + 71);
+  ctx.fillText(TUTORIAL_INSTRUCTOR.title, headerX, panel.y + 71);
+  const body = { x: panel.x + 16, y: panel.y + 132, w: panel.w - 32, h: onboardingUiMode === "first_time_question" ? 58 : 104 };
+  ctx.fillStyle = "rgba(1,7,18,0.46)";
+  ctx.beginPath();
+  ctx.roundRect(body.x, body.y, body.w, body.h, 7);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(150,224,245,0.10)";
+  ctx.stroke();
   ctx.font = "800 12px Arial, sans-serif";
   ctx.fillStyle = "#ffffff";
   const displayedCallSign = String(callSignEditing ? callSignDraft : (callSign || "CADET"));
   if (onboardingUiMode === "first_time_question") {
     ctx.font = "900 15px Arial, sans-serif";
-    ctx.fillText(TUTORIAL_INSTRUCTOR.firstQuestion, panel.x + 24, panel.y + 146);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(TUTORIAL_INSTRUCTOR.firstQuestion, W / 2, body.y + body.h / 2 + 1);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
   } else if (onboardingUiMode === "post_callsign") {
     ctx.fillText(`Flight identity: ${displayedCallSign}${callSignEditing ? "|" : "."}`, panel.x + 24, panel.y + 142);
     ctx.fillText(callSignEditing ? "Type, then press Enter to save." : "Confirm it, or make one final edit.", panel.x + 24, panel.y + 163);
@@ -1265,18 +1297,30 @@ function drawTutorialTransmission() {
   const lines = tutorialDirector.dialogue[0] ? tutorialDirector.dialogue[0].lines : [];
   const panel = getTutorialDialogueRect();
   ctx.save();
-  ctx.fillStyle = "rgba(2,11,26,0.93)";
+  const fill = ctx.createLinearGradient(panel.x, panel.y, panel.x + panel.w, panel.y + panel.h);
+  fill.addColorStop(0, "rgba(6,31,51,0.95)");
+  fill.addColorStop(0.44, "rgba(2,14,31,0.96)");
+  fill.addColorStop(1, "rgba(13,7,26,0.94)");
+  ctx.fillStyle = fill;
   ctx.strokeStyle = "rgba(97,225,255,0.58)";
   ctx.beginPath();
   ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 8);
   ctx.fill();
   ctx.stroke();
+  ctx.strokeStyle = "rgba(130,240,255,0.20)";
+  ctx.beginPath();
+  ctx.moveTo(panel.x + 92, panel.y + 1);
+  ctx.lineTo(panel.x + panel.w - 14, panel.y + 1);
+  ctx.stroke();
   drawTutorialInstructorPortrait(panel.x + 52, panel.y + 58, 74);
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillStyle = "#70eeff";
-  ctx.font = "900 8px Arial, sans-serif";
-  ctx.fillText(`${TUTORIAL_INSTRUCTOR.name}  •  ${TUTORIAL_INSTRUCTOR.title}`, panel.x + 98, panel.y + 18);
+  tutorialHeaderFont(TUTORIAL_INSTRUCTOR.name, panel.w - 116, 9, 8, 900, "Arial, sans-serif");
+  ctx.fillText(TUTORIAL_INSTRUCTOR.name, panel.x + 98, panel.y + 15);
+  tutorialHeaderFont(TUTORIAL_INSTRUCTOR.title, panel.w - 116, 7, 6, 800, "Arial, sans-serif");
+  ctx.fillStyle = "rgba(181,226,240,0.54)";
+  ctx.fillText(TUTORIAL_INSTRUCTOR.title, panel.x + 98, panel.y + 27);
   ctx.fillStyle = "#ffffff";
   ctx.font = "800 11px Arial, sans-serif";
   const joined = lines.join(" ");
@@ -1288,15 +1332,15 @@ function drawTutorialTransmission() {
   for (const word of words) {
     const next = current ? `${current} ${word}` : word;
     if (ctx.measureText(next).width > panel.w - 122 && current) {
-      ctx.fillText(current, panel.x + 98, panel.y + 43 + row * 20);
+      ctx.fillText(current, panel.x + 98, panel.y + 48 + row * 19);
       current = word;
       row++;
     } else current = next;
   }
-  if (current && row < 3) ctx.fillText(current, panel.x + 98, panel.y + 43 + row * 20);
+  if (current && row < 3) ctx.fillText(current, panel.x + 98, panel.y + 48 + row * 19);
   ctx.font = "900 7px Arial, sans-serif";
   ctx.fillStyle = "rgba(180,237,250,0.52)";
-  ctx.fillText(tutorialDirector.dialogueReveal < 1 ? "CONTINUE TO REVEAL" : "CONTINUE", panel.x + 98, panel.y + 98);
+  ctx.fillText(tutorialDirector.dialogueReveal < 1 ? "TAP TO REVEAL" : "TAP OR PRESS ENTER TO CONTINUE", panel.x + 98, panel.y + 100);
   ctx.restore();
 }
 

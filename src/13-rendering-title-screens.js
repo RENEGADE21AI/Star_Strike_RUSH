@@ -25,7 +25,7 @@ function drawTitleAndButtons() {
   const rushMeasure = ctx.measureText(rush);
   const rushTargetWidth = Math.min(W - 34, Math.max(W * 0.66, rushMeasure.width));
   const rushFit = rushTargetWidth / Math.max(1, rushMeasure.width);
-  const rushOffsetY = 92;
+  const rushOffsetY = 96;
   ctx.save();
   ctx.translate(0, rushOffsetY);
   ctx.scale(rushFit, rushFit);
@@ -79,11 +79,22 @@ function drawTitleAndButtons() {
     : {};
   const visibleCallSign = titleOnline.user ? (titleOnline.profileCallSign || "PILOT") : callSign;
   ctx.save();
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  const callFill = ctx.createLinearGradient(callRect.x, callRect.y, callRect.x + callRect.w, callRect.y + callRect.h);
+  callFill.addColorStop(0, "rgba(4,15,29,0.84)");
+  callFill.addColorStop(0.62, "rgba(5,8,18,0.72)");
+  callFill.addColorStop(1, "rgba(30,15,19,0.64)");
+  ctx.fillStyle = callFill;
   ctx.beginPath(); ctx.roundRect(callRect.x, callRect.y, callRect.w, callRect.h, 8); ctx.fill();
   ctx.strokeStyle = callSignEditing ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.35)";
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.roundRect(callRect.x, callRect.y, callRect.w, callRect.h, 8); ctx.stroke();
+  ctx.fillStyle = titleOnline.user ? "#78ffb4" : "#69dcff";
+  ctx.shadowColor = titleOnline.user ? "rgba(120,255,180,0.80)" : "rgba(105,220,255,0.75)";
+  ctx.shadowBlur = 7;
+  ctx.beginPath();
+  ctx.arc(callRect.x + 12, callRect.y + callRect.h / 2, 3, 0, TAU);
+  ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.font = FONT_HUD;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -94,7 +105,7 @@ function drawTitleAndButtons() {
     txt = visibleCallSign || "ENTER CALL SIGN";
   }
   ctx.fillStyle = visibleCallSign ? "#fff" : "rgba(255,255,255,0.30)";
-  ctx.fillText(txt, callRect.x + callRect.w / 2, callRect.y + callRect.h / 2 - (titleOnline.profileHandle ? 4 : 0));
+  ctx.fillText(txt, callRect.x + callRect.w / 2 + 5, callRect.y + callRect.h / 2 - (titleOnline.profileHandle ? 4 : 0));
   ctx.font = "900 8px 'Arial Narrow', Arial, sans-serif";
   ctx.fillStyle = callSignSaveState === "error" ? "#ff8a8a" : callSignSaveState === "success" ? "#78ffb4" : callSignEditing ? "#78ffb4" : "rgba(255,255,255,0.48)";
   const pilotHint = callSignStatusTimer > 0 || callSignEditing ? callSignStatus : (titleOnline.profileHandle ? `@${titleOnline.profileHandle}` : "");
@@ -122,11 +133,19 @@ function drawTitleAndButtons() {
   const dockW = iconRects.codex.x + iconRects.codex.w - iconRects.achievements.x + 16;
   const dockH = 82;
   ctx.save();
-  ctx.fillStyle = "rgba(5,8,18,0.44)";
-  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  const dockFill = ctx.createLinearGradient(dockX, dockY, dockX, dockY + dockH);
+  dockFill.addColorStop(0, "rgba(9,16,29,0.70)");
+  dockFill.addColorStop(1, "rgba(3,7,16,0.45)");
+  ctx.fillStyle = dockFill;
+  ctx.strokeStyle = "rgba(143,209,230,0.14)";
   ctx.beginPath();
   ctx.roundRect(dockX, dockY, dockW, dockH, 8);
   ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(94,224,255,0.14)";
+  ctx.beginPath();
+  ctx.moveTo(dockX + 12, dockY + 1);
+  ctx.lineTo(dockX + dockW - 12, dockY + 1);
   ctx.stroke();
   ctx.restore();
 
@@ -158,18 +177,27 @@ function drawTitleAndButtons() {
   ctx.restore();
 
   ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.82)";
+  const statusW = 218;
+  const statusX = (W - statusW) / 2;
+  const statusY = H * 0.705;
+  const statusFill = ctx.createLinearGradient(statusX, statusY, statusX + statusW, statusY);
+  statusFill.addColorStop(0, "rgba(2,8,18,0)");
+  statusFill.addColorStop(0.5, "rgba(8,15,28,0.68)");
+  statusFill.addColorStop(1, "rgba(2,8,18,0)");
+  ctx.fillStyle = statusFill;
+  ctx.fillRect(statusX, statusY, statusW, 36);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "rgba(225,242,250,0.82)";
   ctx.font = FONT_SMALL;
-  const line3 = "HIGH SCORE: " + highScore;
-  const w3 = ctx.measureText(line3).width;
-  ctx.fillText(line3, (W - w3) / 2, H * 0.72);
+  ctx.fillText(`DEVICE BEST  ${Number(highScore || 0).toLocaleString()}`, W / 2, statusY + 4);
   if (typeof currentMetaSnapshot === "function") {
     const meta = currentMetaSnapshot();
     const rankLine = `${meta.gloryRank.toUpperCase()}  •  SEASON TIER ${meta.seasonTier}`;
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,230,128,0.88)";
     ctx.textAlign = "center";
-    ctx.fillText(rankLine, W / 2, H * 0.747);
+    ctx.fillText(rankLine, W / 2, statusY + 21);
   }
   ctx.restore();
 }
@@ -185,38 +213,88 @@ function drawStartScreen() {
 }
 function drawGameOverScreen() {
   const buttons = getGameOverButtons();
-  ctx.save();
-  ctx.fillStyle = "#fff";
-  ctx.font = FONT_HUGE;
-  const title = "GAME OVER";
-  const tw = ctx.measureText(title).width;
-  ctx.fillText(title, (W - tw) / 2, H * 0.26);
-  ctx.font = FONT_SUBTITLE;
-  const scoreLine = "Score: " + state.score;
-  const scoreW = ctx.measureText(scoreLine).width;
-  ctx.fillText(scoreLine, (W - scoreW) / 2, H * 0.37);
-  const highLine = "High Score: " + highScore;
-  const highW = ctx.measureText(highLine).width;
-  ctx.fillText(highLine, (W - highW) / 2, H * 0.42);
-  if (state.newHighScore) {
-    const record = "New High Score!";
-    const rw = ctx.measureText(record).width;
-    ctx.fillText(record, (W - rw) / 2, H * 0.47);
-  }
+  const panel = { x: 24, y: 110, w: W - 48, h: 264 };
   const meta = typeof getLastRunMeta === "function" ? getLastRunMeta() : null;
+  ctx.save();
+  const panelFill = ctx.createLinearGradient(panel.x, panel.y, panel.x, panel.y + panel.h);
+  panelFill.addColorStop(0, "rgba(16,25,42,0.90)");
+  panelFill.addColorStop(0.48, "rgba(5,10,22,0.94)");
+  panelFill.addColorStop(1, "rgba(4,7,16,0.88)");
+  ctx.fillStyle = panelFill;
+  ctx.beginPath();
+  ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 12);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,116,126,0.40)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 12);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(110,222,255,0.16)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(panel.x + 28, panel.y + 1);
+  ctx.lineTo(panel.x + panel.w - 28, panel.y + 1);
+  ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "rgba(255,132,140,0.76)";
+  ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
+  ctx.fillText("FLIGHT RECORD CLOSED", W / 2, panel.y + 18);
+  ctx.fillStyle = "#fff";
+  ctx.shadowColor = "rgba(255,92,104,0.36)";
+  ctx.shadowBlur = 12;
+  ctx.font = "900 42px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  ctx.fillText("GAME OVER", W / 2, panel.y + 34);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(207,231,242,0.52)";
+  ctx.font = "800 9px Arial, sans-serif";
+  ctx.fillText("FINAL SCORE", W / 2, panel.y + 91);
+  ctx.fillStyle = "#f3fbff";
+  ctx.font = "900 34px 'Arial Narrow', Arial, sans-serif";
+  ctx.fillText(Number(state.score || 0).toLocaleString(), W / 2, panel.y + 103);
+  ctx.fillStyle = "rgba(203,226,238,0.68)";
+  ctx.font = FONT_SMALL;
+  ctx.fillText(`DEVICE BEST  ${Number(highScore || 0).toLocaleString()}`, W / 2, panel.y + 143);
+  if (state.newHighScore) {
+    ctx.fillStyle = "#ffe77a";
+    ctx.shadowColor = "rgba(255,221,80,0.52)";
+    ctx.shadowBlur = 9;
+    ctx.font = "900 11px Arial, sans-serif";
+    ctx.fillText("NEW DEVICE RECORD", W / 2, panel.y + 163);
+    ctx.shadowBlur = 0;
+  }
   if (meta) {
-    let y = H * 0.505;
-    ctx.font = FONT_SMALL;
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#ffe680";
-    ctx.fillText(`Glory +${Number(meta.gloryGained || 0).toLocaleString()}  Total ${Number(meta.gloryAfter || 0).toLocaleString()}`, W / 2, y);
-    y += 22;
-    ctx.fillStyle = meta.rankUp ? "#78ffb4" : "rgba(255,255,255,0.84)";
-    ctx.fillText(`${meta.rankUp ? "NEW RANK: " : "Rank: "}${meta.rankAfter || "Rookie Pilot"}`, W / 2, y);
-    y += 20;
-    ctx.font = FONT_TINY;
-    ctx.fillStyle = "rgba(255,255,255,0.72)";
-    ctx.fillText(`Season XP +${Number(meta.seasonXPGained || 0).toLocaleString()}  |  Credits +${Number(meta.creditsEarned || 0).toLocaleString()}  |  Tier ${meta.seasonTier || 1}`, W / 2, y);
+    const summaryY = panel.y + 194;
+    const summary = [
+      { label: "GLORY", value: `+${Number(meta.gloryGained || 0).toLocaleString()}`, color: "#ffe680" },
+      { label: "SEASON XP", value: `+${Number(meta.seasonXPGained || 0).toLocaleString()}`, color: "#78ffb4" },
+      { label: "CREDITS", value: `+${Number(meta.creditsEarned || 0).toLocaleString()}`, color: "#79efff" }
+    ];
+    const chipW = 86;
+    const chipGap = 8;
+    const startX = W / 2 - (summary.length * chipW + (summary.length - 1) * chipGap) / 2;
+    summary.forEach((item, index) => {
+      const x = startX + index * (chipW + chipGap);
+      ctx.fillStyle = "rgba(255,255,255,0.045)";
+      ctx.beginPath();
+      ctx.roundRect(x, summaryY, chipW, 46, 6);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.10)";
+      ctx.stroke();
+      ctx.font = "800 7px Arial, sans-serif";
+      ctx.fillStyle = "rgba(216,237,245,0.52)";
+      ctx.fillText(item.label, x + chipW / 2, summaryY + 8);
+      ctx.font = "900 13px 'Arial Narrow', Arial, sans-serif";
+      ctx.fillStyle = item.color;
+      ctx.fillText(item.value, x + chipW / 2, summaryY + 23);
+    });
+    ctx.font = "900 8px Arial, sans-serif";
+    ctx.fillStyle = meta.rankUp ? "#78ffb4" : "rgba(255,255,255,0.76)";
+    ctx.fillText(
+      `${meta.rankUp ? "NEW RANK  " : ""}${String(meta.rankAfter || "ROOKIE PILOT").toUpperCase()}  •  SEASON TIER ${meta.seasonTier || 1}`,
+      W / 2,
+      panel.y + panel.h - 12
+    );
   }
   ctx.restore();
   drawPressButton(buttons.respawn, "RESPAWN", respawnPointerDown && respawnPointerInside, "rgba(255,255,255,0.08)", "rgba(255,255,255,0.58)");

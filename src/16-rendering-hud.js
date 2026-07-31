@@ -2,29 +2,63 @@ function drawControls() {
   if (typeof touchControlsVisible === "function" && !touchControlsVisible(state.inputMode, state.gameState)) return;
   const joyCx = 76, joyCy = H - 76, joyR = 56;
   const actCx = W - 76, actCy = H - 76, actR = 42;
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.save();
+  const controlAlpha = state.gameState === "playing" ? 1 : 0.34;
+  ctx.globalAlpha = controlAlpha;
+  const joystickFill = ctx.createRadialGradient(joyCx, joyCy, 4, joyCx, joyCy, joyR);
+  joystickFill.addColorStop(0, "rgba(120,220,255,0.08)");
+  joystickFill.addColorStop(0.72, "rgba(8,18,34,0.18)");
+  joystickFill.addColorStop(1, "rgba(3,8,18,0.46)");
+  ctx.fillStyle = joystickFill;
   ctx.beginPath(); ctx.arc(joyCx, joyCy, joyR, 0, TAU); ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.25)";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(190,231,244,0.30)";
+  ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(joyCx, joyCy, joyR, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = "rgba(105,222,255,0.15)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(joyCx, joyCy, joyR * 0.60, 0, TAU); ctx.stroke();
+  for (let spoke = 0; spoke < 4; spoke++) {
+    const angle = spoke * Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(joyCx + Math.cos(angle) * joyR * 0.72, joyCy + Math.sin(angle) * joyR * 0.72);
+    ctx.lineTo(joyCx + Math.cos(angle) * joyR * 0.88, joyCy + Math.sin(angle) * joyR * 0.88);
+    ctx.stroke();
+  }
   const knobX = state.joystick.active ? joyCx + state.joystick.ax * joyR * 0.62 : joyCx;
   const knobY = state.joystick.active ? joyCy + state.joystick.ay * joyR * 0.62 : joyCy;
-  ctx.fillStyle = "rgba(255,255,255,0.22)";
+  ctx.fillStyle = state.joystick.active ? "rgba(135,238,255,0.34)" : "rgba(226,245,252,0.18)";
+  ctx.shadowColor = state.joystick.active ? "rgba(96,228,255,0.70)" : "transparent";
+  ctx.shadowBlur = state.joystick.active ? 10 : 0;
   ctx.beginPath(); ctx.arc(knobX, knobY, 18, 0, TAU); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(225,248,255,0.32)";
+  ctx.beginPath(); ctx.arc(knobX, knobY, 18, 0, TAU); ctx.stroke();
   const wraith = isWraithActive();
   const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: wraith ? "HOP" : "GHOST", cost: wraith ? 18 : 35 };
   const ready = state.player && state.player.energy >= profile.cost && (wraith ? true : state.player.ghostCooldown <= 0);
   const buttonFill = wraith ? (state.playerRealm === 0 ? "rgba(170,220,255,0.26)" : "rgba(210,170,255,0.26)") : (ready ? "rgba(100,255,180,0.22)" : "rgba(255,255,255,0.10)");
+  const abilityGlow = wraith ? (state.playerRealm === 0 ? "#aee8ff" : "#d2aaff") : "#78ffb4";
+  ctx.shadowColor = ready || wraith ? abilityGlow : "transparent";
+  ctx.shadowBlur = ready || wraith ? 10 : 0;
   ctx.fillStyle = buttonFill;
   ctx.beginPath(); ctx.arc(actCx, actCy, actR, 0, TAU); ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.strokeStyle = wraith ? (state.playerRealm === 0 ? "rgba(170,220,255,0.55)" : "rgba(210,170,255,0.55)") : (ready ? "rgba(100,255,180,0.55)" : "rgba(255,255,255,0.28)");
+  ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(actCx, actCy, actR, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = ready || wraith ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(actCx, actCy, actR - 6, 0, TAU); ctx.stroke();
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = wraith ? FONT_BUTTON : FONT_SMALL;
   const label = profile.label;
-  ctx.fillText(label, actCx, actCy + 2);
+  ctx.fillText(label, actCx, actCy - 1);
+  ctx.font = "800 7px Arial, sans-serif";
+  ctx.fillStyle = ready || wraith ? "rgba(220,255,241,0.72)" : "rgba(225,238,245,0.42)";
+  ctx.fillText(ready || wraith ? "READY" : `${Math.ceil(profile.cost)} ENERGY`, actCx, actCy + 13);
+  ctx.restore();
 }
 function drawDesktopControlHint() {
   if (state.inputMode === "touch" || state.inputMode === "pen" || state.gameState !== "playing" || state.inputHintTimer <= 0) return;
@@ -48,11 +82,12 @@ function drawDesktopControlHint() {
 function getGameplayHudLayout() {
   const offset = bossHudOffset();
   const touchLike = state.inputMode === "touch" || state.inputMode === "pen";
-  const energyY = touchLike ? H - 194 : H - 50;
+  const energyY = touchLike ? H - 214 : H - 78;
   return {
     pause: { x: 10, y: 10, w: 52, h: 32 },
-    energy: { x: 10, y: energyY, w: 76, h: 5 },
-    health: { x: 10, y: energyY + 17, w: 76, h: 7, orientation: "horizontal" },
+    status: { x: 8, y: energyY - 17, w: 112, h: 56 },
+    energy: { x: 18, y: energyY + 3, w: 92, h: 6 },
+    health: { x: 18, y: energyY + 25, w: 92, h: 8, orientation: "horizontal" },
     score: { x: W - 10, y: 10 + offset, w: 92, h: 38 }
   };
 }
@@ -72,24 +107,48 @@ function drawLeftStatusHUD() {
   const enough = p.energy >= actionProfile.cost && p.ghostCooldown <= 0;
   ctx.save();
   ctx.globalAlpha = gameplayHudOpacity(p, layout);
+  const panel = layout.status;
+  const panelFill = ctx.createLinearGradient(panel.x, panel.y, panel.x + panel.w, panel.y + panel.h);
+  panelFill.addColorStop(0, "rgba(2,9,20,0.82)");
+  panelFill.addColorStop(1, "rgba(2,9,20,0.30)");
+  ctx.fillStyle = panelFill;
+  ctx.beginPath();
+  ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 7);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(142,213,235,0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 7);
+  ctx.stroke();
   ctx.font = "900 7px 'Arial Narrow', Arial, sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "bottom";
-  ctx.fillStyle = enough ? "rgba(127,255,199,0.88)" : "rgba(220,238,248,0.60)";
-  ctx.fillText(`${actionProfile.label}  ${Math.round(p.energy)}`, energy.x, energy.y - 3);
+  ctx.fillStyle = "rgba(203,231,242,0.62)";
+  ctx.fillText("ENERGY", energy.x, energy.y - 3);
+  ctx.textAlign = "right";
+  ctx.fillStyle = enough ? "rgba(127,255,199,0.92)" : "rgba(255,183,120,0.86)";
+  ctx.fillText(`${Math.round(p.energy)}${enough ? "  READY" : ""}`, energy.x + energy.w, energy.y - 3);
   ctx.fillStyle = "rgba(255,255,255,0.16)";
   ctx.fillRect(energy.x, energy.y, energy.w, energy.h);
-  ctx.fillStyle = enough ? "#ff0" : "#f44";
+  const energyFill = ctx.createLinearGradient(energy.x, 0, energy.x + energy.w, 0);
+  energyFill.addColorStop(0, "#4bd8ff");
+  energyFill.addColorStop(0.72, enough ? "#92ffc3" : "#ffd05e");
+  energyFill.addColorStop(1, enough ? "#eaff8a" : "#ff8e5e");
+  ctx.fillStyle = energyFill;
   ctx.fillRect(energy.x, energy.y, energy.w * clamp(p.energy / Math.max(1, p.maxEnergy), 0, 1), energy.h);
-  ctx.strokeStyle = "rgba(255,255,255,0.45)";
+  ctx.strokeStyle = "rgba(221,247,255,0.36)";
   ctx.strokeRect(energy.x, energy.y, energy.w, energy.h);
 
   const segments = Math.max(1, Math.floor(p.maxHp || 5));
   const gap = 2;
   const segmentW = Math.max(5, (health.w - gap * (segments - 1)) / segments);
   ctx.textBaseline = "top";
+  ctx.textAlign = "left";
   ctx.fillStyle = "rgba(235,245,255,0.60)";
-  ctx.fillText("HP", health.x, health.y - 8);
+  ctx.fillText("HULL", health.x, health.y - 9);
+  ctx.textAlign = "right";
+  ctx.fillStyle = p.hp <= 1 ? "#ff8a92" : "rgba(235,245,255,0.54)";
+  ctx.fillText(`${p.hp} / ${segments}`, health.x + health.w, health.y - 9);
   for (let i = 0; i < segments; i++) {
     const sx = health.x + i * (segmentW + gap);
     ctx.fillStyle = i < p.hp ? (p.hp <= 1 ? "#ff6464" : "#e34955") : "rgba(100,116,126,0.26)";
@@ -102,7 +161,25 @@ function drawLeftStatusHUD() {
 function drawTopRightHUD() {
   const offset = bossHudOffset();
   const comboGlow = clamp(state.comboPulse / 120, 0, 1);
+  const layout = getGameplayHudLayout();
+  const panel = {
+    x: W - layout.score.w - 8,
+    y: 7 + offset,
+    w: layout.score.w,
+    h: 42
+  };
   ctx.save();
+  const backing = ctx.createLinearGradient(panel.x, panel.y, panel.x + panel.w, panel.y);
+  backing.addColorStop(0, "rgba(2,8,18,0)");
+  backing.addColorStop(1, "rgba(2,8,18,0.72)");
+  ctx.fillStyle = backing;
+  ctx.beginPath();
+  ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 6);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(158,220,238,0.10)";
+  ctx.beginPath();
+  ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 6);
+  ctx.stroke();
   ctx.textAlign = "right";
   ctx.textBaseline = "top";
   ctx.font = "800 9px 'Arial Narrow', Arial, sans-serif";
@@ -222,7 +299,10 @@ function handlePausePointerDown(x, y) {
 function drawPauseButton() {
   const r = getPauseButtonRect();
   ctx.save();
-  ctx.fillStyle = "rgba(5,10,22,0.54)";
+  const fill = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+  fill.addColorStop(0, "rgba(16,32,48,0.78)");
+  fill.addColorStop(1, "rgba(3,9,20,0.64)");
+  ctx.fillStyle = fill;
   ctx.strokeStyle = "rgba(180,235,255,0.34)";
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill(); ctx.stroke();

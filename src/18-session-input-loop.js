@@ -1071,6 +1071,22 @@ function applyDevelopmentQaScenario() {
       state.boss.qaHoldStaging = true;
       showMessage("DEBUG  BOSS STAGING", 72);
     }
+  } else if (scenario === "gameover") {
+    state.gameState = "gameover";
+    state.score = 48250;
+    state.newHighScore = true;
+    highScore = 48250;
+    lastRunMeta = {
+      gloryGained: 420,
+      gloryAfter: 2850,
+      seasonXPGained: 840,
+      creditsEarned: 168,
+      rankAfter: "Ace Pilot",
+      rankUp: true,
+      seasonTier: 4
+    };
+    state.gameOverShake = 0;
+    state.gameOverShakeTimer = 0;
   }
   if (requestedInput === "touch") state.inputMode = "touch";
 }

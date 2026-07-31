@@ -30,7 +30,9 @@ test("ambient title traffic is visible, depth-calibrated, and path-reserved", ()
 
 test("title wordmark measures a real gap between STAR STRIKE and RUSH", () => {
   const source = fs.readFileSync(path.join(repoRoot, "src", "13-rendering-title-screens.js"), "utf8");
-  assert.match(source, /const rushOffsetY = 92/);
+  const offset = source.match(/const rushOffsetY = (\d+)/);
+  assert.ok(offset, "RUSH offset should be explicit and measurable");
+  assert.ok(Number(offset[1]) >= 96, "RUSH should retain a comfortably separated baseline");
   assert.match(source, /nameBounds/);
   assert.match(source, /rushBounds/);
   assert.match(source, /lineGap:/);
