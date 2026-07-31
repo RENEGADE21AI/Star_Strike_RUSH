@@ -52,7 +52,7 @@ rewards.
 | Firestore authorization | Stable | Emulator tests cover anonymous denial, owner privacy, bounded reads, browser-write denial |
 | Build/cache contract | Stable | Commit-versioned runtime/assets plus no-store HTML and `version.json` |
 | Player-facing UI | Focused polish locally verified | Shared glass-edged buttons/panels, explicit settings toggles, isolated destructive actions, clearer title identity, and a score-focused Game Over summary |
-| Visual QA | Stable | 49 asserted scenes spanning title viewports, panels, reset, HUD/touch clearance, Game Over, First Flight, launch states, realm UI, account offer, and checkpoint resume |
+| Visual QA | Stable | 51 asserted scenes spanning portrait and landscape title viewports, panels, settings danger hierarchy, reset, HUD/touch clearance, Game Over, First Flight, launch states, realm UI, account offer, and checkpoint resume |
 
 ## Firebase identity and archive boundary
 
@@ -136,23 +136,26 @@ PR #14 merged with green `verify` and `secret-scan`; its exact-SHA preview was
 staged and smoke-tested. Account A/B smoke remains incomplete, and this
 document does not imply a production Hosting deployment.
 
-Current experience-polish branch evidence on Node 22:
+Current final UX sweep evidence on Node 22:
 
-- `npm test`: 131/131 passed, including real-action desktop and touch First
+- `npm test`: 132/132 passed, including real-action desktop and touch First
   Flight journeys and the complete release-integrity contract suite.
 - Firestore Rules emulator: 4/4 passed.
 - Firebase client integration: one complete real-emulator browser scenario
   passed.
-- Visual QA: 49/49 asserted scenes passed with zero runtime/layout failures
-  across 375×667, 390×844, 430×932, 768×1024, and 1440×900.
+- Visual QA: 51/51 asserted scenes passed with zero runtime/layout failures
+  across 375x667, 390x844, 430x932, 768x1024, 1440x900, and a
+  portrait-first 844x390 landscape safety case.
 - Production build: 104 allowlisted public files generated.
 - Root production audit: 0 vulnerabilities. Functions audit: 0 high-severity
   findings and 8 known moderate transitive findings.
 - Tracked-file secret scan: 237 files passed.
 
-This focused pass is local branch evidence until its PR is merged and a new
-exact-SHA preview is staged. Production Hosting and Account A/B status remain
-unchanged.
+This focused pass separates the device best from the unverified public archive,
+removes contradictory record-publication copy, and isolates Reset Local Data as
+a full-width danger action below routine settings. It remains local branch
+evidence until its PR is merged. Production Hosting and Account A/B status
+remain unchanged.
 
 The focused onboarding-entry refinement replaces local-progress guessing with a
 one-time explicit Yes/No decision whenever `star_strike_rush_onboarding_v1` is

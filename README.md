@@ -48,7 +48,9 @@ Game Over: glass-edged panels, clear primary and destructive actions, readable
 single-column mobile achievement cards, an unobtrusive combat HUD, and a
 score-focused end-of-run summary. Settings expose explicit ON/OFF state and
 apply immediately on this device. Reset Local Data remains a separate,
-plain-language destructive confirmation.
+plain-language destructive confirmation. Records distinguishes the best score
+stored on this device from the unverified public preseason archive and states
+when public writes are paused.
 
 ## Run locally
 
