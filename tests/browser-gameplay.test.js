@@ -104,6 +104,42 @@ test("NO stores the one-time decision and reload returns directly to the ordinar
     await page.waitForTimeout(300);
     assert.equal(await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).isVisible().catch(() => false), false);
     assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_high_score_v1")), "9000");
+    await page.waitForFunction(() => onboardingUiMode === "none" && state.gameState === "start" && state.sceneTransition.mode === "idle");
+    const play = page.getByRole("button", { name: "Play", exact: true });
+    await play.waitFor({ state: "visible" });
+    await play.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => state.sceneTransition.mode === "title_launch" || state.gameState === "playing");
+  } finally {
+    await context.close();
+  }
+});
+
+test("completed First Flight state restores an interactive ordinary title", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => {
+    localStorage.setItem("star_strike_rush_onboarding_v1", JSON.stringify({
+      schemaVersion: 1,
+      tutorialVersion: 1,
+      status: "completed",
+      checkpoint: "graduation",
+      startedAtMs: Date.now() - 60_000,
+      updatedAtMs: Date.now(),
+      completedAtMs: Date.now(),
+      accountOfferShown: true,
+      codexGraduationApplied: true
+    }));
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto(baseUrl, { waitUntil: "commit" });
+    await page.waitForFunction(() => typeof onboardingUiMode !== "undefined" && onboardingUiMode === "none" && state.gameState === "start" && state.sceneTransition.mode === "idle");
+    assert.equal(await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).isVisible().catch(() => false), false);
+    const play = page.getByRole("button", { name: "Play", exact: true });
+    await play.waitFor({ state: "visible" });
+    await play.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => state.sceneTransition.mode === "title_launch" || state.gameState === "playing");
   } finally {
     await context.close();
   }
