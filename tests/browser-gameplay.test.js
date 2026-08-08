@@ -104,7 +104,7 @@ test("NO stores the one-time decision and reload returns directly to the ordinar
     await page.waitForTimeout(300);
     assert.equal(await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).isVisible().catch(() => false), false);
     assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_high_score_v1")), "9000");
-    await page.waitForFunction(() => onboardingUiMode === "none" && state.gameState === "start" && state.sceneTransition.mode === "idle");
+    await page.waitForFunction(() => typeof onboardingUiMode !== "undefined" && onboardingUiMode === "none" && state.gameState === "start" && state.sceneTransition.mode === "idle");
     const play = page.getByRole("button", { name: "Play", exact: true });
     await play.waitFor({ state: "visible" });
     await play.focus();
