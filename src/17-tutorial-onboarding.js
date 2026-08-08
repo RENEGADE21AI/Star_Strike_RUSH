@@ -423,12 +423,13 @@ function initializeOnboardingExperience(options = {}) {
   const stored = loadOnboardingStateFromDevice();
   onboardingState = stored || makeDefaultOnboardingState();
   const debugBypass = options.debugBypass === true;
-  onboardingUiMode = debugBypass
-    ? "none"
-    : onboardingRoute({ storedState: stored });
+  const route = debugBypass ? "title" : onboardingRoute({ storedState: stored });
+  // `title` is a router destination, not an onboarding overlay. Keeping it as
+  // an active UI mode blocks the normal title pointer and keyboard handlers.
+  onboardingUiMode = route === "title" ? "none" : route;
   if (onboardingUiMode === "first_time_question") beginOnboardingIntroFlight();
   renderOnboardingAccessibleMode();
-  return onboardingUiMode;
+  return route;
 }
 
 function startTutorialSession(stepId = "incoming") {
