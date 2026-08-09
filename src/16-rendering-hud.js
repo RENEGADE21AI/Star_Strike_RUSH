@@ -3,7 +3,10 @@ function drawControls() {
   const joyCx = 76, joyCy = H - 76, joyR = 56;
   const actCx = W - 76, actCy = H - 76, actR = 42;
   ctx.save();
-  const controlAlpha = state.gameState === "playing" ? 1 : 0.34;
+  const controlEnabled = typeof currentGameplayControlEnabled === "function"
+    ? currentGameplayControlEnabled()
+    : state.gameState === "playing";
+  const controlAlpha = controlEnabled ? 1 : 0.22;
   ctx.globalAlpha = controlAlpha;
   const joystickFill = ctx.createRadialGradient(joyCx, joyCy, 4, joyCx, joyCy, joyR);
   joystickFill.addColorStop(0, "rgba(120,220,255,0.08)");
@@ -35,18 +38,27 @@ function drawControls() {
   ctx.beginPath(); ctx.arc(knobX, knobY, 18, 0, TAU); ctx.stroke();
   const wraith = isWraithActive();
   const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: wraith ? "HOP" : "GHOST", cost: wraith ? 18 : 35 };
-  const ready = state.player && state.player.energy >= profile.cost && (wraith ? true : state.player.ghostCooldown <= 0);
-  const buttonFill = wraith ? (state.playerRealm === 0 ? "rgba(170,220,255,0.26)" : "rgba(210,170,255,0.26)") : (ready ? "rgba(100,255,180,0.22)" : "rgba(255,255,255,0.10)");
+  const ready = controlEnabled && state.player && state.player.energy >= profile.cost && (wraith ? true : state.player.ghostCooldown <= 0);
+  const visuallyReady = controlEnabled && (ready || wraith);
+  const buttonFill = !controlEnabled
+    ? "rgba(255,255,255,0.08)"
+    : wraith
+      ? (state.playerRealm === 0 ? "rgba(170,220,255,0.26)" : "rgba(210,170,255,0.26)")
+      : (ready ? "rgba(100,255,180,0.22)" : "rgba(255,255,255,0.10)");
   const abilityGlow = wraith ? (state.playerRealm === 0 ? "#aee8ff" : "#d2aaff") : "#78ffb4";
-  ctx.shadowColor = ready || wraith ? abilityGlow : "transparent";
-  ctx.shadowBlur = ready || wraith ? 10 : 0;
+  ctx.shadowColor = visuallyReady ? abilityGlow : "transparent";
+  ctx.shadowBlur = visuallyReady ? 10 : 0;
   ctx.fillStyle = buttonFill;
   ctx.beginPath(); ctx.arc(actCx, actCy, actR, 0, TAU); ctx.fill();
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = wraith ? (state.playerRealm === 0 ? "rgba(170,220,255,0.55)" : "rgba(210,170,255,0.55)") : (ready ? "rgba(100,255,180,0.55)" : "rgba(255,255,255,0.28)");
+  ctx.strokeStyle = !controlEnabled
+    ? "rgba(255,255,255,0.20)"
+    : wraith
+      ? (state.playerRealm === 0 ? "rgba(170,220,255,0.55)" : "rgba(210,170,255,0.55)")
+      : (ready ? "rgba(100,255,180,0.55)" : "rgba(255,255,255,0.28)");
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(actCx, actCy, actR, 0, TAU); ctx.stroke();
-  ctx.strokeStyle = ready || wraith ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.08)";
+  ctx.strokeStyle = visuallyReady ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.08)";
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(actCx, actCy, actR - 6, 0, TAU); ctx.stroke();
   ctx.fillStyle = "#fff";
@@ -56,12 +68,18 @@ function drawControls() {
   const label = profile.label;
   ctx.fillText(label, actCx, actCy - 1);
   ctx.font = "800 7px Arial, sans-serif";
-  ctx.fillStyle = ready || wraith ? "rgba(220,255,241,0.72)" : "rgba(225,238,245,0.42)";
-  ctx.fillText(ready || wraith ? "READY" : `${Math.ceil(profile.cost)} ENERGY`, actCx, actCy + 13);
+  ctx.fillStyle = visuallyReady ? "rgba(220,255,241,0.72)" : "rgba(225,238,245,0.42)";
+  ctx.fillText(controlEnabled ? (ready || wraith ? "READY" : `${Math.ceil(profile.cost)} ENERGY`) : "LOCKED", actCx, actCy + 13);
   ctx.restore();
 }
 function drawDesktopControlHint() {
-  if (state.inputMode === "touch" || state.inputMode === "pen" || state.gameState !== "playing" || state.inputHintTimer <= 0) return;
+  if (
+    state.inputMode === "touch" ||
+    state.inputMode === "pen" ||
+    state.gameState !== "playing" ||
+    state.inputHintTimer <= 0 ||
+    (typeof currentGameplayControlEnabled === "function" && !currentGameplayControlEnabled())
+  ) return;
   const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
   const text = `MOVE  WASD / ARROWS    ${profile.label}  SPACE / SHIFT`;
   const fade = clamp(state.inputHintTimer / 42, 0, 1);
@@ -312,11 +330,13 @@ function handlePausePointerDown(x, y) {
   }
   if (hitRect(rects.resume, x, y)) { resumeGame(); return true; }
   if (state.runMode === "tutorial" && rects.checkpoint && hitRect(rects.checkpoint, x, y)) {
+    if (typeof clearGameAccessibleSurface === "function") clearGameAccessibleSurface("Restarting tutorial checkpoint.");
     recoverTutorialCheckpoint();
     state.gameState = "playing";
     return true;
   }
   if (state.runMode === "tutorial" && hitRect(rects.restart, x, y)) {
+    if (typeof clearGameAccessibleSurface === "function") clearGameAccessibleSurface("Restarting First Flight training.");
     setupSession("start");
     beginTutorialTraining({ replay: true });
     return true;
@@ -332,6 +352,7 @@ function handlePausePointerDown(x, y) {
       requestPauseDestructiveAction("title");
       return true;
     }
+    if (typeof clearGameAccessibleSurface === "function") clearGameAccessibleSurface("Returning to the First Flight checkpoint offer.");
     setupSession("start");
     if (wasTutorial && typeof onboardingState !== "undefined" && onboardingState && onboardingState.status === "in_progress") {
       onboardingUiMode = "resume_training";

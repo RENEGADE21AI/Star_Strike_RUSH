@@ -31,6 +31,10 @@ test("deterministic tutorial spawn plans contain no random or dynamic-director d
     [["red", "red"], ["orange", "red", "orange"]]
   );
   assert.ok(first.evasion.every((shot) => Number.isFinite(shot.x) && Number.isFinite(shot.vy)));
+  assert.ok(
+    first.ghost_shift.startX <= first.ghost_shift.laneX - first.ghost_shift.laneWidth,
+    "Ghost lesson needs a safe approach before the dangerous lane"
+  );
 });
 
 test("tutorial advancement requires the real action for every mechanic lesson", () => {
@@ -114,24 +118,58 @@ test("tutorial boss overrides are isolated and preserve normal boss values", () 
 test("checkpoint recovery clears hazards and restores only the training simulation", () => {
   const api = loadDirector();
   const runtime = {
-    player: { hp: 0, maxHp: 5, energy: 3, maxEnergy: 100, inv: 0 },
+    player: {
+      hp: 0,
+      maxHp: 5,
+      energy: 3,
+      maxEnergy: 100,
+      inv: 0,
+      vx: 4.5,
+      vy: -3.25,
+      ghostTimer: 18,
+      dashTimer: 9,
+      ghostCooldown: 47
+    },
+    playerRealm: 1,
     bullets: [{ id: 1 }],
     enemyBullets: [{ id: 2 }],
     enemies: [{ id: 3 }],
+    pendingSpawns: [{ id: 4 }],
     powerups: [{ id: 4 }],
     debris: [{ id: 5 }],
     enemyBeams: [{ id: 6 }],
     gravityWells: [{ id: 7 }],
-    boss: { id: 8 }
+    wingmen: [{ id: 8 }],
+    boss: { id: 9 },
+    bossDeath: { timer: 42 },
+    bossRecovery: 31
   };
   const result = api.recoverTutorialRuntime(runtime);
   assert.equal(result.player.hp, 5);
   assert.equal(result.player.energy, 100);
   assert.equal(result.player.inv, 120);
-  for (const key of ["bullets", "enemyBullets", "enemies", "powerups", "debris", "enemyBeams", "gravityWells"]) {
+  assert.equal(result.player.vx, 0);
+  assert.equal(result.player.vy, 0);
+  assert.equal(result.player.ghostTimer, 0);
+  assert.equal(result.player.dashTimer, 0);
+  assert.equal(result.player.ghostCooldown, 0);
+  assert.equal(result.playerRealm, 0);
+  for (const key of [
+    "bullets",
+    "enemyBullets",
+    "enemies",
+    "pendingSpawns",
+    "powerups",
+    "debris",
+    "enemyBeams",
+    "gravityWells",
+    "wingmen"
+  ]) {
     assert.deepEqual(Array.from(result[key]), []);
   }
   assert.equal(result.boss, null);
+  assert.equal(result.bossDeath, null);
+  assert.equal(result.bossRecovery, 0);
 });
 
 test("graduation Codex reveal is exact and idempotent", () => {

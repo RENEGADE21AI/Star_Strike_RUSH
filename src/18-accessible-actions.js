@@ -112,7 +112,7 @@ function titlePanelAccessibilityActions() {
   return [];
 }
 
-function syncGameAccessibleSurface() {
+function syncGameAccessibleSurface(force = false) {
   if (typeof setGameAccessibleSurface !== "function") return;
   const onboardingActive = typeof onboardingUiMode !== "undefined" && onboardingUiMode !== "none";
   const tutorialDialogue = state.runMode === "tutorial" && typeof tutorialSimulationPaused === "function" && tutorialSimulationPaused();
@@ -146,10 +146,10 @@ function syncGameAccessibleSurface() {
     handleEditing,
     layoutKey
   ].join("|");
-  if (stateKey === lastGameAccessibilitySyncKey) return;
+  if (!force && stateKey === lastGameAccessibilitySyncKey) return;
   lastGameAccessibilitySyncKey = stateKey;
 
-  if (onboardingActive || tutorialDialogue || callSignEditing || handleEditing) {
+  if (onboardingActive || callSignEditing || handleEditing) {
     clearGameAccessibleSurface();
     return;
   }
@@ -187,12 +187,20 @@ function syncGameAccessibleSurface() {
         ];
     setGameAccessibleSurface({
       mode: resuming ? "resume-countdown" : "pause",
-      label: resuming ? "Resume countdown" : "Flight paused",
-      message: resuming ? "Re-engaging controls. Stay Paused is available." : "Flight paused. Simulation frozen.",
+      label: resuming
+        ? "Resume countdown"
+        : state.runMode === "tutorial" ? "First Flight training paused" : "Flight paused",
+      message: resuming
+        ? "Re-engaging controls. Stay Paused is available."
+        : state.runMode === "tutorial" ? "First Flight training paused. Simulation frozen." : "Flight paused. Simulation frozen.",
       modal: true,
       actions,
       onEscape: handlePauseEscape
     });
+    return;
+  }
+  if (tutorialDialogue) {
+    clearGameAccessibleSurface();
     return;
   }
   if (state.gameState === "gameover") {

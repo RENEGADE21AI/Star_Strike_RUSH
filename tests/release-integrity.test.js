@@ -219,7 +219,7 @@ test("all one-run achievement thresholds fit deterministic theoretical constrain
   }
 });
 
-function loadAudioContext(frameRate = 60) {
+function createAudioContext() {
   const events = [];
   class FakeAudio {
     constructor(src) {
@@ -279,7 +279,14 @@ function loadAudioContext(frameRate = 60) {
       hidden: false,
       addEventListener(type, fn) { listeners[type] = fn; }
     },
-    state: { gameState: "start" },
+    state: {
+      gameState: "start",
+      sceneTransition: {
+        mode: "idle",
+        elapsedSeconds: 0,
+        durationSeconds: 1
+      }
+    },
     settingMusicEnabled: true,
     settingEffectsEnabled: true,
     clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
@@ -298,11 +305,23 @@ function loadAudioContext(frameRate = 60) {
   vm.createContext(context);
   vm.runInContext(source("src/02-audio.js"), context);
   vm.runInContext("unlockGameMusic()", context);
-  vm.runInContext("state.gameState = 'playing'; prepareGameplayMusic()", context);
-  for (let index = 0; index < frameRate * 2; index++) {
-    vm.runInContext(`updateGameMusic(${1 / frameRate})`, context);
+  return { context, events, listeners };
+}
+
+function updateMusicFor(run, seconds, frameRate, onFrame = null) {
+  const frameCount = Math.round(frameRate * seconds);
+  for (let index = 0; index < frameCount; index++) {
+    if (onFrame) onFrame((index + 1) / frameRate, index);
+    vm.runInContext(`updateGameMusic(${1 / frameRate})`, run.context);
   }
-  return { context, events, listeners, snapshot: vm.runInContext("gameMusicStateSnapshot()", context) };
+}
+
+function loadAudioContext(frameRate = 60) {
+  const run = createAudioContext();
+  const { context } = run;
+  vm.runInContext("state.gameState = 'playing'; prepareGameplayMusic()", context);
+  updateMusicFor(run, 2, frameRate);
+  return { ...run, snapshot: vm.runInContext("gameMusicStateSnapshot()", context) };
 }
 
 test("music loading and crossfades are deterministic while effects remain independent", () => {
@@ -324,6 +343,113 @@ test("music loading and crossfades are deterministic while effects remain indepe
   run.context.document.hidden = true;
   run.listeners.visibilitychange();
   assert.equal(vm.runInContext("gameMusicStateSnapshot().tracks.gameplay.paused", run.context), true);
+});
+
+test("title launch and game arrival music remain refresh-rate independent", () => {
+  const results = [];
+  for (const frameRate of [30, 60, 90, 120]) {
+    const run = createAudioContext();
+    updateMusicFor(run, 2, frameRate);
+    const titleReady = vm.runInContext("gameMusicStateSnapshot()", run.context);
+    assert.ok(titleReady.tracks.title.volume > 0.2 && titleReady.tracks.title.volume <= 0.22);
+
+    run.context.state.sceneTransition = {
+      mode: "title_launch",
+      elapsedSeconds: 0,
+      durationSeconds: 2
+    };
+    let midpoint = null;
+    updateMusicFor(run, 2, frameRate, (elapsedSeconds) => {
+      run.context.state.sceneTransition.elapsedSeconds = Math.min(2, elapsedSeconds);
+      if (!midpoint && elapsedSeconds >= 1) {
+        midpoint = vm.runInContext("gameMusicStateSnapshot()", run.context);
+      }
+    });
+    const launchComplete = vm.runInContext("gameMusicStateSnapshot()", run.context);
+    assert.ok(midpoint.tracks.title.volume < titleReady.tracks.title.volume * 0.95, `title did not begin fading at ${frameRate} Hz`);
+    assert.ok(launchComplete.tracks.title.volume < titleReady.tracks.title.volume * 0.4, `title remained dominant at launch completion at ${frameRate} Hz`);
+    assert.equal(launchComplete.tracks.gameplay.paused, false, `gameplay track did not start during launch at ${frameRate} Hz`);
+    assert.ok(launchComplete.tracks.gameplay.volume > 0.035, `gameplay mix did not enter during launch at ${frameRate} Hz: ${launchComplete.tracks.gameplay.volume}`);
+
+    run.context.state.gameState = "playing";
+    run.context.state.sceneTransition = {
+      mode: "game_arrival",
+      elapsedSeconds: 0,
+      durationSeconds: 0.6
+    };
+    const beforeArrival = launchComplete.tracks.gameplay.volume;
+    updateMusicFor(run, 0.6, frameRate, (elapsedSeconds) => {
+      run.context.state.sceneTransition.elapsedSeconds = Math.min(0.6, elapsedSeconds);
+    });
+    const arrivalComplete = vm.runInContext("gameMusicStateSnapshot()", run.context);
+    assert.ok(arrivalComplete.tracks.gameplay.volume > beforeArrival, `arrival mix did not rise at ${frameRate} Hz`);
+    assert.ok(arrivalComplete.tracks.gameplay.volume < 0.17, `arrival mix jumped to full volume at ${frameRate} Hz`);
+    assert.ok(arrivalComplete.tracks.title.volume < launchComplete.tracks.title.volume, `title mix did not keep fading through arrival at ${frameRate} Hz`);
+    results.push({
+      launchTitle: launchComplete.tracks.title.volume,
+      launchGameplay: launchComplete.tracks.gameplay.volume,
+      arrivalGameplay: arrivalComplete.tracks.gameplay.volume
+    });
+  }
+
+  for (const key of ["launchTitle", "launchGameplay", "arrivalGameplay"]) {
+    const values = results.map((result) => result[key]);
+    assert.ok(Math.max(...values) - Math.min(...values) < 0.002, `${key} diverged by refresh rate: ${values}`);
+  }
+});
+
+test("pausing during game arrival immediately uses the paused music mix", () => {
+  const run = createAudioContext();
+  run.context.state.gameState = "playing";
+  run.context.state.sceneTransition = {
+    mode: "game_arrival",
+    elapsedSeconds: 0.45,
+    durationSeconds: 0.6
+  };
+  const arrival = vm.runInContext("gameMusicMix()", run.context);
+  assert.ok(arrival.gameplay > 0.11 && arrival.gameplay < 0.17);
+
+  run.context.state.gameState = "paused";
+  assert.deepEqual(
+    JSON.parse(vm.runInContext("JSON.stringify(gameMusicMix())", run.context)),
+    { title: 0, gameplay: 0.065 }
+  );
+  run.context.state.gameState = "resuming";
+  assert.deepEqual(
+    JSON.parse(vm.runInContext("JSON.stringify(gameMusicMix())", run.context)),
+    { title: 0, gameplay: 0.065 }
+  );
+});
+
+test("hidden-tab music restore starts silent and fades only the active mix", () => {
+  const run = loadAudioContext(60);
+  const beforeHide = vm.runInContext("gameMusicStateSnapshot()", run.context);
+  assert.ok(beforeHide.tracks.gameplay.volume > 0.15 && beforeHide.tracks.gameplay.volume <= 0.17);
+  assert.equal(beforeHide.tracks.gameplay.paused, false);
+
+  run.context.document.hidden = true;
+  run.listeners.visibilitychange();
+  const hidden = vm.runInContext("gameMusicStateSnapshot()", run.context);
+  assert.equal(hidden.hidden, true);
+  assert.equal(hidden.tracks.title.paused, true);
+  assert.equal(hidden.tracks.gameplay.paused, true);
+
+  run.context.state.gameState = "paused";
+  run.context.document.hidden = false;
+  run.listeners.visibilitychange();
+  const restored = vm.runInContext("gameMusicStateSnapshot()", run.context);
+  assert.equal(restored.hidden, false);
+  assert.equal(restored.tracks.title.paused, true);
+  assert.equal(restored.tracks.title.volume, 0);
+  assert.equal(restored.tracks.gameplay.paused, false);
+  assert.ok(restored.tracks.gameplay.volume > 0 && restored.tracks.gameplay.volume < 0.01, `restore volume jumped to ${restored.tracks.gameplay.volume}`);
+
+  updateMusicFor(run, 1, 60);
+  const faded = vm.runInContext("gameMusicStateSnapshot()", run.context);
+  assert.equal(faded.tracks.title.paused, true);
+  assert.equal(faded.tracks.title.volume, 0);
+  assert.ok(faded.tracks.gameplay.volume > restored.tracks.gameplay.volume);
+  assert.ok(faded.tracks.gameplay.volume > 0.04 && faded.tracks.gameplay.volume < 0.06, `paused mix did not fade smoothly toward target: ${faded.tracks.gameplay.volume}`);
 });
 
 test("reusable Canvas scroll controller supports threshold, clamp, momentum, wheel, and buttons", () => {

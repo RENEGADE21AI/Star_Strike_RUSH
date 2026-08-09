@@ -101,7 +101,7 @@ function deterministicTutorialPlan() {
       { x: 112, y: 235, vx: 0, vy: 1.8, kind: "aimed", r: 5 },
       { x: 142, y: 220, vx: 0, vy: 1.8, kind: "aimed", r: 5 }
     ],
-    ghost_shift: { laneX: 187.5, laneWidth: 44, startSide: "left", targetSide: "right" },
+    ghost_shift: { laneX: 187.5, laneWidth: 44, startX: 110, startSide: "left", targetSide: "right" },
     powerup: { type: "phase_shield", x: 187.5, y: 470, vy: 0.35, size: 14, life: 900 },
     controlled_wave: [
       [
@@ -217,10 +217,18 @@ function recoverTutorialRuntime(runtime) {
   runtime.player.hp = runtime.player.maxHp;
   runtime.player.energy = runtime.player.maxEnergy;
   runtime.player.inv = 120;
-  for (const key of ["bullets", "enemyBullets", "enemies", "powerups", "debris", "enemyBeams", "gravityWells"]) {
+  runtime.player.vx = 0;
+  runtime.player.vy = 0;
+  runtime.player.ghostTimer = 0;
+  runtime.player.dashTimer = 0;
+  runtime.player.ghostCooldown = 0;
+  runtime.playerRealm = 0;
+  for (const key of ["bullets", "enemyBullets", "enemies", "pendingSpawns", "powerups", "debris", "enemyBeams", "gravityWells", "wingmen"]) {
     runtime[key] = [];
   }
   runtime.boss = null;
+  runtime.bossDeath = null;
+  runtime.bossRecovery = 0;
   return runtime;
 }
 
