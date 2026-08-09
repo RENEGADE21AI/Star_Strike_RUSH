@@ -51,6 +51,21 @@ async function openGame(context, route = "/?debug=1") {
   return { page, errors };
 }
 
+async function dismissCurrentTutorialDialogue(page) {
+  await page.waitForFunction(() => {
+    const snapshot = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "null");
+    return snapshot?.tutorial?.director?.dialogueVisible === true;
+  }, null, { timeout: 15_000 });
+  await page.evaluate(() => {
+    tutorialDirector.dialogueReveal = 1;
+    advanceTutorialDialogue();
+  });
+  await page.waitForFunction(() => {
+    const snapshot = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "null");
+    return snapshot?.tutorial?.director?.dialogueVisible === false;
+  });
+}
+
 before(async () => {
   server = http.createServer(staticResponse);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -170,6 +185,289 @@ test("held movement and ability input cannot affect the ship during game arrival
     await page.keyboard.up("ArrowRight");
     await page.keyboard.up("Space");
     await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "idle");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("tutorial pause has one modal owner and skip confirmation cannot leak Escape or canvas input", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true
+  });
+  const { page, errors } = await openGame(context, "/?debug=1&scenario=tutorial&step=movement&input=touch");
+  try {
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.runMode === "tutorial" && snapshot.transition.mode === "idle";
+    }, null, { timeout: 20_000 });
+    await dismissCurrentTutorialDialogue(page);
+    await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).input.gameplayControlEnabled === true);
+
+    const healthBeforePause = (await debugSnapshot(page)).player.hp;
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "pause");
+    let modalState = await page.evaluate(() => ({
+      gameState: state.gameState,
+      uiMode: onboardingUiMode,
+      health: state.player.hp,
+      modalCount: document.querySelectorAll('[aria-modal="true"]').length,
+      game: gameAccessibilitySnapshot(),
+      tutorialModal: document.querySelector("#tutorialAccessibility")?.getAttribute("aria-modal")
+    }));
+    assert.equal(modalState.gameState, "paused");
+    assert.equal(modalState.health, healthBeforePause, "training pause must remain free");
+    assert.equal(modalState.modalCount, 1, "only the generic pause surface should own modal semantics");
+    assert.equal(modalState.game.modal, true);
+    assert.equal(modalState.game.actions.filter((action) => action.focused).length, 1);
+    assert.equal(modalState.game.actions.find((action) => action.focused)?.label, "Resume flight");
+    assert.equal(modalState.tutorialModal, null);
+
+    const skipTraining = page.getByRole("button", { name: "Skip training", exact: true });
+    await skipTraining.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => onboardingUiMode === "skip_confirm");
+    modalState = await page.evaluate(() => ({
+      gameState: state.gameState,
+      uiMode: onboardingUiMode,
+      modalCount: document.querySelectorAll('[aria-modal="true"]').length,
+      game: gameAccessibilitySnapshot(),
+      tutorialModal: document.querySelector("#tutorialAccessibility")?.getAttribute("aria-modal"),
+      focused: document.activeElement?.dataset?.onboardingAction || ""
+    }));
+    assert.equal(modalState.gameState, "paused");
+    assert.equal(modalState.uiMode, "skip_confirm");
+    assert.equal(modalState.modalCount, 1, "skip confirmation must replace, not stack on, the pause modal");
+    assert.equal(modalState.game.hidden, true);
+    assert.equal(modalState.tutorialModal, "true");
+    assert.equal(modalState.focused, "cancel-skip");
+
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => onboardingUiMode === "none" && gameAccessibilitySnapshot().mode === "pause");
+    modalState = await page.evaluate(() => ({
+      gameState: state.gameState,
+      health: state.player.hp,
+      modalCount: document.querySelectorAll('[aria-modal="true"]').length,
+      game: gameAccessibilitySnapshot()
+    }));
+    assert.equal(modalState.gameState, "paused", "Escape must cancel confirmation without resuming training");
+    assert.equal(modalState.health, healthBeforePause);
+    assert.equal(modalState.modalCount, 1);
+    assert.equal(modalState.game.mode, "pause");
+
+    await page.getByRole("button", { name: "Skip training", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => onboardingUiMode === "skip_confirm");
+    const resumeCenter = await page.evaluate(() => {
+      const rect = getPauseOverlayRects().resume;
+      return {
+        x: offsetX + (rect.x + rect.w / 2) * scale,
+        y: offsetY + (rect.y + rect.h / 2) * scale
+      };
+    });
+    await page.dispatchEvent("canvas", "pointerdown", {
+      pointerId: 71,
+      pointerType: "touch",
+      clientX: resumeCenter.x,
+      clientY: resumeCenter.y,
+      buttons: 1
+    });
+    await page.dispatchEvent("canvas", "pointerup", {
+      pointerId: 71,
+      pointerType: "touch",
+      clientX: resumeCenter.x,
+      clientY: resumeCenter.y,
+      buttons: 0
+    });
+    await page.waitForTimeout(80);
+    const afterCanvasLeakAttempt = await page.evaluate(() => ({
+      gameState: state.gameState,
+      uiMode: onboardingUiMode,
+      health: state.player.hp
+    }));
+    assert.deepEqual(afterCanvasLeakAttempt, {
+      gameState: "paused",
+      uiMode: "skip_confirm",
+      health: healthBeforePause
+    });
+
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => onboardingUiMode === "none" && gameAccessibilitySnapshot().mode === "pause");
+    const restartCheckpoint = page.getByRole("button", { name: "Restart tutorial checkpoint", exact: true });
+    await restartCheckpoint.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => tutorialDirector?.dialogueVisible === true && state.gameState === "playing");
+    let transferred = await page.evaluate(() => ({
+      modalCount: document.querySelectorAll('[aria-modal="true"]').length,
+      game: gameAccessibilitySnapshot(),
+      tutorialModal: document.querySelector("#tutorialAccessibility")?.getAttribute("aria-modal")
+    }));
+    assert.equal(transferred.modalCount, 1, "checkpoint recovery must transfer modal ownership synchronously");
+    assert.equal(transferred.game.hidden, true);
+    assert.equal(transferred.tutorialModal, "true");
+
+    await dismissCurrentTutorialDialogue(page);
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "pause");
+    const returnTitle = page.getByRole("button", { name: "Return to title", exact: true });
+    await returnTitle.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => onboardingUiMode === "resume_training" && state.gameState === "start");
+    transferred = await page.evaluate(() => ({
+      modalCount: document.querySelectorAll('[aria-modal="true"]').length,
+      game: gameAccessibilitySnapshot(),
+      tutorialModal: document.querySelector("#tutorialAccessibility")?.getAttribute("aria-modal")
+    }));
+    assert.equal(transferred.modalCount, 1, "returning to the checkpoint offer must not stack pause semantics");
+    assert.equal(transferred.game.hidden, true);
+    assert.equal(transferred.tutorialModal, "true");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("Colonel dialogue clears inertia and held keyboard or touch input cannot leak through it", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true
+  });
+  const { page, errors } = await openGame(context, "/?debug=1&scenario=tutorial&step=movement&input=touch");
+  try {
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.runMode === "tutorial" && snapshot.transition.mode === "idle";
+    }, null, { timeout: 20_000 });
+    await dismissCurrentTutorialDialogue(page);
+    await page.evaluate(() => {
+      state.player.vx = 6;
+      state.player.vy = -4;
+      state.keyboard.right = true;
+      state.joystick.active = true;
+      state.joystick.id = 44;
+      state.joystick.ax = 0.9;
+      state.joystick.ay = -0.4;
+      enterTutorialStep("auto_weapons");
+    });
+    const dialogueAt = await page.evaluate(() => ({
+      x: state.player.x,
+      y: state.player.y,
+      vx: state.player.vx,
+      vy: state.player.vy,
+      right: state.keyboard.right,
+      joystickActive: state.joystick.active,
+      dialogueVisible: tutorialDirector.dialogueVisible
+    }));
+    assert.deepEqual(
+      { vx: dialogueAt.vx, vy: dialogueAt.vy, right: dialogueAt.right, joystickActive: dialogueAt.joystickActive, dialogueVisible: dialogueAt.dialogueVisible },
+      { vx: 0, vy: 0, right: false, joystickActive: false, dialogueVisible: true }
+    );
+
+    await page.keyboard.down("ArrowRight");
+    const joystickCenter = await page.evaluate(() => ({
+      x: offsetX + 76 * scale,
+      y: offsetY + (H - 76) * scale
+    }));
+    await page.dispatchEvent("canvas", "pointerdown", {
+      pointerId: 72,
+      pointerType: "touch",
+      clientX: joystickCenter.x,
+      clientY: joystickCenter.y,
+      buttons: 1
+    });
+    await page.waitForTimeout(120);
+    const blocked = await page.evaluate(() => ({
+      x: state.player.x,
+      y: state.player.y,
+      vx: state.player.vx,
+      vy: state.player.vy,
+      right: state.keyboard.right,
+      joystickActive: state.joystick.active
+    }));
+    assert.equal(blocked.x, dialogueAt.x);
+    assert.equal(blocked.y, dialogueAt.y);
+    assert.equal(blocked.vx, 0);
+    assert.equal(blocked.vy, 0);
+    assert.equal(blocked.right, false);
+    assert.equal(blocked.joystickActive, false);
+
+    await page.keyboard.up("ArrowRight");
+    await page.evaluate(() => {
+      tutorialDirector.dialogueReveal = 1;
+      advanceTutorialDialogue();
+    });
+    await page.waitForFunction(() => tutorialDirector.dialogueVisible === false && currentGameplayControlEnabled() === true);
+    const resumedAt = await page.evaluate(() => ({ x: state.player.x, y: state.player.y }));
+    await page.waitForTimeout(180);
+    const afterResume = await page.evaluate(() => ({
+      x: state.player.x,
+      y: state.player.y,
+      vx: state.player.vx,
+      vy: state.player.vy,
+      right: state.keyboard.right,
+      joystickActive: state.joystick.active
+    }));
+    assert.ok(Math.abs(afterResume.x - resumedAt.x) < 0.01, "dismissed dialogue must not release stale horizontal inertia");
+    assert.ok(Math.abs(afterResume.y - resumedAt.y) < 0.01, "dismissed dialogue must not release stale vertical inertia");
+    assert.equal(afterResume.vx, 0);
+    assert.equal(afterResume.vy, 0);
+    assert.equal(afterResume.right, false);
+    assert.equal(afterResume.joystickActive, false);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("graduation completes once and transitions directly into the signed-out identity route", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1&scenario=tutorial&step=graduation");
+  try {
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.runMode === "tutorial" &&
+        snapshot.transition.mode === "idle" &&
+        snapshot.tutorial?.director?.stepId === "graduation" &&
+        snapshot.tutorial.director.dialogueVisible === true;
+    }, null, { timeout: 20_000 });
+    await page.evaluate(() => {
+      window.__graduationCompletionCalls = 0;
+      const originalCompleteTutorialGraduation = completeTutorialGraduation;
+      completeTutorialGraduation = (...args) => {
+        window.__graduationCompletionCalls++;
+        return originalCompleteTutorialGraduation(...args);
+      };
+      tutorialDirector.dialogueReveal = 1;
+      advanceTutorialDialogue();
+    });
+    await page.waitForFunction(() => onboardingUiMode === "post_callsign" && state.gameState === "start");
+    let graduation = await page.evaluate(() => ({
+      calls: window.__graduationCompletionCalls,
+      uiMode: onboardingUiMode,
+      status: onboardingState.status,
+      directorCompleted: tutorialDirector.completed,
+      directorDialogueVisible: tutorialDirector.dialogueVisible,
+      liveText: document.querySelector("#tutorialLiveRegion")?.textContent || ""
+    }));
+    assert.equal(graduation.calls, 1);
+    assert.equal(graduation.status, "completed");
+    assert.equal(graduation.directorCompleted, true);
+    assert.equal(graduation.directorDialogueVisible, false);
+    assert.equal(graduation.uiMode, "post_callsign");
+    assert.doesNotMatch(graduation.liveText, /Flight certification confirmed/i);
+
+    const redundantAdvance = await page.evaluate(() => advanceTutorialDialogue());
+    await page.waitForTimeout(100);
+    graduation = await page.evaluate(() => ({
+      calls: window.__graduationCompletionCalls,
+      uiMode: onboardingUiMode,
+      status: onboardingState.status
+    }));
+    assert.equal(redundantAdvance, false);
+    assert.deepEqual(graduation, { calls: 1, uiMode: "post_callsign", status: "completed" });
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
@@ -483,25 +781,54 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
     assert.equal(refused.player.hp, 1);
     assert.equal(refused.ui.pauseNotice, "PAUSE NEEDS 1 SPARE HEALTH BAR");
 
-    await page.evaluate(() => {
+    const automatic = await page.evaluate(() => {
       state.player.hp = 3;
-      pauseGame("visibility");
+      state.gameState = "playing";
+      for (const name of Object.keys(gameMusicTracks)) delete gameMusicTracks[name];
+      gameMusicUnlocked = true;
+      settingMusicEnabled = true;
+      gameMusicTracks.gameplay = {
+        paused: false,
+        volume: 0.17,
+        preload: "metadata",
+        play() { this.paused = false; return Promise.resolve(); },
+        pause() { this.paused = true; }
+      };
+      window.__qaDocumentHidden = true;
+      Object.defineProperty(document, "hidden", {
+        configurable: true,
+        get: () => window.__qaDocumentHidden
+      });
+      window.dispatchEvent(new Event("blur"));
+      document.dispatchEvent(new Event("visibilitychange"));
+      document.dispatchEvent(new Event("visibilitychange"));
+      return {
+        game: getDebugSnapshot(),
+        music: gameMusicStateSnapshot()
+      };
     });
-    await page.waitForFunction(() => {
-      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
-      return snapshot.gameState === "paused"
-        && snapshot.player.hp === 2
-        && snapshot.ui.pauseNotice === "AUTO-PAUSE COST: 1 HEALTH BAR";
+    assert.equal(automatic.game.gameState, "paused");
+    assert.equal(automatic.game.player.hp, 2, "blur plus visibility events must deduct exactly one health bar");
+    assert.equal(automatic.game.ui.pauseNotice, "AUTO-PAUSE COST: 1 HEALTH BAR");
+    assert.equal(automatic.music.hidden, true);
+    assert.equal(automatic.music.tracks.gameplay.paused, true);
+    assert.equal(automatic.music.tracks.gameplay.volume, 0.17, "hiding pauses immediately without mutating the saved mix level");
+
+    const restoredMusic = await page.evaluate(() => {
+      window.__qaDocumentHidden = false;
+      document.dispatchEvent(new Event("visibilitychange"));
+      return gameMusicStateSnapshot();
     });
-    const automatic = await debugSnapshot(page);
-    assert.equal(automatic.gameState, "paused");
-    assert.equal(automatic.player.hp, 2, "automatic pauses must deduct one health bar");
-    assert.equal(automatic.ui.pauseNotice, "AUTO-PAUSE COST: 1 HEALTH BAR");
+    assert.equal(restoredMusic.hidden, false);
+    assert.equal(restoredMusic.tracks.gameplay.paused, false);
+    assert.ok(restoredMusic.tracks.gameplay.volume > 0 && restoredMusic.tracks.gameplay.volume <= 0.065, "restore must fade into the paused mix without a volume jump");
 
     const lethalAutomatic = await page.evaluate(() => {
       state.gameState = "playing";
       state.player.hp = 1;
-      pauseGame("visibility");
+      window.__qaDocumentHidden = true;
+      window.dispatchEvent(new Event("blur"));
+      document.dispatchEvent(new Event("visibilitychange"));
       return { hp: state.player.hp, gameState: state.gameState };
     });
     assert.equal(lethalAutomatic.hp, 0, "the final automatic-pause cost must not be silently waived");

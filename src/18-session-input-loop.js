@@ -365,6 +365,7 @@ canvas.addEventListener("pointerdown", (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left - offsetX) / scale;
   const y = (e.clientY - rect.top - offsetY) / scale;
+  if (typeof onboardingUiMode !== "undefined" && onboardingUiMode !== "none") return;
   if (state.gameState === "gameover") {
     if (handleGameOverPointerDown(x, y)) return;
     return;
@@ -544,13 +545,16 @@ window.addEventListener("keydown", (e) => {
     ? document.activeElement.dataset.gameAction
     : "";
   if (focusedGameAction && (k === "Enter" || k === " ")) return;
-  if (state.gameState === "start" && typeof onboardingUiMode !== "undefined" && onboardingUiMode !== "none") {
+  if (typeof onboardingUiMode !== "undefined" && onboardingUiMode !== "none") {
     const focusedAction = document.activeElement && document.activeElement.dataset
       ? document.activeElement.dataset.onboardingAction
       : "";
     if ((k === "Enter" || k === " ") && focusedAction) return;
     if (k === "Escape") {
       e.preventDefault();
+      if (onboardingUiMode === "skip_confirm" && typeof cancelSkipTutorialTraining === "function") {
+        cancelSkipTutorialTraining();
+      }
       return;
     }
     return;
@@ -676,6 +680,10 @@ function update() {
       state.gameState = "playing";
       if (state.pauseNotice) showMessage(state.pauseNotice, 100);
       state.pauseNotice = "";
+      if (state.runMode === "tutorial" && typeof updateTutorialLiveRegion === "function") {
+        tutorialLiveSignature = "";
+        updateTutorialLiveRegion();
+      }
     }
     return;
   }
@@ -843,6 +851,8 @@ function getDebugSnapshot() {
     player: state.player ? {
       x: state.player.x,
       y: state.player.y,
+      vx: state.player.vx,
+      vy: state.player.vy,
       hp: state.player.hp,
       energy: state.player.energy,
       inv: state.player.inv,
@@ -1038,6 +1048,7 @@ function updateDebugSnapshot() {
   }
   debugSnapshotEl.textContent = JSON.stringify(getDebugSnapshot());
 }
+
 /* DEVELOPMENT_QA_END */
 
 const simulationClock = createFixedStepClock();

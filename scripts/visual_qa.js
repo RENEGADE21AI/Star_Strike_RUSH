@@ -122,6 +122,52 @@ async function openPanel(page, target, touch = false) {
   }, expectedState);
 }
 
+async function waitForPaintedFrames(page, count = 2) {
+  await page.evaluate((frameCount) => new Promise((resolve) => {
+    let painted = 0;
+    const next = () => {
+      painted += 1;
+      if (painted >= frameCount) {
+        // requestAnimationFrame runs before paint. Yield once more so the final
+        // Canvas upload and DOM overlay reach the compositor before capture.
+        setTimeout(resolve, 34);
+      }
+      else requestAnimationFrame(next);
+    };
+    requestAnimationFrame(next);
+  }), count);
+}
+
+async function waitForRequiredVisualAssets(page, assetIds, errors) {
+  await page.waitForFunction(() => (
+    typeof getAssetLoadState === "function" && getAssetLoadState().ready === true
+  ));
+  const result = await page.evaluate((requiredIds) => {
+    const assets = getAssetLoadState();
+    const loaded = Array.isArray(assets.loaded) ? assets.loaded : [];
+    const failed = Array.isArray(assets.failed) ? assets.failed : [];
+    return {
+      missing: requiredIds.filter((id) => !loaded.includes(id)),
+      failed: requiredIds.filter((id) => failed.includes(id))
+    };
+  }, assetIds);
+  if (result.missing.length || result.failed.length) {
+    errors.push(`required visual assets unavailable: ${Array.from(new Set([...result.missing, ...result.failed])).join(", ")}`);
+  }
+  return result;
+}
+
+async function waitForTutorialInstructorPaint(page, completeDialogue = false, errors = []) {
+  await waitForRequiredVisualAssets(page, ["tutorial_instructor"], errors);
+  await page.waitForFunction((requireCompleteDialogue) => {
+    if (!requireCompleteDialogue) return true;
+    const current = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
+    return current.tutorial?.director?.dialogueVisible === true
+      && current.tutorial?.director?.dialogueReveal >= 0.999;
+  }, completeDialogue);
+  await waitForPaintedFrames(page, 2);
+}
+
 async function touchDrag(page, rect) {
   const x = rect.x + rect.w * 0.5;
   const startY = rect.y + rect.h * 0.78;
@@ -414,6 +460,7 @@ async function runCase(browser, baseUrl, item) {
       if (before.runtimeErrors.length) errors.push("game-over summary produced a runtime error");
     }
   } else if (item.kind === "onboarding-arrival") {
+    await waitForRequiredVisualAssets(page, ["player"], errors);
     const arrivalState = await page.evaluate(() => {
       onboardingUiMode = "first_time_question";
       onboardingIntroFlight.active = true;
@@ -437,11 +484,7 @@ async function runCase(browser, baseUrl, item) {
       errors.push("Colonel question appeared before the player ship arrived");
     }
   } else if (item.kind === "tutorial-question") {
-    await page.waitForFunction(() => (
-      typeof getAssetLoadState === "function" &&
-      getAssetLoadState().ready === true &&
-      !getAssetLoadState().failed.includes("tutorial_instructor")
-    ));
+    await waitForTutorialInstructorPaint(page, false, errors);
     await page.waitForFunction(() => {
       const current = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
       return current.tutorial?.uiMode === "first_time_question"
@@ -470,11 +513,7 @@ async function runCase(browser, baseUrl, item) {
       }
     }
   } else if (item.kind === "tutorial-prelaunch") {
-    await page.waitForFunction(() => (
-      typeof getAssetLoadState === "function" &&
-      getAssetLoadState().ready === true &&
-      !getAssetLoadState().failed.includes("tutorial_instructor")
-    ));
+    await waitForTutorialInstructorPaint(page, false, errors);
     await page.waitForFunction(() => {
       const current = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
       return current.tutorial?.uiMode === "first_time_question"
@@ -577,6 +616,7 @@ async function runCase(browser, baseUrl, item) {
       const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
       return current.tutorial?.director?.dialogueVisible === true;
     });
+    await waitForTutorialInstructorPaint(page, true, errors);
     evidence.after = await snapshot(page);
     const correction = await page.getByRole("status").textContent();
     if (item.step === "evasion" && !/lane was live/i.test(correction)) errors.push("evasion correction was not shown");
@@ -609,6 +649,7 @@ async function runCase(browser, baseUrl, item) {
     if (await page.getByRole("button", { name: "Connect Google Account" }).isVisible().catch(() => false)) errors.push("redundant Google connection was visible");
     if (await page.getByRole("button", { name: "Claim Unique Handle" }).isVisible().catch(() => false)) errors.push("redundant handle claim was visible");
   } else if (item.kind === "tutorial-arrival-lock") {
+    await waitForRequiredVisualAssets(page, ["player", "tutorial_instructor"], errors);
     await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).click();
     await page.getByRole("button", { name: "Begin Flight Training" }).click();
     await page.waitForFunction(() => {
@@ -622,6 +663,7 @@ async function runCase(browser, baseUrl, item) {
     if (Math.abs(evidence.after.transition.continuity?.playerX - 187.5) > 0.01) errors.push("transition ship missed gameplay X");
     if (Math.abs(evidence.after.transition.continuity?.playerY - 533.6) > 0.01) errors.push("transition ship missed gameplay Y");
   } else if (item.kind === "tutorial-launch") {
+    await waitForRequiredVisualAssets(page, ["player", "tutorial_instructor"], errors);
     const yes = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
     await yes.waitFor({ state: "visible" });
     await yes.click();
@@ -661,13 +703,42 @@ async function runCase(browser, baseUrl, item) {
     if (!(await page.getByRole("button", { name: "Resume Training" }).isVisible())) errors.push("resume action was not accessible");
   }
 
-  const finalState = evidence.after || await snapshot(page);
+  await page.waitForFunction(() => (
+    typeof getAssetLoadState !== "function" || getAssetLoadState().ready === true
+  ));
+  const assetState = await page.evaluate(() => (
+    typeof getAssetLoadState === "function" ? getAssetLoadState() : { ready: true, loaded: [], failed: [] }
+  ));
+  evidence.assets = assetState;
+  if (Array.isArray(assetState.failed) && assetState.failed.length) {
+    errors.push(`asset preload failures: ${assetState.failed.join(", ")}`);
+  }
+  const finalState = await snapshot(page);
+  evidence.final = finalState;
   if (finalState.runtimeErrors.length) errors.push(...finalState.runtimeErrors.map((error) => `runtime: ${error}`));
   const screenshotPath = path.join(outputDir, `${item.name}.png`);
+  const pageScreenshotPath = path.join(outputDir, `${item.name}-page.png`);
+  let canonicalCanvasDataUrl = capturedScreenshotDataUrl;
   if (capturedScreenshotDataUrl) {
-    fs.writeFileSync(screenshotPath, Buffer.from(capturedScreenshotDataUrl.split(",", 2)[1], "base64"));
+    await page.screenshot({ path: pageScreenshotPath, fullPage: true });
   } else {
-    await page.screenshot({ path: screenshotPath, fullPage: true });
+    await waitForPaintedFrames(page, 2);
+    const canvasCapture = await page.evaluate(() => {
+      if (typeof draw === "function") draw();
+      const first = document.querySelector("canvas")?.toDataURL("image/png") || "";
+      if (typeof draw === "function") draw();
+      const second = document.querySelector("canvas")?.toDataURL("image/png") || "";
+      return { dataUrl: first, stable: first === second };
+    });
+    if (!canvasCapture.dataUrl) errors.push("Canvas raster capture was unavailable");
+    if (!canvasCapture.stable) errors.push("Two same-state Canvas draws produced different raster output");
+    canonicalCanvasDataUrl = canvasCapture.dataUrl;
+    await page.screenshot({ path: pageScreenshotPath, fullPage: true });
+  }
+  if (canonicalCanvasDataUrl) {
+    const canonicalBuffer = Buffer.from(canonicalCanvasDataUrl.split(",", 2)[1], "base64");
+    if (canonicalBuffer.length < 10_000) errors.push(`Canvas raster was unexpectedly small (${canonicalBuffer.length} bytes)`);
+    fs.writeFileSync(screenshotPath, canonicalBuffer);
   }
   const tracePath = errors.length ? path.join(outputDir, `${item.name}-trace.zip`) : "";
   await context.tracing.stop(tracePath ? { path: tracePath } : undefined);
@@ -677,6 +748,8 @@ async function runCase(browser, baseUrl, item) {
     viewport: { width: item.width, height: item.height },
     url: `${baseUrl}${route}`,
     screenshot: path.basename(screenshotPath),
+    canvasScreenshot: path.basename(screenshotPath),
+    pageScreenshot: path.basename(pageScreenshotPath),
     trace: tracePath ? path.basename(tracePath) : null,
     evidence,
     errors

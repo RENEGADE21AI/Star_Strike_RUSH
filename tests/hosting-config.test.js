@@ -71,7 +71,7 @@ test("production build pins every runtime entry to one commit and describes its 
   assert.doesNotMatch(productionLoop, /DEVELOPMENT_QA_START|DEBUG_SNAPSHOT_ENABLED|scenario=siphon|applyDevelopmentQaScenario|qaHoldStaging/);
   const expectedTag = expectedCommit.slice(0, 12);
   const runtimeReferences = Array.from(
-    html.matchAll(/\b(?:src|href)="((?:src\/|styles\.css|site\.webmanifest)[^"]*)"/g),
+    html.matchAll(/\b(?:src|href)="((?:src\/|assets\/|styles\.css|site\.webmanifest)[^"]*)"/g),
     (match) => match[1]
   );
   assert.ok(runtimeReferences.length > 20);
@@ -79,4 +79,5 @@ test("production build pins every runtime entry to one commit and describes its 
     assert.match(reference, new RegExp(`[?&]v=${expectedTag}(?:&|$)`), reference);
   }
   assert.equal(new Set(runtimeReferences.map((reference) => new URL(reference, "https://build.invalid").searchParams.get("v"))).size, 1);
+  assert.match(html, new RegExp(`href="assets/tutorial/colonel-arisaka\\.png\\?v=${expectedTag}"`));
 });

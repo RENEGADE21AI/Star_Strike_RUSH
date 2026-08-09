@@ -19,6 +19,9 @@ const mimeTypes = {
 let browser;
 let server;
 let baseUrl;
+const GHOST_LANE_APPROACH_X = 140;
+const GHOST_LANE_SAFE_TRIGGER_MIN_X = 118;
+const GHOST_LANE_SAFE_TRIGGER_MAX_X = 165;
 
 function staticResponse(request, response) {
   const url = new URL(request.url, "http://127.0.0.1");
@@ -127,7 +130,6 @@ async function touchGhostCross(page, cdp, layout) {
     buttons: 1,
     isPrimary: true
   });
-  await page.waitForTimeout(45);
   await page.dispatchEvent("canvas", "pointerdown", {
     pointerId: 32,
     pointerType: "touch",
@@ -204,14 +206,27 @@ async function completeTutorial(page, mode) {
     } else if (director.stepId === "evasion") {
       target = { x: 290, y: data.player.y };
     } else if (director.stepId === "ghost_shift") {
-      if (mode === "touch" && data.player.x >= 150 && data.player.x < 188 && data.player.energy >= 35) {
+      if (
+        mode === "touch" &&
+        data.player.x >= GHOST_LANE_SAFE_TRIGGER_MIN_X &&
+        data.player.x < GHOST_LANE_SAFE_TRIGGER_MAX_X &&
+        data.player.energy >= 35
+      ) {
         await touchGhostCross(page, cdp, data.layout);
         target = null;
-      } else if (mode === "desktop" && data.player.x >= 150 && data.player.x < 188 && data.player.energy >= 35) {
+      } else if (
+        mode === "desktop" &&
+        data.player.x >= GHOST_LANE_SAFE_TRIGGER_MIN_X &&
+        data.player.x < GHOST_LANE_SAFE_TRIGGER_MAX_X &&
+        data.player.energy >= 35
+      ) {
         await desktopGhostCross(page);
         target = null;
       } else {
-        target = { x: data.player.x < 150 ? 160 : 270, y: data.player.y };
+        target = {
+          x: data.player.x < GHOST_LANE_SAFE_TRIGGER_MIN_X ? GHOST_LANE_APPROACH_X : 130,
+          y: data.player.y
+        };
       }
     } else if (director.stepId === "powerup") {
       const powerup = data.encounter.powerups[0];
@@ -467,12 +482,24 @@ test("reload after resuming preserves the checkpoint offer", { timeout: 120_000 
   try {
     await page.goto(`${baseUrl}/?debug=1&scenario=tutorial-resume`, { waitUntil: "commit" });
     await page.getByRole("button", { name: "Resume Training" }).waitFor();
+    await page.getByRole("button", { name: "Skip For Now" }).click();
+    await page.getByRole("button", { name: "Keep Training" }).click();
+    await page.waitForFunction(() => onboardingUiMode === "resume_training");
+    assert.equal(await page.getByRole("button", { name: "Resume Training" }).isVisible(), true);
+    await page.getByRole("button", { name: "Skip For Now" }).click();
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => onboardingUiMode === "resume_training");
+    assert.equal(await page.getByRole("button", { name: "Resume Training" }).isVisible(), true);
     await page.getByRole("button", { name: "Resume Training" }).click();
     await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).runMode === "tutorial", null, { timeout: 12_000 });
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("star_strike_rush_onboarding_v1")).checkpoint), "before_wraith");
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: "Restart Checkpoint" }).waitFor();
-    await page.getByRole("button", { name: "Restart Checkpoint" }).click();
+    await page.waitForFunction(() => state.gameState === "paused" && gameAccessibilitySnapshot().mode === "pause");
+    assert.equal(await page.evaluate(() => gameAccessibilitySnapshot().actions.some((action) => action.id === "restart-checkpoint")), true);
+    const restartCheckpoint = page.getByRole("button", { name: "Restart tutorial checkpoint", exact: true });
+    await restartCheckpoint.waitFor();
+    await restartCheckpoint.focus();
+    await page.keyboard.press("Enter");
     await page.waitForFunction(() => {
       const state = JSON.parse(document.querySelector("#debugSnapshot").textContent);
       return state.gameState === "playing" &&
@@ -551,7 +578,7 @@ test("tutorial dialogue blocks held keyboard and touch input without leaking aft
   }
 });
 
-test("tutorial pause runtime and accessible Resume remain free when repeated", { timeout: 120_000 }, async () => {
+test("tutorial pause runtime and accessible Resume flight remain free when repeated", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   try {
@@ -578,7 +605,9 @@ test("tutorial pause runtime and accessible Resume remain free when repeated", {
       });
       assert.equal((await snapshot(page)).player.hp, healthBefore);
       assert.equal((await snapshot(page)).ui.pauseNotice, "TRAINING PAUSED: NO HEALTH COST");
-      await page.getByRole("button", { name: "Resume", exact: true }).click();
+      const resumeFlight = page.getByRole("button", { name: "Resume flight", exact: true });
+      await resumeFlight.focus();
+      await page.keyboard.press("Enter");
       await page.waitForFunction(() => {
         const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
         return current.gameState === "playing" && current.input.gameplayControlEnabled === true;
@@ -632,8 +661,18 @@ test("touch ability reaches the real Ghost lesson action control", { timeout: 12
     await page.waitForFunction(() => JSON.parse(document.querySelector("#debugSnapshot").textContent).transition.mode === "idle");
     for (let attempt = 0; attempt < 3; attempt++) {
       let before = await snapshot(page);
-      while (before.tutorial?.director?.stepId === "ghost_shift" && before.player.x < 150) {
-        await touchMove(page, cdp, before.layout, before.player, { x: 160, y: before.player.y });
+      while (
+        before.tutorial?.director?.stepId === "ghost_shift" &&
+        !before.tutorial.director.dialogueVisible &&
+        (
+          before.player.x < GHOST_LANE_SAFE_TRIGGER_MIN_X ||
+          before.player.x >= GHOST_LANE_SAFE_TRIGGER_MAX_X
+        )
+      ) {
+        await touchMove(page, cdp, before.layout, before.player, {
+          x: before.player.x < GHOST_LANE_SAFE_TRIGGER_MIN_X ? GHOST_LANE_APPROACH_X : 130,
+          y: before.player.y
+        });
         before = await snapshot(page);
       }
       if (before.tutorial?.director?.dialogueVisible) await pressContinue(page);

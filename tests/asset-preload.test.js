@@ -41,6 +41,7 @@ test("asset preload reports progress and times out stalled images without blocki
   });
   assert.equal(result.ready, true);
   assert.ok(result.failed.length > 0);
+  assert.deepEqual(result.loaded, []);
   assert.ok(progress.length > 1);
   assert.equal(progress.at(-1).completed, progress.at(-1).total);
 });
@@ -57,6 +58,7 @@ test("failed images can retry and become available", async () => {
   const result = await context.preloadGameAssets({ ImageCtor: RetryImage, timeoutMs: 20, retries: 1 });
   assert.equal(result.ready, true);
   assert.equal(result.failed.length, 0);
+  assert.equal(result.loaded.includes("tutorial_instructor"), true);
   assert.ok(attempts > 1);
 });
 
@@ -78,4 +80,13 @@ test("failed-only reconnect retry recovers transient asset outages without reloa
   assert.equal(recovered.failed.length, 0);
   assert.equal(attempts - initialAttempts, initial.failed.length, "retry should request only the failed manifest entries");
   assert.equal(context.getAssetLoadState().status, "ready");
+  assert.equal(context.getAssetLoadState().loaded.includes("tutorial_instructor"), true);
+});
+
+test("the final instructor portrait is parser-preloaded before deferred game scripts", () => {
+  const html = fs.readFileSync(path.join(repoRoot, "index.html"), "utf8");
+  const preload = html.indexOf('rel="preload" as="image" type="image/png" href="assets/tutorial/colonel-arisaka.png" fetchpriority="high"');
+  const firstScript = html.indexOf("<script defer");
+  assert.ok(preload >= 0, "Colonel Arisaka should have an explicit high-priority image preload");
+  assert.ok(preload < firstScript, "the instructor preload should be discovered before deferred runtime scripts");
 });

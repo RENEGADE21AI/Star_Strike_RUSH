@@ -6,6 +6,7 @@ let pendingTutorialStep = "";
 let pendingTutorialReplay = false;
 let tutorialDom = null;
 let tutorialSkipReturnMode = "title";
+let tutorialSkipCancelUiMode = "prelaunch_briefing";
 let tutorialLiveSignature = "";
 let onboardingAccountPulseFrames = 0;
 let onboardingPersistenceWarning = false;
@@ -72,11 +73,28 @@ function drawOnboardingGalaxyScene() {
 }
 
 function suppressTutorialTransmissionEffects() {
-  if (typeof clearGameplayInput === "function") clearGameplayInput();
+  stabilizeTutorialPlayer();
   if (state.fx) {
     state.fx.shake = 0;
     state.fx.flash = 0;
   }
+}
+
+function stabilizeTutorialPlayer(options = {}) {
+  if (typeof clearGameplayInput === "function") clearGameplayInput();
+  const player = state && state.player;
+  if (!player) return false;
+  player.vx = 0;
+  player.vy = 0;
+  player.ghostTimer = 0;
+  player.dashTimer = 0;
+  if (options.resetCooldown === true) player.ghostCooldown = 0;
+  if (options.resetRealm === true) state.playerRealm = 0;
+  if (options.resetPosition === true) {
+    player.x = W / 2;
+    player.y = H - 92;
+  }
+  return true;
 }
 
 function tutorialTransmissionVisible() {
@@ -306,7 +324,11 @@ function skipTutorialTraining() {
 
 function requestSkipTutorialTraining(returnMode = "title") {
   tutorialSkipReturnMode = returnMode;
+  tutorialSkipCancelUiMode = onboardingUiMode === "resume_training" ? "resume_training" : "prelaunch_briefing";
   onboardingUiMode = "skip_confirm";
+  if (typeof clearGameAccessibleSurface === "function") {
+    clearGameAccessibleSurface("Skip training confirmation opened.");
+  }
   setTutorialAccessibleSurface(
     "Skip First Flight training? You can replay it from Settings at any time.",
     [
@@ -314,13 +336,7 @@ function requestSkipTutorialTraining(returnMode = "title") {
         label: "Keep Training",
         action: "cancel-skip",
         primary: true,
-        handler: () => {
-          if (tutorialSkipReturnMode === "pause") showTutorialPauseAccessibility();
-          else {
-            onboardingUiMode = "prelaunch_briefing";
-            renderOnboardingAccessibleMode();
-          }
-        }
+        handler: cancelSkipTutorialTraining
       },
       {
         label: "Confirm Skip",
@@ -332,6 +348,19 @@ function requestSkipTutorialTraining(returnMode = "title") {
       }
     ]
   );
+}
+
+function cancelSkipTutorialTraining() {
+  if (onboardingUiMode !== "skip_confirm") return false;
+  if (tutorialSkipReturnMode === "pause") {
+    onboardingUiMode = "none";
+    showTutorialPauseAccessibility();
+  } else {
+    onboardingUiMode = tutorialSkipCancelUiMode;
+    renderOnboardingAccessibleMode();
+  }
+  if (typeof syncGameAccessibleSurface === "function") syncGameAccessibleSurface(true);
+  return true;
 }
 
 function renderOnboardingAccessibleMode() {
@@ -559,8 +588,9 @@ function advanceTutorialDialogue() {
     tutorialDirector.dialogueReveal = 1;
     return true;
   }
-  if (tutorialDirector.stepId === "graduation" && tutorialDirector.completed) {
+  if (tutorialDirector.stepId === "graduation") {
     if (typeof clearGameplayInput === "function") clearGameplayInput();
+    if (!tutorialDirector.completed) completeTutorialGraduation({ presentDialogue: false });
     tutorialDirector.dialogueVisible = false;
     beginPostTutorialIdentityFlow();
     return true;
@@ -684,10 +714,10 @@ function activateTutorialStep() {
       });
     }
   } else if (step === "ghost_shift") {
-    state.player.x = 145;
+    const lane = tutorialRuntime.plan.ghost_shift;
+    state.player.x = lane.startX;
     state.player.energy = state.player.maxEnergy;
     state.player.ghostCooldown = 0;
-    const lane = tutorialRuntime.plan.ghost_shift;
     tutorialRuntime.ghostStartSide = lane.startSide;
     tutorialRuntime.ghostTargetSide = lane.targetSide;
     tutorialRuntime.ghostPreviousX = state.player.x;
@@ -724,8 +754,6 @@ function activateTutorialStep() {
     spawnTutorialWraith(false);
     tutorialRuntime.bossesStart = state.runStats.bosses;
     tutorialRuntime.wraithHpStart = state.boss ? state.boss.hp : 0;
-  } else if (step === "graduation") {
-    completeTutorialGraduation();
   }
 }
 
@@ -800,8 +828,10 @@ function clearTutorialThreats() {
   state.debris = [];
   state.enemyBeams = [];
   state.gravityWells = [];
+  state.wingmen = [];
   state.boss = null;
   state.bossDeath = null;
+  state.bossRecovery = 0;
 }
 
 function updateTutorialDirectorRuntime() {
@@ -907,9 +937,8 @@ function resetTutorialLesson(stepId, correctionLines) {
   clearTutorialThreats();
   state.player.hp = state.player.maxHp;
   state.player.energy = state.player.maxEnergy;
-  state.player.ghostCooldown = 0;
-  state.player.ghostTimer = 0;
   state.player.inv = 60;
+  stabilizeTutorialPlayer({ resetCooldown: true, resetRealm: true, resetPosition: true });
   enterTutorialStep(stepId);
   tutorialDirector.dialogue[0] = { lines: correctionLines.slice(0, 2) };
   tutorialDirector.dialogueVisible = true;
@@ -921,10 +950,12 @@ function resetTutorialLesson(stepId, correctionLines) {
 function recoverTutorialCheckpoint() {
   if (state.runMode !== "tutorial" || !tutorialDirector) return false;
   recoverTutorialRuntime(state);
+  clearTutorialThreats();
   tutorialDirector.recoveryCount++;
   state.player.hp = state.player.maxHp;
   state.player.energy = state.player.maxEnergy;
   state.player.inv = 120;
+  stabilizeTutorialPlayer({ resetCooldown: true, resetRealm: true, resetPosition: true });
   const step = tutorialStepForCheckpoint(onboardingState && onboardingState.checkpoint);
   enterTutorialStep(step);
   tutorialDirector.dialogue[0] = {
@@ -938,7 +969,7 @@ function recoverTutorialCheckpoint() {
   return true;
 }
 
-function completeTutorialGraduation() {
+function completeTutorialGraduation(options = {}) {
   clearTutorialThreats();
   const result = applyTutorialGraduationCodex(codexDiscovered, onboardingState.codexGraduationApplied);
   if (result.changed) {
@@ -958,6 +989,7 @@ function completeTutorialGraduation() {
     state.debugErrors.push("Tutorial changed progression-bearing local state");
   }
   tutorialDirector.completed = true;
+  if (options.presentDialogue === false) return;
   tutorialDirector.dialogueVisible = true;
   tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0.14;
   suppressTutorialTransmissionEffects();
@@ -975,46 +1007,14 @@ function replayFirstFlightTraining() {
 
 function showTutorialPauseAccessibility() {
   if (state.runMode !== "tutorial") return;
-  tutorialLiveSignature = "";
-  const resume = () => resumeGame();
-  setTutorialAccessibleSurface("First Flight training paused.", [
-    { label: "Resume", action: "resume", primary: true, handler: resume },
-    {
-      label: "Restart Checkpoint",
-      action: "restart-checkpoint",
-      handler: () => {
-        recoverTutorialCheckpoint();
-        state.gameState = "playing";
-      }
-    },
-    {
-      label: "Restart Training",
-      action: "restart-training",
-      handler: () => {
-        setupSession("start");
-        beginTutorialTraining({ replay: true });
-      }
-    },
-    {
-      label: "Skip Training",
-      action: "skip",
-      handler: () => requestSkipTutorialTraining("pause")
-    },
-    {
-      label: "Return To Title",
-      action: "title",
-      handler: () => {
-        setupSession("start");
-        onboardingUiMode = "resume_training";
-        renderOnboardingAccessibleMode();
-      }
-    }
-  ]);
+  hideTutorialAccessibleSurface("First Flight training paused.");
+  if (typeof syncGameAccessibleSurface === "function") syncGameAccessibleSurface(true);
 }
 
 function hideTutorialPauseAccessibility() {
   if (state.runMode !== "tutorial") return;
-  updateTutorialLiveRegion();
+  hideTutorialAccessibleSurface("First Flight training resuming.");
+  if (typeof syncGameAccessibleSurface === "function") syncGameAccessibleSurface(true);
 }
 
 function drawColonelArisakaPlaceholder(x, y, size = 82, alpha = 1) {

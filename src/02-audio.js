@@ -143,8 +143,34 @@ function prepareGameplayMusic() {
 
 function gameMusicMix() {
   const mode = state && state.gameState;
-  if (mode === "start") return { title: 0.22, gameplay: 0 };
+  const transition = state && state.sceneTransition;
   if (mode === "paused" || mode === "resuming") return { title: 0, gameplay: 0.065 };
+  if (transition && transition.mode === "title_launch") {
+    const progress = clamp(
+      transition.durationSeconds
+        ? Number(transition.elapsedSeconds || 0) / Math.max(0.001, Number(transition.durationSeconds))
+        : Number(transition.frame || 0) / Math.max(1, Number(transition.duration || 1)),
+      0,
+      1
+    );
+    const titleProgress = clamp((progress - 0.08) / 0.72, 0, 1);
+    const gameplayProgress = clamp((progress - 0.48) / 0.52, 0, 1);
+    const titleEase = titleProgress * titleProgress * (3 - 2 * titleProgress);
+    const gameplayEase = gameplayProgress * gameplayProgress * (3 - 2 * gameplayProgress);
+    return { title: 0.22 * (1 - titleEase), gameplay: 0.11 * gameplayEase };
+  }
+  if (transition && transition.mode === "game_arrival") {
+    const progress = clamp(
+      transition.durationSeconds
+        ? Number(transition.elapsedSeconds || 0) / Math.max(0.001, Number(transition.durationSeconds))
+        : Number(transition.frame || 0) / Math.max(1, Number(transition.duration || 1)),
+      0,
+      1
+    );
+    const eased = progress * progress * (3 - 2 * progress);
+    return { title: 0, gameplay: 0.11 + 0.06 * eased };
+  }
+  if (mode === "start") return { title: 0.22, gameplay: 0 };
   if (mode === "gameover") return { title: 0, gameplay: 0.09 };
   return { title: 0, gameplay: 0.17 };
 }
@@ -215,9 +241,22 @@ function gameMusicStateSnapshot() {
   };
 }
 
+function handleGameMusicVisibilityChange() {
+  if (document.hidden) {
+    gameMusicHidden = true;
+    pauseGameMusicImmediately(false);
+    return;
+  }
+  const restoring = gameMusicHidden;
+  gameMusicHidden = false;
+  if (!restoring || !gameMusicUnlocked || settingMusicEnabled === false) return;
+  for (const track of Object.values(gameMusicTracks)) {
+    track.pause();
+    track.volume = 0;
+  }
+  updateGameMusic(1 / 60);
+}
+
 window.addEventListener("pointerdown", unlockGameMusic, { passive: true });
 window.addEventListener("keydown", unlockGameMusic);
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) pauseGameMusicImmediately(false);
-  else updateGameMusic(0);
-});
+document.addEventListener("visibilitychange", handleGameMusicVisibilityChange);
