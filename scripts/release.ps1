@@ -3,6 +3,7 @@ param(
   [switch]$CheckOnly,
   [switch]$StageBackendPreview,
   [switch]$Production,
+  [switch]$AcceptOwnerAccountSmokeWaiver,
   [string]$ApprovalFile = "",
   [string]$BaselineCommit = "",
   [string]$ExpectedBranch = "main"
@@ -95,6 +96,9 @@ if ($StageBackendPreview) { $modeCount++ }
 if ($Production) { $modeCount++ }
 if ($modeCount -eq 0) { $CheckOnly = $true }
 if ($modeCount -gt 1) { throw "Choose exactly one release mode: -CheckOnly, -StageBackendPreview, or -Production." }
+if ($AcceptOwnerAccountSmokeWaiver -and -not $Production) {
+  throw "-AcceptOwnerAccountSmokeWaiver is valid only with -Production."
+}
 
 Write-Host "Detected repository path: $RepositoryRoot"
 Set-Location -LiteralPath $RepositoryRoot
@@ -218,7 +222,7 @@ if ($StageBackendPreview) {
   Write-Host ""
   Write-Host "Backend and preview staging passed for $releaseCommit."
   Write-Host "Production Hosting remains withheld."
-  Write-Host "Complete Account A/B, migration, progression-invariance, privacy, and music-authorization fields in release-approval.local.json."
+  Write-Host "Complete Account A/B evidence or record an explicit owner waiver, plus migration and music authorization, in release-approval.local.json."
   Write-Host "Staged report: $stageReportPath"
   exit 0
 }
@@ -230,8 +234,12 @@ $approvalPath = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot $ApprovalFile)
 if (-not (Test-Path -LiteralPath $approvalPath)) { throw "Approval file does not exist: $approvalPath" }
 $approval = Get-Content -Raw -LiteralPath $approvalPath | ConvertFrom-Json
 $approvedPreviewUrl = [string]$approval.previewUrl
+$approvalValidatorArguments = @($approvalPath, $releaseCommit, $approvedPreviewUrl)
+if ($AcceptOwnerAccountSmokeWaiver) {
+  $approvalValidatorArguments += "--accept-owner-account-smoke-waiver"
+}
 Invoke-Checked -Label "Validate exact release human approval" -Command {
-  node scripts/validate-release-approval.js $approvalPath $releaseCommit $approvedPreviewUrl
+  node scripts/validate-release-approval.js @approvalValidatorArguments
 }
 Invoke-Checked -Label "Reverify staged preview Hosting/backend SHAs and Google Auth origin" -Command {
   node scripts/smoke-release.js $approvedPreviewUrl $releaseCommit --verify-callables

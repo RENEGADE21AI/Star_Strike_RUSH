@@ -114,7 +114,7 @@ Use the guarded release workflow rather than deploying individual resources:
 ```powershell
 .\scripts\release.ps1 -CheckOnly
 .\scripts\release.ps1 -StageBackendPreview
-# Only after exact-preview human evidence and owner approval:
+# After exact-preview approval (account smoke passed, or explicitly owner-waived):
 .\scripts\release.ps1 -Production -ApprovalFile .\release-approval.local.json
 ```
 
@@ -127,7 +127,10 @@ the exact-SHA Functions, deploys the tested Rules idempotently, deploys changed
 indexes, creates a commit-named Hosting preview, verifies Hosting and backend
 SHAs, proves that Google Identity accepts the exact preview origin, then stops.
 Production requires a local ignored approval file tied to that exact SHA and
-preview. Hosting deploys last. See
+preview. Account smoke is required by default. An owner may explicitly waive
+that smoke without calling it passed by recording the schema-v2 waiver and
+adding `-AcceptOwnerAccountSmokeWaiver`; all unverified account-result fields
+must remain `false`. Hosting deploys last. See
 `docs/RELEASE_WORKFLOW.md`.
 
 ## Architecture

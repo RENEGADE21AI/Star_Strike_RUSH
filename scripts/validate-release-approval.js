@@ -3,9 +3,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const REQUIRED_TRUE_FIELDS = Object.freeze([
+const REQUIRED_AUTOMATED_TRUE_FIELDS = Object.freeze([
   "previewHostingShaVerified",
-  "backendShaVerified",
+  "backendShaVerified"
+]);
+const ACCOUNT_SMOKE_TRUE_FIELDS = Object.freeze([
   "accountASignInPassed",
   "accountACallSignPublicationPassed",
   "accountASignOutPassed",
@@ -14,11 +16,18 @@ const REQUIRED_TRUE_FIELDS = Object.freeze([
   "deviceProgressUnchanged",
   "publicIdentitySanitized"
 ]);
+const ALLOWED_ACCOUNT_SMOKE_WAIVER_FIELDS = new Set([
+  "disposition",
+  "authorizedByProjectOwner",
+  "approvedAtUtc"
+]);
 const ALLOWED_TOP_LEVEL_FIELDS = new Set([
   "schemaVersion",
   "releaseSha",
   "previewUrl",
-  ...REQUIRED_TRUE_FIELDS,
+  ...REQUIRED_AUTOMATED_TRUE_FIELDS,
+  ...ACCOUNT_SMOKE_TRUE_FIELDS,
+  "accountSmokeWaiver",
   "achievementMigration",
   "musicDistributionAuthorization",
   "completedAtUtc"
@@ -54,7 +63,7 @@ function findSensitiveData(value, pathParts = []) {
   return "";
 }
 
-function validateReleaseApproval(approval, expectedSha, expectedPreviewUrl) {
+function validateReleaseApproval(approval, expectedSha, expectedPreviewUrl, options = {}) {
   const errors = [];
   if (!approval || typeof approval !== "object" || Array.isArray(approval)) {
     return { ok: false, errors: ["Approval must be a JSON object."] };
@@ -64,15 +73,50 @@ function validateReleaseApproval(approval, expectedSha, expectedPreviewUrl) {
   }
   const sensitivePath = findSensitiveData(approval);
   if (sensitivePath) errors.push(`Sensitive identity data is forbidden in release approval: ${sensitivePath}`);
-  if (approval.schemaVersion !== 1) errors.push("Unsupported approval schemaVersion.");
+  if (approval.schemaVersion !== 2) errors.push("Unsupported approval schemaVersion.");
   if (approval.releaseSha !== expectedSha || !/^[0-9a-f]{40}$/i.test(String(approval.releaseSha || ""))) {
     errors.push("Approval release SHA does not match the exact release.");
   }
   if (approval.previewUrl !== expectedPreviewUrl || !/^https:\/\/star-strike-rush--release-[a-f0-9]{12}[-a-z0-9]*\.web\.app$/i.test(String(approval.previewUrl || ""))) {
     errors.push("Approval preview URL does not match the exact staged preview.");
   }
-  for (const field of REQUIRED_TRUE_FIELDS) {
-    if (approval[field] !== true) errors.push(`Required human release gate is incomplete: ${field}`);
+  for (const field of REQUIRED_AUTOMATED_TRUE_FIELDS) {
+    if (approval[field] !== true) errors.push(`Required automated release gate is incomplete: ${field}`);
+  }
+  const passedAccountSmoke = ACCOUNT_SMOKE_TRUE_FIELDS.every((field) => approval[field] === true);
+  const waiver = approval.accountSmokeWaiver || {};
+  if (!waiver || typeof waiver !== "object" || Array.isArray(waiver)) {
+    errors.push("Account-smoke waiver must be an object.");
+  } else {
+    for (const key of Object.keys(waiver)) {
+      if (!ALLOWED_ACCOUNT_SMOKE_WAIVER_FIELDS.has(key)) {
+        errors.push(`Unexpected account-smoke waiver field: ${key}`);
+      }
+    }
+  }
+  const ownerWaivedAccountSmoke = waiver.disposition === "owner_waived"
+    && waiver.authorizedByProjectOwner === true;
+  if (!passedAccountSmoke && !ownerWaivedAccountSmoke) {
+    for (const field of ACCOUNT_SMOKE_TRUE_FIELDS) {
+      if (approval[field] !== true) errors.push(`Required human release gate is incomplete: ${field}`);
+    }
+  }
+  if (ownerWaivedAccountSmoke) {
+    if (options.acceptOwnerAccountSmokeWaiver !== true) {
+      errors.push("Owner account-smoke waiver requires the explicit release command switch.");
+    }
+    if (!validUtc(waiver.approvedAtUtc)) {
+      errors.push("Owner account-smoke waiver UTC time is required.");
+    }
+    for (const field of ACCOUNT_SMOKE_TRUE_FIELDS) {
+      if (approval[field] !== false) {
+        errors.push(`Owner-waived account smoke must leave unverified evidence false: ${field}`);
+      }
+    }
+  } else if (waiver.disposition !== "not_waived"
+    || waiver.authorizedByProjectOwner !== false
+    || waiver.approvedAtUtc !== "") {
+    errors.push("Invalid account-smoke waiver state.");
   }
   const migration = approval.achievementMigration || {};
   if (!["dry_run_clean", "applied_verified"].includes(migration.disposition)) {
@@ -93,20 +137,34 @@ function validateReleaseApproval(approval, expectedSha, expectedPreviewUrl) {
 }
 
 function main(argv) {
-  const [approvalPath, expectedSha, expectedPreviewUrl] = argv;
+  const [approvalPath, expectedSha, expectedPreviewUrl, waiverFlag] = argv;
   if (!approvalPath || !expectedSha || !expectedPreviewUrl) {
-    throw new Error("Usage: node scripts/validate-release-approval.js FILE RELEASE_SHA PREVIEW_URL");
+    throw new Error("Usage: node scripts/validate-release-approval.js FILE RELEASE_SHA PREVIEW_URL [--accept-owner-account-smoke-waiver]");
+  }
+  if (waiverFlag && waiverFlag !== "--accept-owner-account-smoke-waiver") {
+    throw new Error(`Unknown approval option: ${waiverFlag}`);
+  }
+  if (argv.length > 4) {
+    throw new Error(`Unexpected extra approval arguments: ${argv.slice(4).join(" ")}`);
   }
   const absolutePath = path.resolve(approvalPath);
   const approval = JSON.parse(fs.readFileSync(absolutePath, "utf8"));
-  const result = validateReleaseApproval(approval, expectedSha, expectedPreviewUrl);
+  const result = validateReleaseApproval(approval, expectedSha, expectedPreviewUrl, {
+    acceptOwnerAccountSmokeWaiver: waiverFlag === "--accept-owner-account-smoke-waiver"
+  });
   if (!result.ok) throw new Error(result.errors.join("\n"));
+  const accountSmokeDisposition = ACCOUNT_SMOKE_TRUE_FIELDS.every((field) => approval[field] === true)
+    ? "passed"
+    : "owner_waived";
   return {
     ok: true,
     releaseSha: expectedSha,
     previewUrl: expectedPreviewUrl,
     migrationDisposition: approval.achievementMigration.disposition,
     musicAuthorizationRecorded: true,
+    accountSmokeDisposition,
+    accountSmokeTestsPassed: accountSmokeDisposition === "passed",
+    accountSmokeOwnerWaived: accountSmokeDisposition === "owner_waived",
     completedAtUtc: approval.completedAtUtc
   };
 }
@@ -121,8 +179,10 @@ if (require.main === module) {
 }
 
 module.exports = {
+  ACCOUNT_SMOKE_TRUE_FIELDS,
+  ALLOWED_ACCOUNT_SMOKE_WAIVER_FIELDS,
   MUSIC_FILES,
-  REQUIRED_TRUE_FIELDS,
+  REQUIRED_AUTOMATED_TRUE_FIELDS,
   findSensitiveData,
   main,
   validateReleaseApproval

@@ -68,6 +68,12 @@ test("production approval rejects missing human gates, music authorization, migr
   assert.equal(fs.existsSync(approvalValidatorScript), true, "approval validator must exist");
   assert.equal(fs.existsSync(approvalTemplatePath), true, "approval template must exist");
   const template = JSON.parse(fs.readFileSync(approvalTemplatePath, "utf8"));
+  assert.equal(template.schemaVersion, 2);
+  assert.deepEqual(template.accountSmokeWaiver, {
+    disposition: "not_waived",
+    authorizedByProjectOwner: false,
+    approvedAtUtc: ""
+  });
   assert.equal(template.musicDistributionAuthorization.authorizedByProjectOwner, false);
   assert.deepEqual(template.musicDistributionAuthorization.files, [
     "assets/audio/hangar-bay-seven.mp3",
@@ -91,6 +97,16 @@ test("production approval rejects missing human gates, music authorization, migr
     ], { encoding: "utf8" });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /music|account|migration/i);
+
+    fs.writeFileSync(approvalPath, JSON.stringify({ ...incomplete, schemaVersion: 1 }));
+    result = spawnSync(process.execPath, [
+      approvalValidatorScript,
+      approvalPath,
+      releaseSha,
+      previewUrl
+    ], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /schemaVersion/i);
 
     const complete = {
       ...incomplete,
@@ -126,7 +142,104 @@ test("production approval rejects missing human gates, music authorization, migr
       previewUrl
     ], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(JSON.parse(result.stdout).ok, true);
+    const passedResult = JSON.parse(result.stdout);
+    assert.equal(passedResult.accountSmokeDisposition, "passed");
+    assert.equal(passedResult.accountSmokeTestsPassed, true);
+    assert.equal(passedResult.accountSmokeOwnerWaived, false);
+
+    const ownerWaived = {
+      ...complete,
+      accountASignInPassed: false,
+      accountACallSignPublicationPassed: false,
+      accountASignOutPassed: false,
+      accountBIsolationPassed: false,
+      accountAReentryPersistencePassed: false,
+      deviceProgressUnchanged: false,
+      publicIdentitySanitized: false,
+      accountSmokeWaiver: {
+        disposition: "owner_waived",
+        authorizedByProjectOwner: true,
+        approvedAtUtc: "2026-08-08T20:00:00.000Z"
+      }
+    };
+    fs.writeFileSync(approvalPath, JSON.stringify(ownerWaived));
+    result = spawnSync(process.execPath, [
+      approvalValidatorScript,
+      approvalPath,
+      releaseSha,
+      previewUrl
+    ], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /explicit release command switch/i);
+
+    result = spawnSync(process.execPath, [
+      approvalValidatorScript,
+      approvalPath,
+      releaseSha,
+      previewUrl,
+      "--accept-owner-account-smoke-waiver"
+    ], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    const waivedResult = JSON.parse(result.stdout);
+    assert.equal(waivedResult.accountSmokeDisposition, "owner_waived");
+    assert.equal(waivedResult.accountSmokeTestsPassed, false);
+    assert.equal(waivedResult.accountSmokeOwnerWaived, true);
+
+    fs.writeFileSync(approvalPath, JSON.stringify({
+      ...ownerWaived,
+      backendShaVerified: false
+    }));
+    result = spawnSync(process.execPath, [
+      approvalValidatorScript,
+      approvalPath,
+      releaseSha,
+      previewUrl,
+      "--accept-owner-account-smoke-waiver"
+    ], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /automated release gate.*backendShaVerified/i);
+
+    fs.writeFileSync(approvalPath, JSON.stringify({
+      ...ownerWaived,
+      accountASignInPassed: true
+    }));
+    result = spawnSync(process.execPath, [
+      approvalValidatorScript,
+      approvalPath,
+      releaseSha,
+      previewUrl,
+      "--accept-owner-account-smoke-waiver"
+    ], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /leave unverified evidence false/i);
+
+    fs.writeFileSync(approvalPath, JSON.stringify({
+      ...ownerWaived,
+      accountSmokeWaiver: {
+        ...ownerWaived.accountSmokeWaiver,
+        note: "untested"
+      }
+    }));
+    result = spawnSync(process.execPath, [
+      approvalValidatorScript,
+      approvalPath,
+      releaseSha,
+      previewUrl,
+      "--accept-owner-account-smoke-waiver"
+    ], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unexpected account-smoke waiver field/i);
+
+    result = spawnSync(process.execPath, [
+      approvalValidatorScript,
+      approvalPath,
+      releaseSha,
+      previewUrl,
+      "--accept-owner-account-smoke-waiver",
+      "--unexpected"
+    ], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unexpected extra approval arguments/i);
 
     fs.writeFileSync(approvalPath, JSON.stringify({ ...complete, email: "pilot@example.test" }));
     result = spawnSync(process.execPath, [
