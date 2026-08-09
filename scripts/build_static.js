@@ -38,7 +38,7 @@ const withVersion = (url) => {
 
 const htmlPath = path.join(out, "index.html");
 let html = fs.readFileSync(htmlPath, "utf8");
-html = html.replace(/\b(src|href)="((?:src\/|styles\.css|site\.webmanifest)[^"]*)"/g, (_, attribute, url) => (
+html = html.replace(/\b(src|href)="((?:src\/|assets\/|styles\.css|site\.webmanifest)[^"]*)"/g, (_, attribute, url) => (
   `${attribute}="${withVersion(url)}"`
 ));
 fs.writeFileSync(htmlPath, html, "utf8");

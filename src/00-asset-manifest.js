@@ -222,6 +222,7 @@ function assetLoadSnapshot() {
     status: spriteAssetRuntime.status,
     total: spriteAssetRuntime.total,
     completed: spriteAssetRuntime.completed,
+    loaded: Array.from(spriteAssetRuntime.images.keys()),
     failed: Array.from(spriteAssetRuntime.failed)
   };
 }
