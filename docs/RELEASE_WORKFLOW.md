@@ -42,14 +42,15 @@ If production has no readable `version.json`, pass a reviewed ancestor:
 
 Do not use the previous commit as an implicit baseline.
 
-## Human approval
+## Release approval
 
 Copy `release-approval.template.json` to `release-approval.local.json`. The
 local file is ignored by Git. Record only directly verified booleans and
 sanitized counts—never emails, Firebase UIDs, names, avatars, tokens, cookies,
 auth headers, or passwords.
 
-The approval must match the exact staged SHA and preview URL and cover:
+The approval must match the exact staged SHA and preview URL. By default it
+must cover:
 
 - Account A sign-in, call-sign publication, sign-out, and re-entry;
 - Account B identity isolation;
@@ -57,6 +58,16 @@ The approval must match the exact staged SHA and preview URL and cover:
 - no provider identity in public game data;
 - achievement migration disposition;
 - explicit project-owner authorization to publicly distribute both MP3 files.
+
+An explicit project-owner decision may waive only the real Account A/B smoke
+portion. A waiver is not a test result: every unverified account-result boolean
+must remain `false`. Set the schema-v2 `accountSmokeWaiver` disposition to
+`owner_waived`, record the UTC authorization time, and invoke production with
+the additional `-AcceptOwnerAccountSmokeWaiver` switch. The validator requires
+both the sanitized waiver record and the conscious command-line switch; it
+continues to require exact preview/backend SHA parity, migration disposition,
+music authorization, build integrity, security headers, private 404s, and all
+closed callable checks.
 
 The 2026-07-28 owner authorization covers
 `assets/audio/hangar-bay-seven.mp3` and
@@ -67,6 +78,14 @@ Production then uses:
 
 ```powershell
 .\scripts\release.ps1 -Production -ApprovalFile .\release-approval.local.json
+```
+
+For an explicitly owner-waived account smoke:
+
+```powershell
+.\scripts\release.ps1 -Production `
+  -ApprovalFile .\release-approval.local.json `
+  -AcceptOwnerAccountSmokeWaiver
 ```
 
 The script validates the approval, re-verifies the preview/backend SHA pair,
@@ -101,8 +120,8 @@ stops the apply.
 
 First Flight preview staging follows the same exact-SHA flow. Tutorial browser
 and visual evidence must be green before merging, and the preview may be
-deployed after merge. Production Hosting remains withheld until the existing
-Account A/B approval gate is complete.
+deployed after merge. Account smoke remains the default production gate; any
+owner waiver is recorded separately and never represented as a passed test.
 
 The public-profile cleanup preserves the maximum legacy score and phase in
 `legacyBestScore` and `legacyPhase`, retains verified fields without deriving

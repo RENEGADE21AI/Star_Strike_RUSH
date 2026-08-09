@@ -10,6 +10,8 @@ const packageJson = require("../package.json");
 
 test("release tooling separates backend staging from approval-gated production Hosting", () => {
   assert.match(releaseScript, /\[switch\]\$Production/);
+  assert.match(releaseScript, /\[switch\]\$AcceptOwnerAccountSmokeWaiver/);
+  assert.match(releaseScript, /if \(\$AcceptOwnerAccountSmokeWaiver -and -not \$Production\)/);
   assert.match(releaseScript, /\[switch\]\$CheckOnly/);
   assert.match(releaseScript, /\[switch\]\$StageBackendPreview/);
   assert.match(releaseScript, /\[string\]\$ApprovalFile/);
@@ -26,6 +28,7 @@ test("release tooling separates backend staging from approval-gated production H
   assert.match(releaseScript, /release-plan\.js/);
   assert.match(releaseScript, /generate-backend-release\.js/);
   assert.match(releaseScript, /validate-release-approval\.js/);
+  assert.match(releaseScript, /--accept-owner-account-smoke-waiver/);
   assert.match(releaseScript, /hosting:channel:deploy/);
   assert.match(releaseScript, /if \(\$StageBackendPreview\)[\s\S]*deploy --only functions/);
   assert.ok(releaseScript.indexOf("deploy --only functions") < releaseScript.indexOf("deploy --only firestore:rules"));

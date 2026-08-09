@@ -88,13 +88,13 @@ preserved; it is not described as current, live, verified, or a world record.
 
 | Area | Boundary |
 | --- | --- |
-| Real Google popup/redirect | Staging proves Identity Toolkit accepts the exact preview origin; actual Account A/B interaction remains a human gate |
+| Real Google popup/redirect | Staging proves Identity Toolkit accepts the exact preview origin; Account A/B interaction is untested and explicitly owner-waived for the 2026-08-08 release rather than reported passed |
 | Real account call-sign publication | Requires live Functions/Auth verification |
 | Production achievement archive | Applied 2026-07-28: 1 aggregate reconstructed from 15 valid unlocks, 0 invalid IDs; follow-up dry run found 0 remaining changes |
 | App Check | Console provider registration and direct enforcement tests have not been performed |
 | Audio distribution rights | Owner authorization to publicly distribute both MP3s recorded on 2026-07-28; no artist/source/license name inferred |
 | Exact-SHA backend staging | PR #14 merge `0b1ef8f8eff38962580b9b8e0c0d5884d948c1f8` staged with matching Hosting/backend SHA at its preview |
-| Production deployment | Production Hosting remains unchanged; Account A/B approval is incomplete |
+| Production deployment | Exact-SHA release automation now supports a separately recorded owner waiver for Account A/B smoke while preserving every automated and Firebase boundary; live truth is `/version.json` |
 
 ## Verification commands
 
@@ -133,8 +133,10 @@ Current onboarding-entry refinement evidence on Node 22:
 - Tracked-file secret scan: 231 files passed.
 
 PR #14 merged with green `verify` and `secret-scan`; its exact-SHA preview was
-staged and smoke-tested. Account A/B smoke remains incomplete, and this
-document does not imply a production Hosting deployment.
+staged and smoke-tested. Account A/B smoke was not performed. On 2026-08-08 the
+project owner explicitly directed release without that smoke; the approval
+contract records this as `owner_waived`, never as passed. Live deployment truth
+comes from production `/version.json`, not this historical section.
 
 Current game-quality sweep evidence on Node 22:
 
@@ -208,8 +210,10 @@ sequence, account authority, achievement definition, or Firebase gate.
 4. Require intended SHA = Hosting SHA = backend SHA and smoke-test headers,
    private 404s, Google Identity origin acceptance, and all three paused
    callable boundaries.
-5. Complete the ignored sanitized approval file with Account A/B, unchanged
-   device progress, migration disposition, and explicit owner music rights.
-6. Run `-Production -ApprovalFile ...`; deploy Hosting last.
-7. Production remains blocked if any required evidence cannot be completed
-   truthfully. See `docs/RELEASE_WORKFLOW.md`.
+5. Complete the ignored sanitized approval file with Account A/B evidence or a
+   separately recorded owner waiver, plus migration disposition and explicit
+   owner music rights.
+6. Run `-Production -ApprovalFile ...`; when waived, also pass
+   `-AcceptOwnerAccountSmokeWaiver`. Deploy Hosting last.
+7. A waiver leaves all unverified account results `false`; it must never be
+   described as passed. See `docs/RELEASE_WORKFLOW.md`.
