@@ -1,9 +1,36 @@
 # Project Status
 
-Last audited: 2026-07-31
+Last audited: 2026-08-08
 
 This is the release truth table. Disabled, configuration-dependent, previewed,
 and production-deployed are distinct states.
+
+## Production truth and pending post-launch hardening
+
+The verified production Hosting and backend baseline at the start of this pass
+was `3c72e72d333f204ac7e1ea077d8e1af22e79af31`. The authoritative current live
+identity is always the SHA returned by `/version.json` and the matching backend
+release marker; a source commit or merged PR alone is not deployment evidence.
+
+This post-launch hardening pass covers:
+
+- early Colonel Arisaka portrait preload plus commit-versioned HTML asset
+  references, preventing a stale or late portrait during first-load dialogue;
+- single-owner tutorial modal accessibility, input clearing across dialogue and
+  checkpoint recovery, complete transient-combat cleanup, and resilient resume
+  routing;
+- immediate hidden-tab music suspension and time-based, state-aware restoration
+  without an arrival-volume jump;
+- deterministic visual evidence with explicit asset readiness, stable Canvas
+  frame comparison, an atomic Canvas capture, and a separate full-page capture.
+
+They are production-ready only after the full release suite and protected-branch
+checks pass, they merge, and the guarded workflow verifies matching live Hosting
+and backend SHAs. Device-local preseason progression remains authoritative;
+client competition writes, server competition writes, and server progression
+writes remain disabled. Real Account A/B smoke was explicitly owner-waived for
+the current production release and was **not passed**. The waiver is not account
+verification and does not weaken any Firebase or progression boundary.
 
 ## Preseason product authority
 

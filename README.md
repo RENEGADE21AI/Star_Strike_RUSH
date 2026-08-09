@@ -22,6 +22,13 @@ progression. Optional Google identity appears only after graduation.
 
 Play: https://star-strike-rush.web.app
 
+Release truth as of 2026-08-08: the verified production baseline at the start of
+the current hardening pass was `3c72e72d333f204ac7e1ea077d8e1af22e79af31`.
+The authoritative live identity is the matching Hosting `/version.json` and
+backend release marker, not a source commit alone. Account A/B smoke for that
+baseline was owner-waived, not passed; device-local progression authority and
+every competition/progression write gate remain unchanged and closed.
+
 ## Controls
 
 - Move: WASD or arrow keys.
