@@ -108,6 +108,38 @@ test("title patrol reservation uses the same normalized path without runtime sid
   assert.doesNotMatch(read("src/08-title-traffic.js"), /avoidX|avoidY/);
 });
 
+test("title patrol replacements always restore a readable depth layer", () => {
+  const deterministicMath = Object.create(Math);
+  deterministicMath.random = () => 0;
+  const context = vm.createContext({
+    globalThis: null,
+    W: 375,
+    H: 667,
+    TAU: Math.PI * 2,
+    Math: deterministicMath,
+    Number,
+    Object,
+    state: { titleFormations: [], titleLaneCursor: 0 },
+    settingReducedMotion: false,
+    SIMULATION_STEP_MS: 1000 / 60,
+    clamp: (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value)),
+    rand: (minimum, maximum) => (minimum + maximum) / 2
+  });
+  context.globalThis = context;
+  vm.runInContext(read("src/08-title-traffic.js"), context);
+  const result = vm.runInContext(`(() => {
+    state.titleFormations = [makeTitleFormation(0, 1, true, "distant")];
+    const spawned = spawnTitleFormationIfPossible();
+    return {
+      spawned,
+      depths: state.titleFormations.map((formation) => formation.depthLayer)
+    };
+  })()`, context);
+
+  assert.equal(result.spawned, true);
+  assert.ok(result.depths.some((depth) => depth === "midground" || depth === "foreground"));
+});
+
 test("wingman targets preserve player clearance at every screen corner", () => {
   const context = vm.createContext({
     W: 375,

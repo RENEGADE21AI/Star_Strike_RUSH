@@ -174,7 +174,10 @@ function initTitleFormations() {
 function spawnTitleFormationIfPossible() {
   const lane = state.titleLaneCursor++ % 2;
   const dir = state.titleLaneCursor % 2 === 0 ? 1 : -1;
-  const formation = makeTitleFormation(lane, dir, true);
+  const hasReadableFormation = state.titleFormations.some((active) => (
+    active && !active.removed && active.depthLayer !== "distant"
+  ));
+  const formation = makeTitleFormation(lane, dir, true, hasReadableFormation ? "" : "midground");
   if (formationSpawnWouldOverlap(formation)) return false;
   state.titleFormations.push(formation);
   return true;
