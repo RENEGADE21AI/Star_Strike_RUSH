@@ -1,42 +1,12 @@
 {
-  "score": 4,
-  "summary": "The rules are default-deny, owner-scoped, type-checked, size-limited, and monotonic for permanent progression fields. Run receipts are owner-only, create-only, bounded, and immutable. Cloud Functions source now exists for server-side run validation and Season reward claims, but deployment is blocked until the Firebase project is upgraded to Blaze. Until deployed and rules are tightened, direct client progression writes remain transitional risk.",
-  "findings": [
-    {
-      "check": "The Update Bypass",
-      "severity": "minor",
-      "issue": "Create and update paths use the same field allowlists and type checks. Public profile, private progression, and leaderboard updates keep best score, phase, achievement count, Glory, rank index, season tier, Credits preview, and lifetime counters non-decreasing.",
-      "recommendation": "Keep future mutable fields in shared validators. Deploy the included Cloud Functions before adding real spending, then remove direct client progression writes."
-    },
-    {
-      "check": "Authority Source",
-      "severity": "minor",
-      "issue": "Ownership comes from request.auth.uid and the path user id, not from user-supplied data. Cloud Functions source computes run rewards server-side, but the project cannot deploy Functions until Blaze is enabled.",
-      "recommendation": "After Blaze upgrade, deploy submitRunReceipt and claimSeasonReward, verify callable writes, then deny direct client writes to progression and leaderboard grant fields."
-    },
-    {
-      "check": "Storage Abuse",
-      "severity": "minor",
-      "issue": "Strings, URLs, scores, counters, phases, durations, season ids, rank values, run receipt fields, and public list query limits are bounded. Achievement ids are whitelisted and now match the expanded achievement list.",
-      "recommendation": "Keep query limits on public collections and cap arrays, strings, and per-user subcollection writes as new meta systems are added."
-    },
-    {
-      "check": "Type Safety",
-      "severity": "minor",
-      "issue": "Rules validate strings, ints, URLs, timestamps, allowed document shapes, rank names, rank indexes, season tiers, and receipt counters for each writable collection.",
-      "recommendation": "Add matching validators before introducing missions, reports, run history, or accessibility settings sync."
-    },
-    {
-      "check": "Field-Level vs. Identity-Level Security",
-      "severity": "minor",
-      "issue": "Every write rule combines field validation with an isOwner(userId) check. Authenticated users can read public leaderboard/profile documents, but cannot write another user's records or read private account documents.",
-      "recommendation": "Keep emails, moderation data, and private progression details out of public documents."
-    },
-    {
-      "check": "Reward Authority",
-      "severity": "minor",
-      "issue": "Signed-out Season Road claims use local fallback. Signed-in claims are wired to a callable Function, but the Function cannot deploy until Blaze is enabled.",
-      "recommendation": "Deploy the callable and keep signed-in reward grants server-first; do not add direct client writes for spendable balance spending."
-    }
+  "status": "superseded",
+  "summary": "This historical point-in-time audit no longer describes the active architecture. Current browser writes are denied, device-local progression is authoritative, and Firebase is account identity plus legacy archive only.",
+  "currentBoundaries": [
+    "Firestore rules are default-deny and browser progression writes are denied.",
+    "submitRunReceipt and joinWeeklyLeague reject before authentication or Firestore access.",
+    "claimSeasonReward is an inert retired compatibility endpoint with no reward calculation, authentication, reads, or writes.",
+    "Season XP, tiers, reward lanes, and claims are not active progression.",
+    "Historical season_reward_claims documents remain owner-readable and browser-write-denied for audit preservation.",
+    "The executable Firestore emulator and release-integrity suites are the current verification evidence."
   ]
 }

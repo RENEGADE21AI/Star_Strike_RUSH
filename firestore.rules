@@ -51,6 +51,8 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // Historical Season reward archive only. The retired compatibility callable
+    // performs no reads or writes; clients retain owner-read access for audit.
     match /season_reward_claims/{userId}/items/{rewardId} {
       allow get, list: if isOwner(userId);
       allow create, update, delete: if false;

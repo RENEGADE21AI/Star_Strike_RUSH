@@ -75,8 +75,8 @@ Persisted fields:
 - `codexGraduationApplied`
 
 When onboarding state is absent, the game always asks exactly “Is this your
-first time here, pilot?” It does not inspect high score, runs, Glory, Season XP,
-Credits, achievements, claimed rewards, or Codex discovery. Yes stores
+first time here, pilot?” It does not inspect high score, runs, cumulative Glory,
+derived Prestige, Credits, achievements, or Codex discovery. Yes stores
 `in_progress` and opens the separate call-sign prelaunch briefing. No stores
 `skipped` and immediately reveals the ordinary title. In-progress players
 receive Resume Training, Restart Training, and Skip for Now. Completion and
@@ -251,9 +251,9 @@ return directly to title and do not reopen account setup.
   discovery, difficulty sampling, and normal Game Over are bypassed;
 - score and kill counters are tutorial-local objective data only;
 - no recent receipt is created;
-- `submitRunReceipt`, `joinWeeklyLeague`, and `claimSeasonReward` are never
-  called;
-- Glory, Season XP, Credits, lifetime statistics, claimed rewards, account
+- `submitRunReceipt`, `joinWeeklyLeague`, and the retired
+  `claimSeasonReward` compatibility endpoint are never called;
+- cumulative Glory, derived Prestige, Credits, lifetime statistics, account
   archive, public records, and the 79 achievement IDs remain unchanged.
 
 The director snapshots progression-bearing storage on entry and exposes

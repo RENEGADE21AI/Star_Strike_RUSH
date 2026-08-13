@@ -172,14 +172,17 @@ verified run sessions exist:
 - Gameplay progression is **DEVICE PROGRESS** and authoritative on this device.
 - Firebase provides **ACCOUNT IDENTITY** and a **LEGACY ACCOUNT ARCHIVE**.
 - Sign-in, auth restoration, refresh, account switching, and account call-sign
-  publication do not change Glory, Season XP, Credits, lifetime statistics,
-  high score, claimed rewards, local achievements, or Codex discovery.
-- Season rewards always use the device-local path, signed in or signed out.
+  publication do not change cumulative Glory, derived Prestige, Credits,
+  lifetime statistics, high score, local achievements, or Codex discovery.
+- Glory is permanent and never consumed. The visible Glory Road repeats every
+  300,000 Glory; Prestige and current-road position are derived from the same
+  cumulative total rather than stored as separate currencies.
 - Existing `leaderboard_scores` documents are preserved and shown only as a
   **LEGACY/PRESEASON ARCHIVE** with `recordTrust = "legacy_unverified"`.
 - New run progression does not publish to Firebase. Public competition, weekly
-  enrollment, run receipt, and server Season reward writes are paused by
-  separate closed client, competition, and server-progression gates.
+  enrollment, and run receipt writes are paused by separate closed client,
+  competition, and server-progression gates. The former Season reward callable
+  is an inert compatibility endpoint that rejects before auth or database work.
 
 Google sign-in activates account identity, an account-scoped published call
 sign, an optional immutable `@handle`, one achievement archive aggregate, and
@@ -192,6 +195,25 @@ visible. When no pending intent exists, the server-confirmed call sign is
 authoritative and refreshes the UID-scoped published cache. Sign-out clears the
 runtime pending indicator but preserves that account's private pending entry for
 retry when the same account returns.
+
+## Permanent Glory Road
+
+There is one long-term progression Road. Score converts to permanent cumulative
+Glory at 10:1, while Credits continue as the separate earned balance. The Road
+visually repeats every 300,000 Glory:
+
+```text
+Prestige = floor(totalGlory / 300000)
+current Road Glory = totalGlory % 300000
+```
+
+Completing a Road never subtracts or resets Glory. Current rank and Road nodes
+use the modulo position; total Glory and Prestige preserve the full lifetime
+accomplishment. Titles accumulate a Prestige suffix after the first completed
+Road (`Ace`, `Ace I`, `Ace II`, ...). Checkpoints, rank-ups, and the terminal
+Star Eternal rollover are recognized explicitly when progression is applied at
+Game Over and use accessibility-aware celebrations. Prestige grants no combat
+power.
 
 Ordinary clients cannot invoke the achievement migration. The Admin-only,
 dry-run-by-default command is:

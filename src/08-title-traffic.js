@@ -249,7 +249,6 @@ function updateTitleScreen() {
   titlePanelAnim = settingReducedMotion ? titlePanelTarget : titlePanelAnim + (titlePanelTarget - titlePanelAnim) * 0.22;
   titleMetaScreenTransition = settingReducedMotion ? 1 : titleMetaScreenTransition + (1 - titleMetaScreenTransition) * 0.24;
   if (titleMetaScreenTransition > 0.995) titleMetaScreenTransition = 1;
-  titleProgressClaimPulse = Math.max(0, titleProgressClaimPulse - 1);
   if (typeof onboardingAccountPulseFrames === "number" && onboardingAccountPulseFrames > 0) onboardingAccountPulseFrames--;
   callSignCursorBlink = (callSignCursorBlink + 1) % 56;
   if (titleSubState === "progress") clampTitleProgressScroll();

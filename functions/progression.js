@@ -1,7 +1,4 @@
-const CURRENT_SEASON_ID = "season_01";
-const CURRENT_SEASON_NAME = "Launch Flight";
-const SEASON_TIER_XP = 1000;
-const ROAD_SEASON_TIERS = 50;
+const GLORY_ROAD_LENGTH = 300000;
 
 const GLORY_RANKS = [
   { threshold: 0, name: "Rookie Pilot" },
@@ -48,51 +45,85 @@ function safeDocId(value, fallback = "item") {
   return text || fallback;
 }
 
-function currentSeasonTierForXP(xp) {
-  return clamp(1 + Math.floor(intValue(xp) / SEASON_TIER_XP), 1, ROAD_SEASON_TIERS);
+function romanPrestige(value) {
+  const prestige = intValue(value);
+  if (prestige === 0) return "0";
+  if (prestige > 3999) return prestige.toLocaleString("en-US");
+  const numerals = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+  let remaining = prestige;
+  let result = "";
+  for (const [amount, numeral] of numerals) {
+    while (remaining >= amount) {
+      result += numeral;
+      remaining -= amount;
+    }
+  }
+  return result;
 }
 
-function rankForGlory(glory) {
-  const total = intValue(glory);
+function rankForRoadGlory(glory) {
+  const total = intValue(glory) % GLORY_ROAD_LENGTH;
   let current = GLORY_RANKS[0];
   let index = 0;
-  for (let i = 1; i < GLORY_RANKS.length; i++) {
+  for (let i = 1; i < GLORY_RANKS.length - 1; i++) {
     if (total < GLORY_RANKS[i].threshold) break;
     current = GLORY_RANKS[i];
     index = i;
   }
-  return { index, name: current.name };
+  const next = GLORY_RANKS[index + 1];
+  return { index, name: current.name, threshold: current.threshold, nextName: next.name, nextThreshold: next.threshold };
 }
 
-function seasonReward(id, type, amount, name) {
-  return { id, type, amount, name };
+function gloryRoadStateForTotal(value) {
+  const totalGlory = intValue(value);
+  const prestige = Math.floor(totalGlory / GLORY_ROAD_LENGTH);
+  const roadGlory = totalGlory % GLORY_ROAD_LENGTH;
+  const rank = rankForRoadGlory(roadGlory);
+  return {
+    totalGlory,
+    prestige,
+    roadGlory,
+    rank,
+    displayRankName: prestige > 0 ? `${rank.name} ${romanPrestige(prestige)}` : rank.name
+  };
 }
 
-function buildSeasonRewardTable() {
-  const rows = [];
-  for (let tier = 1; tier <= ROAD_SEASON_TIERS; tier++) {
-    const pad = String(tier).padStart(2, "0");
-    const milestone = tier % 5 === 0;
-    const flightAmount = milestone ? 180 + tier * 18 : 45 + tier * 7;
-    const supplyAmount = milestone ? 320 + tier * 22 : 90 + tier * 10;
-    const flight = milestone
-      ? seasonReward(`s01_flight_${pad}`, "glory_cache", flightAmount, `${flightAmount} Glory Cache`)
-      : seasonReward(`s01_flight_${pad}`, "season_xp_cache", flightAmount, `${flightAmount} Season XP`);
-    const supply = seasonReward(`s01_supply_${pad}`, "credits", supplyAmount, `${supplyAmount} Credits`);
-    rows.push({ tier, flight, supply });
+function gloryMilestoneDefinitions() {
+  const definitions = [];
+  for (let index = 0; index < GLORY_RANKS.length; index++) {
+    const rank = GLORY_RANKS[index];
+    if (rank.threshold > 0 && rank.threshold < GLORY_ROAD_LENGTH) {
+      definitions.push({ type: "rank", threshold: rank.threshold, rankName: rank.name });
+    }
+    const next = GLORY_RANKS[index + 1];
+    if (next) definitions.push({ type: "checkpoint", threshold: Math.floor(rank.threshold + (next.threshold - rank.threshold) * 0.5), rankName: "" });
   }
-  return rows;
+  definitions.push({ type: "prestige", threshold: GLORY_ROAD_LENGTH, rankName: "Star Eternal" });
+  return definitions.sort((a, b) => a.threshold - b.threshold || (a.type === "prestige" ? 1 : -1));
 }
 
-const SEASON_REWARDS = buildSeasonRewardTable();
+const GLORY_MILESTONES = gloryMilestoneDefinitions();
 
-function findSeasonReward(rewardId) {
-  const id = safeDocId(rewardId, "");
-  for (const row of SEASON_REWARDS) {
-    if (row.flight.id === id) return { tier: row.tier, lane: "flight", reward: row.flight };
-    if (row.supply.id === id) return { tier: row.tier, lane: "supply", reward: row.supply };
+function gloryMilestonesCrossed(beforeValue, afterValue) {
+  const before = intValue(beforeValue);
+  const after = Math.max(before, intValue(afterValue));
+  if (after <= before) return [];
+  const events = [];
+  for (let cycle = Math.floor(before / GLORY_ROAD_LENGTH); cycle <= Math.floor(after / GLORY_ROAD_LENGTH); cycle++) {
+    for (const milestone of GLORY_MILESTONES) {
+      const absoluteThreshold = cycle * GLORY_ROAD_LENGTH + milestone.threshold;
+      if (absoluteThreshold <= before || absoluteThreshold > after) continue;
+      events.push({
+        type: milestone.type,
+        threshold: milestone.threshold,
+        absoluteThreshold,
+        prestigeCycle: cycle,
+        prestigeAfter: milestone.type === "prestige" ? cycle + 1 : cycle,
+        rankName: milestone.rankName
+      });
+    }
   }
-  return null;
+  return events.sort((a, b) => a.absoluteThreshold - b.absoluteThreshold || (a.type === "prestige" ? 1 : -1));
 }
 
 function sanitizeRunReceipt(raw = {}) {
@@ -130,17 +161,13 @@ function validateRunPlausibility(run) {
 function computeRunGrants(run) {
   return {
     gloryGained: Math.floor(run.score / 10),
-    seasonXPGained: clamp(Math.floor(run.score / 45) + run.phaseReached * 8 + run.bossesKilled * 60 + run.powerupsCollected * 5, 0, 2500),
     creditsEarned: clamp(Math.floor(run.score / 120) + run.phaseReached * 2 + run.bossesKilled * 25, 0, 1500)
   };
 }
 
 function defaultProfile() {
   return {
-    glory: 0,
-    currentSeasonId: CURRENT_SEASON_ID,
-    currentSeasonXP: 0,
-    currentSeasonTier: 1,
+    totalGlory: 0,
     credits: 0,
     lifetimeRuns: 0,
     lifetimeScore: 0,
@@ -151,17 +178,13 @@ function defaultProfile() {
     lifetimeDamageTaken: 0,
     highestCombo: 0,
     bestScore: 0,
-    phase: 1,
-    seasonClaimedRewardIds: []
+    phase: 1
   };
 }
 
 function normalizeProfile(profile = {}) {
   const base = defaultProfile();
-  base.glory = intValue(profile.glory);
-  base.currentSeasonId = safeDocId(profile.currentSeasonId || CURRENT_SEASON_ID, CURRENT_SEASON_ID).slice(0, 40);
-  base.currentSeasonXP = intValue(profile.currentSeasonXP);
-  base.currentSeasonTier = currentSeasonTierForXP(base.currentSeasonXP);
+  base.totalGlory = intValue(profile.totalGlory ?? profile.glory);
   base.credits = intValue(profile.credits);
   base.lifetimeRuns = intValue(profile.lifetimeRuns, 1000000);
   base.lifetimeScore = intValue(profile.lifetimeScore);
@@ -173,15 +196,6 @@ function normalizeProfile(profile = {}) {
   base.highestCombo = intValue(profile.highestCombo, 1000000);
   base.bestScore = intValue(profile.bestScore);
   base.phase = Math.max(1, intValue(profile.phase || profile.bestPhase, 9999) || 1);
-  base.seasonClaimedRewardIds = Array.isArray(profile.seasonClaimedRewardIds)
-    ? Array.from(new Set(profile.seasonClaimedRewardIds.map((id) => safeDocId(id, "")).filter(Boolean))).slice(0, 220)
-    : [];
-  if (base.currentSeasonId !== CURRENT_SEASON_ID) {
-    base.currentSeasonId = CURRENT_SEASON_ID;
-    base.currentSeasonXP = 0;
-    base.currentSeasonTier = 1;
-    base.seasonClaimedRewardIds = [];
-  }
   return base;
 }
 
@@ -224,9 +238,8 @@ function achievementTitle(achievementId) {
 function applyRunToProfile(profile, run) {
   const next = normalizeProfile(profile);
   const grants = computeRunGrants(run);
-  next.glory += grants.gloryGained;
-  next.currentSeasonXP += grants.seasonXPGained;
-  next.currentSeasonTier = currentSeasonTierForXP(next.currentSeasonXP);
+  const gloryBefore = next.totalGlory;
+  next.totalGlory += grants.gloryGained;
   next.credits += grants.creditsEarned;
   next.lifetimeRuns += 1;
   next.lifetimeScore += run.score;
@@ -239,59 +252,39 @@ function applyRunToProfile(profile, run) {
   next.bestScore = Math.max(next.bestScore, run.score);
   next.phase = Math.max(next.phase, run.phaseReached);
   next.grants = grants;
+  next.milestoneEvents = gloryMilestonesCrossed(gloryBefore, next.totalGlory);
   next.earnedAchievementIds = earnedAchievementIdsForRun(run, next);
   return next;
 }
 
-function applySeasonRewardToProfile(profile, rewardId) {
-  const next = normalizeProfile(profile);
-  const found = findSeasonReward(rewardId);
-  if (!found) return { ok: false, reason: "unknown_reward", profile: next };
-  if (next.seasonClaimedRewardIds.includes(found.reward.id)) {
-    return { ok: false, reason: "already_claimed", reward: found.reward, profile: next };
-  }
-  if (found.tier > next.currentSeasonTier) {
-    return { ok: false, reason: "locked", reward: found.reward, profile: next };
-  }
-  if (found.reward.type === "credits") next.credits += found.reward.amount;
-  else if (found.reward.type === "glory_cache") next.glory += found.reward.amount;
-  else if (found.reward.type === "season_xp_cache") {
-    next.currentSeasonXP += found.reward.amount;
-    next.currentSeasonTier = currentSeasonTierForXP(next.currentSeasonXP);
-  }
-  next.seasonClaimedRewardIds = Array.from(new Set([...next.seasonClaimedRewardIds, found.reward.id])).slice(0, 220);
-  return { ok: true, reason: "claimed", reward: found.reward, tier: found.tier, lane: found.lane, profile: next };
-}
-
 function publicProfileFromPrivate(profile) {
   const normalized = normalizeProfile(profile);
-  const rank = rankForGlory(normalized.glory);
+  const road = gloryRoadStateForTotal(normalized.totalGlory);
   return {
     ...normalized,
-    currentSeasonName: CURRENT_SEASON_NAME,
-    gloryRank: rank.name,
-    gloryRankIndex: rank.index,
-    seasonXP: normalized.currentSeasonXP,
-    seasonTier: normalized.currentSeasonTier,
-    totalGlory: normalized.glory
+    prestige: road.prestige,
+    roadGlory: road.roadGlory,
+    gloryRank: road.rank.name,
+    gloryRankDisplay: road.displayRankName,
+    gloryRankIndex: road.rank.index
   };
 }
 
 module.exports = {
   ACHIEVEMENTS,
-  CURRENT_SEASON_ID,
-  CURRENT_SEASON_NAME,
-  SEASON_TIER_XP,
+  GLORY_MILESTONES,
+  GLORY_RANKS,
+  GLORY_ROAD_LENGTH,
   applyRunToProfile,
-  applySeasonRewardToProfile,
   achievementTitle,
   computeRunGrants,
-  currentSeasonTierForXP,
   earnedAchievementIdsForRun,
-  findSeasonReward,
+  gloryMilestonesCrossed,
+  gloryRoadStateForTotal,
   normalizeProfile,
   publicProfileFromPrivate,
-  rankForGlory,
+  rankForRoadGlory,
+  romanPrestige,
   safeCallSign,
   safeDocId,
   safeText,

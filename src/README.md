@@ -42,9 +42,13 @@ after the files they depend on, because the current code intentionally shares gl
 - `12-rendering-title-panels.js`: identity/settings, explicit ON/OFF controls,
   global and weekly records, the categorized achievement vault, Codex, and
   isolated destructive reset confirmation.
-- `12-progress-road-data.js`: Glory Road and Season Road reward tables, detail
-  payloads, and local reward claim logic.
-- `12-rendering-progress-road.js`: Glory Road and Season Road layout and rendering.
+- `00-glory-progression.js`: canonical browser Glory Road, Prestige, rank, and
+  repeating milestone math.
+- `12-progress-road-data.js`: the single Glory Road's repeating rank/checkpoint
+  nodes and concise Prestige-aware detail payloads.
+- `12-rendering-progress-road.js`: winding Glory Road layout and rendering.
+- `12-glory-celebration.js`: ordered checkpoint, rank-up, and Prestige rollover
+  presentation after progression is applied at Game Over.
 - `13-rendering-title-screens.js`: title identity hierarchy and the score-first
   end-of-run flight-record composition.
 - `14-rendering-player.js`: background and player ship rendering.

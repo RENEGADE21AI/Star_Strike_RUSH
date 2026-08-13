@@ -3,8 +3,8 @@ function drawTitleMetaStrip(x, y, w) {
   if (!meta) return;
   const chips = [
     { label: "BEST", value: Number((meta.lifetime && meta.lifetime.bestScore) || highScore || 0).toLocaleString(), color: "rgba(92,238,255,0.72)" },
-    { label: "RANK", value: String(meta.gloryRank || "ROOKIE").toUpperCase(), color: "rgba(255,230,128,0.70)" },
-    { label: "SEASON", value: `T${String(meta.seasonTier || 1)}`, color: "rgba(120,255,180,0.72)" }
+    { label: "RANK", value: String(meta.gloryRankDisplay || meta.gloryRank || "ROOKIE").toUpperCase(), color: "rgba(255,230,128,0.70)" },
+    { label: "PRESTIGE", value: Number(meta.prestige || 0) > 0 ? romanPrestige(meta.prestige) : "0", color: "rgba(120,255,180,0.72)" }
   ];
   const gap = 6;
   const chipW = Math.max(72, Math.floor((w - gap * (chips.length - 1)) / chips.length));
@@ -23,7 +23,7 @@ function drawTitleMetaStrip(x, y, w) {
     ctx.fillText(chip.label, rx + 7, y + 11);
     ctx.textAlign = "right";
     ctx.fillStyle = "#fff";
-    ctx.fillText(String(chip.value).slice(0, 11), rx + chipW - 7, y + 11);
+    ctx.fillText(String(chip.value), rx + chipW - 7, y + 11, chipW - 45);
   }
   ctx.restore();
 }

@@ -32,15 +32,17 @@ Live Firebase Hosting URL: `https://star-strike-rush.web.app`.
 Persistence:
 
 - Local high score, call sign, settings, and codex discoveries use localStorage.
-- Local Glory, current-season XP preview, Credits preview, lifetime stats, and
-  recent run receipts use localStorage.
+- Cumulative Glory, Credits, lifetime stats, and recent run receipts use
+  localStorage. Prestige and current-road Glory are always derived from total
+  Glory; they are not independently mutable balances.
 - Firebase Auth supports Google sign-in.
-- Cloud Firestore stores online profiles, player-card progression fields, world
-  record leaderboard entries, immutable run receipts, and earned achievements.
-- Cloud Functions source exists for server-side run receipt validation and
-  Season reward claiming. Deployment requires the Firebase project to be on the
-  Blaze plan.
-- The game remains playable signed out; online sync is additive.
+- Cloud Firestore stores account identity plus a legacy account archive. It is
+  not authoritative for device gameplay progression.
+- Cloud Functions source retains dormant server-side run validation with matching
+  Glory/Prestige semantics. The former Season reward endpoint is an inert,
+  fail-closed compatibility stub.
+- The game remains playable signed out; account actions never replace device
+  progress.
 
 Source layout:
 
@@ -50,9 +52,12 @@ Source layout:
   shows current screens, long stretched layouts for scrollable panels, and
   future meta-screen guardrails. Update it before making major UI changes.
 - `src/01-core.js` through `src/18-session-input-loop.js` own the core game.
-- `src/12-rendering-progress-road.js` owns the title-screen Glory Road and
-  Season Road renderer, season reward definitions, Road hit testing, and
-  current-progress focus behavior.
+- `src/00-glory-progression.js` owns canonical browser Glory Road, Prestige,
+  rank, and repeating milestone math.
+- `src/12-rendering-progress-road.js` owns the single title-screen Glory Road,
+  Road hit testing, and current-progress focus behavior.
+- `src/12-glory-celebration.js` owns ordered Game Over checkpoint, rank, and
+  Prestige rollover celebrations.
 - `src/18-expansion-data.js`, `src/18-expansion-enemies-powerups.js`,
   `src/18-expansion-hazards-bosses.js`, and
   `src/18-expansion-rendering-waves.js` own the final expansion package.
@@ -118,26 +123,22 @@ start flow instead of a dashboard-style menu. Progression is mostly presented
 after the run, but the title screen should always make long-term identity and
 goals visible.
 
-Current implemented meta layer:
+### Permanent Glory and repeating Road
 
-- Score converts to Glory at 10:1.
-- Glory ranks appear on the title screen, game-over screen, online player card,
-  and leaderboard rows.
-- End-of-run progression shows Glory gained, total Glory, rank, Season XP gained,
-  Credits earned, and current season tier.
-- Run receipts record score, phase reached, duration, enemies killed, bosses
-  killed, powerups collected, ghost uses, damage taken, highest combo, and client
-  version.
-- Local guest progression works signed out. Signed-in accounts sync public
-  profile fields, leaderboard records, achievements, and owner-only receipt
-  archives.
-- Season Road rewards are claimable. Claimed state persists, rewards apply to
-  Credits, Glory, or Season XP, and signed-out players use local fallback.
-- Signed-in run submissions are wired to `submitRunReceipt()` so the server can
-  validate plausibility and compute Glory, Season XP, Credits, achievements, and
-  leaderboard records after Functions are deployed.
+Glory is one permanent cumulative value. It never resets, decreases, or gets
+spent when a Road is completed. The Glory Road is a repeating visual journey of
+exactly 300,000 Glory:
 
-Glory ranks:
+- `prestige = floor(totalGlory / 300000)`
+- `roadGlory = totalGlory % 300000`
+
+Prestige is therefore the compressed record of completed Roads, not another
+currency or a destructive reset transaction. At 300,200 total Glory the player
+is Prestige 1 with 200 Glory on the new Road; the stored total remains 300,200.
+Prestige grants status only and never adds HP, damage, score multipliers, better
+abilities, powerup odds, or other combat advantages.
+
+Current Road ranks, based on `roadGlory`, are:
 
 - 0: Rookie Pilot.
 - 1,000: Star Cadet.
@@ -148,92 +149,70 @@ Glory ranks:
 - 60,000: Phantom Hunter.
 - 100,000: Wraithbreaker.
 - 175,000: Solar Legend.
-- 300,000: Star Eternal.
+- 300,000: Star Eternal and Road completion.
 
-Season structure target:
+After the first completed Road, the player's displayed title carries the
+Prestige suffix: Ace, Ace I, Ace II, and so on. The terminal Star Eternal event
+belongs to the completed Road; immediately after rollover the current rank is
+derived from the remainder near the start of the next Road.
 
-- 8-week seasons.
-- 50 Season Road tiers.
-- Flight reward lane for Season XP and Glory caches.
-- Supply reward lane for Credits.
-- Daily and weekly missions later.
-- No season gameplay events.
+Midpoint checkpoints repeat with the ranks in every Prestige cycle. Progression
+application—not rendering—translates each relative threshold into an absolute
+cumulative threshold and emits ordered checkpoint, rank, or terminal Prestige
+events. A terminal event combines Star Eternal, Glory Road completion, and the
+new Prestige so the player never receives two redundant major ceremonies.
 
-Meta systems that are planned but not implemented yet:
+### Progression presentation
 
-- Daily missions.
-- Weekly missions.
-- Practice/training screen.
-- Run history screen.
-- Accessibility/audio controls.
-- AdMob rewarded ads.
+- Score converts to Glory at 10:1 and adds to cumulative `totalGlory` exactly
+  once at normal Game Over. Credits and lifetime statistics continue to apply.
+- Tutorial and debug runs cannot award Glory, Prestige, Credits, milestones,
+  achievements, or receipts.
+- Ordinary checkpoints receive short energy/chime celebrations. Named ranks use
+  stronger rings, typography, and particles. Intensity grows with Road position.
+- The 300,000 terminal threshold receives the most substantial concise ceremony:
+  Star Eternal, Glory Road Complete, the new Prestige, and explicit reassurance
+  that Glory endures while the Road begins again.
+- Celebrations run after progression is committed and before Game Over controls
+  become interactive. They honor Reduced Motion, Reduced Flash, Screen Shake,
+  and Effects settings.
+- Game Over shows Glory gained, Credits gained, the relevant next-rank or
+  Prestige context, and a single `VIEW ROAD` action. It never shows a Season
+  tier or Season XP.
 
-Hard monetization and community constraints:
+### Glory Road screen
 
-- No fan-fund or fuel system.
-- No loot boxes.
-- No paid gameplay advantage.
-- No permanent gameplay upgrades.
-- No gameplay power from purchases, Glory, Credits, or seasons.
+Road opens one focused, long, winding vertical Glory journey. The player ship,
+reached nodes, rank, and auto-focus use the current modulo Road position. The
+header keeps total cumulative Glory and Prestige visible so rollover cannot be
+mistaken for lost progress. Tapping a node shows its current-Road threshold,
+reached/locked state, Prestige context, and absolute cumulative requirement.
+There are no tabs, reward cards, claim buttons, lanes, or temporary tiers.
 
-Stripe is not added yet. If web payments are ever added, Stripe must be handled
-by server-side checkout and webhooks, and clients must not grant purchases or
-spendable balances directly. Android/iOS builds should use a purchase-provider
-abstraction for platform billing.
+Title meta placement remains compact: Play is dominant; the upper strip shows
+Best, current Rank, and Prestige; the pilot status line uses the suffixed rank
+and permanent Glory context. Badges, Road, Records, and Codex remain distinct
+focused surfaces rather than a dashboard.
 
-Signed-in players can sync:
+### Persistence and account boundary
 
-- Profile call sign.
-- Best score.
-- Player-card progression fields.
-- Run receipts.
-- Earned achievements.
-- Global leaderboard records.
+Local schema migration preserves cumulative Glory, Credits, lifetime stats,
+high score, achievements, Codex, settings, identity, onboarding, and historical
+receipt data. Obsolete Season XP/tier/claim fields are dropped from the active
+normalized schema without reversing rewards already reflected in balances and
+without replaying historical milestone ceremonies.
 
-Title screen meta placement:
+Firebase remains account identity plus legacy archive during preseason.
+Sign-in, sign-out, refresh, and account switching never overwrite device Glory
+or derived Prestige. Dormant server progression uses the same cumulative
+Glory/Prestige math but stays behind closed progression and competition gates.
+`claimSeasonReward()` exists only as a retired compatibility callable that
+rejects before authentication, Firestore reads, or writes.
 
-- Play remains the largest central action.
-- Glory, Credits, and current Season Tier are visible at the top of the title
-  screen and in title-side meta screens.
-- The call sign area doubles as the pilot card, showing current Glory rank and
-  total Glory.
-- A small account chip sits to the left of the call sign. It opens account
-  sign-in, sign-out, profile sync, online refresh, settings, and reset controls.
-- The main icon row under Play is: Badges, Road, Records, Codex.
-- Badges opens the achievements trophy panel.
-- Road opens Glory Road and Season Road tabs. These tracks should feel like
-  classic long-scroll progression roads with a central spine, nodes, milestone
-  rewards, and visible travel distance. Do not compress them into short lists.
-  The current canvas implementation uses a draggable/wheel-scroll road viewport:
-  Glory alternates rank milestones and checkpoints, while Season displays all
-  50 supported tiers on a central rail with Flight and Supply reward markers.
-  Road opens around current progress instead of always starting at tier/rank 1.
-  The current node has a pulsing marker ship, and tapping nodes or reward cards
-  opens an inspect panel with requirement, reward, and reached/locked/claimed
-  state. Unclaimed Season rewards can be claimed from the detail panel.
-- Records opens the world-record leaderboard and refresh controls.
-- Codex opens enemy and boss discovery.
-
-The old combined Online drawer should not be the default information model.
-Account, achievements, records, and progression should remain distinct so each
-screen has one obvious purpose.
-
-The old standalone settings screen should not return. Settings belong inside
-Account because they are personal/profile utility, not a fifth title-screen
-destination.
-
-Game over should bridge into meta progression. After a run, the player sees
-Glory, Season XP, Credits, rank/tier movement, and a `VIEW ROAD` action that
-opens the Road panel near the newly relevant progress.
-
-The game must remain functional if Firebase is unavailable or the player is signed out. In that case, local play and local high score continue normally.
-
-Competitive production rule: Firestore rules can protect owner scope and data
-shape, but they cannot prove a browser-reported run is real. The repo includes
-`submitRunReceipt()` and `claimSeasonReward()` Cloud Functions for this, but the
-Firebase project must be upgraded to Blaze before Functions can be deployed.
-After deployment is verified, Firestore rules should be tightened so browser
-clients no longer write leaderboard/progression grants directly.
+The game must remain functional if Firebase is unavailable or the player is
+signed out. Firestore rules and callable-only writes protect scope but cannot
+prove browser gameplay; verified run sessions, public scoring, and competition
+remain disabled.
 
 ## 6. Progression And Boss Rotation
 

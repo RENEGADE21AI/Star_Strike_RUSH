@@ -96,6 +96,19 @@ function playGameSound(kind, intensity = 1) {
       { from: 140, to: 45, duration: 0.19, gain: 0.07, wave: "sawtooth" },
       { from: 320, to: 82, duration: 0.11, gain: 0.03, wave: "square" }
     ],
+    checkpoint: [
+      { from: 520, to: 940, duration: 0.14, gain: 0.040, wave: "sine" },
+      { from: 760, to: 1260, duration: 0.10, gain: 0.020, wave: "triangle" }
+    ],
+    rank_up: [
+      { from: 330, to: 980, duration: 0.24, gain: 0.052, wave: "triangle" },
+      { from: 620, to: 1420, duration: 0.20, gain: 0.032, wave: "sine" }
+    ],
+    prestige: [
+      { from: 180, to: 720, duration: 0.44, gain: 0.070, wave: "triangle" },
+      { from: 410, to: 1320, duration: 0.36, gain: 0.044, wave: "sine" },
+      { from: 760, to: 1640, duration: 0.28, gain: 0.026, wave: "sine" }
+    ],
     boss_destroy: [
       { from: 110, to: 34, duration: 0.48, gain: 0.11, wave: "sawtooth" },
       { from: 440, to: 64, duration: 0.32, gain: 0.055, wave: "square" }

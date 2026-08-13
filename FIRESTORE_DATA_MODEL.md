@@ -12,9 +12,11 @@ the device. Browser writes are denied.
 Client competition writes, server competition writes, server progression
 writes, and verified run sessions are separate flags and all are disabled.
 Profile identity sync and handle claims may operate when Firebase is configured.
-Run receipt, weekly league, and server Season reward callables reject before
-authentication or Firestore access. Existing plausibility validation is dormant
-defense in depth; it cannot prove browser-reported gameplay occurred.
+Run receipt and weekly league callables reject before authentication or
+Firestore access. The former Season reward callable is a retired compatibility
+stub that also rejects before authentication or Firestore access and contains
+no reward logic. Existing plausibility validation is dormant defense in depth;
+it cannot prove browser-reported gameplay occurred.
 
 Firebase web config is loaded at runtime. Real API keys must not be committed to
 the repository. Local development can use ignored `src/firebase-config.local.json`
@@ -86,8 +88,8 @@ receipt fields include:
 - damage taken
 - highest combo
 - Glory gained
-- Season XP gained
 - Credits earned
+- cumulative Glory, derived Prestige, and current-road Glory after the run
 - client version
 - submitted server timestamp
 
@@ -97,8 +99,8 @@ matching server progression/competition gates are deliberately enabled.
 
 ### `season_reward_claims/{uid}/items/{rewardId}`
 
-Owner historical reward-claim archive. Browser writes are denied and new server
-claims are paused. Each existing document may record:
+Retired owner historical reward-claim archive. Browser writes are denied and no
+new claims exist. Historical documents may record:
 
 - reward id
 - reward type
@@ -107,9 +109,10 @@ claims are paused. Each existing document may record:
 - lane
 - claimed server timestamp
 
-During preseason, Season Road claims always use device-local state whether the
-player is signed in or out. `claimSeasonReward()` rejects before auth, reads, or
-writes.
+The active game has no Season Road, Season XP, tier, or reward-claim path.
+`claimSeasonReward()` remains temporarily as an inert compatibility endpoint;
+it rejects before auth, reads, or writes. Historical documents are preserved
+because deleting prior records is unnecessary and could erase audit context.
 
 ### `player_achievements/{uid}/items/{achievementId}`
 
@@ -152,14 +155,14 @@ competition claim:
    remains unavailable.
 4. On game over, `submitOnlineRun()` builds a score and achievement payload.
 5. Signed-in clients submit the receipt to `submitRunReceipt()`.
-6. The server validates plausibility and computes Glory, Season XP, Credits, and
-   achievements.
+6. The dormant server validates plausibility and computes cumulative Glory,
+   derived Prestige/current-road position, Credits, and achievements.
 7. Firebase stores an immutable owner-scoped run receipt and credits verified
    weekly Flight Points exactly once.
 8. Firebase updates the player's public profile and best leaderboard record.
 9. Newly earned achievement documents are created under the player's account.
-10. A future verified mode may use server Season claims. Preseason always uses
-    the local reward path.
+10. No Season reward system is part of this flow; the compatibility endpoint is
+    permanently non-mutating unless deliberately removed in a later deployment.
 
 No combination of only the competition flags activates this flow. Server
 progression writes, server competition writes, and verified run sessions must
@@ -170,15 +173,15 @@ all be enabled, and enrollment additionally requires
 
 Implemented now:
 
-- Score to Glory at 10:1.
-- Glory ranks and local player-card summary.
-- End-of-run device-local Glory, Season XP, Credits, records, achievements, and
-  Codex discovery.
-- Device-local Season Road claims and reload persistence.
+- Score to cumulative Glory at 10:1.
+- One repeating 300,000-Glory Road with derived Prestige and current-loop rank.
+- Ordered checkpoint, rank-up, and terminal Prestige events at Game Over.
+- End-of-run device-local Glory, Credits, records, achievements, and Codex
+  discovery.
 - Account identity and handle publication.
 - Legacy account/archive display separated from device progress.
-- Closed callable source retained for future verified run receipts, Season
-  claims, and weekly leagues.
+- Closed callable source retained for future verified run receipts and weekly
+  leagues; the former Season claim name is only an inert compatibility stub.
 
 Explicitly not implemented yet:
 

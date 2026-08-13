@@ -1,14 +1,14 @@
 # Project Status
 
-Last audited: 2026-08-08
+Last audited: 2026-08-13
 
 This is the release truth table. Disabled, configuration-dependent, previewed,
 and production-deployed are distinct states.
 
 ## Production truth and pending post-launch hardening
 
-The verified production Hosting and backend baseline at the start of this pass
-was `3c72e72d333f204ac7e1ea077d8e1af22e79af31`. The authoritative current live
+The production source baseline at the start of this focused progression pass
+was `25ce52d41612ecd9ea988d9b1aab29ac6dc70646`. The authoritative current live
 identity is always the SHA returned by `/version.json` and the matching backend
 release marker; a source commit or merged PR alone is not deployment evidence.
 
@@ -48,10 +48,9 @@ verification and does not weaken any Firebase or progression boundary.
 | App Check enforcement | Prepared but disabled; live configuration not verified |
 
 Account sign-in, refresh, call-sign publication, restored auth, sign-out, and
-switching between Accounts A and B must not change high score, Glory, Season XP,
-Credits, lifetime statistics, local reward claims, achievements, or Codex
-discoveries. Signed-in Season rewards use the same local path as signed-out
-rewards.
+switching between Accounts A and B must not change high score, cumulative Glory,
+derived Prestige, Credits, lifetime statistics, achievements, or Codex
+discoveries. Season Road, Season XP, tiers, and reward claims are retired.
 
 ## Stable and verified locally
 
@@ -62,7 +61,7 @@ rewards.
 | Account call sign | Stable | Pending intent wins temporarily; otherwise server confirmation replaces stale UID-scoped cache; failure retry and guest isolation |
 | Auth hydration | Stable | `onAuthStateChanged` sole owner; one callable, one aggregate load, one listener per login |
 | Mobile Google auth flow | Mock/emulator verified | Popup success, blocked-popup redirect fallback, redirect restoration, sign-out, account switching |
-| Season rewards | Stable/local | Signed-in and signed-out local claims are identical and survive reload |
+| Glory Road | Stable/local verified | One permanent cumulative Glory value, repeating 300,000-Glory Road, derived Prestige/rank, explicit milestones, and escalating Game Over celebrations |
 | Server preseason gates | Stable/closed | All three endpoints reject before auth or Firestore access |
 | Legacy leaderboard | Quarantined | Separate legacy/verified fields and public-only/leaderboard-only/conflict/no-record tests |
 | Achievements | Stable | One generated 79-entry catalog, browser/server parity, semantic and reachability checks |
@@ -79,7 +78,7 @@ rewards.
 | Firestore authorization | Stable | Emulator tests cover anonymous denial, owner privacy, bounded reads, browser-write denial |
 | Build/cache contract | Stable | Commit-versioned runtime/assets plus no-store HTML and `version.json` |
 | Player-facing UI | Focused polish locally verified | Shared glass-edged buttons/panels, explicit settings toggles, isolated destructive actions, clearer title identity, and a score-focused Game Over summary |
-| Visual QA | Stable | 52 asserted scenes spanning portrait and landscape title viewports, panels, settings danger hierarchy, reset, pause confirmation, HUD/touch clearance, Game Over, First Flight, launch states, realm UI, account offer, and checkpoint resume |
+| Visual QA | Stable | 63 asserted scenes spanning portrait and landscape title viewports, panels, settings danger hierarchy, reset, pause confirmation, HUD/touch clearance, Game Over, First Flight, launch states, realm UI, account offer, checkpoint resume, repeating Glory Roads, and milestone ceremonies |
 
 ## Firebase identity and archive boundary
 
@@ -101,15 +100,17 @@ fields, and deletes obsolete `bestScore`, `phase`, Glory/rank/tier,
 `achievementsCount`, and duplicated `uid` fields. `leaderboard_scores` remains
 untouched as the legacy archive.
 
-The paused callables are:
+The paused progression/competition callables are:
 
 - `submitRunReceipt`
 - `joinWeeklyLeague`
-- `claimSeasonReward`
 
 They fail with `failed-precondition` before authentication, reads, or writes
-while `SERVER_PROGRESSION_WRITES_ENABLED` is false. Existing server data is
-preserved; it is not described as current, live, verified, or a world record.
+while the corresponding gates are closed. `claimSeasonReward` remains only as
+an inert retired compatibility endpoint and also rejects before authentication,
+reads, or writes; it contains no Season reward calculation. Existing server
+data is preserved; it is not described as current, live, verified, or a world
+record.
 
 ## Configuration-dependent and not yet proven live
 
@@ -179,6 +180,25 @@ Current game-quality sweep evidence on Node 22:
 - Root production audit: 0 vulnerabilities. Functions audit: 0 high-severity
   findings and 9 known moderate transitive findings.
 - Tracked-file secret scan: 237 files passed.
+
+Current permanent-Glory progression pass evidence on Node 22:
+
+- `npm test`: 169/169 passed, including full real-action desktop and touch First
+  Flight journeys plus deterministic Glory, Prestige, migration, server parity,
+  and celebration contracts.
+- Firestore Rules emulator: 4/4 passed; the historical Season claim archive
+  remains owner-readable and browser-write-denied.
+- Firebase client integration: one complete real Auth/Firestore/Functions
+  emulator scenario passed with device Glory/Prestige invariance and all three
+  direct fail-closed endpoint checks.
+- Visual QA: the complete 63-scene pass succeeded, then all five Road and
+  celebration states affected by the general polish pass were rerun and
+  inspected at original resolution.
+- Production build: 108 allowlisted public files generated.
+- Root production audit: 0 vulnerabilities. Functions audit: 0 high-severity
+  findings and 8 known moderate transitive findings whose suggested fix is a
+  breaking Firebase Admin major upgrade.
+- Tracked-file secret scan: 239 files passed.
 
 This focused pass adds keyboard- and screen-reader-accessible action surfaces to
 the Canvas UI, contains modal focus, prevents hidden title/pause actions and

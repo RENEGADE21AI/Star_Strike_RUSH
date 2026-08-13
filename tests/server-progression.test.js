@@ -1,13 +1,16 @@
 const assert = require("node:assert/strict");
 
 const {
+  GLORY_ROAD_LENGTH,
   applyRunToProfile,
-  applySeasonRewardToProfile,
   computeRunGrants,
   earnedAchievementIdsForRun,
+  gloryMilestonesCrossed,
+  gloryRoadStateForTotal,
   sanitizeRunReceipt,
   validateRunPlausibility
 } = require("../functions/progression");
+const browserProgression = require("../src/00-glory-progression.js");
 
 function test(name, fn) {
   try {
@@ -36,7 +39,6 @@ test("server computes run grants without trusting browser-reported rewards", () 
 
   assert.deepEqual(computeRunGrants(run), {
     gloryGained: 300,
-    seasonXPGained: 170,
     creditsEarned: 56
   });
 });
@@ -76,8 +78,7 @@ test("run application advances server profile and achievements from sanitized st
     clientVersion: "web-v1"
   });
   const profile = applyRunToProfile({
-    glory: 900,
-    currentSeasonXP: 980,
+    totalGlory: 900,
     credits: 50,
     lifetimeRuns: 2,
     lifetimeScore: 1500,
@@ -88,13 +89,10 @@ test("run application advances server profile and achievements from sanitized st
     lifetimeDamageTaken: 1,
     highestCombo: 9,
     bestScore: 1500,
-    phase: 2,
-    seasonClaimedRewardIds: []
+    phase: 2
   }, run);
 
-  assert.equal(profile.glory, 1900);
-  assert.equal(profile.currentSeasonXP, 1486);
-  assert.equal(profile.currentSeasonTier, 2);
+  assert.equal(profile.totalGlory, 1900);
   assert.equal(profile.credits, 224);
   assert.equal(profile.lifetimeRuns, 3);
   assert.equal(profile.bestScore, 10000);
@@ -104,35 +102,63 @@ test("run application advances server profile and achievements from sanitized st
   assert.ok(profile.earnedAchievementIds.includes("boss_hunter"));
 });
 
-test("server reward claims are idempotent and apply real reward values", () => {
-  const first = applySeasonRewardToProfile({
-    glory: 0,
-    currentSeasonXP: 2000,
-    currentSeasonTier: 3,
-    credits: 0,
-    seasonClaimedRewardIds: []
-  }, "s01_supply_01");
-  const second = applySeasonRewardToProfile(first.profile, "s01_supply_01");
-
-  assert.equal(first.ok, true);
-  assert.equal(first.profile.credits, 100);
-  assert.deepEqual(first.profile.seasonClaimedRewardIds, ["s01_supply_01"]);
-  assert.equal(second.ok, false);
-  assert.equal(second.reason, "already_claimed");
-  assert.equal(second.profile.credits, 100);
+test("server derives repeated Glory Road state from cumulative Glory", () => {
+  assert.equal(GLORY_ROAD_LENGTH, 300000);
+  assert.deepEqual(
+    [0, 299999, 300000, 300001, 600000, 925000].map((value) => {
+      const state = gloryRoadStateForTotal(value);
+      return [state.totalGlory, state.prestige, state.roadGlory, state.rank.name];
+    }),
+    [
+      [0, 0, 0, "Rookie Pilot"],
+      [299999, 0, 299999, "Solar Legend"],
+      [300000, 1, 0, "Rookie Pilot"],
+      [300001, 1, 1, "Rookie Pilot"],
+      [600000, 2, 0, "Rookie Pilot"],
+      [925000, 3, 25000, "Ace"]
+    ]
+  );
 });
 
-test("locked server reward claims do not mutate profile balances", () => {
-  const claim = applySeasonRewardToProfile({
-    glory: 0,
-    currentSeasonXP: 0,
-    currentSeasonTier: 1,
-    credits: 0,
-    seasonClaimedRewardIds: []
-  }, "s01_flight_04");
+test("server run grants preserve overflow and emit terminal Prestige semantics", () => {
+  const run = sanitizeRunReceipt({
+    clientReceiptId: "prestige",
+    score: 3000,
+    phaseReached: 3,
+    runDurationMs: 120000,
+    enemiesKilled: 20,
+    bossesKilled: 1,
+    powerupsCollected: 2,
+    ghostUses: 1,
+    damageTaken: 0,
+    highestCombo: 8
+  });
+  const profile = applyRunToProfile({ totalGlory: 299900 }, run);
+  assert.equal(profile.totalGlory, 300200);
+  assert.equal(profile.milestoneEvents.at(-1).type, "prestige");
+  assert.equal(profile.milestoneEvents.at(-1).rankName, "Star Eternal");
+  assert.equal(gloryRoadStateForTotal(profile.totalGlory).roadGlory, 200);
+});
 
-  assert.equal(claim.ok, false);
-  assert.equal(claim.reason, "locked");
-  assert.equal(claim.profile.currentSeasonXP, 0);
-  assert.equal(claim.profile.credits, 0);
+test("server multi-Prestige milestone detection is deterministic", () => {
+  const events = gloryMilestonesCrossed(250000, 950000);
+  assert.equal(events.filter((event) => event.type === "prestige").length, 3);
+  assert.deepEqual(
+    events.map((event) => event.absoluteThreshold),
+    events.map((event) => event.absoluteThreshold).sort((a, b) => a - b)
+  );
+});
+
+test("browser and dormant server Glory contracts remain in exact parity", () => {
+  assert.equal(GLORY_ROAD_LENGTH, browserProgression.GLORY_ROAD_LENGTH);
+  const serverRanks = require("../functions/progression").GLORY_RANKS;
+  assert.deepEqual(serverRanks, browserProgression.GLORY_RANKS);
+  for (const total of [0, 999, 1000, 299999, 300000, 301000, 600000, 925000, 3000123]) {
+    const server = gloryRoadStateForTotal(total);
+    const browser = browserProgression.gloryRoadStateForTotal(total);
+    assert.deepEqual(
+      [server.totalGlory, server.prestige, server.roadGlory, server.rank.name, server.displayRankName],
+      [browser.totalGlory, browser.prestige, browser.roadGlory, browser.rank.name, browser.displayRankName]
+    );
+  }
 });

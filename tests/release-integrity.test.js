@@ -35,14 +35,17 @@ test("device-local preseason authority is explicit and client/server gates remai
   const functionsSource = source("functions/index.js");
   for (const [start, end] of [
     ["exports.joinWeeklyLeague", "function clientProfile"],
-    ["exports.submitRunReceipt", "exports.claimSeasonReward"],
-    ["exports.claimSeasonReward", ""]
+    ["exports.submitRunReceipt", "exports.claimSeasonReward"]
   ]) {
     const body = functionsSource.slice(functionsSource.indexOf(start), end ? functionsSource.indexOf(end) : undefined);
     assert.ok(body.indexOf("requireServerProgressionWritesEnabled()") >= 0);
     assert.ok(body.indexOf("requireServerProgressionWritesEnabled()") < body.indexOf("authContext(request)"));
     assert.ok(body.indexOf("requireServerProgressionWritesEnabled()") < body.indexOf("db."));
   }
+  const retired = functionsSource.slice(functionsSource.indexOf("exports.claimSeasonReward"));
+  assert.match(retired, /Season Road is retired/);
+  assert.match(retired, /BACKEND_RELEASE_IDENTITY/);
+  assert.doesNotMatch(retired, /authContext\(request\)|db\.|runTransaction|applySeasonReward/);
 });
 
 test("Firebase identity hydration cannot merge account archive data into device progress", () => {
@@ -65,12 +68,16 @@ test("Firebase identity hydration cannot merge account archive data into device 
   assert.match(client, /authGeneration/);
 });
 
-test("Season rewards use the same local path signed in or signed out", () => {
+test("Glory Road is the only active local progression road", () => {
   const titleInput = source("src/18-title-input.js");
-  const body = titleInput.slice(titleInput.indexOf("function handleProgressClaim"), titleInput.indexOf("let titleScrollablePendingAction"));
-  assert.match(body, /claimSeasonReward\(rewardId\)/);
-  assert.doesNotMatch(body, /claimSeasonRewardOnline|starStrikeOnline|online\.user/);
-  assert.match(source("src/12-rendering-progress-road.js"), /REWARDS STORED ON THIS DEVICE/);
+  const road = source("src/12-rendering-progress-road.js");
+  const data = source("src/12-progress-road-data.js");
+  const firebase = source("src/20-firebase-online.js");
+  assert.doesNotMatch(titleInput, /handleProgressClaim|setTitleProgressTab|seasonTab/);
+  assert.doesNotMatch(road, /Season Road|SEASON ROAD|drawSeason|claim/i);
+  assert.doesNotMatch(data, /Season XP|seasonReward|claimSeason/i);
+  assert.doesNotMatch(firebase, /claimSeasonRewardOnline|claimSeasonReward:/);
+  assert.match(road, /drawGloryRoadContent/);
 });
 
 test("account-scoped pending call signs survive failure and remain isolated by UID", () => {
