@@ -1088,6 +1088,10 @@ test("semantic title, settings, reset, pause, and game-over actions are keyboard
       state.gameState = "gameover";
       state.score = 12345;
     });
+    await page.waitForFunction(() => {
+      const surface = gameAccessibilitySnapshot();
+      return surface.mode === "game-over" && surface.actions.some((action) => action.id === "respawn" && action.focused);
+    });
     const road = page.getByRole("button", { name: "Open Progress Road" });
     await road.waitFor({ state: "attached" });
     await road.focus();
