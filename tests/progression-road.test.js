@@ -62,6 +62,7 @@ function loadGameContext() {
   };
   context.globalThis = context;
   vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/00-glory-progression.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/01-core.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/12-progress-road-data.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/12-rendering-progress-road.js"), "utf8"), context);
@@ -83,94 +84,133 @@ function test(name, fn) {
   }
 }
 
-test("unlocked Season rewards can be claimed once and applied to local meta progress", () => {
+test("local meta migration preserves cumulative Glory, Credits, and lifetime while retiring Season state", () => {
   const context = loadGameContext();
   const result = runInGame(context, `
-    metaProgress = makeDefaultMetaProgress();
-    metaProgress.currentSeason.xp = SEASON_TIER_XP * 2;
-    metaProgress.currentSeason.tier = currentSeasonTierForXP(metaProgress.currentSeason.xp);
-    const reward = getSeasonRewardForTier(1).supply;
-    const first = claimSeasonReward(reward.id);
-    const afterFirst = currentMetaSnapshot();
-    const second = claimSeasonReward(reward.id);
-    JSON.stringify({ first, second, afterFirst });
-  `);
-  const data = JSON.parse(result);
-
-  assert.equal(data.first.ok, true);
-  assert.equal(data.first.status, "CLAIMED");
-  assert.equal(data.first.rewardId, "s01_supply_01");
-  assert.equal(data.afterFirst.credits, 100);
-  assert.deepEqual(data.afterFirst.seasonClaimedRewardIds, ["s01_supply_01"]);
-  assert.equal(data.second.ok, false);
-  assert.equal(data.second.reason, "already_claimed");
-  assert.equal(data.second.status, "CLAIMED");
-});
-
-test("locked Season rewards cannot be claimed or mutate balances", () => {
-  const context = loadGameContext();
-  const result = runInGame(context, `
-    metaProgress = makeDefaultMetaProgress();
-    const reward = getSeasonRewardForTier(4).flight;
-    const claim = claimSeasonReward(reward.id);
-    const snapshot = currentMetaSnapshot();
-    JSON.stringify({ claim, snapshot });
-  `);
-  const data = JSON.parse(result);
-
-  assert.equal(data.claim.ok, false);
-  assert.equal(data.claim.reason, "locked");
-  assert.equal(data.snapshot.totalGlory, 0);
-  assert.equal(data.snapshot.seasonXP, 0);
-  assert.equal(data.snapshot.credits, 0);
-  assert.deepEqual(data.snapshot.seasonClaimedRewardIds, []);
-});
-
-test("Season XP cache claims can advance the current tier", () => {
-  const context = loadGameContext();
-  const result = runInGame(context, `
-    metaProgress = makeDefaultMetaProgress();
-    metaProgress.currentSeason.xp = 955;
-    metaProgress.currentSeason.tier = currentSeasonTierForXP(metaProgress.currentSeason.xp);
-    const reward = getSeasonRewardForTier(1).flight;
-    const claim = claimSeasonReward(reward.id);
-    const snapshot = currentMetaSnapshot();
-    JSON.stringify({ claim, snapshot });
-  `);
-  const data = JSON.parse(result);
-
-  assert.equal(data.claim.ok, true);
-  assert.equal(data.claim.applied.type, "season_xp_cache");
-  assert.equal(data.snapshot.seasonXP, 1007);
-  assert.equal(data.snapshot.seasonTier, 2);
-});
-
-test("Season Road layout ascends: later tiers sit higher than earlier tiers", () => {
-  const context = loadGameContext();
-  const result = runInGame(context, `
-    metaProgress = makeDefaultMetaProgress();
-    metaProgress.currentSeason.xp = SEASON_TIER_XP * 17;
-    metaProgress.currentSeason.tier = currentSeasonTierForXP(metaProgress.currentSeason.xp);
-    const layout = buildSeasonRoadLayout({ x: 18, y: 162, w: 339, h: 455 }, currentMetaSnapshot());
-    JSON.stringify({
-      tier1: layout.find((item) => item.tier === 1).dotY,
-      tier18: layout.find((item) => item.tier === 18).dotY,
-      tier50: layout.find((item) => item.tier === 50).dotY,
-      activeTier: layout.find((item) => item.active).tier
+    const migrated = sanitizeStoredMetaProgress({
+      version: 1,
+      totalGlory: 600123,
+      credits: 876,
+      currentSeason: { id: "season_01", xp: 49000, tier: 50, claimedRewardIds: ["s01_supply_01"] },
+      lifetime: { runs: 9, score: 12000, kills: 42, bestScore: 7000, bestPhase: 6 },
+      recentReceipts: [{ receiptId: "old", score: 100, phaseReached: 2, gloryGained: 10, seasonXPGained: 99, creditsEarned: 2 }]
     });
+    JSON.stringify({ migrated, keys: Object.keys(migrated), receiptKeys: Object.keys(migrated.recentReceipts[0]) });
   `);
   const data = JSON.parse(result);
 
-  assert.equal(data.activeTier, 18);
-  assert.ok(data.tier50 < data.tier18, "tier 50 should be above the current tier");
-  assert.ok(data.tier18 < data.tier1, "current progress should climb upward from tier 1");
+  assert.equal(data.migrated.version, 2);
+  assert.equal(data.migrated.totalGlory, 600123);
+  assert.equal(data.migrated.credits, 876);
+  assert.equal(data.migrated.lifetime.runs, 9);
+  assert.equal(data.migrated.lifetime.bestScore, 7000);
+  assert.equal(data.keys.includes("currentSeason"), false);
+  assert.equal(data.receiptKeys.includes("seasonXPGained"), false);
+});
+
+test("local meta migration is idempotent and derives Prestige without storing a second currency", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    const first = sanitizeStoredMetaProgress({ totalGlory: 925000, credits: 4, lifetime: { runs: 2 } });
+    const second = sanitizeStoredMetaProgress(first);
+    metaProgress = second;
+    JSON.stringify({ first, second, snapshot: currentMetaSnapshot() });
+  `);
+  const data = JSON.parse(result);
+
+  assert.deepEqual(data.first, data.second);
+  assert.equal(data.snapshot.totalGlory, 925000);
+  assert.equal(data.snapshot.prestige, 3);
+  assert.equal(data.snapshot.roadGlory, 25000);
+  assert.equal(data.snapshot.gloryRank, "Ace");
+  assert.equal(data.snapshot.gloryRankDisplay, "Ace III");
+  assert.equal("prestige" in data.second, false);
+  assert.equal("roadGlory" in data.second, false);
+});
+
+test("legacy saves below, at, and above the Road boundary preserve total Glory exactly", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    JSON.stringify([299999, 300000, 600123].map((totalGlory) => {
+      const migrated = sanitizeStoredMetaProgress({
+        version: 1,
+        totalGlory,
+        credits: 77,
+        lifetime: { runs: 4, score: 9000, kills: 12 }
+      });
+      metaProgress = migrated;
+      return { migrated, snapshot: currentMetaSnapshot() };
+    }));
+  `);
+  const data = JSON.parse(result);
+
+  assert.deepEqual(data.map((entry) => entry.migrated.totalGlory), [299999, 300000, 600123]);
+  assert.deepEqual(data.map((entry) => entry.snapshot.prestige), [0, 1, 2]);
+  assert.deepEqual(data.map((entry) => entry.snapshot.roadGlory), [299999, 0, 123]);
+  for (const entry of data) {
+    assert.equal(entry.migrated.credits, 77);
+    assert.equal(entry.migrated.lifetime.runs, 4);
+    assert.equal("prestige" in entry.migrated, false);
+    assert.equal("roadGlory" in entry.migrated, false);
+  }
+});
+
+test("run application adds cumulative Glory once and records explicit milestone events", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    metaProgress = makeDefaultMetaProgress();
+    metaProgress.totalGlory = 299900;
+    state.runMode = "standard";
+    state.score = 3000;
+    state.phase = 3;
+    state.runStats = { activeFrames: 7200, kills: 20, bosses: 1, powerups: 2, ghostUses: 1, damageTaken: 1, highestCombo: 8, metaApplied: false };
+    highScore = 3000;
+    const first = applyRunMetaProgress();
+    const second = applyRunMetaProgress();
+    JSON.stringify({ first, second, stored: metaProgress, receipt: metaProgress.recentReceipts[0] });
+  `);
+  const data = JSON.parse(result);
+
+  assert.equal(data.first.gloryAfter, 300200);
+  assert.equal(data.first.prestigeAfter, 1);
+  assert.equal(data.first.roadGloryAfter, 200);
+  assert.equal(data.first.prestigeCrossings, 1);
+  assert.equal(data.first.milestoneEvents.at(-1).type, "prestige");
+  assert.equal(data.first.milestoneEvents.at(-1).rankName, "Star Eternal");
+  assert.equal(data.second.gloryAfter, 300200);
+  assert.equal(data.stored.totalGlory, 300200);
+  assert.equal(data.stored.recentReceipts.length, 1);
+  assert.equal(data.receipt.totalGloryAfter, 300200);
+  assert.equal("seasonXPGained" in data.receipt, false);
+});
+
+test("tutorial and debug runs cannot emit Glory or Prestige milestones", () => {
+  const context = loadGameContext();
+  const result = runInGame(context, `
+    metaProgress = makeDefaultMetaProgress();
+    metaProgress.totalGlory = 299999;
+    state.score = 1000000;
+    state.runStats = { metaApplied: false };
+    state.runMode = "tutorial";
+    const tutorial = applyRunMetaProgress();
+    state.runMode = "debug";
+    const debug = applyRunMetaProgress();
+    JSON.stringify({ tutorial, debug, snapshot: currentMetaSnapshot() });
+  `);
+  const data = JSON.parse(result);
+
+  assert.equal(data.tutorial.nonProgressionRun, true);
+  assert.equal(data.debug.nonProgressionRun, true);
+  assert.equal(data.snapshot.totalGlory, 299999);
+  assert.equal(data.tutorial.receipt, null);
+  assert.equal(data.debug.receipt, null);
 });
 
 test("Glory Road ascends on a winding route toward future ranks", () => {
   const context = loadGameContext();
   const result = runInGame(context, `
     metaProgress = makeDefaultMetaProgress();
-    metaProgress.totalGlory = GLORY_RANKS[2].threshold;
+    metaProgress.totalGlory = GLORY_ROAD_LENGTH + GLORY_RANKS[2].threshold;
     const layout = buildGloryRoadLayout({ x: 18, y: 162, w: 339, h: 455 }, currentMetaSnapshot());
     JSON.stringify({
       firstY: layout[0].dotY,

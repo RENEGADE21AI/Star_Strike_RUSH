@@ -22,10 +22,12 @@ test("identity endpoints preserve the legacy archive while progression endpoints
   assert.doesNotMatch(claimHandle, /leaderboardRef|leaderboard_scores/);
   for (const [start, end] of [
     ["exports.joinWeeklyLeague", "function clientProfile"],
-    ["exports.submitRunReceipt", "exports.claimSeasonReward"],
-    ["exports.claimSeasonReward", ""]
+    ["exports.submitRunReceipt", "exports.claimSeasonReward"]
   ]) {
     const body = source.slice(source.indexOf(start), end ? source.indexOf(end) : undefined);
     assert.ok(body.indexOf("requireServerProgressionWritesEnabled()") < body.indexOf("authContext(request)"));
   }
+  const retiredSeason = source.slice(source.indexOf("exports.claimSeasonReward"));
+  assert.match(retiredSeason, /Season Road is retired/);
+  assert.doesNotMatch(retiredSeason, /authContext\(request\)|db\.|runTransaction/);
 });

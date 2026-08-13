@@ -167,18 +167,18 @@ function safeGloryRankIndex(value, rankName = "") {
 }
 
 function normalizeArchiveMeta(meta) {
-  const rankName = safeGloryRank(meta && (meta.gloryRank || meta.rankAfter));
+  const totalGlory = boundedNumber(meta && (meta.totalGlory ?? meta.glory), 999999999);
+  const road = window.StarStrikeGloryProgression
+    ? window.StarStrikeGloryProgression.gloryRoadStateForTotal(totalGlory)
+    : { prestige: 0, roadGlory: totalGlory, rank: { name: safeGloryRank(meta && meta.gloryRank), index: safeGloryRankIndex(meta && meta.gloryRankIndex) }, displayRankName: safeGloryRank(meta && meta.gloryRank) };
+  const rankName = safeGloryRank(road.rank.name);
   return {
-    totalGlory: boundedNumber(meta && meta.totalGlory, 999999999),
+    totalGlory,
+    prestige: boundedNumber(road.prestige, 999999),
+    roadGlory: boundedNumber(road.roadGlory, 299999),
     gloryRank: rankName,
-    gloryRankIndex: safeGloryRankIndex(meta && meta.gloryRankIndex, rankName),
-    seasonId: safeId(meta && meta.seasonId, "season_01"),
-    seasonName: safeText(meta && meta.seasonName, "Launch Flight", 60),
-    seasonXP: boundedNumber(meta && meta.seasonXP, 999999999),
-    seasonTier: Math.max(1, Math.min(50, numberOrZero(meta && meta.seasonTier) || 1)),
-    seasonClaimedRewardIds: Array.isArray(meta && meta.seasonClaimedRewardIds)
-      ? meta.seasonClaimedRewardIds.map((id) => safeId(id, "")).filter(Boolean).slice(0, 220)
-      : [],
+    gloryRankDisplay: safeText(road.displayRankName, rankName, 40),
+    gloryRankIndex: safeGloryRankIndex(road.rank.index, rankName),
     credits: boundedNumber(meta && meta.credits, 999999999),
     lifetime: {
       runs: boundedNumber(meta && meta.lifetime && meta.lifetime.runs, 1000000),
@@ -574,11 +574,6 @@ async function submitRun() {
   return { ok: false, reason: "device_local_preseason", localOnly: true };
 }
 
-async function claimSeasonRewardOnline() {
-  setStatus("Season rewards are stored on this device during preseason.");
-  return { ok: false, reason: "device_local_preseason", localOnly: true };
-}
-
 async function devSignInAccount(accountName = "account-a") {
   if (!emulatorMode || !auth || !window.starStrikeFirebaseApi) {
     throw new Error("Emulator account sign-in is unavailable.");
@@ -611,7 +606,6 @@ window.starStrikeOnline = {
   claimHandle,
   joinWeeklyLeague,
   submitRun,
-  claimSeasonReward: claimSeasonRewardOnline,
   ...(emulatorMode ? { devSignInAccount } : {})
 };
 

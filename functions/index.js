@@ -4,12 +4,10 @@ const { HttpsError, onCall } = require("firebase-functions/v2/https");
 
 const {
   ACHIEVEMENTS,
-  CURRENT_SEASON_ID,
   achievementTitle,
   applyRunToProfile,
-  applySeasonRewardToProfile,
+  gloryRoadStateForTotal,
   publicProfileFromPrivate,
-  rankForGlory,
   safeCallSign,
   safeDocId,
   safeText,
@@ -78,19 +76,23 @@ function legacyArchiveFromSnapshots(publicSnap, leaderboardSnap) {
 }
 
 function privatePayloadFor(auth, profile, existing = {}) {
-  const rank = rankForGlory(profile.glory);
+  const road = gloryRoadStateForTotal(profile.totalGlory);
   const now = FieldValue.serverTimestamp();
   return {
     uid: auth.uid,
     email: FieldValue.delete(),
     displayName: FieldValue.delete(),
     photoURL: FieldValue.delete(),
-    glory: profile.glory,
-    gloryRank: rank.name,
-    gloryRankIndex: rank.index,
-    currentSeasonId: CURRENT_SEASON_ID,
-    currentSeasonXP: profile.currentSeasonXP,
-    currentSeasonTier: profile.currentSeasonTier,
+    glory: FieldValue.delete(),
+    totalGlory: profile.totalGlory,
+    prestige: road.prestige,
+    roadGlory: road.roadGlory,
+    gloryRank: road.rank.name,
+    gloryRankDisplay: road.displayRankName,
+    gloryRankIndex: road.rank.index,
+    currentSeasonId: FieldValue.delete(),
+    currentSeasonXP: FieldValue.delete(),
+    currentSeasonTier: FieldValue.delete(),
     credits: profile.credits,
     lifetimeRuns: profile.lifetimeRuns,
     lifetimeScore: profile.lifetimeScore,
@@ -100,7 +102,7 @@ function privatePayloadFor(auth, profile, existing = {}) {
     lifetimeBosses: profile.lifetimeBosses,
     lifetimeDamageTaken: profile.lifetimeDamageTaken,
     highestCombo: profile.highestCombo,
-    seasonClaimedRewardIds: profile.seasonClaimedRewardIds || [],
+    seasonClaimedRewardIds: FieldValue.delete(),
     createdAt: existing.createdAt || now,
     lastSeenAt: now,
     updatedAt: now
@@ -349,13 +351,11 @@ function clientProfile(profile) {
   const publicProfile = publicProfileFromPrivate(profile);
   return {
     totalGlory: publicProfile.totalGlory,
+    prestige: publicProfile.prestige,
+    roadGlory: publicProfile.roadGlory,
     gloryRank: publicProfile.gloryRank,
+    gloryRankDisplay: publicProfile.gloryRankDisplay,
     gloryRankIndex: publicProfile.gloryRankIndex,
-    seasonId: CURRENT_SEASON_ID,
-    seasonName: publicProfile.currentSeasonName,
-    seasonXP: publicProfile.currentSeasonXP,
-    seasonTier: publicProfile.currentSeasonTier,
-    seasonClaimedRewardIds: publicProfile.seasonClaimedRewardIds || [],
     credits: publicProfile.credits,
     lifetime: {
       runs: publicProfile.lifetimeRuns,
@@ -458,8 +458,10 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
       damageTaken: run.damageTaken,
       highestCombo: run.highestCombo,
       gloryGained: nextProfile.grants.gloryGained,
-      seasonXPGained: nextProfile.grants.seasonXPGained,
       creditsEarned: nextProfile.grants.creditsEarned,
+      totalGloryAfter: nextProfile.totalGlory,
+      prestigeAfter: gloryRoadStateForTotal(nextProfile.totalGlory).prestige,
+      roadGloryAfter: gloryRoadStateForTotal(nextProfile.totalGlory).roadGlory,
       clientVersion: run.clientVersion,
       endedAtMs: Date.now(),
       submittedAt: FieldValue.serverTimestamp()
@@ -504,72 +506,9 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
 });
 
 exports.claimSeasonReward = onCall(CALLABLE_OPTIONS, async (request) => {
-  requireServerProgressionWritesEnabled();
-  const auth = authContext(request);
-  const rewardId = safeDocId(request.data && request.data.rewardId, "");
-  if (!rewardId) throw new HttpsError("invalid-argument", "Reward id is required.");
-
-  const uid = auth.uid;
-  const privateRef = db.doc(`players_private/${uid}`);
-  const publicRef = db.doc(`players_public/${uid}`);
-  const leaderboardRef = db.doc(`leaderboard_scores/${uid}`);
-  const claimRef = db.doc(`season_reward_claims/${uid}/items/${rewardId}`);
-
-  return db.runTransaction(async (tx) => {
-    const [privateSnap, publicSnap, leaderboardSnap, claimSnap] = await Promise.all([
-      tx.get(privateRef),
-      tx.get(publicRef),
-      tx.get(leaderboardRef),
-      tx.get(claimRef)
-    ]);
-    const baseProfile = profileFromSnapshots(privateSnap);
-    if (claimSnap.exists) {
-      return {
-        ok: false,
-        reason: "already_claimed",
-        rewardId,
-        profile: clientProfile(baseProfile)
-      };
-    }
-
-    const claim = applySeasonRewardToProfile(baseProfile, rewardId);
-    if (!claim.ok) {
-      return {
-        ok: false,
-        reason: claim.reason,
-        rewardId,
-        profile: clientProfile(claim.profile)
-      };
-    }
-
-    const publicData = publicSnap.exists ? publicSnap.data() : {};
-    const privateData = privateSnap.exists ? privateSnap.data() : {};
-    const existingPublicCount = Math.max(
-      Number(publicData.achievementsCount || 0),
-      Number((leaderboardSnap.exists && leaderboardSnap.data().achievementsCount) || 0)
-    );
-    const publicPayload = publicVerifiedPayloadFor(auth, claim.profile, publicData.callSign || "", existingPublicCount, publicData);
-    const privatePayload = privatePayloadFor(auth, claim.profile, privateData);
-
-    tx.set(privateRef, privatePayload, { merge: true });
-    tx.set(publicRef, publicPayload);
-    if (competitionWritesEnabled()) tx.set(leaderboardRef, publicPayload);
-    tx.create(claimRef, {
-      uid,
-      rewardId,
-      rewardType: claim.reward.type,
-      amount: claim.reward.amount,
-      tier: claim.tier,
-      lane: claim.lane,
-      claimedAt: FieldValue.serverTimestamp()
-    });
-
-    return {
-      ok: true,
-      reason: "claimed",
-      rewardId,
-      reward: claim.reward,
-      profile: clientProfile(claim.profile)
-    };
-  });
+  throw new HttpsError(
+    "failed-precondition",
+    "Season Road is retired. Glory Road is the only active progression road, and account progression writes remain paused.",
+    { retired: true, release: BACKEND_RELEASE_IDENTITY }
+  );
 });

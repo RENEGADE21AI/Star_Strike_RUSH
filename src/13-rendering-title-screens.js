@@ -193,7 +193,7 @@ function drawTitleAndButtons() {
   ctx.fillText(`DEVICE BEST  ${Number(highScore || 0).toLocaleString()}`, W / 2, statusY + 4);
   if (typeof currentMetaSnapshot === "function") {
     const meta = currentMetaSnapshot();
-    const rankLine = `${meta.gloryRank.toUpperCase()}  •  SEASON TIER ${meta.seasonTier}`;
+    const rankLine = `${String(meta.gloryRankDisplay || meta.gloryRank).toUpperCase()}  •  ${String(meta.prestigeLabel || "PRESTIGE 0").toUpperCase()}`;
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,230,128,0.88)";
     ctx.textAlign = "center";
@@ -265,10 +265,18 @@ function drawGameOverScreen() {
   }
   if (meta) {
     const summaryY = panel.y + 194;
+    const latestRankEvent = Array.isArray(meta.milestoneEvents)
+      ? [...meta.milestoneEvents].reverse().find((event) => event.type === "rank")
+      : null;
+    const nextChip = meta.prestigeEarned
+      ? { label: "PRESTIGE", value: romanPrestige(meta.prestigeAfter) }
+      : latestRankEvent
+        ? { label: "NEW RANK", value: String(latestRankEvent.rankName || "RANK UP").toUpperCase() }
+        : { label: "TO NEXT", value: formatRoadNumber(Math.max(0, Number((meta.snapshot && meta.snapshot.nextGloryThreshold) || GLORY_ROAD_LENGTH) - Number(meta.roadGloryAfter || 0))) };
     const summary = [
       { label: "GLORY", value: `+${Number(meta.gloryGained || 0).toLocaleString()}`, color: "#ffe680" },
-      { label: "SEASON XP", value: `+${Number(meta.seasonXPGained || 0).toLocaleString()}`, color: "#78ffb4" },
-      { label: "CREDITS", value: `+${Number(meta.creditsEarned || 0).toLocaleString()}`, color: "#79efff" }
+      { label: "CREDITS", value: `+${Number(meta.creditsEarned || 0).toLocaleString()}`, color: "#79efff" },
+      { ...nextChip, color: "#78ffb4" }
     ];
     const chipW = 86;
     const chipGap = 8;
@@ -286,12 +294,17 @@ function drawGameOverScreen() {
       ctx.fillText(item.label, x + chipW / 2, summaryY + 8);
       ctx.font = "900 13px 'Arial Narrow', Arial, sans-serif";
       ctx.fillStyle = item.color;
-      ctx.fillText(item.value, x + chipW / 2, summaryY + 23);
+      ctx.fillText(String(item.value).slice(0, 14), x + chipW / 2, summaryY + 23);
     });
     ctx.font = "900 8px Arial, sans-serif";
-    ctx.fillStyle = meta.rankUp ? "#78ffb4" : "rgba(255,255,255,0.76)";
+    ctx.fillStyle = meta.prestigeEarned || meta.rankUp ? "#ffe680" : "rgba(255,255,255,0.76)";
+    const milestoneLine = meta.prestigeEarned
+      ? `GLORY ROAD COMPLETE  •  PRESTIGE ${romanPrestige(meta.prestigeAfter)}`
+      : latestRankEvent
+        ? `NEW RANK  •  ${String(latestRankEvent.rankName).toUpperCase()}`
+        : `${String(meta.rankAfter || "ROOKIE PILOT").toUpperCase()}  •  ${Number(meta.gloryAfter || 0).toLocaleString()} TOTAL GLORY`;
     ctx.fillText(
-      `${meta.rankUp ? "NEW RANK  " : ""}${String(meta.rankAfter || "ROOKIE PILOT").toUpperCase()}  •  SEASON TIER ${meta.seasonTier || 1}`,
+      milestoneLine,
       W / 2,
       panel.y + panel.h - 12
     );
@@ -300,5 +313,6 @@ function drawGameOverScreen() {
   drawPressButton(buttons.respawn, "RESPAWN", respawnPointerDown && respawnPointerInside, "rgba(255,255,255,0.08)", "rgba(255,255,255,0.58)");
   drawSimpleButton(buttons.road, "VIEW ROAD", "rgba(120,255,180,0.58)");
   drawSimpleButton(buttons.title, "TITLE SCREEN");
+  if (typeof drawGloryCelebration === "function") drawGloryCelebration();
 }
 

@@ -116,10 +116,20 @@ test("visual QA covers the full player journey and polished terminal states", ()
     "settings-mobile-375x667",
     "gameplay-hud-touch-390x844",
     "game-over-summary",
-    "reset-local-data-confirmation"
+    "reset-local-data-confirmation",
+    "glory-road-beginning-prestige-1",
+    "glory-road-mid-prestige-3",
+    "glory-checkpoint-celebration",
+    "glory-rank-up-celebration",
+    "glory-road-complete-celebration",
+    "glory-celebration-reduced-motion"
   ]) {
     assert.match(source, new RegExp(scenario));
   }
+  assert.match(source, /retryFailedAssets\(\{ timeoutMs: 20000, retries: 1 \}\)/);
+  assert.match(source, /asset preload failures/);
+  assert.match(source, /__visualLaunchWatch/);
+  assert.match(source, /__visualArrivalObserver/);
   const titleSource = fs.readFileSync(path.join(repoRoot, "src", "13-rendering-title-screens.js"), "utf8");
   assert.match(titleSource, /FLIGHT RECORD CLOSED/);
   assert.match(titleSource, /NEW DEVICE RECORD/);

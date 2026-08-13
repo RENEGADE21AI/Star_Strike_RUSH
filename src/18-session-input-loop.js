@@ -137,6 +137,7 @@ function handlePauseEscape() {
 }
 function setupSession(mode = "start", options = {}) {
   const preserveStars = options.preserveStars === true && Array.isArray(state.stars) && state.stars.length > 0;
+  if (typeof resetGloryCelebrations === "function") resetGloryCelebrations();
   state.player = makePlayer();
   state.bullets = [];
   state.enemyBullets = [];
@@ -243,7 +244,6 @@ function setupSession(mode = "start", options = {}) {
   titleSubState = "main";
   titlePanelAnim = 0;
   titlePanelTarget = 0;
-  titleProgressTab = "glory";
   titleProgressScroll = 0;
   titleProgressDragActive = false;
   titleProgressDragPointerId = null;
@@ -253,7 +253,6 @@ function setupSession(mode = "start", options = {}) {
   titleProgressDragMoved = false;
   titleProgressPointerDownNode = null;
   titleProgressSelectedNode = null;
-  titleProgressClaimPulse = 0;
   recordsPanelTab = "global";
   achievementCategory = "all";
   achievementScroll = 0;
@@ -288,13 +287,14 @@ function enterGameOver() {
   const progressionAllowed = typeof runModeAllowsProgression === "function"
     ? runModeAllowsProgression(state.runMode)
     : state.runMode === "standard";
+  let progressionResult = null;
   if (progressionAllowed) {
     const nextHighScore = typeof highScoreAfterRun === "function"
       ? highScoreAfterRun(highScore, state.score, state.runMode)
       : Math.max(highScore, state.score);
     if (nextHighScore > highScore) { highScore = nextHighScore; highScoreDirty = true; }
     if (highScoreDirty) saveHighScore();
-    applyRunMetaProgress();
+    progressionResult = applyRunMetaProgress();
   }
   state.message = "";
   state.messageTimer = 0;
@@ -307,6 +307,9 @@ function enterGameOver() {
   state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
   if (typeof recordDifficultySample === "function") recordDifficultySample(true);
   if (progressionAllowed) finalizeLocalRunAchievements();
+  if (typeof startGloryCelebrations === "function") {
+    startGloryCelebrations(progressionResult && progressionResult.presentationEvents);
+  }
 }
 function resize() {
   clearTransientPointerInput();
@@ -342,6 +345,10 @@ function resize() {
 }
 
 function handleGameOverPointerDown(x, y) {
+  if (typeof gloryCelebrationActive === "function" && gloryCelebrationActive()) {
+    advanceGloryCelebration();
+    return true;
+  }
   const buttons = getGameOverButtons();
   if (hitRect(buttons.respawn, x, y)) {
     respawnPointerDown = true;
@@ -356,7 +363,7 @@ function handleGameOverPointerDown(x, y) {
     state.gameState = "start";
     titlePanelAnim = 1;
     const meta = typeof getLastRunMeta === "function" ? getLastRunMeta() : null;
-    openTitleProgressRoad(meta && meta.rankUp ? "glory" : "season");
+    openTitleProgressRoad();
     return true;
   }
   return false;
@@ -605,6 +612,10 @@ window.addEventListener("keydown", (e) => {
   if (state.gameState === "gameover") {
     if (k === "Enter" || k === " ") {
       e.preventDefault();
+      if (typeof gloryCelebrationActive === "function" && gloryCelebrationActive()) {
+        advanceGloryCelebration();
+        return;
+      }
       beginGame();
     }
     return;
@@ -710,6 +721,7 @@ function update() {
   if (state.gameState === "gameover") {
     updateStars();
     updateParticles();
+    if (typeof updateGloryCelebration === "function") updateGloryCelebration();
     const GAME_OVER_SHAKE_FRAMES = 180;
     if (state.gameOverShakeTimer > 0) {
       const t = 1 - state.gameOverShakeTimer / GAME_OVER_SHAKE_FRAMES;
@@ -847,6 +859,13 @@ function getDebugSnapshot() {
     highScore,
     phase: state.phase,
     deviceProgress: typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null,
+    gloryCelebration: typeof gloryCelebrationActive === "function" && gloryCelebrationActive() ? {
+      active: true,
+      index: gloryCelebrationState.index,
+      count: gloryCelebrationState.queue.length,
+      frame: gloryCelebrationState.frame,
+      event: currentGloryCelebration()
+    } : { active: false, index: 0, count: 0, frame: 0, event: null },
     localAchievements: typeof localAchievementIds !== "undefined" ? localAchievementIds.slice() : [],
     player: state.player ? {
       x: state.player.x,
@@ -908,7 +927,6 @@ function getDebugSnapshot() {
       codexDetailType,
       codexCategory,
       codexScroll,
-      titleProgressTab,
       titleProgressScroll,
       titleProgressMaxScroll: typeof getProgressMaxScroll === "function" ? getProgressMaxScroll() : 0,
       titleProgressDragActive,
@@ -1115,6 +1133,22 @@ function applyDevelopmentQaScenario() {
     }
     return;
   }
+  if (scenario.startsWith("glory-road-")) {
+    const totals = {
+      "glory-road-early": 2500,
+      "glory-road-high": 250000,
+      "glory-road-prestige-1": 300200,
+      "glory-road-prestige-3": 925000
+    };
+    setupSession("start");
+    metaProgress = makeDefaultMetaProgress();
+    metaProgress.totalGlory = totals[scenario] ?? 2500;
+    titleSubState = "progress";
+    titlePanelAnim = 1;
+    titlePanelTarget = 1;
+    focusTitleProgressOnCurrent();
+    return;
+  }
   setupSession("playing");
   state.runMode = "debug";
   state.player.hp = state.player.maxHp;
@@ -1158,20 +1192,41 @@ function applyDevelopmentQaScenario() {
       state.boss.qaHoldStaging = true;
       showMessage("DEBUG  BOSS STAGING", 72);
     }
-  } else if (scenario === "gameover") {
+  } else if (scenario === "gameover" || scenario === "gameover-rank" || scenario === "gameover-prestige" || scenario.startsWith("glory-celebration-")) {
+    const progressionCase = scenario === "gameover-prestige" || scenario === "glory-celebration-prestige" || scenario === "glory-celebration-prestige-reduced"
+      ? { before: 299900, after: 300200 }
+      : scenario === "gameover-rank" || scenario === "glory-celebration-rank"
+        ? { before: 14999, after: 15000 }
+        : scenario === "glory-celebration-late"
+          ? { before: 174999, after: 175000 }
+          : scenario === "glory-celebration-checkpoint"
+            ? { before: 1999, after: 2000 }
+            : { before: 2430, after: 2850 };
+    const events = gloryMilestonesCrossed(progressionCase.before, progressionCase.after);
+    const afterRoad = gloryRoadStateForTotal(progressionCase.after);
+    metaProgress = makeDefaultMetaProgress();
+    metaProgress.totalGlory = progressionCase.after;
     state.gameState = "gameover";
     state.score = 48250;
     state.newHighScore = true;
     highScore = 48250;
     lastRunMeta = {
       gloryGained: 420,
-      gloryAfter: 2850,
-      seasonXPGained: 840,
+      gloryAfter: progressionCase.after,
       creditsEarned: 168,
-      rankAfter: "Ace Pilot",
-      rankUp: true,
-      seasonTier: 4
+      prestigeAfter: afterRoad.prestige,
+      roadGloryAfter: afterRoad.roadGlory,
+      rankAfter: afterRoad.displayRankName,
+      rankUp: events.some((event) => event.type === "rank"),
+      prestigeEarned: events.some((event) => event.type === "prestige"),
+      milestoneEvents: events,
+      presentationEvents: gloryCelebrationQueue(events, progressionCase.before, progressionCase.after),
+      snapshot: currentMetaSnapshot()
     };
+    if (scenario === "glory-celebration-prestige-reduced") settingReducedMotion = true;
+    if (scenario.startsWith("glory-celebration-")) {
+      startGloryCelebrations(lastRunMeta.presentationEvents.map((event) => ({ ...event, qaHold: true })));
+    }
     state.gameOverShake = 0;
     state.gameOverShakeTimer = 0;
   }

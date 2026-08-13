@@ -149,15 +149,11 @@ function setAchievementCategory(category) {
 function getProgressRects() {
   const panel = getTitlePanelRect();
   const closeRect = { x: panel.x + 14, y: panel.y + 12, w: 54, h: 22 };
-  const tabW = Math.floor((panel.w - 48) / 2);
-  const gloryTab = { x: panel.x + 20, y: panel.y + 72, w: tabW, h: 30 };
-  const seasonTab = { x: gloryTab.x + tabW + 8, y: gloryTab.y, w: tabW, h: 30 };
-  const contentRect = { x: panel.x + 18, y: panel.y + 162, w: panel.w - 36, h: panel.h - 198 };
-  return { panel, closeRect, gloryTab, seasonTab, contentRect };
+  const contentRect = { x: panel.x + 18, y: panel.y + 124, w: panel.w - 36, h: panel.h - 160 };
+  return { panel, closeRect, contentRect };
 }
 function getProgressContentHeight() {
   if (typeof getProgressRoadContentHeight === "function") return getProgressRoadContentHeight();
-  if (titleProgressTab === "season") return 86 + 50 * 62;
   const gloryStepCount = Math.max(1, GLORY_RANKS.length * 2 - 1);
   return 72 + gloryStepCount * 80;
 }

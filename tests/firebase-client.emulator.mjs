@@ -203,22 +203,18 @@ test("real Firebase client keeps device progression authoritative across account
   }, localMetaSeed());
   const page = await context.newPage();
   const runtimeErrors = [];
-  let browserSeasonCallableRequests = 0;
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
-  page.on("request", (request) => {
-    if (request.url().includes("/claimSeasonReward")) browserSeasonCallableRequests++;
-  });
   await page.goto(`${baseUrl}/?debug=1&firebaseEmulators=1`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.starStrikeOnline?.getState().ready === true, null, { timeout: 90000 });
   await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent, null, { timeout: 90000 });
 
   const before = await debugSnapshot(page);
   assert.equal(before.deviceProgress.totalGlory, 4321);
-  assert.equal(before.deviceProgress.seasonXP, 6789);
-  assert.equal(before.deviceProgress.seasonTier, 7);
+  assert.equal(before.deviceProgress.prestige, 0);
+  assert.equal(before.deviceProgress.roadGlory, 4321);
   assert.equal(before.deviceProgress.credits, 2468);
-  assert.deepEqual(before.deviceProgress.seasonClaimedRewardIds, ["season_01_tier_1"]);
   assert.deepEqual(before.deviceProgress.lifetime, localMetaSeed().lifetime);
+  assert.equal(await page.evaluate(() => "currentSeason" in JSON.parse(localStorage.getItem("star_strike_rush_meta_v1"))), false);
 
   await page.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountAName);
   await waitForOnlineState(
@@ -245,6 +241,9 @@ test("real Firebase client keeps device progression authoritative across account
     ["first_sortie", "mythic_score"]
   );
   const archive = await page.evaluate(() => window.starStrikeOnline.getState());
+  assert.equal(archive.onlineArchiveMeta.totalGlory, 999999);
+  assert.equal(archive.onlineArchiveMeta.prestige, 3);
+  assert.equal(archive.onlineArchiveMeta.roadGlory, 99999);
   assert.equal(archive.legacyRecord.legacyBestScore, 999999);
   assert.equal(archive.legacyRecord.verifiedBestScore, 0);
   assert.equal(archive.legacyRecord.recordTrust, "legacy_unverified");
@@ -347,27 +346,16 @@ test("real Firebase client keeps device progression authoritative across account
   assert.equal((await page.evaluate((uid) => window.readAccountIdentityState(localStorage, uid), accountA.uid)).publishedCallSign, "PENDING_A");
   assert.notEqual((await page.evaluate((uid) => window.readAccountIdentityState(localStorage, uid), accountB.uid)).publishedCallSign, "PENDING_A");
 
-  const localSeason = await page.evaluate(() => window.starStrikeOnline.claimSeasonReward("season_01_tier_2"));
-  assert.deepEqual(localSeason, { ok: false, reason: "device_local_preseason", localOnly: true });
+  assert.equal(await page.evaluate(() => typeof window.starStrikeOnline.claimSeasonReward), "undefined");
   for (const endpoint of ["submitRunReceipt", "joinWeeklyLeague", "claimSeasonReward"]) {
     const rejection = await callableError(endpoint, endpoint === "claimSeasonReward" ? { rewardId: "season_01_tier_1" } : {});
     assert.equal(rejection.body.error.status, "FAILED_PRECONDITION", endpoint);
-    assert.match(rejection.body.error.message, /paused|preseason/i, endpoint);
+    assert.match(rejection.body.error.message, /paused|preseason|retired/i, endpoint);
   }
-
-  const signedInLocalClaim = await page.evaluate(() => claimSeasonReward("s01_supply_02"));
-  assert.equal(signedInLocalClaim.ok, true);
-  assert.ok(signedInLocalClaim.snapshot.seasonClaimedRewardIds.includes("s01_supply_02"));
-  await page.waitForFunction(() => {
-    const snapshot = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "{}");
-    return snapshot.deviceProgress?.seasonClaimedRewardIds?.includes("s01_supply_02");
-  });
-  const claimedProgress = (await debugSnapshot(page)).deviceProgress;
-  assert.ok(claimedProgress.seasonClaimedRewardIds.includes("s01_supply_02"));
-  assert.equal(browserSeasonCallableRequests, 0, "signed-in local Season claim called the server");
+  const invariantProgress = (await debugSnapshot(page)).deviceProgress;
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction((uid) => window.starStrikeOnline?.getState().user?.uid === uid, accountB.uid, { timeout: 90000 });
-  assert.ok((await debugSnapshot(page)).deviceProgress.seasonClaimedRewardIds.includes("s01_supply_02"));
+  assert.deepEqual((await debugSnapshot(page)).deviceProgress, invariantProgress);
 
   await page.evaluate(() => window.starStrikeOnline.signOut());
   await page.waitForFunction(() => window.starStrikeOnline.getState().user === null);
@@ -375,7 +363,7 @@ test("real Firebase client keeps device progression authoritative across account
   assert.equal(signedOut.leaderboard.length, 0);
   assert.equal(signedOut.achievements.length, 0);
   assert.equal(signedOut.profileCallSign, "");
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, claimedProgress);
+  assert.deepEqual((await debugSnapshot(page)).deviceProgress, invariantProgress);
   assert.deepEqual(runtimeErrors, []);
   await context.close();
 });

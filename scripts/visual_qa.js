@@ -43,12 +43,23 @@ const cases = [
   { name: "codex-overview", width: 390, height: 844, kind: "panel", target: "codex" },
   { name: "records-network", width: 390, height: 844, kind: "panel", target: "records" },
   { name: "progress-road", width: 390, height: 844, kind: "panel", target: "progress" },
+  { name: "glory-road-early-prestige-0", width: 375, height: 667, kind: "scenario", scenario: "glory-road-early", expectedGlory: 2500, expectedPrestige: 0 },
+  { name: "glory-road-high-prestige-0", width: 390, height: 844, kind: "scenario", scenario: "glory-road-high", expectedGlory: 250000, expectedPrestige: 0 },
+  { name: "glory-road-beginning-prestige-1", width: 430, height: 932, kind: "scenario", scenario: "glory-road-prestige-1", expectedGlory: 300200, expectedPrestige: 1 },
+  { name: "glory-road-mid-prestige-3", width: 390, height: 844, kind: "scenario", scenario: "glory-road-prestige-3", expectedGlory: 925000, expectedPrestige: 3 },
   { name: "play-immediate", width: 390, height: 844, kind: "play" },
   { name: "gameplay-hud-375x667", width: 375, height: 667, kind: "gameplay-hud" },
   { name: "gameplay-hud-touch-390x844", width: 390, height: 844, kind: "gameplay-hud", touch: true },
   { name: "paused-hud-375x667", width: 375, height: 667, kind: "paused-hud" },
   { name: "pause-restart-confirmation", width: 375, height: 667, kind: "pause-confirm" },
   { name: "game-over-summary", width: 390, height: 844, kind: "scenario", scenario: "gameover" },
+  { name: "game-over-rank-up", width: 390, height: 844, kind: "scenario", scenario: "gameover-rank" },
+  { name: "game-over-prestige-rollover", width: 390, height: 844, kind: "scenario", scenario: "gameover-prestige" },
+  { name: "glory-checkpoint-celebration", width: 375, height: 667, kind: "scenario", scenario: "glory-celebration-checkpoint", expectedCelebration: "checkpoint" },
+  { name: "glory-rank-up-celebration", width: 390, height: 844, kind: "scenario", scenario: "glory-celebration-rank", expectedCelebration: "rank" },
+  { name: "glory-late-rank-celebration", width: 430, height: 932, kind: "scenario", scenario: "glory-celebration-late", expectedCelebration: "rank" },
+  { name: "glory-road-complete-celebration", width: 390, height: 844, kind: "scenario", scenario: "glory-celebration-prestige", expectedCelebration: "prestige" },
+  { name: "glory-celebration-reduced-motion", width: 390, height: 844, kind: "scenario", scenario: "glory-celebration-prestige-reduced", expectedCelebration: "prestige" },
   { name: "debris-staging", width: 375, height: 667, kind: "scenario", scenario: "debris-incoming" },
   { name: "powerup-gallery", width: 390, height: 844, kind: "scenario", scenario: "powerups" },
   { name: "first-flight-galaxy-arrival", width: 390, height: 844, kind: "onboarding-arrival", scenario: "tutorial", touch: true },
@@ -454,7 +465,18 @@ async function runCase(browser, baseUrl, item) {
       if (!boss || boss.damageable || boss.hp !== boss.maxHp) errors.push("incoming boss was damageable");
     }
     if (item.scenario === "powerups" && before.counts.powerups !== 13) errors.push("powerup gallery did not show all 13 powerups");
-    if (item.scenario === "gameover") {
+    if (item.scenario.startsWith("glory-road-")) {
+      if (before.gameState !== "start" || before.ui.titleSubState !== "progress") errors.push("Glory Road scenario did not open the Road panel");
+      if (before.deviceProgress.totalGlory !== item.expectedGlory) errors.push("Glory Road scenario lost cumulative Glory");
+      if (before.deviceProgress.prestige !== item.expectedPrestige) errors.push("Glory Road scenario derived the wrong Prestige");
+      if (before.deviceProgress.roadGlory !== item.expectedGlory % 300000) errors.push("Glory Road scenario used cumulative rather than modulo Road progress");
+    }
+    if (item.scenario.startsWith("glory-celebration-")) {
+      if (before.gameState !== "gameover" || !before.gloryCelebration.active) errors.push("Glory celebration overlay did not open over Game Over");
+      if (before.gloryCelebration.event?.type !== item.expectedCelebration) errors.push(`Expected ${item.expectedCelebration} celebration`);
+      if (item.scenario.endsWith("reduced") && before.ui.settingReducedMotion !== true) errors.push("Reduced Motion celebration did not preserve the setting");
+    }
+    if (item.scenario === "gameover" || item.scenario === "gameover-rank" || item.scenario === "gameover-prestige") {
       if (before.gameState !== "gameover") errors.push("game-over summary did not open");
       if (before.score !== 48250 || before.highScore !== 48250) errors.push("game-over summary lost score evidence");
       if (before.runtimeErrors.length) errors.push("game-over summary produced a runtime error");
@@ -561,8 +583,10 @@ async function runCase(browser, baseUrl, item) {
     }
     if (item.ghostVisual) {
       await page.evaluate(() => {
-        state.player.ghostTimer = 60;
-        state.player.ghostCooldown = Math.max(state.player.ghostCooldown, 60);
+        // Keep this development-only visual state alive long enough to survive
+        // slow CI screenshots without changing the production ability duration.
+        state.player.ghostTimer = 600;
+        state.player.ghostCooldown = Math.max(state.player.ghostCooldown, 600);
       });
       await page.waitForTimeout(80);
     }
@@ -650,13 +674,35 @@ async function runCase(browser, baseUrl, item) {
     if (await page.getByRole("button", { name: "Claim Unique Handle" }).isVisible().catch(() => false)) errors.push("redundant handle claim was visible");
   } else if (item.kind === "tutorial-arrival-lock") {
     await waitForRequiredVisualAssets(page, ["player", "tutorial_instructor"], errors);
+    await page.evaluate(() => {
+      window.__visualArrivalSnapshot = "";
+      window.__visualArrivalObserver?.disconnect();
+      const target = document.querySelector("#debugSnapshot");
+      const capture = () => {
+        const raw = target?.textContent || "";
+        if (!raw || window.__visualArrivalSnapshot) return;
+        const current = JSON.parse(raw);
+        if (current.runMode === "tutorial" && current.transition?.mode === "game_arrival") {
+          window.__visualArrivalSnapshot = raw;
+          window.__visualArrivalObserver?.disconnect();
+        }
+      };
+      window.__visualArrivalObserver = new MutationObserver(capture);
+      window.__visualArrivalObserver.observe(target, { childList: true, subtree: true, characterData: true });
+      capture();
+    });
     await page.getByRole("button", { name: "YES — START FIRST FLIGHT" }).click();
     await page.getByRole("button", { name: "Begin Flight Training" }).click();
     await page.waitForFunction(() => {
       const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
-      return current.runMode === "tutorial" && current.transition.mode === "game_arrival";
+      return Boolean(window.__visualArrivalSnapshot) ||
+        (current.runMode === "tutorial" && current.transition.mode === "game_arrival");
     });
-    evidence.after = await snapshot(page);
+    evidence.after = await page.evaluate(() => {
+      const raw = window.__visualArrivalSnapshot || document.querySelector("#debugSnapshot").textContent;
+      window.__visualArrivalObserver?.disconnect();
+      return JSON.parse(raw);
+    });
     if (evidence.after.input.gameplayControlEnabled !== false) errors.push("arrival left gameplay controls enabled");
     if (evidence.after.input.gameplaySimulationEnabled !== false) errors.push("arrival left gameplay simulation enabled");
     if (evidence.after.transition.continuity?.starsPreserved !== true) errors.push("galaxy star field jumped at arrival");
@@ -664,19 +710,33 @@ async function runCase(browser, baseUrl, item) {
     if (Math.abs(evidence.after.transition.continuity?.playerY - 533.6) > 0.01) errors.push("transition ship missed gameplay Y");
   } else if (item.kind === "tutorial-launch") {
     await waitForRequiredVisualAssets(page, ["player", "tutorial_instructor"], errors);
+    await page.evaluate(() => {
+      window.__visualLaunchFrame = "";
+      clearInterval(window.__visualLaunchWatch);
+      window.__visualLaunchWatch = setInterval(() => {
+        const raw = document.querySelector("#debugSnapshot")?.textContent;
+        if (!raw || window.__visualLaunchFrame) return;
+        const state = JSON.parse(raw);
+        if (state.transition?.mode === "title_launch" && state.transition.progress >= 0.72) {
+          window.__visualLaunchFrame = document.querySelector("canvas")?.toDataURL("image/png") || "";
+        }
+      }, 16);
+    });
     const yes = page.getByRole("button", { name: "YES — START FIRST FLIGHT" });
     await yes.waitFor({ state: "visible" });
     await yes.click();
     await page.getByRole("button", { name: "Begin Flight Training" }).click();
     const launchHandle = await page.waitForFunction(() => {
       const state = JSON.parse(document.querySelector("#debugSnapshot").textContent);
-      const visibleLaunch = state.transition.mode === "title_launch" && state.transition.progress >= 0.78;
+      const visibleLaunch = state.transition.mode === "title_launch" && state.transition.progress >= 0.72;
       const reducedArrival = state.transition.lastLaunchReducedMotion && state.runMode === "tutorial";
       if (visibleLaunch && !window.__visualLaunchFrame) {
         window.__visualLaunchFrame = document.querySelector("canvas").toDataURL("image/png");
       }
-      return visibleLaunch || reducedArrival ? state : false;
+      const launchCompleted = state.runMode === "tutorial" && state.transition.lastLaunchDurationSeconds > 0;
+      return visibleLaunch || reducedArrival || (launchCompleted && !!window.__visualLaunchFrame) ? state : false;
     });
+    await page.evaluate(() => clearInterval(window.__visualLaunchWatch));
     let launch = await launchHandle.jsonValue();
     if (item.reduced) {
       await page.waitForFunction(() => {
@@ -706,6 +766,16 @@ async function runCase(browser, baseUrl, item) {
   await page.waitForFunction(() => (
     typeof getAssetLoadState !== "function" || getAssetLoadState().ready === true
   ));
+  // A long asserted run can briefly outpace image decoding on constrained CI
+  // hosts. Exercise the production failed-only retry path once with a larger
+  // bounded window, then keep the same strict zero-failure assertion below.
+  await page.evaluate(async () => {
+    if (typeof getAssetLoadState !== "function" || typeof retryFailedAssets !== "function") return;
+    const state = getAssetLoadState();
+    if (Array.isArray(state.failed) && state.failed.length > 0) {
+      await retryFailedAssets({ timeoutMs: 20000, retries: 1 });
+    }
+  });
   const assetState = await page.evaluate(() => (
     typeof getAssetLoadState === "function" ? getAssetLoadState() : { ready: true, loaded: [], failed: [] }
   ));

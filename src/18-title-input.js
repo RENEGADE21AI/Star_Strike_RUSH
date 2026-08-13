@@ -58,18 +58,6 @@ function handleResetProgressConfirmDown(x, y) {
   return true;
 }
 
-function setTitleProgressTab(tab) {
-  if (titleProgressTab !== tab) {
-    titleProgressTab = tab;
-    titleProgressDragActive = false;
-    titleProgressDragPointerId = null;
-    titleProgressPointerDownNode = null;
-    titleProgressSelectedNode = null;
-    if (typeof focusTitleProgressOnCurrent === "function") focusTitleProgressOnCurrent();
-  }
-  clampTitleProgressScroll();
-}
-
 function beginTitleProgressDrag(pointerId, x, y) {
   titleProgressDragActive = true;
   titleProgressDragPointerId = pointerId;
@@ -116,29 +104,14 @@ function cancelTitlePointerInteractions() {
   if (titleProgressDragActive) endTitleProgressDrag(titleProgressDragPointerId, true);
 }
 
-function openTitleProgressRoad(tab = null) {
+function openTitleProgressRoad() {
   openTitleMetaScreen("progress");
   titleProgressDragActive = false;
   titleProgressDragPointerId = null;
   titleProgressPointerDownNode = null;
   titleProgressSelectedNode = null;
-  if (tab) titleProgressTab = tab;
   if (typeof focusTitleProgressOnCurrent === "function") focusTitleProgressOnCurrent();
   else clampTitleProgressScroll();
-}
-
-function handleProgressClaim(rewardId) {
-  const result = claimSeasonReward(rewardId);
-  titleProgressClaimPulse = 32;
-  const refreshed = typeof getProgressDetailById === "function" ? getProgressDetailById(rewardId) : null;
-  if (refreshed) titleProgressSelectedNode = refreshed;
-  if (result.ok) {
-    showMessage(`CLAIMED ${String((result.applied && result.applied.name) || "REWARD").toUpperCase()}`, 100);
-  } else if (result.reason === "already_claimed") {
-    showMessage("ALREADY CLAIMED", 80);
-  } else if (result.reason === "locked") {
-    showMessage("REWARD LOCKED", 80);
-  }
 }
 
 let titleScrollablePendingAction = null;
@@ -263,17 +236,7 @@ function handleAchievementsPanelPointerDown(x, y, pointerId = null) {
 function handleProgressPanelPointerDown(x, y, pointerId = null) {
   const r = getProgressRects();
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
-  if (hitRect(r.gloryTab, x, y)) { setTitleProgressTab("glory"); return true; }
-  if (hitRect(r.seasonTab, x, y)) { setTitleProgressTab("season"); return true; }
   if (typeof getProgressDetailRect === "function" && titleProgressSelectedNode && hitRect(getProgressDetailRect(), x, y)) {
-    if (
-      typeof progressDetailCanClaim === "function" &&
-      typeof getProgressClaimRect === "function" &&
-      progressDetailCanClaim(titleProgressSelectedNode) &&
-      hitRect(getProgressClaimRect(), x, y)
-    ) {
-      handleProgressClaim(titleProgressSelectedNode.id);
-    }
     return true;
   }
   if (hitRect(r.contentRect, x, y)) {

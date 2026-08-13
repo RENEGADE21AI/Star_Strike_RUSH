@@ -41,8 +41,7 @@ function publicPilotRecord(raw = {}, fallbackSeed = "PUBLIC") {
     achievementsCount: Math.max(0, Math.floor(Number(raw.achievementsCount) || 0)),
     glory: Math.max(0, Math.floor(Number(raw.glory) || 0)),
     gloryRank: String(raw.gloryRank || "Rookie Pilot").slice(0, 32),
-    gloryRankIndex: Math.max(0, Math.min(9, Math.floor(Number(raw.gloryRankIndex) || 0))),
-    seasonTier: Math.max(1, Math.min(50, Math.floor(Number(raw.seasonTier) || 1)))
+    gloryRankIndex: Math.max(0, Math.min(9, Math.floor(Number(raw.gloryRankIndex) || 0)))
   };
 }
 

@@ -701,10 +701,10 @@ test("Reset Local Data clears every progression store and preserves settings and
     const reset = await debugSnapshot(page);
     assert.equal(reset.highScore, 0);
     assert.equal(reset.deviceProgress.totalGlory, 0);
-    assert.equal(reset.deviceProgress.seasonXP, 0);
+    assert.equal(reset.deviceProgress.prestige, 0);
+    assert.equal(reset.deviceProgress.roadGlory, 0);
     assert.equal(reset.deviceProgress.credits, 0);
     assert.equal(reset.deviceProgress.lifetime.runs, 0);
-    assert.deepEqual(reset.deviceProgress.seasonClaimedRewardIds, []);
     assert.deepEqual(reset.localAchievements, []);
     const preserved = await page.evaluate(() => ({
       callSign: localStorage.getItem("star_strike_rush_callsign_v1"),

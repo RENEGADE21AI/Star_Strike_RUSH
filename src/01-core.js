@@ -24,21 +24,6 @@ const TAU = Math.PI * 2;
 
 const STORAGE_KEY = "star_strike_rush_high_score_v1";
 const META_STORAGE_KEY = "star_strike_rush_meta_v1";
-const CURRENT_SEASON_ID = "season_01";
-const CURRENT_SEASON_NAME = "Launch Flight";
-const SEASON_TIER_XP = 1000;
-const GLORY_RANKS = [
-  { threshold: 0, name: "Rookie Pilot" },
-  { threshold: 1000, name: "Star Cadet" },
-  { threshold: 3000, name: "Strike Pilot" },
-  { threshold: 7500, name: "Void Runner" },
-  { threshold: 15000, name: "Ace" },
-  { threshold: 30000, name: "Elite Ace" },
-  { threshold: 60000, name: "Phantom Hunter" },
-  { threshold: 100000, name: "Wraithbreaker" },
-  { threshold: 175000, name: "Solar Legend" },
-  { threshold: 300000, name: "Star Eternal" }
-];
 let highScore = 0;
 let previousHighScore = 0;
 let highScoreDirty = false;
@@ -63,7 +48,6 @@ let achievementScroll = 0;
 let titleSubState = "main";
 let titlePanelAnim = 0.0;
 let titlePanelTarget = 0.0;
-let titleProgressTab = "glory";
 let titleProgressScroll = 0;
 let titleProgressDragActive = false;
 let titleProgressDragPointerId = null;
@@ -73,7 +57,6 @@ let titleProgressDragStartScroll = 0;
 let titleProgressDragMoved = false;
 let titleProgressPointerDownNode = null;
 let titleProgressSelectedNode = null;
-let titleProgressClaimPulse = 0;
 let titleMetaScreenTransition = 1;
 let titlePanelOrigin = { x: GAME_W / 2, y: GAME_H / 2 };
 let playBtnPointerDown = false;
@@ -411,37 +394,8 @@ function loadCodexDiscovered() {
     codexDiscovered = {};
   }
 }
-function rankForGlory(glory) {
-  const total = Math.max(0, Math.floor(glory || 0));
-  let current = GLORY_RANKS[0];
-  let index = 0;
-  for (let i = 1; i < GLORY_RANKS.length; i++) {
-    if (total < GLORY_RANKS[i].threshold) break;
-    current = GLORY_RANKS[i];
-    index = i;
-  }
-  const next = GLORY_RANKS[index + 1] || null;
-  return {
-    index,
-    name: current.name,
-    threshold: current.threshold,
-    nextName: next ? next.name : "",
-    nextThreshold: next ? next.threshold : 0,
-    progress: next ? clamp((total - current.threshold) / Math.max(1, next.threshold - current.threshold), 0, 1) : 1
-  };
-}
-function currentSeasonTierForXP(xp) {
-  return clamp(1 + Math.floor(Math.max(0, Math.floor(xp || 0)) / SEASON_TIER_XP), 1, 50);
-}
 function gloryForScore(score) {
   return Math.floor(Math.max(0, Math.floor(score || 0)) / 10);
-}
-function seasonXpForRun(score, phase, stats) {
-  const s = Math.max(0, Math.floor(score || 0));
-  const p = Math.max(1, Math.floor(phase || 1));
-  const bossBonus = Math.max(0, Math.floor((stats && stats.bosses) || 0)) * 60;
-  const powerupBonus = Math.max(0, Math.floor((stats && stats.powerups) || 0)) * 5;
-  return clamp(Math.floor(s / 45) + p * 8 + bossBonus + powerupBonus, 0, 2500);
 }
 function creditsForRun(score, phase, stats) {
   const s = Math.max(0, Math.floor(score || 0));
@@ -451,15 +405,8 @@ function creditsForRun(score, phase, stats) {
 }
 function makeDefaultMetaProgress() {
   return {
-    version: 1,
+    version: META_PROGRESS_SCHEMA_VERSION,
     totalGlory: 0,
-    currentSeason: {
-      id: CURRENT_SEASON_ID,
-      name: CURRENT_SEASON_NAME,
-      xp: 0,
-      tier: 1,
-      claimedRewardIds: []
-    },
     credits: 0,
     lifetime: {
       runs: 0,
@@ -480,20 +427,9 @@ function makeDefaultMetaProgress() {
 function sanitizeStoredMetaProgress(raw) {
   const base = makeDefaultMetaProgress();
   const data = raw && typeof raw === "object" ? raw : {};
-  const season = data.currentSeason && typeof data.currentSeason === "object" ? data.currentSeason : {};
   const lifetime = data.lifetime && typeof data.lifetime === "object" ? data.lifetime : {};
-  base.totalGlory = Math.max(0, Math.floor(data.totalGlory || 0));
+  base.totalGlory = normalizedGloryInteger(data.totalGlory ?? data.glory);
   base.credits = Math.max(0, Math.floor(data.credits || 0));
-  base.currentSeason.id = String(season.id || CURRENT_SEASON_ID).slice(0, 40);
-  base.currentSeason.name = String(season.name || CURRENT_SEASON_NAME).slice(0, 60);
-  base.currentSeason.xp = Math.max(0, Math.floor(season.xp || 0));
-  base.currentSeason.tier = currentSeasonTierForXP(base.currentSeason.xp);
-  base.currentSeason.claimedRewardIds = Array.isArray(season.claimedRewardIds)
-    ? season.claimedRewardIds.map((id) => String(id).slice(0, 80)).slice(0, 200)
-    : [];
-  if (base.currentSeason.id !== CURRENT_SEASON_ID) {
-    base.currentSeason = { id: CURRENT_SEASON_ID, name: CURRENT_SEASON_NAME, xp: 0, tier: 1, claimedRewardIds: [] };
-  }
   base.lifetime.runs = Math.max(0, Math.floor(lifetime.runs || 0));
   base.lifetime.score = Math.max(0, Math.floor(lifetime.score || 0));
   base.lifetime.kills = Math.max(0, Math.floor(lifetime.kills || 0));
@@ -504,14 +440,30 @@ function sanitizeStoredMetaProgress(raw) {
   base.lifetime.highestCombo = Math.max(0, Math.floor(lifetime.highestCombo || 0));
   base.lifetime.bestScore = Math.max(0, Math.floor(lifetime.bestScore || 0));
   base.lifetime.bestPhase = Math.max(1, Math.floor(lifetime.bestPhase || 1));
-  base.recentReceipts = Array.isArray(data.recentReceipts) ? data.recentReceipts.slice(-20) : [];
+  base.recentReceipts = Array.isArray(data.recentReceipts)
+    ? data.recentReceipts.slice(-20).map((receipt) => ({
+      receiptId: String((receipt && receipt.receiptId) || "").slice(0, 100),
+      score: Math.max(0, Math.floor((receipt && receipt.score) || 0)),
+      phaseReached: Math.max(1, Math.floor((receipt && receipt.phaseReached) || 1)),
+      gloryGained: Math.max(0, Math.floor((receipt && receipt.gloryGained) || 0)),
+      creditsEarned: Math.max(0, Math.floor((receipt && receipt.creditsEarned) || 0)),
+      totalGloryAfter: Math.max(0, Math.floor((receipt && receipt.totalGloryAfter) || 0)),
+      prestigeAfter: Math.max(0, Math.floor((receipt && receipt.prestigeAfter) || 0)),
+      roadGloryAfter: Math.max(0, Math.floor((receipt && receipt.roadGloryAfter) || 0)),
+      endedAtMs: Math.max(0, Math.floor((receipt && receipt.endedAtMs) || 0))
+    }))
+    : [];
   base.lastUpdatedAtMs = Math.max(0, Math.floor(data.lastUpdatedAtMs || 0));
   return base;
 }
 function loadMetaProgress() {
   try {
     const raw = localStorage.getItem(META_STORAGE_KEY);
-    metaProgress = sanitizeStoredMetaProgress(raw ? JSON.parse(raw) : {});
+    const parsed = raw ? JSON.parse(raw) : {};
+    metaProgress = sanitizeStoredMetaProgress(parsed);
+    if (!raw || JSON.stringify(parsed) !== JSON.stringify(metaProgress)) {
+      try { localStorage.setItem(META_STORAGE_KEY, JSON.stringify(metaProgress)); } catch {}
+    }
   } catch {
     metaProgress = makeDefaultMetaProgress();
   }
@@ -525,19 +477,20 @@ function saveMetaProgress() {
 }
 function currentMetaSnapshot() {
   const progress = getMetaProgress();
-  const rank = rankForGlory(progress.totalGlory);
+  const road = gloryRoadStateForTotal(progress.totalGlory);
   return {
     totalGlory: progress.totalGlory,
-    gloryRank: rank.name,
-    gloryRankIndex: rank.index,
-    nextGloryRank: rank.nextName,
-    nextGloryThreshold: rank.nextThreshold,
-    rankProgress: rank.progress,
-    seasonId: progress.currentSeason.id,
-    seasonName: progress.currentSeason.name,
-    seasonXP: progress.currentSeason.xp,
-    seasonTier: progress.currentSeason.tier,
-    seasonClaimedRewardIds: progress.currentSeason.claimedRewardIds.slice(),
+    prestige: road.prestige,
+    prestigeLabel: road.prestigeLabel,
+    roadGlory: road.roadGlory,
+    roadLength: GLORY_ROAD_LENGTH,
+    roadProgress: road.roadProgress,
+    gloryRank: road.rank.name,
+    gloryRankDisplay: road.displayRankName,
+    gloryRankIndex: road.rank.index,
+    nextGloryRank: road.rank.nextName,
+    nextGloryThreshold: road.rank.nextThreshold,
+    rankProgress: road.rank.progress,
     credits: progress.credits,
     lifetime: { ...progress.lifetime }
   };
@@ -565,27 +518,22 @@ function currentRunReceiptSnapshot() {
 }
 function applyRunMetaProgress() {
   const stats = state.runStats || {};
-  if (typeof runModeAllowsProgression === "function" && !runModeAllowsProgression(state.runMode)) {
+  const progressionAllowed = typeof runModeAllowsProgression === "function"
+    ? runModeAllowsProgression(state.runMode)
+    : state.runMode === "standard";
+  if (!progressionAllowed) {
     return { nonProgressionRun: true, runMode: state.runMode, snapshot: currentMetaSnapshot(), receipt: null };
   }
   if (stats.metaApplied) return lastRunMeta || { snapshot: currentMetaSnapshot(), receipt: currentRunReceiptSnapshot() };
   const progress = getMetaProgress();
   const receipt = currentRunReceiptSnapshot();
   const beforeGlory = progress.totalGlory;
-  const beforeRank = rankForGlory(beforeGlory);
-  const beforeSeasonXP = progress.currentSeason.xp;
-  const beforeSeasonTier = progress.currentSeason.tier;
+  const beforeRoad = gloryRoadStateForTotal(beforeGlory);
   const beforeCredits = progress.credits;
   const gloryGained = gloryForScore(receipt.score);
-  const seasonXPGained = seasonXpForRun(receipt.score, receipt.phaseReached, {
-    bosses: receipt.bossesKilled,
-    powerups: receipt.powerupsCollected
-  });
   const creditsEarned = creditsForRun(receipt.score, receipt.phaseReached, { bosses: receipt.bossesKilled });
 
   progress.totalGlory += gloryGained;
-  progress.currentSeason.xp += seasonXPGained;
-  progress.currentSeason.tier = currentSeasonTierForXP(progress.currentSeason.xp);
   progress.credits += creditsEarned;
   progress.lifetime.runs++;
   progress.lifetime.score += receipt.score;
@@ -598,37 +546,45 @@ function applyRunMetaProgress() {
   progress.lifetime.bestScore = Math.max(progress.lifetime.bestScore, receipt.score, highScore);
   progress.lifetime.bestPhase = Math.max(progress.lifetime.bestPhase, receipt.phaseReached);
   progress.lastUpdatedAtMs = receipt.endedAtMs;
+  const afterRoad = gloryRoadStateForTotal(progress.totalGlory);
+  const milestoneEvents = gloryMilestonesCrossed(beforeGlory, progress.totalGlory);
   progress.recentReceipts.push({
     receiptId: receipt.receiptId,
     score: receipt.score,
     phaseReached: receipt.phaseReached,
     gloryGained,
-    seasonXPGained,
     creditsEarned,
+    totalGloryAfter: progress.totalGlory,
+    prestigeAfter: afterRoad.prestige,
+    roadGloryAfter: afterRoad.roadGlory,
     endedAtMs: receipt.endedAtMs
   });
   if (progress.recentReceipts.length > 20) progress.recentReceipts.splice(0, progress.recentReceipts.length - 20);
   stats.metaApplied = true;
-  const afterRank = rankForGlory(progress.totalGlory);
+  const rankEvents = milestoneEvents.filter((event) => event.type === "rank");
+  const prestigeEvents = milestoneEvents.filter((event) => event.type === "prestige");
+  const presentationEvents = gloryCelebrationQueue(milestoneEvents, beforeGlory, progress.totalGlory);
   lastRunMeta = {
     receipt,
     gloryBefore: beforeGlory,
     gloryAfter: progress.totalGlory,
     gloryGained,
-    seasonXPBefore: beforeSeasonXP,
-    seasonXPAfter: progress.currentSeason.xp,
-    seasonXPGained,
+    prestigeBefore: beforeRoad.prestige,
+    prestigeAfter: afterRoad.prestige,
+    roadGloryBefore: beforeRoad.roadGlory,
+    roadGloryAfter: afterRoad.roadGlory,
     creditsBefore: beforeCredits,
     creditsAfter: progress.credits,
     creditsEarned,
-    rankBefore: beforeRank.name,
-    rankAfter: afterRank.name,
-    rankIndexBefore: beforeRank.index,
-    rankIndexAfter: afterRank.index,
-    rankUp: afterRank.index > beforeRank.index,
-    seasonTierBefore: beforeSeasonTier,
-    seasonTier: progress.currentSeason.tier,
-    seasonTierUp: progress.currentSeason.tier > beforeSeasonTier,
+    rankBefore: beforeRoad.displayRankName,
+    rankAfter: afterRoad.displayRankName,
+    rankIndexBefore: beforeRoad.rank.index,
+    rankIndexAfter: afterRoad.rank.index,
+    rankUp: rankEvents.length > 0,
+    prestigeEarned: prestigeEvents.length > 0,
+    prestigeCrossings: prestigeEvents.length,
+    milestoneEvents,
+    presentationEvents,
     snapshot: currentMetaSnapshot()
   };
   saveMetaProgress();

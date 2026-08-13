@@ -93,11 +93,7 @@ function titlePanelAccessibilityActions() {
   }
   if (titleSubState === "progress") {
     const rects = getProgressRects();
-    return [
-      accessibleRectAction("close-panel", "Close Progress Road", rects.closeRect, closeTitleMetaScreen, 4),
-      accessibleRectAction("glory-road", "Glory Road", rects.gloryTab, () => setTitleProgressTab("glory")),
-      accessibleRectAction("season-road", "Season Road", rects.seasonTab, () => setTitleProgressTab("season"))
-    ];
+    return [accessibleRectAction("close-panel", "Close Glory Road", rects.closeRect, closeTitleMetaScreen, 4)];
   }
   if (titleSubState === "codex") {
     const rects = getCodexRects();
@@ -129,12 +125,13 @@ function syncGameAccessibleSurface(force = false) {
     titleSubState,
     Math.round(titlePanelAnim * 20),
     titlePanelTarget,
+    typeof gloryCelebrationActive === "function" && gloryCelebrationActive(),
+    typeof gloryCelebrationState !== "undefined" ? gloryCelebrationState.index : 0,
     resetProgressConfirm,
     pauseConfirmAction,
     accountPanelTab,
     achievementCategory,
     codexCategory,
-    titleProgressTab,
     settingScreenShake,
     settingReducedMotion,
     settingReducedFlash,
@@ -205,6 +202,19 @@ function syncGameAccessibleSurface(force = false) {
   }
   if (state.gameState === "gameover") {
     const rects = getGameOverButtons();
+    if (typeof gloryCelebrationActive === "function" && gloryCelebrationActive()) {
+      const event = currentGloryCelebration();
+      const copy = gloryCelebrationCopy(event);
+      const layout = gloryCelebrationLayout(event, W, H);
+      setGameAccessibleSurface({
+        mode: "glory-celebration",
+        label: copy.title,
+        message: `${copy.eyebrow}. ${copy.title}. ${copy.value}. ${copy.detail}.`,
+        modal: true,
+        actions: [accessibleRectAction("continue-celebration", "Continue", layout.continueRect, advanceGloryCelebration)]
+      });
+      return;
+    }
     setGameAccessibleSurface({
       mode: "game-over",
       label: "Run complete",
