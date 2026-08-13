@@ -1080,7 +1080,6 @@
           <li><a href="#account">Account</a></li>
           <li><a href="#badges">Badges</a></li>
           <li><a href="#glory-road">Glory Road</a></li>
-          <li><a href="#season-road">Season Road</a></li>
           <li><a href="#records">World Records</a></li>
           <li><a href="#codex">Codex Grid</a></li>
           <li><a href="#codex-detail">Codex Detail</a></li>
@@ -1111,7 +1110,7 @@
       </div>
       <div class="principle">
         <h3>No Cosmetic Economy</h3>
-        <p>Progression rewards are Glory, Credits, Season XP, records, and achievements. Do not add dress-up economies to this game.</p>
+        <p>Progression records cumulative Glory, derived Prestige, Credits, records, and achievements. Do not add dress-up economies or gameplay power to this game.</p>
       </div>
     </section>
 
@@ -1122,7 +1121,7 @@
         <p>The first screen is a playable arcade cockpit, not a landing page. It should say: choose a pilot identity, press Play, or inspect one focused meta surface.</p>
         <ul>
           <li>Logo sits in the upper third, readable over menu-flight background.</li>
-          <li>Currency values sit at the top: Glory, Credits, and current Season Tier.</li>
+          <li>The compact meta strip shows Best, current Road Rank, and Prestige.</li>
           <li>Call sign is the pilot-card anchor; account chip sits to the left and opens profile/settings.</li>
           <li>Play is the dominant action and wider than every other control.</li>
           <li>Icon order: Badges, Road, Records, Codex.</li>
@@ -1243,16 +1242,16 @@
       <div class="screen-copy">
         <span class="status current expandable">Current, expandable</span>
         <h2>Glory Road</h2>
-        <p>Glory Road is lifetime identity. It climbs upward through a winding space route with big rank milestones, smaller checkpoints, and visible distance to the next prestige moment.</p>
+        <p>Glory Road is permanent lifetime identity. Cumulative Glory never resets; the ship travels a repeating 300,000-Glory route while Prestige records each completed Road.</p>
         <ul>
-          <li>Top tabs switch Glory Road and Season Road.</li>
-          <li>Current rank is the headline, with next rank and progress bar pinned near the top.</li>
+          <li>There is one focused Road with no tabs, reward lanes, or claim cards.</li>
+          <li>Current rank is the headline; total Glory, Prestige, and current-road progress stay visible.</li>
           <li>Progress begins low and winds upward around restrained planets and star systems.</li>
           <li>Completed segments are solid; future segments are dotted; future nodes are outlined.</li>
           <li>Major ranks get larger glowing nodes; minor checkpoints preview the climb between ranks.</li>
           <li>Opening the Road should auto-position near the player's current rank, with a little space above it.</li>
           <li>The current node should have extra energy: pulse, glow, and a small ship marker on the rail.</li>
-          <li>Tapping a node opens an inspect panel with requirement, status, and identity reward.</li>
+          <li>Tapping a node opens an inspect panel with current-Road and absolute cumulative requirements.</li>
           <li>Use gold for lifetime identity, green for reached status.</li>
         </ul>
       </div>
@@ -1261,12 +1260,11 @@
           <div class="panel long">
             <div class="close">X</div>
             <div class="road-header">
-              <div class="panel-title">Progress Road</div>
-              <div class="tabs"><div class="tab active">Glory Road</div><div class="tab">Season Road</div></div>
+              <div class="panel-title">Glory Road</div>
               <div class="road-summary">
                 <div>
-                  <strong>Rookie Pilot</strong>
-                  <span>Glory 0 | Next: Star Cadet at 1,000</span>
+                  <strong>Rookie Pilot I</strong>
+                  <span>Prestige I | 300,200 Total Glory | 200 / 300,000 Road</span>
                 </div>
                 <div class="road-badge">I</div>
               </div>
@@ -1288,75 +1286,9 @@
               <div class="road-node left major"><span class="node-title">Phantom Hunter</span><span class="node-sub">60,000 Glory. Ghost-realm identity.</span></div>
               <div class="road-node right major"><span class="node-title">Wraithbreaker</span><span class="node-sub">100,000 Glory. Boss-slayer badge.</span></div>
               <div class="road-node left major"><span class="node-title">Solar Legend</span><span class="node-sub">175,000 Glory. Gold title lockup.</span></div>
-              <div class="road-node right major"><span class="node-title">Star Eternal</span><span class="node-sub">300,000 Glory. Lifetime capstone.</span></div>
+              <div class="road-node right major"><span class="node-title">Star Eternal</span><span class="node-sub">300,000 Road Glory. Complete the Road; cumulative Glory endures.</span></div>
             </div>
-            <div class="future-note">Design rule: the scroll distance is part of the fantasy. Ranks unlock identity only, never player power.</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="season-road" class="screen-spec">
-      <div class="screen-copy">
-        <span class="status current expandable">Current, expandable</span>
-        <h2>Season Road</h2>
-        <p>Season Road is the temporary 8-week progress surface. It climbs upward on a subtle winding spine with frequent small resource rewards and larger milestone rewards every few steps.</p>
-        <ul>
-          <li>Use green/cyan instead of gold so it does not compete with lifetime Glory.</li>
-          <li>Tier rows become a long scroll track, not a compact list.</li>
-          <li>Flight rewards sit on the left lane; Supply rewards sit on the right lane. Both lanes are earned through play.</li>
-          <li>Reward cards use real reward data: tier, reward type, amount/name, detail text, and claimed/unclaimed/locked state.</li>
-          <li>Opening the Season Road should auto-position near the player's current tier.</li>
-          <li>Every fifth tier should feel like a larger milestone node.</li>
-          <li>Completed segments are solid and future segments are dotted without changing reward economy.</li>
-          <li>Reward claiming happens here through the selected reward detail panel, not directly on the title screen.</li>
-        </ul>
-      </div>
-      <div class="screen-frame">
-        <div class="phone season-long">
-          <div class="panel long">
-            <div class="close">X</div>
-            <div class="road-header">
-              <div class="panel-title">Progress Road</div>
-              <div class="tabs"><div class="tab">Glory Road</div><div class="tab active">Season Road</div></div>
-              <div class="road-summary">
-                <div>
-                  <strong>Launch Flight - Tier 1</strong>
-                  <span>Season XP 0 | Next tier in 1,000 XP</span>
-                </div>
-                <div class="road-badge" style="border-color:rgba(120,255,180,0.58);color:var(--green);background:radial-gradient(circle, rgba(120,255,180,0.25), rgba(120,255,180,0.05));">01</div>
-              </div>
-              <div class="meter"><span style="width:0%;"></span></div>
-            </div>
-            <div class="track-labels"><span>Flight</span><span>Tier</span><span>Supply</span></div>
-            <div class="season-map">
-              <div class="tier-step reached"><div class="reward flight">52 Season XP</div><div class="tier-dot">1</div><div class="reward supply">100 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">59 Season XP</div><div class="tier-dot">2</div><div class="reward supply">110 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">66 Season XP</div><div class="tier-dot">3</div><div class="reward supply">120 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">73 Season XP</div><div class="tier-dot">4</div><div class="reward supply">130 Credits</div></div>
-              <div class="tier-step milestone"><div class="reward flight">270 Glory Cache</div><div class="tier-dot">5</div><div class="reward supply">430 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">87 Season XP</div><div class="tier-dot">6</div><div class="reward supply">150 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">94 Season XP</div><div class="tier-dot">7</div><div class="reward supply">160 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">101 Season XP</div><div class="tier-dot">8</div><div class="reward supply">170 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">108 Season XP</div><div class="tier-dot">9</div><div class="reward supply">180 Credits</div></div>
-              <div class="tier-step milestone"><div class="reward flight">360 Glory Cache</div><div class="tier-dot">10</div><div class="reward supply">540 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">122 Season XP</div><div class="tier-dot">11</div><div class="reward supply">200 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">129 Season XP</div><div class="tier-dot">12</div><div class="reward supply">210 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">136 Season XP</div><div class="tier-dot">13</div><div class="reward supply">220 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">143 Season XP</div><div class="tier-dot">14</div><div class="reward supply">230 Credits</div></div>
-              <div class="tier-step milestone"><div class="reward flight">450 Glory Cache</div><div class="tier-dot">15</div><div class="reward supply">650 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">157 Season XP</div><div class="tier-dot">16</div><div class="reward supply">250 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">164 Season XP</div><div class="tier-dot">17</div><div class="reward supply">260 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">171 Season XP</div><div class="tier-dot">18</div><div class="reward supply">270 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">178 Season XP</div><div class="tier-dot">19</div><div class="reward supply">280 Credits</div></div>
-              <div class="tier-step milestone"><div class="reward flight">540 Glory Cache</div><div class="tier-dot">20</div><div class="reward supply">760 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">192 Season XP</div><div class="tier-dot">21</div><div class="reward supply">300 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">199 Season XP</div><div class="tier-dot">22</div><div class="reward supply">310 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">206 Season XP</div><div class="tier-dot">23</div><div class="reward supply">320 Credits</div></div>
-              <div class="tier-step"><div class="reward flight">213 Season XP</div><div class="tier-dot">24</div><div class="reward supply">330 Credits</div></div>
-              <div class="tier-step milestone"><div class="reward flight">630 Glory Cache</div><div class="tier-dot">25</div><div class="reward supply">870 Credits</div></div>
-              <div class="future-note">Blueprint shows the scroll rhythm. Full implementation target is 50 earned tiers across an 8-week season, with Flight and Supply reward data only.</div>
-            </div>
+            <div class="future-note">Design rule: the route visually begins again after Star Eternal. Total Glory never decreases, and Prestige never grants player power.</div>
           </div>
         </div>
       </div>
@@ -1618,7 +1550,7 @@
         <ul>
           <li>Game Over title sits top third.</li>
           <li>Score and high score appear before meta gains.</li>
-          <li>Glory/Season/Credits preview sits above buttons.</li>
+          <li>Glory/Credits plus next-rank or Prestige context sits above buttons.</li>
           <li>Respawn is primary; View Road is the meta bridge; Title Screen is secondary.</li>
           <li>Future: new achievements should appear as compact reward chips here.</li>
         </ul>
@@ -1630,7 +1562,7 @@
           <div class="stat-line" style="top:286px;font-size:18px;">High Score: 8,200</div>
           <div class="stat-line gold-text" style="top:338px;">Glory +820 | Total 1,420</div>
           <div class="stat-line green-text" style="top:364px;">New Rank: Star Cadet</div>
-          <div class="stat-line muted" style="top:390px;">Season XP +240 | Credits +68 | Tier 2</div>
+          <div class="stat-line muted" style="top:390px;">Credits +68 | Prestige I | 1,420 Total Glory</div>
           <div class="button" style="left:78px;right:78px;top:430px;height:44px;">Respawn</div>
           <div class="button secondary" style="left:78px;right:78px;top:486px;height:44px;">View Road</div>
           <div class="button secondary" style="left:78px;right:78px;top:542px;height:44px;">Title Screen</div>
@@ -1674,7 +1606,7 @@
         <h2>Future Meta Map</h2>
         <p>These are not implemented screens yet. They are included so future progression and utility work has guardrails before code starts.</p>
         <ul>
-          <li>Missions: daily and weekly objectives that reward Season XP, Glory, or Credits.</li>
+          <li>Missions: any future objective design must preserve cumulative Glory and avoid a second progression Road.</li>
           <li>Practice: a low-pressure training surface for dash timing, boss warnings, and enemy study.</li>
           <li>Accessibility: audio, contrast, input, and readable-warning controls.</li>
           <li>Run History: recent local and synced runs with score, phase, rank, and road gains.</li>

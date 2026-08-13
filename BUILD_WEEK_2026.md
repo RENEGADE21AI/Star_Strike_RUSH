@@ -13,7 +13,7 @@
   `0fdb7beff47325adfc1c2259de0875f9292f45e9`.
 - First Flight onboarding branch: `codex/first-flight-onboarding`.
 
-The starting game already had local play, 79 achievements, Glory/Season roads,
+The starting game already had local play, 79 achievements, two progression roads,
 music/effects, a Records Network, a Pilot Dossier, Firestore rules, callable
 Functions, and closed client/server competition gates. The release-integrity
 pass preserved working gameplay while correcting account/progression authority
@@ -44,7 +44,9 @@ and release evidence.
 - Device progression remains authoritative. Account hydration stores Firebase
   metadata as `onlineArchiveMeta` and has no API capable of merging it into
   local gameplay progression.
-- Signed-in and signed-out Season reward claims use one local path.
+- The later permanent-progression pass retired Season XP, tiers, reward lanes,
+  and claims in favor of one cumulative Glory Road. Prestige is derived from
+  full 300,000-Glory blocks and never consumes Glory.
 - Call-sign publication uses UID-scoped pending state with explicit stored,
   publishing, published, pending, and failed outcomes.
 - Pending call-sign intent temporarily wins; without pending intent, the
@@ -62,8 +64,9 @@ and release evidence.
 - `leaderboard_scores` is retained as a **LEGACY/PRESEASON ARCHIVE**.
 - Legacy score/phase fields are separated from future verified fields and never
   seed verified/profile progression.
-- `submitRunReceipt`, `joinWeeklyLeague`, and `claimSeasonReward` reject before
-  auth, reads, or writes while server progression writes are paused.
+- `submitRunReceipt` and `joinWeeklyLeague` reject before auth, reads, or writes
+  while server progression writes are paused. `claimSeasonReward` is retained
+  only as an inert retired compatibility stub with the same zero-access boundary.
 - Active identity callables have payload-size bounds, per-UID throttles, safe
   errors, and a prepared-but-disabled App Check flag.
 - Public profiles migrate on touch to explicit legacy/verified record fields.
@@ -211,7 +214,7 @@ Playable URL: https://star-strike-rush.web.app
 - Kept the classic bottom-left Energy/Hull hierarchy while shrinking its
   footprint and explicitly protecting the touch joystick and ability control.
 - Rebuilt Game Over as an end-of-run flight record with final score, device
-  best, earned currencies, rank, season tier, and clear next actions.
+  best, Glory/Credits, rank or Prestige context, and clear next actions.
 - Extended asserted visual QA to the Pilot Dossier, Settings, reset
   confirmation, Records, Codex overview, progression road, touch HUD, and Game
   Over rather than treating screenshot creation alone as success.
