@@ -26,7 +26,8 @@ function beginOnboardingIntroFlight() {
 }
 
 function onboardingGalaxySceneActive() {
-  return state.gameState === "start" && onboardingUiMode !== "none" && state.sceneTransition.mode !== "title_launch";
+  return state.gameState === "start" && onboardingUiMode !== "none" &&
+    state.sceneTransition.mode !== "title_launch" && state.sceneTransition.mode !== "tutorial_return";
 }
 
 function updateOnboardingIntroFlight(elapsedSeconds = SIMULATION_STEP_MS / 1000) {
@@ -483,6 +484,15 @@ function startTutorialSession(stepId = "incoming") {
     realmThreatAvoided: false,
     realmsMatched: false,
     matchingRealmDamage: false,
+    pendingStepAdvanceFrames: 0,
+    beaconAppearFrame: state.frame,
+    beaconDissolves: [],
+    playerTransit: null,
+    weaponsLocked: false,
+    controlLocked: false,
+    ghostBarrierElapsed: 0,
+    ghostBarrierDuration: 36,
+    ghostBarrierActive: false,
     replay: pendingTutorialReplay,
     entryProgressSnapshot: JSON.stringify({
       highScore,
@@ -530,6 +540,9 @@ function tutorialSnapshot() {
     } : null,
     runtime: tutorialRuntime ? {
       beaconIndex: tutorialRuntime.beaconIndex,
+      activeBeacon: tutorialRuntime.plan?.movement?.[tutorialRuntime.beaconIndex]
+        ? { ...tutorialRuntime.plan.movement[tutorialRuntime.beaconIndex] }
+        : null,
       controlledWaveIndex: tutorialRuntime.controlledWaveIndex,
       evasionCrossed: tutorialRuntime.evasionCrossed === true,
       evasionVolleyId: tutorialRuntime.evasionVolleyId || "",
@@ -537,6 +550,17 @@ function tutorialSnapshot() {
       realmThreatAvoided: tutorialRuntime.realmThreatAvoided,
       realmsMatched: tutorialRuntime.realmsMatched,
       matchingRealmDamage: tutorialRuntime.matchingRealmDamage,
+      pendingStepAdvanceFrames: tutorialRuntime.pendingStepAdvanceFrames || 0,
+      weaponsLocked: tutorialRuntime.weaponsLocked === true,
+      controlLocked: tutorialRuntime.controlLocked === true,
+      playerTransit: tutorialRuntime.playerTransit ? {
+        progress: Number(tutorialRuntime.playerTransit.progress || 0),
+        targetX: tutorialRuntime.playerTransit.to.x,
+        targetY: tutorialRuntime.playerTransit.to.y
+      } : null,
+      ghostBarrierProgress: tutorialRuntime.ghostBarrierDuration
+        ? Number(Math.min(1, tutorialRuntime.ghostBarrierElapsed / tutorialRuntime.ghostBarrierDuration).toFixed(3))
+        : 0,
       noProgressionSnapshot: tutorialRuntime.entryProgressSnapshot,
       noProgressionInvariantPassed: tutorialRuntime.noProgressionInvariantPassed !== false
     } : null
@@ -554,6 +578,14 @@ function enterTutorialStep(stepId) {
   tutorialRuntime.tutorialKillsStart = state.runStats.kills;
   tutorialRuntime.ghostUsesStart = state.runStats.ghostUses;
   tutorialRuntime.realmHopsStart = state.runStats.realmHops;
+  tutorialRuntime.pendingStepAdvanceFrames = 0;
+  tutorialRuntime.beaconAppearFrame = state.frame;
+  tutorialRuntime.beaconDissolves = [];
+  tutorialRuntime.playerTransit = null;
+  tutorialRuntime.weaponsLocked = false;
+  tutorialRuntime.controlLocked = false;
+  tutorialRuntime.ghostBarrierElapsed = 0;
+  tutorialRuntime.ghostBarrierActive = false;
   tutorialDirector.dialogueReveal = settingReducedMotion ? 1 : 0.14;
   suppressTutorialTransmissionEffects();
   if (tutorialDirector.dialogueVisible && typeof playGameSound === "function") playGameSound("ui", 0.42);
@@ -592,7 +624,7 @@ function advanceTutorialDialogue() {
     if (typeof clearGameplayInput === "function") clearGameplayInput();
     if (!tutorialDirector.completed) completeTutorialGraduation({ presentDialogue: false });
     tutorialDirector.dialogueVisible = false;
-    beginPostTutorialIdentityFlow();
+    beginTutorialDeparture();
     return true;
   }
   if (typeof clearGameplayInput === "function") clearGameplayInput();
@@ -604,23 +636,46 @@ function advanceTutorialDialogue() {
   return true;
 }
 
+function beginTutorialDeparture() {
+  clearGameplayInput();
+  tutorialRuntime.controlLocked = true;
+  tutorialRuntime.weaponsLocked = true;
+  state.sceneTransition = {
+    mode: "tutorial_departure",
+    frame: 0,
+    duration: Math.max(1, Math.round((settingReducedMotion ? 0.32 : 1.35) * SIMULATION_HZ)),
+    elapsedSeconds: 0,
+    durationSeconds: settingReducedMotion ? 0.32 : 1.35
+  };
+  hideTutorialAccessibleSurface("Flight certification complete. Returning to the hangar.");
+  if (typeof playGameSound === "function") playGameSound("launch", 0.72);
+}
+
 function beginPostTutorialIdentityFlow() {
+  const replay = tutorialRuntime && tutorialRuntime.replay;
   setupSession("start");
   const account = accountIdentitySnapshot();
   onboardingUiMode = postTutorialIdentityRoute({
-    replay: tutorialRuntime && tutorialRuntime.replay,
+    replay,
     signedIn: !!account.user,
     handle: account.profileHandle,
     pendingCallSign: account.pendingCallSign === true,
     failedCallSign: callSignSaveState === "error"
   });
   if (onboardingUiMode === "title") {
-    enterPostTutorialHangar(false);
-    return;
+    onboardingUiMode = "none";
+  } else {
+    onboardingState = transitionOnboardingState(onboardingState, { type: "account_offer_shown" });
+    saveOnboardingStateToDevice(onboardingState);
   }
-  onboardingState = transitionOnboardingState(onboardingState, { type: "account_offer_shown" });
-  saveOnboardingStateToDevice(onboardingState);
-  renderOnboardingAccessibleMode();
+  state.sceneTransition = {
+    mode: "tutorial_return",
+    frame: 0,
+    duration: Math.max(1, Math.round((settingReducedMotion ? 0.18 : 0.62) * SIMULATION_HZ)),
+    elapsedSeconds: 0,
+    durationSeconds: settingReducedMotion ? 0.18 : 0.62
+  };
+  hideTutorialAccessibleSurface("Returning to the Star Strike RUSH hangar.");
 }
 
 function showPostTutorialIdentityChoice() {
@@ -673,6 +728,120 @@ function enterPostTutorialHangar(pulseAccount = true) {
   hideTutorialAccessibleSurface("Entering Hangar. Device progress remains authoritative.");
 }
 
+function tutorialControlLocked() {
+  return state.runMode === "tutorial" && !!(tutorialRuntime && tutorialRuntime.controlLocked);
+}
+
+function tutorialWeaponsLocked() {
+  return state.runMode === "tutorial" && !!(tutorialRuntime && tutorialRuntime.weaponsLocked);
+}
+
+function beginTutorialPlayerTransit(x, y, duration = 42) {
+  const from = { x: state.player.x, y: state.player.y };
+  tutorialRuntime.playerTransit = {
+    from,
+    to: { x: clamp(x, 20, W - 20), y: clamp(y, H * 0.60, H - 28) },
+    elapsed: 0,
+    duration: Math.max(1, duration),
+    progress: 0
+  };
+  tutorialRuntime.controlLocked = true;
+  tutorialRuntime.weaponsLocked = true;
+  stabilizeTutorialPlayer();
+}
+
+function updateTutorialMotionRuntime() {
+  if (state.runMode !== "tutorial" || !tutorialRuntime) return;
+  const transit = tutorialRuntime.playerTransit;
+  if (transit) {
+    transit.elapsed++;
+    const position = tutorialTransitPosition(transit.from, transit.to, transit.elapsed, transit.duration);
+    state.player.x = position.x;
+    state.player.y = position.y;
+    state.player.vx = 0;
+    state.player.vy = 0;
+    transit.progress = position.progress;
+    if (position.progress >= 1) {
+      tutorialRuntime.playerTransit = null;
+      tutorialRuntime.controlLocked = false;
+      clearGameplayInput();
+    }
+  }
+  if (tutorialDirector && tutorialDirector.stepId === "ghost_shift" && !tutorialRuntime.ghostBarrierActive && !tutorialRuntime.playerTransit) {
+    tutorialRuntime.ghostBarrierElapsed++;
+    if (tutorialRuntime.ghostBarrierElapsed >= tutorialRuntime.ghostBarrierDuration) {
+      tutorialRuntime.ghostBarrierActive = true;
+      const lane = tutorialRuntime.plan.ghost_shift;
+      for (let index = 0; index < 7; index++) {
+        state.enemyBullets.push({
+          x: lane.laneX,
+          y: H * 0.61 + index * 22,
+          vx: 0,
+          vy: 0,
+          life: 1200,
+          r: 6,
+          kind: "aimed",
+          tutorialGhostWall: true
+        });
+      }
+      tutorialRuntime.controlLocked = false;
+      clearGameplayInput();
+    }
+  }
+}
+
+function configureTutorialEnemyArrival(enemy, targetX, targetY, index = 0, duration = 54) {
+  if (!enemy) return;
+  const delay = Math.max(0, index * 8);
+  enemy.x = targetX;
+  enemy.y = -Math.max(30, enemy.r || 18) - index * 12;
+  enemy.tutorialArrival = {
+    from: { x: targetX, y: enemy.y },
+    to: { x: targetX, y: targetY },
+    elapsed: -delay,
+    duration: Math.max(1, duration)
+  };
+  enemy.tutorialArrivalComplete = false;
+  enemy.tutorialVisualAlpha = 0;
+  enemy.tutorialVisualScale = 0.56;
+  enemy.entryFrames = 0;
+  enemy.fireTimer = 99999;
+  enemy.shoot = 99999;
+}
+
+function spawnTutorialEvasionVolley() {
+  tutorialRuntime.evasionVolleyId = `evasion-${state.frame}`;
+  tutorialRuntime.evasionVolleyActive = true;
+  const emitter = state.enemies.find((enemy) => enemy.tutorialEvasionEmitter);
+  const originX = emitter ? emitter.x : tutorialRuntime.evasionLaneX;
+  const originY = emitter ? emitter.y + 18 : 205;
+  for (let index = 0; index < tutorialRuntime.plan.evasion.length; index++) {
+    const shot = tutorialRuntime.plan.evasion[index];
+    state.enemyBullets.push({
+      ...shot,
+      x: originX + (index - 1) * 24,
+      y: originY + index * 8,
+      vx: (index - 1) * 0.22,
+      vy: Math.max(2, shot.vy || 2),
+      life: 420,
+      age: 0,
+      tutorialShot: true,
+      tutorialVolleyId: tutorialRuntime.evasionVolleyId
+    });
+  }
+}
+
+function scheduleTutorialStepAdvance() {
+  if (!tutorialRuntime || tutorialRuntime.pendingStepAdvanceFrames > 0) return;
+  tutorialRuntime.pendingStepAdvanceFrames = settingReducedMotion ? 18 : TUTORIAL_BREATH_FRAMES;
+  tutorialRuntime.weaponsLocked = true;
+  tutorialRuntime.controlLocked = false;
+  state.enemyBullets = [];
+  tutorialDirector.objective = "OBJECTIVE COMPLETE";
+  if (typeof playGameSound === "function") playGameSound("ui", 0.5);
+  updateTutorialLiveRegion();
+}
+
 function activateTutorialStep() {
   if (!tutorialDirector || !tutorialRuntime || tutorialRuntime.stepActivated) return;
   tutorialRuntime.stepActivated = true;
@@ -680,7 +849,9 @@ function activateTutorialStep() {
   if (step === "movement") {
     tutorialDirector.objectiveTarget = tutorialRuntime.plan.movement.length;
   } else if (step === "auto_weapons") {
-    for (const target of tutorialRuntime.plan.auto_weapons) {
+    tutorialRuntime.weaponsLocked = true;
+    for (let index = 0; index < tutorialRuntime.plan.auto_weapons.length; index++) {
+      const target = tutorialRuntime.plan.auto_weapons[index];
       spawnEnemy(target.type, target.x, target.y, { forceSpawn: true });
       const enemy = state.enemies[state.enemies.length - 1];
       if (enemy) {
@@ -692,51 +863,53 @@ function activateTutorialStep() {
         enemy.tutorialPath = target.path;
         enemy.tutorialHoldX = target.x;
         enemy.tutorialHoldY = target.y;
+        configureTutorialEnemyArrival(enemy, target.x, target.y, index);
       }
     }
     tutorialDirector.objectiveTarget = 3;
   } else if (step === "evasion") {
-    state.player.x = 145;
-    tutorialRuntime.evasionStartX = state.player.x;
+    const emitterPlan = tutorialRuntime.plan.evasionEmitter;
+    beginTutorialPlayerTransit(145, state.player.y, 42);
+    tutorialRuntime.evasionStartX = 145;
     tutorialRuntime.evasionStartSide = "left";
     tutorialRuntime.evasionTargetSide = "right";
-    tutorialRuntime.evasionLaneX = 220;
+    tutorialRuntime.evasionLaneX = emitterPlan.x;
     tutorialRuntime.evasionDamageTakenStart = state.runStats.damageTaken;
-    tutorialRuntime.evasionVolleyId = `evasion-${state.frame}`;
-    tutorialRuntime.evasionVolleyActive = true;
-    for (const shot of tutorialRuntime.plan.evasion) {
-      state.enemyBullets.push({
-        ...shot,
-        life: 420,
-        age: 0,
-        tutorialShot: true,
-        tutorialVolleyId: tutorialRuntime.evasionVolleyId
-      });
+    tutorialRuntime.evasionVolleyActive = false;
+    spawnEnemy(emitterPlan.type, emitterPlan.x, emitterPlan.y, { forceSpawn: true });
+    const emitter = state.enemies[state.enemies.length - 1];
+    if (emitter) {
+      emitter.tutorialTarget = true;
+      emitter.tutorialEvasionEmitter = true;
+      emitter.tutorialInvulnerable = true;
+      emitter.tutorialHoldX = emitterPlan.x;
+      emitter.tutorialHoldY = emitterPlan.y;
+      emitter.hp = emitter.maxHp = 9999;
+      configureTutorialEnemyArrival(emitter, emitterPlan.x, emitterPlan.y, 0, 58);
     }
   } else if (step === "ghost_shift") {
     const lane = tutorialRuntime.plan.ghost_shift;
-    state.player.x = lane.startX;
+    beginTutorialPlayerTransit(lane.startX, state.player.y, 42);
     state.player.energy = state.player.maxEnergy;
     state.player.ghostCooldown = 0;
     tutorialRuntime.ghostStartSide = lane.startSide;
     tutorialRuntime.ghostTargetSide = lane.targetSide;
-    tutorialRuntime.ghostPreviousX = state.player.x;
+    tutorialRuntime.ghostPreviousX = lane.startX;
     tutorialRuntime.ghostDamageTakenStart = state.runStats.damageTaken;
     tutorialRuntime.ghostLanePhased = false;
-    for (let index = 0; index < 7; index++) {
-      state.enemyBullets.push({
-        x: lane.laneX,
-        y: H * 0.61 + index * 22,
-        vx: 0,
-        vy: 0,
-        life: 1200,
-        r: 6,
-        kind: "aimed",
-        tutorialGhostWall: true
-      });
-    }
+    tutorialRuntime.ghostBarrierElapsed = 0;
+    tutorialRuntime.ghostBarrierActive = false;
   } else if (step === "powerup") {
-    state.powerups.push({ ...tutorialRuntime.plan.powerup });
+    const position = tutorialPickupPosition(state.player, tutorialRuntime.plan.powerup, W, H);
+    state.powerups.push({
+      ...tutorialRuntime.plan.powerup,
+      ...position,
+      tutorialSpawnFrame: state.frame,
+      tutorialArrivalDuration: settingReducedMotion ? 10 : 30,
+      tutorialCollectibleFrame: state.frame + (settingReducedMotion ? 10 : 30),
+      tutorialVisualAlpha: 0,
+      tutorialVisualScale: 0.56
+    });
   } else if (step === "controlled_wave") {
     spawnTutorialControlledWave(0);
   } else if (step === "command_boss") {
@@ -747,7 +920,7 @@ function activateTutorialStep() {
     tutorialRuntime.bossesStart = state.runStats.bosses;
   } else if (step === "wraith_briefing") {
     tutorialRuntime.briefingAcknowledged = true;
-    advanceTutorialStep();
+    scheduleTutorialStepAdvance();
   } else if (step === "realm_practice") {
     spawnTutorialWraith(true);
   } else if (step === "wraith_boss") {
@@ -761,6 +934,7 @@ function spawnTutorialControlledWave(index) {
   const wave = tutorialRuntime.plan.controlled_wave[index] || [];
   tutorialRuntime.controlledWaveIndex = index;
   tutorialRuntime.tutorialKillsStart = state.runStats.kills;
+  tutorialRuntime.weaponsLocked = true;
   for (let itemIndex = 0; itemIndex < wave.length; itemIndex++) {
     const item = wave[itemIndex];
     const holdY = 188 + itemIndex * 34;
@@ -769,11 +943,11 @@ function spawnTutorialControlledWave(index) {
     if (!enemy) continue;
     enemy.hp = 1;
     enemy.maxHp = 1;
-    enemy.entryFrames = 0;
     enemy.tutorialTarget = true;
     enemy.tutorialHoldX = item.x;
     enemy.tutorialHoldY = holdY;
     enemy.fireTimer = 99999;
+    configureTutorialEnemyArrival(enemy, item.x, holdY, itemIndex + Math.round(item.delay / 8));
   }
   tutorialDirector.objectiveTarget = wave.length;
 }
@@ -782,9 +956,6 @@ function spawnTutorialWraith(practice) {
   spawnWraithBoss();
   state.boss = applyTutorialBossOverride(state.boss);
   if (!state.boss) return;
-  state.boss.y = 94;
-  state.boss.entered = true;
-  state.boss.combatActive = true;
   state.boss.realm = 1;
   state.boss.attackTimer = practice ? 999999 : 96;
   state.boss.phantomSpewTimer = 999999;
@@ -792,10 +963,7 @@ function spawnTutorialWraith(practice) {
   state.playerRealm = 0;
   state.player.energy = state.player.maxEnergy;
   tutorialDirector.tutorialBossOverride = { mode: "wraith", maxHp: state.boss.maxHp, practice };
-  if (practice) {
-    const threat = tutorialRuntime.plan.realm_practice.threat;
-    state.enemyBullets.push({ ...threat, life: 520, age: 0, tutorialRealmThreat: true });
-  }
+  tutorialRuntime.realmThreatSpawned = false;
 }
 
 function advanceTutorialStep() {
@@ -842,20 +1010,45 @@ function updateTutorialDirectorRuntime() {
     if (!settingReducedMotion) tutorialDirector.dialogueReveal = Math.min(1, tutorialDirector.dialogueReveal + 0.025);
     return;
   }
+  if (tutorialRuntime.pendingStepAdvanceFrames > 0) {
+    tutorialRuntime.pendingStepAdvanceFrames--;
+    tutorialRuntime.beaconDissolves = tutorialRuntime.beaconDissolves.filter((ring) => {
+      ring.age++;
+      return ring.age <= ring.duration;
+    });
+    if (tutorialRuntime.pendingStepAdvanceFrames <= 0) advanceTutorialStep();
+    return;
+  }
   if (!tutorialRuntime.stepActivated) activateTutorialStep();
   const step = tutorialDirector.stepId;
   if (step === "movement") {
     const beacon = tutorialRuntime.plan.movement[tutorialRuntime.beaconIndex];
     if (beacon && Math.hypot(state.player.x - beacon.x, state.player.y - beacon.y) <= beacon.radius + 14) {
+      tutorialRuntime.beaconDissolves.push({ ...beacon, age: 0, duration: settingReducedMotion ? 10 : 26 });
       tutorialRuntime.beaconIndex++;
+      tutorialRuntime.beaconAppearFrame = state.frame + (settingReducedMotion ? 0 : 6);
       tutorialDirector.objectiveProgress = tutorialRuntime.beaconIndex;
-      if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
+      if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
     }
+    tutorialRuntime.beaconDissolves = tutorialRuntime.beaconDissolves.filter((ring) => {
+      ring.age++;
+      return ring.age <= ring.duration;
+    });
   } else if (step === "auto_weapons") {
+    if (tutorialRuntime.weaponsLocked && state.enemies.length && state.enemies.every((enemy) => enemy.tutorialArrivalComplete)) {
+      tutorialRuntime.weaponsLocked = false;
+      clearGameplayInput();
+    }
     tutorialRuntime.tutorialKills = state.runStats.kills - tutorialRuntime.tutorialKillsStart;
     tutorialDirector.objectiveProgress = tutorialRuntime.tutorialKills;
-    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
+    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
   } else if (step === "evasion") {
+    const emitter = state.enemies.find((enemy) => enemy.tutorialEvasionEmitter);
+    if (!tutorialRuntime.evasionVolleyActive && !tutorialRuntime.playerTransit && emitter && emitter.tutorialArrivalComplete) {
+      spawnTutorialEvasionVolley();
+      tutorialRuntime.controlLocked = false;
+      clearGameplayInput();
+    }
     const tookDamage = state.runStats.damageTaken > tutorialRuntime.evasionDamageTakenStart;
     if (tookDamage) {
       resetTutorialLesson("evasion", ["That lane was live.", "Cross after the volley opens."]);
@@ -871,7 +1064,7 @@ function updateTutorialDirectorRuntime() {
       damageTakenCurrent: state.runStats.damageTaken,
       playerX: state.player.x
     });
-    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
+    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
   } else if (step === "ghost_shift") {
     tutorialRuntime.ghostUses = state.runStats.ghostUses - tutorialRuntime.ghostUsesStart;
     const lane = tutorialRuntime.plan.ghost_shift;
@@ -896,38 +1089,47 @@ function updateTutorialDirectorRuntime() {
       resetTutorialLesson("ghost_shift", ["Ghost must cover the crossing.", "Shift first, then pierce the lane."]);
       return;
     }
-    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
+    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
   } else if (step === "powerup") {
     tutorialRuntime.phaseShield = state.player.phaseShield || 0;
-    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
+    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
   } else if (step === "controlled_wave") {
     const wave = tutorialRuntime.plan.controlled_wave[tutorialRuntime.controlledWaveIndex] || [];
     const kills = state.runStats.kills - tutorialRuntime.tutorialKillsStart;
+    if (tutorialRuntime.weaponsLocked && state.enemies.length && state.enemies.every((enemy) => enemy.tutorialArrivalComplete)) {
+      tutorialRuntime.weaponsLocked = false;
+      clearGameplayInput();
+    }
     tutorialDirector.objectiveProgress = Math.min(wave.length, kills);
     if (!state.enemies.length && !state.pendingSpawns.length && kills >= wave.length) {
       if (tutorialRuntime.controlledWaveIndex + 1 < tutorialRuntime.plan.controlled_wave.length) {
         spawnTutorialControlledWave(tutorialRuntime.controlledWaveIndex + 1);
       } else {
         tutorialRuntime.controlledWavesCleared = true;
-        advanceTutorialStep();
+        scheduleTutorialStepAdvance();
       }
     }
   } else if (step === "command_boss") {
     tutorialRuntime.commandBossDefeated = !state.boss && state.runStats.bosses > tutorialRuntime.bossesStart;
-    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
+    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
   } else if (step === "realm_practice") {
+    if (state.boss && state.boss.entered && state.boss.combatActive && !tutorialRuntime.realmThreatSpawned) {
+      const threat = tutorialRuntime.plan.realm_practice.threat;
+      state.enemyBullets.push({ ...threat, x: state.boss.x, y: state.boss.y + 28, life: 520, age: 0, tutorialRealmThreat: true });
+      tutorialRuntime.realmThreatSpawned = true;
+    }
     tutorialRuntime.realmHops = state.runStats.realmHops - tutorialRuntime.realmHopsStart;
     tutorialRuntime.realmsMatched = !!state.boss && state.playerRealm === state.boss.realm;
     const threat = state.enemyBullets.find((bullet) => bullet.tutorialRealmThreat);
     if (!threat || (threat.y > state.player.y + 40 && state.playerRealm !== 0)) tutorialRuntime.realmThreatAvoided = true;
-    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
+    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
   } else if (step === "wraith_boss") {
     tutorialRuntime.realmHops = state.runStats.realmHops - tutorialRuntime.realmHopsStart;
     if (state.boss && state.boss.hp < tutorialRuntime.wraithHpStart && state.playerRealm === state.boss.realm) {
       tutorialRuntime.matchingRealmDamage = true;
     }
     tutorialRuntime.wraithBossDefeated = !state.boss && state.runStats.bosses > tutorialRuntime.bossesStart;
-    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) advanceTutorialStep();
+    if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
   }
   if (tutorialDirector && tutorialDirector.elapsedFrames > 540) tutorialDirector.hintLevel = 1;
   updateTutorialLiveRegion();
@@ -938,7 +1140,7 @@ function resetTutorialLesson(stepId, correctionLines) {
   state.player.hp = state.player.maxHp;
   state.player.energy = state.player.maxEnergy;
   state.player.inv = 60;
-  stabilizeTutorialPlayer({ resetCooldown: true, resetRealm: true, resetPosition: true });
+  stabilizeTutorialPlayer({ resetCooldown: true, resetRealm: true });
   enterTutorialStep(stepId);
   tutorialDirector.dialogue[0] = { lines: correctionLines.slice(0, 2) };
   tutorialDirector.dialogueVisible = true;
@@ -955,7 +1157,7 @@ function recoverTutorialCheckpoint() {
   state.player.hp = state.player.maxHp;
   state.player.energy = state.player.maxEnergy;
   state.player.inv = 120;
-  stabilizeTutorialPlayer({ resetCooldown: true, resetRealm: true, resetPosition: true });
+  stabilizeTutorialPlayer({ resetCooldown: true, resetRealm: true });
   const step = tutorialStepForCheckpoint(onboardingState && onboardingState.checkpoint);
   enterTutorialStep(step);
   tutorialDirector.dialogue[0] = {
@@ -1274,19 +1476,19 @@ function drawTutorialTrainingEnvironment() {
   ctx.textAlign = "left";
   ctx.fillText("ARISAKA RANGE  //  SECTOR 07", 12, 58);
 
-  if (tutorialDirector.stepId === "movement" && tutorialRuntime) {
+  if (tutorialDirector.stepId === "movement" && tutorialRuntime && tutorialRuntime.stepActivated) {
     const beacons = tutorialRuntime.plan.movement;
-    for (let index = tutorialRuntime.beaconIndex; index < beacons.length; index++) {
-      const beacon = beacons[index];
-      const active = index === tutorialRuntime.beaconIndex;
+    const beacon = beacons[tutorialRuntime.beaconIndex];
+    if (beacon && state.frame >= tutorialRuntime.beaconAppearFrame) {
+      const appearance = tutorialArrivalVisual(state.frame - tutorialRuntime.beaconAppearFrame, settingReducedMotion ? 1 : 24);
       const pulse = settingReducedMotion || tutorialDirector.hintLevel < 1
         ? 1
         : 0.88 + Math.sin(state.frame * 0.08) * 0.12;
-      ctx.globalAlpha = active ? 0.92 : 0.24;
-      ctx.strokeStyle = active ? "#69f5ff" : "rgba(120,220,255,0.55)";
-      ctx.lineWidth = active ? 2 : 1;
+      ctx.globalAlpha = appearance.alpha * 0.92;
+      ctx.strokeStyle = "#69f5ff";
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(beacon.x, beacon.y, beacon.radius * pulse, 0, TAU);
+      ctx.arc(beacon.x, beacon.y, beacon.radius * pulse * appearance.scale, 0, TAU);
       ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(beacon.x - 8, beacon.y);
@@ -1295,15 +1497,29 @@ function drawTutorialTrainingEnvironment() {
       ctx.lineTo(beacon.x, beacon.y + 8);
       ctx.stroke();
     }
+    for (const ring of tutorialRuntime.beaconDissolves) {
+      const dissolve = tutorialDissolveVisual(ring.age, ring.duration);
+      ctx.globalAlpha = dissolve.alpha * 0.9;
+      ctx.strokeStyle = "#a8fbff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, ring.radius * dissolve.scale, 0, TAU);
+      ctx.stroke();
+    }
   }
-  if (tutorialDirector.stepId === "ghost_shift" && tutorialRuntime) {
+  if (tutorialDirector.stepId === "ghost_shift" && tutorialRuntime && tutorialRuntime.stepActivated) {
     const lane = tutorialRuntime.plan.ghost_shift;
-    ctx.globalAlpha = 0.45;
+    const reveal = tutorialRuntime.ghostBarrierActive
+      ? { alpha: 1, scale: 1 }
+      : tutorialArrivalVisual(tutorialRuntime.ghostBarrierElapsed, tutorialRuntime.ghostBarrierDuration || 36);
+    ctx.globalAlpha = reveal.alpha * 0.45;
     ctx.fillStyle = "rgba(255,92,92,0.20)";
-    ctx.fillRect(lane.laneX - lane.laneWidth / 2, H * 0.58, lane.laneWidth, H * 0.36);
+    const laneHeight = H * 0.36 * reveal.scale;
+    const laneY = H * 0.76 - laneHeight / 2;
+    ctx.fillRect(lane.laneX - lane.laneWidth / 2, laneY, lane.laneWidth, laneHeight);
     ctx.strokeStyle = "rgba(255,170,90,0.82)";
     ctx.setLineDash([7, 5]);
-    ctx.strokeRect(lane.laneX - lane.laneWidth / 2, H * 0.58, lane.laneWidth, H * 0.36);
+    ctx.strokeRect(lane.laneX - lane.laneWidth / 2, laneY, lane.laneWidth, laneHeight);
     ctx.setLineDash([]);
   }
   ctx.restore();

@@ -27,7 +27,8 @@ function touchControlsVisible(inputMode, gameState) {
 function gameplayControlEnabled(context = {}) {
   return context.gameState === "playing" &&
     context.transitionMode !== "game_arrival" &&
-    context.tutorialDialogueVisible !== true;
+    context.tutorialDialogueVisible !== true &&
+    context.tutorialControlLocked !== true;
 }
 
 function gameplaySimulationEnabled(context = {}) {

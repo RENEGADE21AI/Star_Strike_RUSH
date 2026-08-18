@@ -197,9 +197,8 @@ async function completeTutorial(page, mode) {
 
     let target = null;
     if (director.stepId === "movement") {
-      const beacons = [[187.5, 520], [92, 455], [283, 410]];
-      const point = beacons[data.tutorial.runtime.beaconIndex] || beacons[beacons.length - 1];
-      target = { x: point[0], y: point[1] };
+      const beacon = data.tutorial.runtime.activeBeacon;
+      target = beacon ? { x: beacon.x, y: beacon.y } : null;
     } else if (director.stepId === "auto_weapons" || director.stepId === "controlled_wave") {
       const enemy = data.encounter.enemies.find((item) => item.y < data.player.y - 60);
       target = enemy ? { x: enemy.x, y: data.player.y } : { x: 187.5, y: data.player.y };

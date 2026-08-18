@@ -84,25 +84,65 @@ const TUTORIAL_DEFINITIONS = Object.freeze([
   })))
 })));
 
+const TUTORIAL_BREATH_FRAMES = 36;
+
+function tutorialUnitProgress(elapsed, duration) {
+  return Math.max(0, Math.min(1, Number(elapsed || 0) / Math.max(1, Number(duration || 1))));
+}
+
+function tutorialEaseOutCubic(progress) {
+  const t = Math.max(0, Math.min(1, Number(progress) || 0));
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function tutorialArrivalVisual(elapsed, duration) {
+  const progress = tutorialUnitProgress(elapsed, duration);
+  const eased = tutorialEaseOutCubic(progress);
+  return { alpha: eased, scale: 0.56 + eased * 0.44, progress };
+}
+
+function tutorialDissolveVisual(elapsed, duration) {
+  const progress = tutorialUnitProgress(elapsed, duration);
+  return { alpha: 1 - progress, scale: 1 + tutorialEaseOutCubic(progress) * 0.72, progress };
+}
+
+function tutorialTransitPosition(from, to, elapsed, duration) {
+  const progress = tutorialUnitProgress(elapsed, duration);
+  const eased = tutorialEaseOutCubic(progress);
+  return {
+    x: Number(from.x) + (Number(to.x) - Number(from.x)) * eased,
+    y: Number(from.y) + (Number(to.y) - Number(from.y)) * eased,
+    progress
+  };
+}
+
+function tutorialPickupPosition(player, plan, width, height) {
+  return {
+    x: Math.max(28, Math.min(Number(width) - 28, Number(player.x) + Number(plan.offsetX || 0))),
+    y: Math.max(Number(height) * 0.61, Math.min(Number(height) - 72, Number(player.y) + Number(plan.offsetY || -108)))
+  };
+}
+
 function deterministicTutorialPlan() {
   return {
     movement: [
-      { x: 187.5, y: 520, radius: 28 },
+      { x: 278, y: 492, radius: 28 },
       { x: 92, y: 455, radius: 28 },
       { x: 283, y: 410, radius: 28 }
     ],
     auto_weapons: [
-      { type: "red", x: 187.5, y: 210, hp: 1, path: "hold" },
-      { type: "red", x: 102, y: 188, hp: 1, path: "slow_sweep" },
-      { type: "orange", x: 273, y: 176, hp: 1, path: "slow_sweep" }
+      { type: "red", x: 187.5, y: 210, hp: 3, path: "hold" },
+      { type: "red", x: 102, y: 188, hp: 3, path: "slow_sweep" },
+      { type: "orange", x: 273, y: 176, hp: 3, path: "slow_sweep" }
     ],
+    evasionEmitter: { type: "purple", x: 187.5, y: 184, invulnerable: true },
     evasion: [
       { x: 82, y: 250, vx: 0, vy: 1.8, kind: "aimed", r: 5 },
       { x: 112, y: 235, vx: 0, vy: 1.8, kind: "aimed", r: 5 },
       { x: 142, y: 220, vx: 0, vy: 1.8, kind: "aimed", r: 5 }
     ],
     ghost_shift: { laneX: 187.5, laneWidth: 44, startX: 110, startSide: "left", targetSide: "right" },
-    powerup: { type: "phase_shield", x: 187.5, y: 470, vy: 0.35, size: 14, life: 900 },
+    powerup: { type: "phase_shield", offsetX: 42, offsetY: -108, vy: 0, size: 14, life: 900 },
     controlled_wave: [
       [
         { type: "red", x: 112, y: -32, delay: 0 },
@@ -240,11 +280,16 @@ function applyTutorialGraduationCodex(existing, alreadyApplied) {
 }
 
 Object.assign(globalThis, {
+  TUTORIAL_BREATH_FRAMES,
   TUTORIAL_DEFINITIONS,
   deterministicTutorialPlan,
   tutorialDefinition,
   createTutorialDirector,
   tutorialObjectiveComplete,
+  tutorialArrivalVisual,
+  tutorialDissolveVisual,
+  tutorialTransitPosition,
+  tutorialPickupPosition,
   tutorialEvasionSucceeded,
   tutorialGhostLaneSucceeded,
   applyTutorialBossOverride,

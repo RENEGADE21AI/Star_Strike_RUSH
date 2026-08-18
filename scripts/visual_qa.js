@@ -71,7 +71,8 @@ const cases = [
   { name: "first-flight-question-430x932", width: 430, height: 932, kind: "tutorial-question", scenario: "tutorial", touch: true },
   { name: "first-flight-question-1440x900", width: 1440, height: 900, kind: "tutorial-question", scenario: "tutorial" },
   { name: "colonel-arisaka-call-sign-briefing", width: 390, height: 844, kind: "tutorial-prelaunch", scenario: "tutorial", touch: true },
-  { name: "tutorial-navigation", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "movement", touch: true },
+  { name: "tutorial-navigation", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "movement", touch: true, activate: true },
+  { name: "tutorial-target-arrival", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "auto_weapons", touch: true, activate: true },
   { name: "tutorial-ghost-shift", width: 390, height: 844, kind: "tutorial-step", scenario: "tutorial", step: "ghost", touch: true, activate: true, ghostVisual: true },
   { name: "tutorial-evasion-retry", width: 390, height: 844, kind: "tutorial-retry", scenario: "tutorial", step: "evasion", touch: true },
   { name: "tutorial-ghost-retry", width: 390, height: 844, kind: "tutorial-retry", scenario: "tutorial", step: "ghost", touch: true },
@@ -697,6 +698,21 @@ async function runCase(browser, baseUrl, item) {
     }
     if (item.complete && tutorial.tutorial?.onboarding?.status !== "completed") errors.push("graduation did not persist completion");
     if (item.step === "command-boss" && tutorial.encounter.boss && !tutorial.encounter.boss.tutorialOverride) errors.push("Command Ship lacks tutorial override");
+    if (item.step === "movement") {
+      const beacon = tutorial.tutorial?.runtime?.activeBeacon;
+      if (!beacon) errors.push("navigation lesson lacks an active beacon");
+      else if (Math.hypot(tutorial.player.x - beacon.x, tutorial.player.y - beacon.y) < 80) errors.push("first navigation beacon overlaps the fighter");
+    }
+    if (item.step === "auto_weapons") {
+      if (tutorial.counts.enemies !== 3) errors.push("training targets did not enter as a complete formation");
+      if (!tutorial.tutorial?.runtime?.weaponsLocked) errors.push("weapons unlocked before training targets completed arrival");
+      if (tutorial.counts.bullets !== 0) errors.push("weapons fired during target arrival");
+    }
+    if (item.step === "powerup") {
+      const powerup = tutorial.encounter.powerups[0];
+      if (!powerup) errors.push("Phase Shield was not staged");
+      else if (Math.hypot(tutorial.player.x - powerup.x, tutorial.player.y - powerup.y) < 90) errors.push("Phase Shield appeared on top of the fighter");
+    }
     if (item.step === "realm_practice" && (!tutorial.encounter.boss || tutorial.encounter.boss.realm == null)) errors.push("realm practice lacks a realm target");
     if (item.realmOverride != null && tutorial.encounter.boss?.realm !== item.realmOverride) errors.push("Wraith realm art case did not hold the requested realm");
     if (item.ghostVisual && tutorial.player.ghostTimer <= 0) errors.push("Ghost visual case was not active");
@@ -708,6 +724,10 @@ async function runCase(browser, baseUrl, item) {
     if (item.step === "evasion") {
       await page.evaluate(() => { state.runStats.damageTaken += 1; });
     } else {
+      await page.waitForFunction(() => {
+        const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+        return current.tutorial?.runtime?.playerTransit == null && current.tutorial?.runtime?.ghostBarrierProgress >= 1;
+      });
       await page.evaluate(() => {
         tutorialRuntime.ghostPreviousX = tutorialRuntime.plan.ghost_shift.laneX - 2;
         state.player.x = tutorialRuntime.plan.ghost_shift.laneX + 2;

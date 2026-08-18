@@ -233,6 +233,59 @@ function drawGameArrivalEffect() {
   }
   ctx.restore();
 }
+function drawTutorialDepartureEffect() {
+  if (state.sceneTransition.mode !== "tutorial_departure") return;
+  const t = sceneTransitionProgress();
+  const eased = easeOutCubic(t);
+  ctx.save();
+  ctx.fillStyle = `rgba(1,5,16,${Math.min(0.78, eased * 0.72)})`;
+  ctx.fillRect(0, 0, W, H);
+  if (!settingReducedMotion) {
+    ctx.globalCompositeOperation = "lighter";
+    for (let index = 0; index < 26; index++) {
+      const x = ((index * 83 + 19) % 373) + 1;
+      const y = ((index * 149 + state.sceneTransition.frame * (4 + index % 4)) % 760) - 48;
+      ctx.globalAlpha = (settingReducedFlash ? 0.18 : 0.34) * eased;
+      ctx.strokeStyle = index % 4 === 0 ? "#b98cff" : "#8ff5ff";
+      ctx.lineWidth = 0.7 + (index % 3) * 0.25;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 30 + eased * 34);
+      ctx.lineTo(x, y - eased * 46);
+      ctx.stroke();
+    }
+  }
+  const shipY = state.player.y - eased * (state.player.y + 70);
+  if (typeof drawEnginePlume === "function") {
+    drawEnginePlume(state.player.x, shipY + 18, {
+      scale: 1 + eased * 0.7,
+      alpha: 1 - Math.max(0, (t - 0.78) / 0.22),
+      color: "92,238,255",
+      phase: t * 14
+    });
+  }
+  drawSpriteAsset(ctx, "player", state.player.x, shipY, {
+    scale: 1 - eased * 0.35,
+    alpha: 1 - Math.max(0, (t - 0.78) / 0.22),
+    glowColor: "#73efff",
+    glowBlur: 9 + eased * 15
+  });
+  ctx.restore();
+}
+function drawTutorialReturnEffect() {
+  if (state.sceneTransition.mode !== "tutorial_return") return;
+  const t = sceneTransitionProgress();
+  ctx.save();
+  ctx.fillStyle = `rgba(1,5,16,${Math.max(0, 0.88 - t * 0.88)})`;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = (1 - t) * (settingReducedFlash ? 0.10 : 0.22);
+  const bloom = ctx.createRadialGradient(W / 2, H * 0.35, 0, W / 2, H * 0.35, 180);
+  bloom.addColorStop(0, "rgba(116,236,255,0.8)");
+  bloom.addColorStop(1, "rgba(16,48,92,0)");
+  ctx.fillStyle = bloom;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
 function draw() {
   state.renderFrameFlags = { titleUi: false, onboardingGalaxy: false, galaxyTransit: false };
   ctx.setTransform(renderDpr, 0, 0, renderDpr, 0, 0);
@@ -264,7 +317,7 @@ function draw() {
     drawBossDeath();
     drawBoss();
     drawWingmen();
-    drawPlayer();
+    if (state.sceneTransition.mode !== "tutorial_departure") drawPlayer();
     drawParticles();
     drawPlayfieldFogBlend();
     drawControls();
@@ -272,13 +325,24 @@ function draw() {
     if (typeof drawTutorialPresentation === "function") drawTutorialPresentation();
     if (state.gameState === "paused" || state.gameState === "resuming") drawPauseOverlay();
     drawGameArrivalEffect();
+    drawTutorialDepartureEffect();
   } else if (state.gameState === "start") {
     const launchT = state.sceneTransition.mode === "title_launch" ? sceneTransitionProgress() : 0;
     const onboardingGalaxy = typeof onboardingGalaxySceneActive === "function" && onboardingGalaxySceneActive();
     ctx.save();
     // The title retracts quickly, revealing a continuous top-down galaxy
     // flyover. No perspective flip or radial wipe interrupts spatial context.
-    if (onboardingGalaxy) {
+    if (state.sceneTransition.mode === "tutorial_return") {
+      drawTutorialReturnEffect();
+      const reveal = clamp((sceneTransitionProgress() - 0.64) / 0.36, 0, 1);
+      if (reveal > 0) {
+        ctx.save();
+        ctx.globalAlpha = reveal;
+        if (onboardingUiMode === "none") drawStartScreen();
+        else if (typeof drawOnboardingTitleOverlay === "function") drawOnboardingTitleOverlay();
+        ctx.restore();
+      }
+    } else if (onboardingGalaxy) {
       state.renderFrameFlags.onboardingGalaxy = true;
       if (typeof drawOnboardingGalaxyScene === "function") drawOnboardingGalaxyScene();
       if (typeof drawOnboardingTitleOverlay === "function") drawOnboardingTitleOverlay();

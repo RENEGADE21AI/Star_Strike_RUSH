@@ -134,7 +134,8 @@ function enemyHeadingRotation(dx, dy, fallbackY = 1) {
 }
 function drawEnemies() {
   for (const e of state.enemies) {
-    const scale = 1 + Math.min(0.12, (e.hitPulse || 0) * 0.08);
+    const arrivalScale = Number.isFinite(e.tutorialVisualScale) ? e.tutorialVisualScale : 1;
+    const scale = (1 + Math.min(0.12, (e.hitPulse || 0) * 0.08)) * arrivalScale;
     const hitMix = clamp((e.hitFlash || 0) / 12, 0, 1);
     const typeScale = e.type === "red" ? 1.05 : 1;
     let entityAlpha = 1;
@@ -143,6 +144,7 @@ function drawEnemies() {
         ? clamp(0.42 + Math.sin((state.frame + (e.flickerSeed || 0)) * 0.8) * 0.22, 0.2, 0.64)
         : (e.stateMode === "ghost" ? 0.42 : 1);
     }
+    entityAlpha *= Number.isFinite(e.tutorialVisualAlpha) ? e.tutorialVisualAlpha : 1;
     ctx.save();
     ctx.translate(e.x, e.y);
     ctx.scale(scale * typeScale, scale * typeScale);
@@ -312,6 +314,9 @@ function drawPowerups() {
     const label = p.type === "spread" ? "S" : p.type === "rapid" ? "R" : p.type === "repair" ? "+" : p.type === "wingman" ? "W" : p.type === "dual" ? "2" : visual ? visual.label : "?";
     ctx.save();
     ctx.translate(p.x, p.y + bob);
+    ctx.globalAlpha = Number.isFinite(p.tutorialVisualAlpha) ? p.tutorialVisualAlpha : 1;
+    const tutorialScale = Number.isFinite(p.tutorialVisualScale) ? p.tutorialVisualScale : 1;
+    ctx.scale(tutorialScale, tutorialScale);
     const spriteKey = typeof powerupSpriteKey === "function" ? powerupSpriteKey(p.type) : "powerup";
     const pulseWave = 0.5 + 0.5 * Math.sin(state.frame * 0.09 + p.x * 0.02);
     const pulse = 0.93 + pulseWave * 0.08;

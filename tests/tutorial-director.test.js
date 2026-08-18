@@ -21,11 +21,15 @@ test("deterministic tutorial spawn plans contain no random or dynamic-director d
   const first = api.deterministicTutorialPlan();
   const second = api.deterministicTutorialPlan();
   assert.deepEqual(JSON.parse(JSON.stringify(first)), JSON.parse(JSON.stringify(second)));
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(first.movement.map((item) => [item.x, item.y]))),
-    [[187.5, 520], [92, 455], [283, 410]]
+  const playerStart = { x: 187.5, y: 533.6 };
+  const firstBeacon = first.movement[0];
+  assert.ok(
+    Math.hypot(firstBeacon.x - playerStart.x, firstBeacon.y - playerStart.y) >= 80,
+    "the first navigation beacon must require meaningful flight"
   );
   assert.equal(first.auto_weapons.length, 3);
+  assert.ok(first.auto_weapons.every((target) => target.hp >= 2), "training targets must survive long enough to teach positioning");
+  assert.ok(first.evasionEmitter && first.evasionEmitter.invulnerable, "the evasion lesson needs a durable visible emitter");
   assert.deepEqual(
     JSON.parse(JSON.stringify(first.controlled_wave.map((wave) => wave.map((enemy) => enemy.type)))),
     [["red", "red"], ["orange", "red", "orange"]]
@@ -35,6 +39,37 @@ test("deterministic tutorial spawn plans contain no random or dynamic-director d
     first.ghost_shift.startX <= first.ghost_shift.laneX - first.ghost_shift.laneWidth,
     "Ghost lesson needs a safe approach before the dangerous lane"
   );
+});
+
+test("tutorial staging helpers animate arrivals, dissipations, transit, and forward pickups", () => {
+  const api = loadDirector();
+  assert.ok(api.TUTORIAL_BREATH_FRAMES >= 30, "objective transitions need a perceptible breathing beat");
+
+  const arrivalStart = api.tutorialArrivalVisual(0, 48);
+  const arrivalMiddle = api.tutorialArrivalVisual(24, 48);
+  const arrivalEnd = api.tutorialArrivalVisual(48, 48);
+  assert.equal(arrivalStart.alpha, 0);
+  assert.ok(arrivalStart.scale < arrivalMiddle.scale && arrivalMiddle.scale < arrivalEnd.scale);
+  assert.ok(arrivalStart.alpha < arrivalMiddle.alpha && arrivalMiddle.alpha < arrivalEnd.alpha);
+  assert.equal(arrivalEnd.alpha, 1);
+  assert.equal(arrivalEnd.scale, 1);
+
+  const dissolveStart = api.tutorialDissolveVisual(0, 24);
+  const dissolveEnd = api.tutorialDissolveVisual(24, 24);
+  assert.equal(dissolveStart.alpha, 1);
+  assert.equal(dissolveEnd.alpha, 0);
+  assert.ok(dissolveEnd.scale >= 1.6, "completed rings should expand as they dissipate");
+
+  const transitStart = api.tutorialTransitPosition({ x: 40, y: 500 }, { x: 135, y: 480 }, 0, 42);
+  const transitMiddle = api.tutorialTransitPosition({ x: 40, y: 500 }, { x: 135, y: 480 }, 21, 42);
+  const transitEnd = api.tutorialTransitPosition({ x: 40, y: 500 }, { x: 135, y: 480 }, 42, 42);
+  assert.deepEqual(JSON.parse(JSON.stringify(transitStart)), { x: 40, y: 500, progress: 0 });
+  assert.ok(transitMiddle.x > 40 && transitMiddle.x < 135);
+  assert.deepEqual(JSON.parse(JSON.stringify(transitEnd)), { x: 135, y: 480, progress: 1 });
+
+  const pickup = api.tutorialPickupPosition({ x: 187.5, y: 533.6 }, { offsetX: 42, offsetY: -108 }, 375, 667);
+  assert.ok(Math.hypot(pickup.x - 187.5, pickup.y - 533.6) >= 90, "the powerup must be ahead of the player");
+  assert.ok(pickup.y < 470, "the powerup must require forward movement");
 });
 
 test("tutorial advancement requires the real action for every mechanic lesson", () => {
