@@ -228,6 +228,17 @@ function updateTitleFormations(elapsedSeconds = 1 / 60) {
 }
 
 function updateTitleScreen() {
+  if (state.sceneTransition.mode === "tutorial_return") {
+    state.sceneTransition.frame++;
+    state.sceneTransition.elapsedSeconds = Number(state.sceneTransition.elapsedSeconds || 0) + SIMULATION_STEP_MS / 1000;
+    updateTitleFormations(SIMULATION_STEP_MS / 1000);
+    if (state.sceneTransition.elapsedSeconds >= state.sceneTransition.durationSeconds) {
+      state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
+      if (onboardingUiMode !== "none") renderOnboardingAccessibleMode();
+      else hideTutorialAccessibleSurface("Hangar ready.");
+    }
+    return;
+  }
   if (state.sceneTransition.mode === "title_launch") {
     state.sceneTransition.frame++;
     state.sceneTransition.elapsedSeconds = Number(state.sceneTransition.elapsedSeconds || 0) + SIMULATION_STEP_MS / 1000;

@@ -312,8 +312,7 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "pause");
     const returnTitle = page.getByRole("button", { name: "Return to title", exact: true });
-    await returnTitle.focus();
-    await page.keyboard.press("Enter");
+    await returnTitle.press("Enter");
     await page.waitForFunction(() => onboardingUiMode === "resume_training" && state.gameState === "start");
     transferred = await page.evaluate(() => ({
       modalCount: document.querySelectorAll('[aria-modal="true"]').length,
@@ -422,6 +421,119 @@ test("Colonel dialogue clears inertia and held keyboard or touch input cannot le
   }
 });
 
+test("tutorial choreography glides targets in, moves the player visibly, and arms pickups ahead", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1&scenario=tutorial&step=movement");
+  try {
+    await page.waitForFunction(() => getDebugSnapshot().transition.mode === "idle", null, { timeout: 20_000 });
+    await dismissCurrentTutorialDialogue(page);
+    const firstDistance = await page.evaluate(() => {
+      const beacon = tutorialRuntime.plan.movement[0];
+      return Math.hypot(state.player.x - beacon.x, state.player.y - beacon.y);
+    });
+    assert.ok(firstDistance >= 80, "the first beacon must not overlap the starting ship");
+
+    const targetArrival = await page.evaluate(() => {
+      clearTutorialThreats();
+      enterTutorialStep("auto_weapons");
+      tutorialDirector.dialogueReveal = 1;
+      advanceTutorialDialogue();
+      return {
+        enemies: state.enemies.map((enemy) => ({ y: enemy.y, ready: enemy.tutorialArrivalComplete })),
+        bullets: state.bullets.length,
+        weaponsLocked: tutorialRuntime.weaponsLocked
+      };
+    });
+    assert.ok(targetArrival.enemies.every((enemy) => enemy.y < 0 && enemy.ready === false));
+    assert.equal(targetArrival.bullets, 0);
+    assert.equal(targetArrival.weaponsLocked, true);
+    await page.waitForFunction(() => state.enemies.length === 3 && state.enemies.every((enemy) => enemy.tutorialArrivalComplete));
+    await page.waitForFunction(() => tutorialRuntime.weaponsLocked === false && state.bullets.length > 0);
+
+    await page.evaluate(() => {
+      clearTutorialThreats();
+      enterTutorialStep("ghost_shift");
+    });
+    await dismissCurrentTutorialDialogue(page);
+    const ghostStart = await page.evaluate(() => ({
+      x: state.player.x,
+      targetX: tutorialRuntime.plan.ghost_shift.startX,
+      transit: !!tutorialRuntime.playerTransit,
+      barrierActive: tutorialRuntime.ghostBarrierActive,
+      controls: currentGameplayControlEnabled()
+    }));
+    assert.notEqual(ghostStart.x, ghostStart.targetX, "Ghost lesson setup must not teleport the player");
+    assert.equal(ghostStart.transit, true);
+    assert.equal(ghostStart.barrierActive, false);
+    assert.equal(ghostStart.controls, false);
+    await page.waitForFunction(() => !tutorialRuntime.playerTransit && tutorialRuntime.ghostBarrierActive === true);
+    const ghostReady = await page.evaluate(() => ({ x: state.player.x, bullets: state.enemyBullets.filter((b) => b.tutorialGhostWall).length }));
+    assert.equal(ghostReady.x, 110);
+    assert.equal(ghostReady.bullets, 7);
+
+    await page.evaluate(() => {
+      clearTutorialThreats();
+      enterTutorialStep("powerup");
+    });
+    await dismissCurrentTutorialDialogue(page);
+    const pickup = await page.evaluate(() => {
+      const powerup = state.powerups[0];
+      return {
+        distance: Math.hypot(powerup.x - state.player.x, powerup.y - state.player.y),
+        ahead: powerup.y < state.player.y,
+        collectible: state.frame >= powerup.tutorialCollectibleFrame,
+        alpha: powerup.tutorialVisualAlpha
+      };
+    });
+    assert.ok(pickup.distance >= 90);
+    assert.equal(pickup.ahead, true);
+    assert.equal(pickup.collectible, false);
+    assert.ok(pickup.alpha < 1);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("staging boss hulls stop bullets with feedback but take no damage", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context);
+  try {
+    const result = await page.evaluate(() => {
+      startPlayingSession();
+      state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
+      state.phase = 4;
+      spawnBoss();
+      const boss = state.boss;
+      boss.x = W / 2;
+      boss.y = 126;
+      boss.entered = false;
+      boss.combatActive = false;
+      boss.hitFlash = 0;
+      const hpBefore = boss.hp;
+      const shotsHitBefore = state.difficulty.shotsHit;
+      const bullet = { x: boss.x, y: boss.y, vx: 0, vy: -9, life: 60, r: 3, kind: "physical", damage: 1 };
+      state.bullets = [bullet];
+      updateCollisions();
+      return {
+        hpBefore,
+        hpAfter: boss.hp,
+        bulletLife: bullet.life,
+        hitFlash: boss.hitFlash,
+        shotsHitBefore,
+        shotsHitAfter: state.difficulty.shotsHit
+      };
+    });
+    assert.equal(result.hpAfter, result.hpBefore);
+    assert.equal(result.bulletLife, 0, "the projectile should ping instead of passing through the hull");
+    assert.ok(result.hitFlash > 0, "the staging hull should visibly acknowledge the hit");
+    assert.equal(result.shotsHitAfter, result.shotsHitBefore, "invulnerable staging pings are not damage hits");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("graduation completes once and transitions directly into the signed-out identity route", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const { page, errors } = await openGame(context, "/?debug=1&scenario=tutorial&step=graduation");
@@ -443,6 +555,20 @@ test("graduation completes once and transitions directly into the signed-out ide
       tutorialDirector.dialogueReveal = 1;
       advanceTutorialDialogue();
     });
+    await page.waitForFunction(() => state.sceneTransition.mode === "tutorial_departure");
+    await page.waitForTimeout(360);
+    const departure = await page.evaluate(() => ({
+      gameState: state.gameState,
+      runMode: state.runMode,
+      transitionMode: state.sceneTransition.mode,
+      transitionProgress: sceneTransitionProgress(),
+      controlsEnabled: currentGameplayControlEnabled()
+    }));
+    assert.equal(departure.gameState, "playing");
+    assert.equal(departure.runMode, "tutorial");
+    assert.equal(departure.transitionMode, "tutorial_departure");
+    assert.ok(departure.transitionProgress > 0 && departure.transitionProgress < 1);
+    assert.equal(departure.controlsEnabled, false);
     await page.waitForFunction(() => onboardingUiMode === "post_callsign" && state.gameState === "start");
     let graduation = await page.evaluate(() => ({
       calls: window.__graduationCompletionCalls,
@@ -633,6 +759,12 @@ test("debug runs cannot persist records or progression across reload", { timeout
   });
   const { page, errors } = await openGame(context, "/?debug=1&scenario=siphon");
   try {
+    await page.waitForFunction(() => {
+      const node = document.querySelector("#debugSnapshot");
+      if (!node?.textContent) return false;
+      const snapshot = JSON.parse(node.textContent);
+      return snapshot.gameState === "playing" && snapshot.input.gameplayControlEnabled === true;
+    });
     const before = await debugSnapshot(page);
     await page.evaluate(() => {
       addScore(50000);
@@ -808,8 +940,8 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
       };
     });
     assert.equal(automatic.game.gameState, "paused");
-    assert.equal(automatic.game.player.hp, 2, "blur plus visibility events must deduct exactly one health bar");
-    assert.equal(automatic.game.ui.pauseNotice, "AUTO-PAUSE COST: 1 HEALTH BAR");
+    assert.equal(automatic.game.player.hp, 3, "automatic lifecycle pauses must not deduct health");
+    assert.equal(automatic.game.ui.pauseNotice, "AUTO-PAUSED: NO HEALTH COST");
     assert.equal(automatic.music.hidden, true);
     assert.equal(automatic.music.tracks.gameplay.paused, true);
     assert.equal(automatic.music.tracks.gameplay.volume, 0.17, "hiding pauses immediately without mutating the saved mix level");
@@ -831,8 +963,8 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
       document.dispatchEvent(new Event("visibilitychange"));
       return { hp: state.player.hp, gameState: state.gameState };
     });
-    assert.equal(lethalAutomatic.hp, 0, "the final automatic-pause cost must not be silently waived");
-    assert.equal(lethalAutomatic.gameState, "gameover", "a lethal automatic-pause cost must end a standard run cleanly");
+    assert.equal(lethalAutomatic.hp, 1, "automatic pause must remain safe at one health");
+    assert.equal(lethalAutomatic.gameState, "paused", "automatic pause must pause rather than end the run");
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

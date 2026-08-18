@@ -110,8 +110,8 @@ and release evidence.
   top-right Score/Hi-Score/Combo text. Energy sits above segmented Health in a
   classic bottom-left stack above touch controls.
 - A deliberate standard-run pause costs one Health bar and reports the cost;
-  manual First Flight pause is free. Focus and visibility auto-pauses cost one
-  Health in either run mode. A manual standard pause is refused when no spare
+  manual First Flight pause is free. Focus and visibility auto-pauses are free
+  in either run mode. A manual standard pause is refused when no spare
   Health remains.
 - Player-facing phase skips, developer stats, and hitbox toggles are removed.
   Production builds also strip automated QA scenarios and debug snapshots.

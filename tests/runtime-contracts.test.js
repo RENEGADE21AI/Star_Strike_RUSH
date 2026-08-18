@@ -112,7 +112,7 @@ test("gameplay renders compact classic HUD without announcement popups", () => {
   assert.doesNotMatch(hudSource, /devStatsVisible|drawDebugHitboxes/);
 });
 
-test("manual training pause is free while standard and automatic pauses cost one health", () => {
+test("manual standard pause costs one health while training and automatic pauses are free", () => {
   const decision = (player, reason, runMode) => JSON.parse(JSON.stringify(context.pauseHealthDecision(player, reason, runMode)));
   assert.deepEqual(
     decision({ hp: 5, maxHp: 5 }, "manual", "standard"),
@@ -120,7 +120,7 @@ test("manual training pause is free while standard and automatic pauses cost one
   );
   assert.deepEqual(
     decision({ hp: 5, maxHp: 5 }, "visibility", "standard"),
-    { allowed: true, cost: 1, remainingHp: 4, message: "AUTO-PAUSE COST: 1 HEALTH BAR" }
+    { allowed: true, cost: 0, remainingHp: 5, message: "AUTO-PAUSED: NO HEALTH COST" }
   );
   assert.deepEqual(
     decision({ hp: 1, maxHp: 5 }, "manual", "standard"),
@@ -135,11 +135,11 @@ test("manual training pause is free while standard and automatic pauses cost one
   assert.equal(hp, 5);
   assert.deepEqual(
     decision({ hp: 3, maxHp: 5 }, "focus", "tutorial"),
-    { allowed: true, cost: 1, remainingHp: 2, message: "AUTO-PAUSE COST: 1 HEALTH BAR" }
+    { allowed: true, cost: 0, remainingHp: 3, message: "AUTO-PAUSED: NO HEALTH COST" }
   );
   assert.deepEqual(
     decision({ hp: 1, maxHp: 5 }, "visibility", "tutorial"),
-    { allowed: true, cost: 1, remainingHp: 0, message: "AUTO-PAUSE COST: 1 HEALTH BAR" }
+    { allowed: true, cost: 0, remainingHp: 1, message: "AUTO-PAUSED: NO HEALTH COST" }
   );
   const inputSource = fs.readFileSync(path.join(repoRoot, "src", "18-session-input-loop.js"), "utf8");
   assert.match(inputSource, /decision\.cost > 0 && state\.player\.hp <= 0/);

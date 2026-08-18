@@ -30,9 +30,9 @@ center and lower-middle playfield remain clear while those verbs are active.
   `combatActive` are both true.
 - The normal one-Health manual pause policy stays intact for standard runs.
   Tutorial manual pauses are free, including at one Health. Automatic
-  focus/visibility pauses cost one Health in both standard and tutorial modes;
-  a lethal cost resolves immediately through Game Over or tutorial checkpoint
-  recovery instead of leaving a live zero-Health session.
+  focus/visibility pauses are free in every run mode so browser lifecycle
+  events can never consume Health. A single interruption still creates at most
+  one paused state.
 
 The director observes these real state changes. It does not award success from
 a timer or substitute a tutorial-only animation for an ability.
@@ -94,17 +94,17 @@ checkpoint, and next step. Timers control presentation cadence only.
 | --- | --- | --- |
 | 0 | `incoming` | Player begins or skips after the Colonel identifies the local call sign. |
 | 1 | `lightspeed` | The shared time-based launch reaches arrival. |
-| 2 | `movement` | Player enters three sequential beacon collision radii. |
-| 3 | `auto_weapons` | Three slow training drones are destroyed by real automatic shots. |
+| 2 | `movement` | Player flies to three sequential beacons; each ring grows in, then expands and dissipates on contact. The first beacon is deliberately outside the spawn radius. |
+| 3 | `auto_weapons` | Three slow training drones glide in from above before automatic fire unlocks, then are destroyed by real shots. |
 | 4 | `evasion` | Player crosses to the intended safe side after the identified volley becomes active and without taking volley damage. A hit resets only this lesson. |
 | 5 | `ghost_shift` | A real Ghost Shift is used and the fighter crosses the lane boundary while the production Ghost timer is active. Ordinary movement resets only this lesson. |
-| 6 | `powerup` | The player collides with one intentionally placed Phase Shield. |
+| 6 | `powerup` | The player flies forward to one intentionally placed Phase Shield after its short reveal. |
 | 7 | `controlled_wave` | Two deterministic early-enemy waves are cleared. |
 | 8 | `command_boss` | A staged standard boss at 25% normal HP is defeated through normal collision and damage rules. |
 | 9 | `wraith_briefing` | The two-realm explanation is acknowledged while combat is safely frozen. |
 | 10 | `realm_practice` | One real Realm Hop, one realm-specific avoidance, and one matching-realm state are observed. |
 | 11 | `wraith_boss` | A staged Wraith at 22% normal HP is defeated after a hop and matching-realm damage. |
-| 12 | `graduation` | Hostiles are cleared, completion is persisted, and the player advances to the optional identity offer. |
+| 12 | `graduation` | Hostiles are cleared, completion is persisted, and a short galaxy departure/return carries the player into the optional identity offer. |
 
 Checkpoints are persisted after movement, Ghost Shift, before Command Ship,
 before the Wraith lesson, before the Wraith boss, and graduation. Resume maps a
@@ -113,7 +113,10 @@ checkpoint to the earliest safe step that reconstructs all required state.
 ## Deterministic encounters
 
 Training drones use existing early-enemy rendering and collision with isolated
-low HP and fixed paths. The director disables normal wave selection, dynamic
+low HP and fixed paths. Training enemies enter through one eased off-screen
+arrival contract; the player ship uses the same visible transit principle for
+lesson staging rather than coordinate jumps. A brief objective-complete beat
+separates player action from the next transmission. The director disables normal wave selection, dynamic
 difficulty changes, random debris, random powerups, and unrelated hazards while
 `runMode` is `tutorial`.
 

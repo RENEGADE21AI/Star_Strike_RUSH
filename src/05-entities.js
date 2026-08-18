@@ -112,6 +112,7 @@ function updatePlayer() {
 }
 function firePlayer() {
   const p = state.player;
+  if (typeof tutorialWeaponsLocked === "function" && tutorialWeaponsLocked()) return;
   const cooldown = p.rapid > 0 ? 10 : 14;
   if (p.fire > 0) return;
   const kind = getPlayerShotKind();

@@ -26,6 +26,31 @@ function updateEnemies() {
     e.prevX = e.x; e.prevY = e.y;
     e.hitFlash = Math.max(0, (e.hitFlash || 0) - 1);
     e.hitPulse = Math.max(0, (e.hitPulse || 0) - 0.12);
+    if (e.tutorialArrival && !e.tutorialArrivalComplete) {
+      const arrival = e.tutorialArrival;
+      arrival.elapsed++;
+      if (arrival.elapsed < 0) {
+        e.tutorialVisualAlpha = 0;
+        e.tutorialVisualScale = 0.56;
+        continue;
+      }
+      const visual = tutorialArrivalVisual(arrival.elapsed, arrival.duration);
+      const position = tutorialTransitPosition(arrival.from, arrival.to, arrival.elapsed, arrival.duration);
+      e.x = position.x;
+      e.y = position.y;
+      e.tutorialVisualAlpha = visual.alpha;
+      e.tutorialVisualScale = visual.scale;
+      e.vx = 0;
+      e.vy = 0;
+      e.fireTimer = 99999;
+      e.shoot = 99999;
+      if (visual.progress >= 1) {
+        e.tutorialArrivalComplete = true;
+        e.tutorialVisualAlpha = 1;
+        e.tutorialVisualScale = 1;
+      }
+      continue;
+    }
     if (e.entryFrames > 0 && e.spawnMode !== "boss") {
       e.entryFrames--;
       e.y += 0.62;
@@ -260,6 +285,12 @@ function updateEnemies() {
 }
 function updatePowerups() {
   for (const p of state.powerups) {
+    if (p.tutorialSpawnFrame != null) {
+      const elapsed = Math.max(0, state.frame - p.tutorialSpawnFrame);
+      const visual = tutorialArrivalVisual(elapsed, p.tutorialArrivalDuration || 30);
+      p.tutorialVisualAlpha = visual.alpha;
+      p.tutorialVisualScale = visual.scale;
+    }
     if (p.static) continue;
     p.rotation = Number(p.rotation || 0) + Number(p.spinSpeed == null ? 0.024 : p.spinSpeed);
     const nearPlayer = Math.hypot(p.x - state.player.x, p.y - state.player.y) < 140;
@@ -343,6 +374,13 @@ function applyBossHitFeedback(boss, x, y) {
   spawnParticles(x, y, 7, "#fff", 0.82);
   if (typeof playGameSound === "function") playGameSound("boss_hit", 0.78);
 }
+function applyBossStagingPingFeedback(boss, x, y) {
+  if (!boss) return;
+  boss.hitFlash = Math.max(boss.hitFlash || 0, 5);
+  boss.hitPulse = Math.max(boss.hitPulse || 0, 0.45);
+  spawnParticles(x, y, 4, "#bff6ff", 0.48);
+  if (typeof playGameSound === "function") playGameSound("enemy_hit", 0.32);
+}
 function bossSpriteKey(mode) { return `boss_${mode || "standard"}`; }
 function playerBulletSpriteKey() { return "player_bullet"; }
 function enemyBulletSpriteKey(kind) { return kind === "drainShot" ? "drainShot" : "enemy_bullet"; }
@@ -358,6 +396,11 @@ function updateCollisions() {
   for (let i = state.bullets.length - 1; i >= 0; i--) {
     const b = state.bullets[i], dmg = b.damage ?? 1;
     if (b.life <= 0) continue;
+    if (state.boss && !bossCanTakeDamage(state.boss) && bossCollisionHits(b, state.boss)) {
+      b.life = 0;
+      applyBossStagingPingFeedback(state.boss, b.x, b.y);
+      continue;
+    }
     if (state.boss && bossCanTakeDamage(state.boss)) {
       if (state.boss.mode === "wraith") {
         if ((b.realm == null || b.realm === state.playerRealm) && b.kind === (state.boss.realm === 0 ? "physical" : "ghost") && bossCollisionHits(b, state.boss)) {
@@ -477,7 +520,9 @@ function updateCollisions() {
         if (b.pierce > 0) b.pierce--;
         else b.life = 0;
         state.difficulty.shotsHit++;
-        const actualDamage = typeof applyEnemyDamageModifiers === "function" ? applyEnemyDamageModifiers(e, dmg, b) : dmg;
+        const actualDamage = e.tutorialInvulnerable
+          ? 0
+          : (typeof applyEnemyDamageModifiers === "function" ? applyEnemyDamageModifiers(e, dmg, b) : dmg);
         if (actualDamage > 0) {
           e.hp -= actualDamage;
           applyEnemyHitFeedback(e);
@@ -597,6 +642,7 @@ function updateCollisions() {
 
   for (let i = state.powerups.length - 1; i >= 0; i--) {
     const pu = state.powerups[i];
+    if (pu.tutorialCollectibleFrame != null && state.frame < pu.tutorialCollectibleFrame) continue;
     if (manifestCollision(
       { key: `powerup_${pu.type}`, x: pu.x, y: pu.y, fallbackRadius: pu.size || 16 },
       { key: "player", x: p.x, y: p.y, fallbackRadius: 15 }

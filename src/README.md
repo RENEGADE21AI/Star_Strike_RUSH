@@ -32,8 +32,8 @@ after the files they depend on, because the current code intentionally shares gl
 - `06-bosses.js`: boss spawning, boss attacks, boss death effects.
 - `07-gameplay-systems.js`: enemy movement, collisions, powerups, phase/wave loop.
 - `07-tutorial-director.js`: immutable tutorial step definitions, deterministic
-  spawn plans, action completion predicates, isolated boss overrides, recovery,
-  and one-time graduation Codex policy.
+  spawn plans, action completion predicates, reusable arrival/dissipation math,
+  isolated boss overrides, recovery, and one-time graduation Codex policy.
 - `08-title-screen.js`: title formations, title input geometry, menu hit testing.
 - `09-rendering-controls.js`: shared rounded glass button, pressed-state, and
   icon drawing helpers used across title panels and terminal states.
@@ -61,8 +61,8 @@ after the files they depend on, because the current code intentionally shares gl
 - `17-tutorial-onboarding.js`: First Flight runtime director, accessible
   Colonel/objective surfaces, replaceable Colonel Arisaka portrait boundary
   with the registered owner-supplied portrait and geometric load-failure
-  fallback, checkpoints, tutorial presentation, and adaptive optional
-  post-graduation identity flow.
+  fallback, eased player/enemy lesson staging, checkpoints, tutorial
+  presentation, and adaptive optional post-graduation identity flow.
 - `18-expansion-data.js`: expansion roster constants, codex metadata, spawn
   caps, and enemy setup defaults.
 - `18-expansion-enemies-powerups.js`: expansion enemy behavior, support effects,

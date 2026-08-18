@@ -63,7 +63,8 @@ function currentGameplayPolicyContext() {
   return {
     gameState: state.gameState,
     transitionMode: state.sceneTransition && state.sceneTransition.mode,
-    tutorialDialogueVisible: state.runMode === "tutorial" && !!(tutorialDirector && tutorialDirector.dialogueVisible)
+    tutorialDialogueVisible: state.runMode === "tutorial" && !!(tutorialDirector && tutorialDirector.dialogueVisible),
+    tutorialControlLocked: typeof tutorialControlLocked === "function" && tutorialControlLocked()
   };
 }
 function currentGameplayControlEnabled() {
@@ -747,6 +748,15 @@ function update() {
     return;
   }
 
+  if (state.sceneTransition.mode === "tutorial_departure") {
+    state.sceneTransition.frame++;
+    state.sceneTransition.elapsedSeconds = Number(state.sceneTransition.elapsedSeconds || 0) + SIMULATION_STEP_MS / 1000;
+    updateStars();
+    updateParticles();
+    if (state.sceneTransition.elapsedSeconds >= state.sceneTransition.durationSeconds) beginPostTutorialIdentityFlow();
+    return;
+  }
+
   if (
     state.runMode === "tutorial" &&
     typeof tutorialSimulationPaused === "function" &&
@@ -766,6 +776,7 @@ function update() {
   updateStars();
   if (state.runMode !== "tutorial") updateWavesAndPhaseAndPressure();
   updatePlayer();
+  if (state.runMode === "tutorial" && typeof updateTutorialMotionRuntime === "function") updateTutorialMotionRuntime();
   updateWingmen();
   updateBullets();
   updateEnemies();
