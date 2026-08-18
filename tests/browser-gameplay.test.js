@@ -312,8 +312,7 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "pause");
     const returnTitle = page.getByRole("button", { name: "Return to title", exact: true });
-    await returnTitle.focus();
-    await page.keyboard.press("Enter");
+    await returnTitle.press("Enter");
     await page.waitForFunction(() => onboardingUiMode === "resume_training" && state.gameState === "start");
     transferred = await page.evaluate(() => ({
       modalCount: document.querySelectorAll('[aria-modal="true"]').length,
