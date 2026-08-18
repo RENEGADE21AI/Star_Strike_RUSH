@@ -307,6 +307,7 @@ function enterGameOver() {
   state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
   if (typeof recordDifficultySample === "function") recordDifficultySample(true);
   if (progressionAllowed) finalizeLocalRunAchievements();
+  if (progressionAllowed && typeof publishWeeklyRunIfEligible === "function") publishWeeklyRunIfEligible();
   if (typeof startGloryCelebrations === "function") {
     startGloryCelebrations(progressionResult && progressionResult.presentationEvents);
   }

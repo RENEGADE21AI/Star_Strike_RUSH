@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {
   competitionActivationState,
+  preseasonCompetitionActivationState,
   divisionName,
   normalizeHandle,
   performanceBand,
@@ -47,7 +48,7 @@ test("league member payloads expose only public game identity", () => {
   assert.equal("uid" in member, false);
 });
 
-test("future leagues require progression writes, competition writes, and verified run sessions", () => {
+test("verified leagues remain gated while the unverified preseason board cannot mutate progression", () => {
   for (const progressionWritesEnabled of [false, true]) {
     for (const competitionWritesEnabled of [false, true]) {
       for (const verifiedRunSessionsEnabled of [false, true]) {
@@ -63,8 +64,22 @@ test("future leagues require progression writes, competition writes, and verifie
       }
     }
   }
+  assert.equal(preseasonCompetitionActivationState({
+    progressionWritesEnabled: false,
+    competitionWritesEnabled: true,
+    verifiedRunSessionsEnabled: false
+  }), true);
+  assert.equal(preseasonCompetitionActivationState({
+    progressionWritesEnabled: true,
+    competitionWritesEnabled: true,
+    verifiedRunSessionsEnabled: false
+  }), false);
   const indexSource = fs.readFileSync(path.resolve(__dirname, "../functions/index.js"), "utf8");
-  assert.match(indexSource, /performanceBand\(publicData\.verifiedBestScore\)/);
-  assert.doesNotMatch(indexSource, /performanceBand\(publicData\.(?:bestScore|legacyBestScore)\)/);
-  assert.match(indexSource, /recordTrust\s*!==\s*"verified_run_session"/);
+  const joinBody = indexSource.slice(indexSource.indexOf("exports.joinWeeklyLeague"), indexSource.indexOf("function clientProfile"));
+  assert.doesNotMatch(joinBody, /verifiedBestScore|legacyBestScore/);
+  assert.match(joinBody, /recordTrust: "preseason_unverified"/);
+  const submitBody = indexSource.slice(indexSource.indexOf("exports.submitRunReceipt"), indexSource.indexOf("exports.claimSeasonReward"));
+  assert.doesNotMatch(submitBody, /players_private|player_achievement|leaderboard_scores|applyRunToProfile/);
+  assert.match(submitBody, /weekly_run_receipts/);
+  assert.match(submitBody, /Math\.max\(/);
 });

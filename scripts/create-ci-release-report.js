@@ -19,6 +19,7 @@ function createCiReleaseReport(options = {}) {
     hostingBuildShaVerified: true,
     backendMarkerShaVerified: true,
     progressionAuthority: backend.progressionAuthority,
+    competitionMode: backend.competitionMode,
     competitionWritesEnabled: backend.competitionWritesEnabled,
     serverProgressionWritesEnabled: backend.serverProgressionWritesEnabled,
     appCheckEnforced: backend.appCheckEnforced,

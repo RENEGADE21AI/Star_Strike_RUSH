@@ -30,6 +30,7 @@ function loadHydrationContract(overrides = {}) {
     Promise,
     hydrationPromises: new Map(),
     authGeneration: 1,
+    competitiveModeEnabled: false,
     localStorage: {},
     navigator: { onLine: true },
     online: {
@@ -45,6 +46,7 @@ function loadHydrationContract(overrides = {}) {
     },
     isHydrationCurrent: () => true,
     subscribeLegacyArchive: () => {},
+    loadWeeklyLeague: async () => ({ ok: false, reason: "disabled" }),
     setStatus: () => {},
     setError: () => {},
     ...overrides

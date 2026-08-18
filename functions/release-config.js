@@ -4,8 +4,9 @@
 const RELEASE_INTEGRITY_CONFIG = Object.freeze({
   schemaVersion: 1,
   progressionAuthority: "device_local_preseason",
-  clientCompetitionWritesEnabled: false,
-  serverCompetitionWritesEnabled: false,
+  competitionMode: "preseason_unverified",
+  clientCompetitionWritesEnabled: true,
+  serverCompetitionWritesEnabled: true,
   serverProgressionWritesEnabled: false,
   verifiedRunSessionsEnabled: false,
   serverAppCheckEnforced: false
@@ -14,6 +15,7 @@ const RELEASE_INTEGRITY_CONFIG = Object.freeze({
 module.exports = {
   RELEASE_INTEGRITY_CONFIG,
   PROGRESSION_AUTHORITY: RELEASE_INTEGRITY_CONFIG.progressionAuthority,
+  PUBLIC_COMPETITION_MODE: RELEASE_INTEGRITY_CONFIG.competitionMode,
   SERVER_APP_CHECK_ENFORCED: RELEASE_INTEGRITY_CONFIG.serverAppCheckEnforced,
   SERVER_COMPETITION_WRITES_ENABLED: RELEASE_INTEGRITY_CONFIG.serverCompetitionWritesEnabled,
   SERVER_PROGRESSION_WRITES_ENABLED: RELEASE_INTEGRITY_CONFIG.serverProgressionWritesEnabled,

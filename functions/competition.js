@@ -1,5 +1,6 @@
 const { HttpsError } = require("firebase-functions/v2/https");
 const {
+  PUBLIC_COMPETITION_MODE,
   SERVER_COMPETITION_WRITES_ENABLED,
   SERVER_PROGRESSION_WRITES_ENABLED,
   VERIFIED_RUN_SESSIONS_ENABLED
@@ -77,15 +78,23 @@ function competitionActivationState(config = {}) {
   );
 }
 
+function preseasonCompetitionActivationState(config = {}) {
+  return (
+    config.progressionWritesEnabled !== true &&
+    config.competitionWritesEnabled === true &&
+    config.verifiedRunSessionsEnabled !== true
+  );
+}
+
 function requireCompetitionEnabled() {
-  if (!competitionActivationState({
+  if (PUBLIC_COMPETITION_MODE !== "preseason_unverified" || !preseasonCompetitionActivationState({
     progressionWritesEnabled: SERVER_PROGRESSION_WRITES_ENABLED,
     competitionWritesEnabled: SERVER_COMPETITION_WRITES_ENABLED,
     verifiedRunSessionsEnabled: VERIFIED_RUN_SESSIONS_ENABLED
   })) {
     throw new HttpsError(
       "failed-precondition",
-      "Public competition is paused until verified run sessions and matching progression writes are enabled.",
+      "The preseason weekly board is unavailable.",
       { release: BACKEND_RELEASE_IDENTITY }
     );
   }
@@ -110,6 +119,7 @@ module.exports = {
   HANDLE_MAX_LENGTH,
   HANDLE_MIN_LENGTH,
   competitionActivationState,
+  preseasonCompetitionActivationState,
   divisionName,
   competitionWritesEnabled,
   normalizeHandle,

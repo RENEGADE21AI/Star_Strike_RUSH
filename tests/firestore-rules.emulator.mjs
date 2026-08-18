@@ -46,7 +46,8 @@ before(async () => {
       setDoc(doc(db, "season_reward_claims/alice/items/reward_1"), { rewardId: "reward_1" }),
       setDoc(doc(db, "handle_registry/alpha"), { uid: "alice" }),
       setDoc(doc(db, "weekly_enrollments/week_alice"), { uid: "alice" }),
-      setDoc(doc(db, "weekly_leagues/league_1"), { memberCount: 1 })
+      setDoc(doc(db, "weekly_leagues/league_1"), { memberCount: 1 }),
+      setDoc(doc(db, "weekly_run_receipts/week_1/members/alice/items/run_1"), { score: 100 })
     ]);
   });
 });
@@ -101,4 +102,6 @@ test("handle and league internals remain callable-only", async () => {
   await assertFails(setDoc(doc(db, "handle_registry/attacker"), { uid: "alice" }));
   await assertFails(getDoc(doc(db, "weekly_enrollments/week_alice")));
   await assertFails(getDoc(doc(db, "weekly_leagues/league_1")));
+  await assertFails(getDoc(doc(db, "weekly_run_receipts/week_1/members/alice/items/run_1")));
+  await assertFails(setDoc(doc(db, "weekly_run_receipts/week_1/members/alice/items/forged"), { score: 999999999 }));
 });

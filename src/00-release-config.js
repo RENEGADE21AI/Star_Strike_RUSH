@@ -2,8 +2,9 @@
 const RELEASE_INTEGRITY_CONFIG = Object.freeze({
   schemaVersion: 1,
   progressionAuthority: "device_local_preseason",
-  clientCompetitionWritesEnabled: false,
-  serverCompetitionWritesEnabled: false,
+  competitionMode: "preseason_unverified",
+  clientCompetitionWritesEnabled: true,
+  serverCompetitionWritesEnabled: true,
   serverProgressionWritesEnabled: false,
   verifiedRunSessionsEnabled: false,
   serverAppCheckEnforced: false
@@ -12,8 +13,10 @@ const RELEASE_INTEGRITY_CONFIG = Object.freeze({
 const PROGRESSION_AUTHORITY = RELEASE_INTEGRITY_CONFIG.progressionAuthority;
 const CLIENT_COMPETITION_WRITES_ENABLED = RELEASE_INTEGRITY_CONFIG.clientCompetitionWritesEnabled;
 const VERIFIED_RUN_SESSIONS_ENABLED = RELEASE_INTEGRITY_CONFIG.verifiedRunSessionsEnabled;
+const PUBLIC_COMPETITION_MODE = RELEASE_INTEGRITY_CONFIG.competitionMode;
 
 globalThis.RELEASE_INTEGRITY_CONFIG = RELEASE_INTEGRITY_CONFIG;
 globalThis.PROGRESSION_AUTHORITY = PROGRESSION_AUTHORITY;
 globalThis.CLIENT_COMPETITION_WRITES_ENABLED = CLIENT_COMPETITION_WRITES_ENABLED;
 globalThis.VERIFIED_RUN_SESSIONS_ENABLED = VERIFIED_RUN_SESSIONS_ENABLED;
+globalThis.PUBLIC_COMPETITION_MODE = PUBLIC_COMPETITION_MODE;

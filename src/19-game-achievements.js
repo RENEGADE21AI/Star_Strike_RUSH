@@ -169,6 +169,16 @@ function finalizeLocalRunAchievements() {
   unlockLocalAchievementsForRun(run);
 }
 
+function publishWeeklyRunIfEligible() {
+  if (state.runMode !== "standard") return false;
+  const service = window.starStrikeOnline;
+  if (!service || typeof service.getState !== "function" || typeof service.submitRun !== "function") return false;
+  const status = service.getState();
+  if (!status.user || !status.weeklyLeague || status.competitionMode !== "preseason_unverified") return false;
+  Promise.resolve(service.submitRun(buildOnlineRunPayload())).catch(() => {});
+  return true;
+}
+
 function requestOnlineSignIn() {
   callOnlineService("signIn", "ONLINE NOT READY");
 }
