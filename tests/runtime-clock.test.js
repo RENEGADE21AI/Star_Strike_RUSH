@@ -48,11 +48,22 @@ test("30, 60, 90, and 120 Hz rendering produce equivalent simulation timing", ()
 });
 
 test("long background gaps are clamped and cannot spiral into hundreds of updates", () => {
-  const clock = context.createFixedStepClock({ maxDeltaMs: 200, maxSteps: 8 });
+  const clock = context.createFixedStepClock();
   let steps = 0;
   context.advanceFixedStep(clock, 0, () => { steps++; });
   const result = context.advanceFixedStep(clock, 30_000, () => { steps++; });
-  assert.equal(steps, 8);
+  assert.ok(steps <= 3, `a stalled render must not replay ${steps} simulation ticks in one visual frame`);
   assert.ok(result.droppedMs > 0);
   assert.ok(result.alpha >= 0 && result.alpha < 1);
+});
+
+test("a 200 ms foreground stall resumes near normal speed instead of fast-forwarding", () => {
+  const clock = context.createFixedStepClock();
+  let steps = 0;
+  context.advanceFixedStep(clock, 0, () => { steps++; });
+  const stalled = context.advanceFixedStep(clock, 200, () => { steps++; });
+  assert.ok(stalled.steps <= 3);
+  assert.ok(stalled.droppedMs >= 140, `expected most stalled wall time to be discarded, got ${stalled.droppedMs}`);
+  const resumed = context.advanceFixedStep(clock, 200 + 1000 / 60, () => { steps++; });
+  assert.equal(resumed.steps, 1);
 });

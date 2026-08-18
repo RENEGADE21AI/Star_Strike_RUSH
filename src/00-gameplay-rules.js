@@ -121,6 +121,26 @@ function ghostActionProfile(bossMode) {
   return { label: "GHOST", cost: 35, cooldown: 20, burst: 4.6, phaseThroughDebris: true };
 }
 
+function wrapGameplayAngle(angle) {
+  let wrapped = Number(angle) || 0;
+  while (wrapped > Math.PI) wrapped -= Math.PI * 2;
+  while (wrapped < -Math.PI) wrapped += Math.PI * 2;
+  return wrapped;
+}
+
+function smoothEnemyVisualHeading(current, dx, dy, fallbackY = 1, maxTurn = 0.08) {
+  const movementX = Number(dx) || 0;
+  const movementY = Number(dy) || 0;
+  const moving = Math.hypot(movementX, movementY) > 0.08;
+  const target = moving
+    ? Math.atan2(movementY, movementX) - Math.PI / 2
+    : (fallbackY < 0 ? Math.PI : 0);
+  if (!Number.isFinite(Number(current))) return wrapGameplayAngle(target);
+  const delta = wrapGameplayAngle(target - Number(current));
+  const turn = Math.max(0.01, Number(maxTurn) || 0.08);
+  return wrapGameplayAngle(Number(current) + Math.max(-turn, Math.min(turn, delta)));
+}
+
 globalThis.simulateReachableDistance = simulateReachableDistance;
 globalThis.debrisSafeGap = debrisSafeGap;
 globalThis.createDoubleDebrisPlan = createDoubleDebrisPlan;
@@ -131,3 +151,5 @@ globalThis.debrisSpawnScale = debrisSpawnScale;
 globalThis.bossCanTakeDamage = bossCanTakeDamage;
 globalThis.createSiphonShot = createSiphonShot;
 globalThis.ghostActionProfile = ghostActionProfile;
+globalThis.wrapGameplayAngle = wrapGameplayAngle;
+globalThis.smoothEnemyVisualHeading = smoothEnemyVisualHeading;

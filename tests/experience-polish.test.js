@@ -24,10 +24,32 @@ test("combat HUD protects touch controls and keeps the classic status order", ()
   assert.equal(touch.status.y + touch.status.h <= 535, true, "status must finish above the joystick zone");
   assert.equal(touch.pause.x, 10);
   assert.equal(touch.pause.y, 10);
+  assert.ok(touch.pause.w <= 44, "Pause and its -1 cost should share a compact capsule");
+  assert.ok(touch.score.w <= 82, "score backing should not carry an empty left gutter");
 
   context.state.inputMode = "keyboard";
   const desktop = vm.runInContext("getGameplayHudLayout()", context);
   assert.equal(desktop.status.y + desktop.status.h < 637, true, "status must not collide with the transient desktop hint");
+});
+
+test("Codex detail places the encounter graphic below its title and all data below the graphic", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "src", "12-rendering-title-panels.js"), "utf8");
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  const panel = { x: 10, y: 14, w: 355, h: 639 };
+  const layout = vm.runInContext(`codexDetailLayout(${JSON.stringify(panel)}, "boss_standard")`, context);
+  assert.equal(layout.graphic.x, panel.x + panel.w / 2);
+  assert.ok(layout.graphic.y > layout.title.y, "graphic must sit below the title");
+  assert.ok(layout.stats.y > layout.graphic.bottom, "stats must start below the complete ship silhouette");
+  assert.ok(layout.brief.y > layout.stats.bottom, "briefing must follow the stats");
+  assert.ok(layout.brief.y + layout.brief.h <= layout.card.y + layout.card.h - 12, "briefing must remain inside the card");
+});
+
+test("Flight Network connected status is fitted to the card's measured text lane", () => {
+  const source = fs.readFileSync(path.join(repoRoot, "src", "12-rendering-title-panels.js"), "utf8");
+  assert.match(source, /fitCondensedCanvasFont\("ACCOUNT CONNECTED"/);
+  assert.match(source, /networkTextMaxWidth/);
 });
 
 test("boss Health HUD reserves the top-left Pause control", () => {
@@ -99,7 +121,8 @@ test("Records separates this device's best from the unverified public archive", 
   assert.match(source, /LEGACY\/PRESEASON ARCHIVE • UNVERIFIED/);
   assert.match(source, /PUBLIC ARCHIVE WRITES PAUSED/);
   assert.match(source, /DEVICE PROGRESS ACTIVE • PUBLIC WRITES PAUSED/);
-  assert.match(source, /VERIFIED BEST SETS YOUR DIVISION/);
+  assert.match(source, /PRESEASON WEEKLY BOARD/);
+  assert.match(source, /UNVERIFIED FLIGHT POINTS/);
   assert.doesNotMatch(source, /CONNECT TO PUBLISH RECORDS/);
   assert.doesNotMatch(source, /PRIOR BEST SCORE SETS YOUR DIVISION/);
 });

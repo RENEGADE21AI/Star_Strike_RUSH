@@ -245,6 +245,16 @@ function updateEnemies() {
     }
   }
   resolveEnemySpacing();
+  for (const e of state.enemies) {
+    if (typeof smoothEnemyVisualHeading !== "function") continue;
+    e.visualHeading = smoothEnemyVisualHeading(
+      e.visualHeading,
+      e.x - (Number.isFinite(e.prevX) ? e.prevX : e.x),
+      e.y - (Number.isFinite(e.prevY) ? e.prevY : e.y),
+      e.escape ? -1 : 1,
+      e.spawnMode === "boss" ? 0.11 : 0.075
+    );
+  }
   if (typeof updateExpansionSupportEffects === "function") updateExpansionSupportEffects();
   state.enemies = state.enemies.filter(e => e.hp > 0);
 }

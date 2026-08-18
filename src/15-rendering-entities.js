@@ -148,10 +148,10 @@ function drawEnemies() {
     ctx.scale(scale * typeScale, scale * typeScale);
     const dx = e.x - (e.prevX || e.x);
     const dy = e.y - (e.prevY || e.y);
-    const heading = enemyHeadingRotation(dx, dy, e.escape ? -1 : 1);
-    const bank = clamp(dx * 0.018, -0.12, 0.12);
-    const sway = Math.sin(state.frame * 0.10 + e.loopPhase) * 0.05;
-    ctx.rotate(heading + bank + sway);
+    const heading = Number.isFinite(e.visualHeading)
+      ? e.visualHeading
+      : enemyHeadingRotation(dx, dy, e.escape ? -1 : 1);
+    ctx.rotate(heading);
     drawEnemyGeometry(e.type, {
       hitMix,
       alpha: entityAlpha,

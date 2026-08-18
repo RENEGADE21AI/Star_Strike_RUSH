@@ -244,10 +244,31 @@ function codexTacticalLines(type, meta) {
   };
   return notes[type] || [String(meta.trait || "Study its movement and warning state."), "Keep the lower screen clear before it attacks."];
 }
+function codexDetailLayout(panel, type) {
+  const card = { x: panel.x + 18, y: panel.y + 78, w: panel.w - 36, h: panel.h - 94 };
+  const boss = String(type || "").startsWith("boss");
+  const graphic = {
+    x: card.x + card.w / 2,
+    y: card.y + (boss ? 92 : 88),
+    scale: boss ? 0.52 : 0.72,
+    bottom: card.y + 142
+  };
+  const stats = { x: card.x + Math.round((card.w - 162) / 2), y: graphic.bottom + 12 };
+  stats.bottom = stats.y + 82;
+  const briefY = stats.bottom + 14;
+  return {
+    card,
+    title: { x: card.x + card.w / 2, y: card.y + 14, maxWidth: card.w - 92 },
+    graphic,
+    stats,
+    brief: { x: card.x + 14, y: briefY, w: card.w - 28, h: Math.max(142, card.y + card.h - briefY - 12) }
+  };
+}
 function drawCodexDetail(panel, type) {
   const stats = codexTypeStats(type);
   const meta = typeof getCodexMeta === "function" ? getCodexMeta(type) : { color: "#fff" };
-  const card = { x: panel.x + 18, y: panel.y + 78, w: panel.w - 36, h: panel.h - 94 };
+  const layout = codexDetailLayout(panel, type);
+  const card = layout.card;
   ctx.save();
   ctx.fillStyle = "rgba(0,0,8,0.93)";
   ctx.beginPath(); ctx.roundRect(card.x, card.y, card.w, card.h, 10); ctx.fill();
@@ -266,29 +287,29 @@ function drawCodexDetail(panel, type) {
   ctx.textBaseline = "middle";
   ctx.fillText("<", backRect.x + backRect.w / 2, backRect.y + backRect.h / 2 + 1);
 
-  ctx.translate(card.x + 44, card.y + 56);
-  drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.85 : 0.85, silhouette: false, stateMode: "physical", realm: 0 });
+  ctx.translate(layout.graphic.x, layout.graphic.y);
+  drawEncounterShipGraphic(type, { scale: layout.graphic.scale, silhouette: false, stateMode: "physical", realm: 0 });
   ctx.restore();
 
   ctx.save();
   ctx.fillStyle = "#fff";
   ctx.font = FONT_HUD;
-  ctx.textAlign = "left";
+  ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText(stats.name, card.x + 88, card.y + 12);
+  ctx.fillText(stats.name, layout.title.x, layout.title.y, layout.title.maxWidth);
   ctx.fillStyle = "rgba(255,255,255,0.76)";
   ctx.font = FONT_SMALL;
-  ctx.fillText(`Threat: ${stats.threat.toFixed(2)}`, card.x + 88, card.y + 42);
-  ctx.fillText(`HP: ${stats.hp}`, card.x + 88, card.y + 60);
-  drawStatBar(card.x + 88, card.y + 86, "Speed", stats.speed);
-  drawStatBar(card.x + 88, card.y + 108, "Aggression", stats.aggression);
-  drawStatBar(card.x + 88, card.y + 130, "Fire Rate", stats.fire);
+  ctx.fillText(`THREAT ${stats.threat.toFixed(2)}   •   HP ${stats.hp}`, layout.title.x, layout.stats.y);
+  drawStatBar(layout.stats.x, layout.stats.y + 25, "Speed", stats.speed);
+  drawStatBar(layout.stats.x, layout.stats.y + 47, "Aggression", stats.aggression);
+  drawStatBar(layout.stats.x, layout.stats.y + 69, "Fire Rate", stats.fire);
   const tactics = codexTacticalLines(type, meta);
-  const briefY = card.y + 184;
+  const briefY = layout.brief.y;
   ctx.fillStyle = "rgba(255,255,255,0.045)";
-  ctx.fillRect(card.x + 14, briefY, card.w - 28, 142);
+  ctx.fillRect(layout.brief.x, briefY, layout.brief.w, layout.brief.h);
   ctx.strokeStyle = "rgba(255,255,255,0.14)";
-  ctx.strokeRect(card.x + 14, briefY, card.w - 28, 142);
+  ctx.strokeRect(layout.brief.x, briefY, layout.brief.w, layout.brief.h);
+  ctx.textAlign = "left";
   ctx.fillStyle = meta.color || "#fff";
   ctx.font = FONT_TINY;
   ctx.fillText(type.startsWith("boss") ? "BOSS TACTICAL BRIEF" : "TACTICAL BRIEF", card.x + 26, briefY + 14);
@@ -334,8 +355,8 @@ function drawResetProgressConfirm() {
   ctx.fillText(labelName || "PILOT", r.box.x + r.box.w / 2, r.box.y + 55);
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,150,150,0.88)";
-  ctx.fillText("ERASES: SCORE, GLORY, XP, CREDITS, STATS,", r.box.x + r.box.w / 2, r.box.y + 83);
-  ctx.fillText("RECEIPTS, REWARDS, ACHIEVEMENTS, CODEX, LAST RUN", r.box.x + r.box.w / 2, r.box.y + 99);
+  ctx.fillText("ERASES: SCORE, GLORY, PRESTIGE, CREDITS, STATS,", r.box.x + r.box.w / 2, r.box.y + 83);
+  ctx.fillText("RECEIPTS, ACHIEVEMENTS, CODEX, AND LAST RUN", r.box.x + r.box.w / 2, r.box.y + 99);
   ctx.fillStyle = "rgba(150,255,205,0.80)";
   ctx.fillText("PRESERVES: ACCESSIBILITY, AUDIO, CALL SIGN,", r.box.x + r.box.w / 2, r.box.y + 124);
   ctx.fillText("ACCOUNT IDENTITY AND FIREBASE AUTH", r.box.x + r.box.w / 2, r.box.y + 140);
@@ -373,7 +394,7 @@ function drawOnlineActionButton(rect, label, active = true) {
   ctx.roundRect(rect.x, rect.y, rect.w, rect.h, Math.min(7, rect.h * 0.22));
   ctx.stroke();
   ctx.fillStyle = active ? "#fff" : "rgba(255,255,255,0.45)";
-  ctx.font = FONT_BUTTON;
+  fitCondensedCanvasFont(label, Math.max(48, rect.w - 20), 16, 9);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
@@ -456,6 +477,15 @@ function drawMetaBar(x, y, w, ratio, color) {
   ctx.strokeStyle = "rgba(255,255,255,0.22)";
   ctx.strokeRect(x, y, w, 8);
   ctx.restore();
+}
+function fitCondensedCanvasFont(text, maxWidth, startSize = 18, minSize = 12, weight = 900) {
+  let size = Math.max(minSize, startSize);
+  do {
+    ctx.font = `${weight} ${size}px 'Arial Narrow', Arial, sans-serif`;
+    if (ctx.measureText(String(text || "")).width <= maxWidth || size <= minSize) break;
+    size--;
+  } while (size > minSize);
+  return size;
 }
 function drawAccountTab(rect, label, active) {
   ctx.save();
@@ -547,13 +577,16 @@ function drawFlightNetworkCard(rect, online, user) {
   ctx.textAlign = "left"; ctx.textBaseline = "top";
   ctx.font = FONT_TINY; ctx.fillStyle = "rgba(255,255,255,0.46)";
   ctx.fillText("FLIGHT NETWORK", rect.x + 116, rect.y + 22);
-  ctx.font = "900 18px 'Arial Narrow', Arial, sans-serif";
+  const networkStatus = connected ? "ACCOUNT CONNECTED" : "DEVICE PROGRESS";
+  const networkTextX = rect.x + 112;
+  const networkTextMaxWidth = Math.max(80, rect.x + rect.w - 14 - networkTextX);
+  fitCondensedCanvasFont("ACCOUNT CONNECTED", networkTextMaxWidth, 18, 13);
   ctx.fillStyle = connected ? "#78ffb4" : "#d8fbff";
-  ctx.fillText(connected ? "ACCOUNT CONNECTED" : "DEVICE PROGRESS", rect.x + 116, rect.y + 40);
+  ctx.fillText(networkStatus, networkTextX, rect.y + 40);
   ctx.font = FONT_TINY; ctx.fillStyle = "rgba(255,255,255,0.52)";
-  ctx.fillText(connected ? "PILOT IDENTITY ACTIVE" : "LOCAL GAMEPLAY READY", rect.x + 116, rect.y + 66);
+  ctx.fillText(connected ? "PILOT IDENTITY ACTIVE" : "LOCAL GAMEPLAY READY", networkTextX, rect.y + 66);
   ctx.fillStyle = "rgba(255,214,92,0.76)";
-  ctx.fillText("PUBLIC COMPETITION PAUSED", rect.x + 116, rect.y + 82);
+  ctx.fillText(connected ? "PRESEASON WEEKLY BOARD ONLINE" : "WEEKLY BOARD REQUIRES ACCOUNT", networkTextX, rect.y + 82, networkTextMaxWidth);
   ctx.restore();
 }
 function drawOnlinePanel() {
@@ -680,26 +713,26 @@ function drawRecordsPanel() {
     ctx.textBaseline = "top";
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,255,255,0.52)";
-    ctx.fillText("SEVEN-DAY FLIGHT LEAGUE", card.x + 16, card.y + 16);
+    ctx.fillText("PRESEASON WEEKLY BOARD", card.x + 16, card.y + 16);
     ctx.font = "900 23px 'Arial Narrow', Arial, sans-serif";
     ctx.fillStyle = "#ffe67a";
     ctx.shadowColor = "rgba(255,214,92,0.45)";
     ctx.shadowBlur = 10;
-    ctx.fillText(league ? `${String(league.division || "ROOKIE")} LEAGUE` : (competitionEnabled ? "WEEKLY LEAGUES" : "PRESEASON"), card.x + 16, card.y + 37);
+    ctx.fillText(league ? `${String(league.division || "OPEN")} BOARD` : (competitionEnabled ? "WEEKLY RECORDS" : "OFFLINE"), card.x + 16, card.y + 37);
     ctx.shadowBlur = 0;
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,255,255,0.64)";
     ctx.fillText(
       league
-        ? `${league.memberCount || 0}/${league.capacity || 30} PILOTS  •  PERFORMANCE MATCHED`
-        : (competitionEnabled ? "UP TO 30 PILOTS • MATCHED BY VERIFIED BEST" : "VERIFIED WEEKLY SCORING IS CURRENTLY PAUSED"),
+        ? `${league.memberCount || 0}/${league.capacity || 30} PILOTS  •  UNVERIFIED FLIGHT POINTS`
+        : (competitionEnabled ? "UP TO 30 PILOTS • UNVERIFIED FLIGHT POINTS" : "WEEKLY BOARD IS CURRENTLY UNAVAILABLE"),
       card.x + 16,
       card.y + 75
     );
     ctx.fillText(
       league
-        ? String(league.weekLabel || "CURRENT WEEK")
-        : (competitionEnabled ? "CLAIM A HANDLE, THEN ENTER THIS WEEK'S GROUP" : "DEVICE PROGRESS CONTINUES; PUBLIC WRITES ARE CLOSED"),
+        ? String(league.weekLabel || "MONDAY - SUNDAY UTC")
+        : (competitionEnabled ? "CLAIM A HANDLE, THEN ENTER THIS WEEK'S BOARD" : "DEVICE PROGRESS CONTINUES OFFLINE"),
       card.x + 16,
       card.y + 94
     );
@@ -725,14 +758,14 @@ function drawRecordsPanel() {
     } else {
       ctx.fillStyle = "rgba(255,255,255,0.48)";
       const empty = !competitionEnabled
-        ? "LEAGUE MATCHMAKING RETURNS WITH VERIFIED RUN SESSIONS."
+        ? "THE PRESEASON WEEKLY BOARD IS OFFLINE."
         : (!user ? "SIGN IN FROM YOUR PILOT DOSSIER TO ENTER." : (!online.profileHandle ? "CLAIM YOUR @HANDLE IN THE PILOT DOSSIER FIRST." : "ENTER TO FIND YOUR WEEKLY GROUP."));
       ctx.fillText(empty, panel.x + 24, listY);
       const formatCard = { x: panel.x + 20, y: listY + 33, w: panel.w - 40, h: 188 };
       drawDossierCard(formatCard, "#ffd65c");
       ctx.fillStyle = "rgba(255,255,255,0.48)";
-      ctx.fillText("FLIGHT LEAGUE FORMAT", formatCard.x + 16, formatCard.y + 15);
-      const divisions = ["ROOKIE", "CADET", "ACE", "ELITE"];
+      ctx.fillText("WEEKLY BOARD FORMAT", formatCard.x + 16, formatCard.y + 15);
+      const divisions = ["OPEN", "7 DAYS", "BEST RUN", "UNVERIFIED"];
       divisions.forEach((division, index) => {
         const badgeW = 70;
         const badgeX = formatCard.x + 14 + index * 76;
@@ -746,9 +779,9 @@ function drawRecordsPanel() {
       });
       ctx.textAlign = "left";
       const rules = [
-        ["01", "PERFORMANCE MATCHING", "VERIFIED BEST SETS YOUR DIVISION"],
-        ["02", "SEVEN-DAY RESET", "A FRESH GROUP AND CLIMB EVERY MONDAY"],
-        ["03", "VERIFIED FLIGHT POINTS", "ACCEPTED RUN RECEIPTS POWER THE LADDER"]
+        ["01", "OPEN PRESEASON GROUP", "UP TO 30 ACCOUNT PILOTS"],
+        ["02", "SEVEN-DAY RESET", "A FRESH BOARD BEGINS EVERY MONDAY"],
+        ["03", "UNVERIFIED FLIGHT POINTS", "YOUR BEST ACCEPTED RUN SETS THE LADDER"]
       ];
       rules.forEach((rule, index) => {
         const ruleY = formatCard.y + 78 + index * 34;
@@ -765,8 +798,8 @@ function drawRecordsPanel() {
     ctx.restore();
     const competitionAvailable = online.competitionMode !== "unavailable";
     const actionLabel = !competitionEnabled
-      ? "WEEKLY LEAGUES • PRESEASON"
-      : (competitionAvailable ? (league ? "LEAGUE ACTIVE • AUTO UPDATES" : "ENTER THIS WEEK'S LEAGUE") : "COMPETITION SERVICES OFFLINE");
+      ? "WEEKLY BOARD UNAVAILABLE"
+      : (competitionAvailable ? (league ? "WEEKLY BOARD ACTIVE • AUTO UPDATES" : "ENTER THIS WEEK'S BOARD") : "WEEKLY BOARD SERVICE OFFLINE");
     drawOnlineActionButton(r.joinLeague, actionLabel, competitionEnabled && !!user && !!online.profileHandle && competitionAvailable && !league);
     return;
   }

@@ -14,8 +14,11 @@ function effectiveCanvasDpr(width, height, deviceDpr = 1, maxDpr = 2, maxPixels 
 function createFixedStepClock(options = {}) {
   return {
     stepMs: Number(options.stepMs) > 0 ? Number(options.stepMs) : SIMULATION_STEP_MS,
-    maxDeltaMs: Number(options.maxDeltaMs) > 0 ? Number(options.maxDeltaMs) : 200,
-    maxSteps: Number(options.maxSteps) > 0 ? Math.floor(Number(options.maxSteps)) : 8,
+    // Thirty-Hz rendering needs two fixed updates. A third is enough tolerance
+    // for an uneven frame without replaying a visible wall-time backlog after a
+    // stall. Lost wall time is intentionally discarded below.
+    maxDeltaMs: Number(options.maxDeltaMs) > 0 ? Number(options.maxDeltaMs) : 50,
+    maxSteps: Number(options.maxSteps) > 0 ? Math.floor(Number(options.maxSteps)) : 3,
     lastTimestamp: null,
     accumulator: 0
   };
