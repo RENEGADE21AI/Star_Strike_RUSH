@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited: 2026-08-13
+Last audited: 2026-08-18
 
 This is the release truth table. Disabled, configuration-dependent, previewed,
 and production-deployed are distinct states.
@@ -27,8 +27,9 @@ This post-launch hardening pass covers:
 They are production-ready only after the full release suite and protected-branch
 checks pass, they merge, and the guarded workflow verifies matching live Hosting
 and backend SHAs. Device-local preseason progression remains authoritative;
-client competition writes, server competition writes, and server progression
-writes remain disabled. Real Account A/B smoke was explicitly owner-waived for
+the preseason weekly board is enabled with explicitly unverified Flight Points,
+while server progression writes and verified run sessions remain disabled.
+Real Account A/B smoke was explicitly owner-waived for
 the current production release and was **not passed**. The waiver is not account
 verification and does not weaken any Firebase or progression boundary.
 
@@ -41,8 +42,8 @@ verification and does not weaken any Firebase or progression boundary.
 | Firebase identity | Active when configured; separate from gameplay progression |
 | Account archive | Legacy data preserved and loaded separately |
 | Legacy records | `legacy_unverified`; never used to seed verified/current progress |
-| Client competition writes | Disabled |
-| Server competition writes | Disabled |
+| Client competition writes | Enabled only for the unverified preseason weekly board |
+| Server competition writes | Enabled only for server-owned weekly enrollment/receipts |
 | Server progression writes | Disabled |
 | Verified run sessions | Disabled/not implemented |
 | App Check enforcement | Prepared but disabled; live configuration not verified |
@@ -100,17 +101,17 @@ fields, and deletes obsolete `bestScore`, `phase`, Glory/rank/tier,
 `achievementsCount`, and duplicated `uid` fields. `leaderboard_scores` remains
 untouched as the legacy archive.
 
-The paused progression/competition callables are:
+The active preseason-board callables are:
 
 - `submitRunReceipt`
 - `joinWeeklyLeague`
 
-They fail with `failed-precondition` before authentication, reads, or writes
-while the corresponding gates are closed. `claimSeasonReward` remains only as
-an inert retired compatibility endpoint and also rejects before authentication,
-reads, or writes; it contains no Season reward calculation. Existing server
-data is preserved; it is not described as current, live, verified, or a world
-record.
+They require authentication, bounded payloads, per-UID throttling, an account
+identity, and (to join) a public handle. They write only server-owned weekly
+enrollment, member, and idempotency documents. Submitted scores are labeled
+`preseason_unverified` and never mutate private/public progression, achievements,
+or the legacy archive. `claimSeasonReward` remains an inert retired compatibility
+endpoint and rejects before authentication, reads, or writes.
 
 ## Configuration-dependent and not yet proven live
 
@@ -181,24 +182,24 @@ Current game-quality sweep evidence on Node 22:
   findings and 9 known moderate transitive findings.
 - Tracked-file secret scan: 237 files passed.
 
-Current permanent-Glory progression pass evidence on Node 22:
+Current Glory/weekly-board/UI reliability evidence on Node 22:
 
-- `npm test`: 169/169 passed, including full real-action desktop and touch First
+- `npm test`: 174/174 passed, including full real-action desktop and touch First
   Flight journeys plus deterministic Glory, Prestige, migration, server parity,
-  and celebration contracts.
-- Firestore Rules emulator: 4/4 passed; the historical Season claim archive
-  remains owner-readable and browser-write-denied.
+  celebration, bounded-stall, smooth-heading, and weekly-board contracts.
+- Firestore Rules emulator: 4/4 passed; weekly internals and receipts are
+  callable-only and the historical Season archive remains owner-readable.
 - Firebase client integration: one complete real Auth/Firestore/Functions
-  emulator scenario passed with device Glory/Prestige invariance and all three
-  direct fail-closed endpoint checks.
-- Visual QA: the complete 63-scene pass succeeded, then all five Road and
-  celebration states affected by the general polish pass were rerun and
-  inspected at original resolution.
+  emulator scenario passed with Account A/B isolation, weekly enrollment,
+  idempotent scoring, and device Glory/Prestige invariance.
+- Visual QA: 66/66 asserted scenes passed. Connected Dossier, connected weekly
+  board, Command Ship Codex detail, and compact touch HUD were inspected at
+  original resolution.
 - Production build: 108 allowlisted public files generated.
 - Root production audit: 0 vulnerabilities. Functions audit: 0 high-severity
-  findings and 8 known moderate transitive findings whose suggested fix is a
+  findings and 9 known moderate transitive findings whose suggested fix is a
   breaking Firebase Admin major upgrade.
-- Tracked-file secret scan: 239 files passed.
+- Tracked-file secret scan: 247 files passed.
 
 This focused pass adds keyboard- and screen-reader-accessible action surfaces to
 the Canvas UI, contains modal focus, prevents hidden title/pause actions and
@@ -255,8 +256,8 @@ sequence, account authority, achievement definition, or Firebase gate.
    Functions first, then the exact tested Rules idempotently, then changed
    indexes, then a commit-named preview.
 4. Require intended SHA = Hosting SHA = backend SHA and smoke-test headers,
-   private 404s, Google Identity origin acceptance, and all three paused
-   callable boundaries.
+   private 404s, Google Identity origin acceptance, authenticated boundaries for
+   both weekly callables, and the retired Season callable.
 5. Complete the ignored sanitized approval file with Account A/B evidence or a
    separately recorded owner waiver, plus migration disposition and explicit
    owner music rights.

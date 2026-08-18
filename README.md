@@ -22,12 +22,12 @@ progression. Optional Google identity appears only after graduation.
 
 Play: https://star-strike-rush.web.app
 
-Release truth as of 2026-08-08: the verified production baseline at the start of
-the current hardening pass was `3c72e72d333f204ac7e1ea077d8e1af22e79af31`.
+Release truth as of 2026-08-18: the production baseline for this pass is
+`25ce52d41612ecd9ea988d9b1aab29ac6dc70646`.
 The authoritative live identity is the matching Hosting `/version.json` and
 backend release marker, not a source commit alone. Account A/B smoke for that
-baseline was owner-waived, not passed; device-local progression authority and
-every competition/progression write gate remain unchanged and closed.
+baseline was owner-waived, not passed. Device-local progression remains
+authoritative; the public weekly board described below never writes it.
 
 ## Controls
 
@@ -179,10 +179,13 @@ verified run sessions exist:
   cumulative total rather than stored as separate currencies.
 - Existing `leaderboard_scores` documents are preserved and shown only as a
   **LEGACY/PRESEASON ARCHIVE** with `recordTrust = "legacy_unverified"`.
-- New run progression does not publish to Firebase. Public competition, weekly
-  enrollment, and run receipt writes are paused by separate closed client,
-  competition, and server-progression gates. The former Season reward callable
-  is an inert compatibility endpoint that rejects before auth or database work.
+- New run progression does not publish to Firebase. Signed-in pilots with a
+  public handle may enter the **PRESEASON WEEKLY BOARD**. Its server-owned
+  enrollment and idempotent best-run receipts publish only explicitly
+  **UNVERIFIED FLIGHT POINTS**; they never change Glory, Prestige, Credits,
+  lifetime statistics, achievements, the legacy archive, or device progress.
+  Verified run sessions and all server progression writes remain disabled. The
+  former Season reward callable is an inert compatibility endpoint.
 
 Google sign-in activates account identity, an account-scoped published call
 sign, an optional immutable `@handle`, one achievement archive aggregate, and

@@ -9,14 +9,13 @@ identity plus a preserved legacy account archive, and Cloud Functions for
 privileged identity mutations. Gameplay progression remains authoritative on
 the device. Browser writes are denied.
 
-Client competition writes, server competition writes, server progression
-writes, and verified run sessions are separate flags and all are disabled.
-Profile identity sync and handle claims may operate when Firebase is configured.
-Run receipt and weekly league callables reject before authentication or
-Firestore access. The former Season reward callable is a retired compatibility
-stub that also rejects before authentication or Firestore access and contains
-no reward logic. Existing plausibility validation is dormant defense in depth;
-it cannot prove browser-reported gameplay occurred.
+Client and server competition writes are enabled only for the explicitly
+unverified preseason weekly board. Server progression writes and verified run
+sessions remain disabled. Profile identity sync, handle claims, weekly
+enrollment, and idempotent weekly best-run receipts may operate when Firebase is
+configured. Weekly receipts cannot mutate Glory, Prestige, Credits, lifetime
+stats, achievements, public verified fields, or the legacy archive. The former
+Season reward callable remains a retired, zero-access compatibility stub.
 
 Firebase web config is loaded at runtime. Real API keys must not be committed to
 the repository. Local development can use ignored `src/firebase-config.local.json`
@@ -74,8 +73,9 @@ documents remain in place.
 
 ### `run_receipts/{uid}/items/{receiptId}`
 
-Owner-only historical run receipt archive. Browser writes are denied. New
-receipts are paused while server progression writes are disabled. Dormant
+Owner-only historical progression receipt archive. Browser writes are denied.
+New progression receipts remain paused while server progression writes are
+disabled. Dormant
 receipt fields include:
 
 - score
@@ -93,9 +93,8 @@ receipt fields include:
 - client version
 - submitted server timestamp
 
-`submitRunReceipt()` currently rejects before auth, reads, or writes. Its
-dormant implementation cannot be enabled until verified run sessions and the
-matching server progression/competition gates are deliberately enabled.
+The active `submitRunReceipt()` does not write this collection. It writes only
+the separate unverified weekly idempotency record described below.
 
 ### `season_reward_claims/{uid}/items/{rewardId}`
 
@@ -130,12 +129,15 @@ sanitized valid IDs and count through `syncPilotProfile`; it does not list up to
 ### Competition collections
 
 - `handle_registry/{handle}`: server-only unique-handle ownership registry.
-- `weekly_leagues/{leagueId}`: server-only allocation document keyed by UTC week
-  and future verified-performance band.
+- `weekly_leagues/{leagueId}`: server-only open-group allocation for one UTC
+  week (maximum 30 pilots).
 - `weekly_leagues/{leagueId}/members/{uid}`: server-only standings rows with
-  opaque `publicPilotId`, call sign, handle, and verified Flight Points. The
+  opaque `publicPilotId`, call sign, handle, and unverified Flight Points. The
   sanitized client payload does not include the Firebase UID.
-- `weekly_enrollments/{uid}`: server-only pointer to a pilot's current league.
+- `weekly_enrollments/{weekId_uid}`: server-only pointer to a pilot's weekly group.
+- `weekly_run_receipts/{weekId}/members/{uid}/items/{receiptId}`: server-only,
+  idempotent unverified scoring receipt. It contains bounded run facts and
+  `recordTrust = preseason_unverified`, never progression rewards.
 
 The client receives a sanitized league payload from `joinWeeklyLeague()`; these
 collections have no direct browser reads or writes.
@@ -143,31 +145,28 @@ collections have no direct browser reads or writes.
 The complete 79-entry achievement catalog is generated from
 `shared/achievements.json`; this document does not maintain a duplicate list.
 
-## Designed Competition Flow (currently disabled)
+## Active Preseason Weekly Board
 
-The following describes the intended callable flow, not an enabled public
-competition claim:
+This is an online social board, not verified progression:
 
 1. The player opens the Pilot Dossier and signs in with Google.
 2. The game calls `syncPilotProfile()` for identity and a sanitized legacy
    archive response. It does not synchronize gameplay progression.
-3. A pilot can atomically claim one immutable public handle. League enrollment
-   remains unavailable.
-4. On game over, `submitOnlineRun()` builds a score and achievement payload.
+3. A pilot can atomically claim one immutable public handle and enter one open
+   weekly group.
+4. On standard Game Over, the client builds a bounded run-fact payload.
 5. Signed-in clients submit the receipt to `submitRunReceipt()`.
-6. The dormant server validates plausibility and computes cumulative Glory,
-   derived Prestige/current-road position, Credits, and achievements.
-7. Firebase stores an immutable owner-scoped run receipt and credits verified
-   weekly Flight Points exactly once.
-8. Firebase updates the player's public profile and best leaderboard record.
-9. Newly earned achievement documents are created under the player's account.
-10. No Season reward system is part of this flow; the compatibility endpoint is
-    permanently non-mutating unless deliberately removed in a later deployment.
+6. The server validates bounds/plausibility and records only the best
+   `floor(score / 10)` unverified Flight Points for that weekly group.
+7. A repeated receipt ID is idempotent.
+8. The callable returns at most 30 sanitized rows with opaque public pilot ID,
+   call sign, handle, and Flight Points; Firebase UID is never returned.
+9. Glory and every other progression value stay device-local and unchanged.
+10. No Season reward system is part of this flow.
 
-No combination of only the competition flags activates this flow. Server
-progression writes, server competition writes, and verified run sessions must
-all be enabled, and enrollment additionally requires
-`recordTrust = "verified_run_session"` plus `verifiedBestScore`.
+Because the browser is not an authoritative run session, this board must never
+be described as verified. A future verified system requires a separate design
+and cannot be activated by this board's flags.
 
 ## Meta Layer Scope
 

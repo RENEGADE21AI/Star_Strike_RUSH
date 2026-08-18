@@ -38,9 +38,9 @@ Persistence:
 - Firebase Auth supports Google sign-in.
 - Cloud Firestore stores account identity plus a legacy account archive. It is
   not authoritative for device gameplay progression.
-- Cloud Functions source retains dormant server-side run validation with matching
-  Glory/Prestige semantics. The former Season reward endpoint is an inert,
-  fail-closed compatibility stub.
+- Cloud Functions operate an explicitly unverified weekly social board without
+  changing device progression. Dormant server progression math retains matching
+  Glory/Prestige semantics. The former Season reward endpoint is an inert stub.
 - The game remains playable signed out; account actions never replace device
   progress.
 
@@ -204,15 +204,17 @@ without replaying historical milestone ceremonies.
 
 Firebase remains account identity plus legacy archive during preseason.
 Sign-in, sign-out, refresh, and account switching never overwrite device Glory
-or derived Prestige. Dormant server progression uses the same cumulative
-Glory/Prestige math but stays behind closed progression and competition gates.
+or derived Prestige. The online weekly board stores only server-owned
+enrollment, sanitized public identity, and an idempotent unverified best-run
+score. Dormant server progression uses the same cumulative Glory/Prestige math
+but remains closed.
 `claimSeasonReward()` exists only as a retired compatibility callable that
 rejects before authentication, Firestore reads, or writes.
 
 The game must remain functional if Firebase is unavailable or the player is
 signed out. Firestore rules and callable-only writes protect scope but cannot
-prove browser gameplay; verified run sessions, public scoring, and competition
-remain disabled.
+prove browser gameplay; every weekly value is therefore labeled unverified and
+never treated as progression or a verified record.
 
 ## 6. Progression And Boss Rotation
 
