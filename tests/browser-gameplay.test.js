@@ -760,6 +760,12 @@ test("debug runs cannot persist records or progression across reload", { timeout
   });
   const { page, errors } = await openGame(context, "/?debug=1&scenario=siphon");
   try {
+    await page.waitForFunction(() => {
+      const node = document.querySelector("#debugSnapshot");
+      if (!node?.textContent) return false;
+      const snapshot = JSON.parse(node.textContent);
+      return snapshot.gameState === "playing" && snapshot.input.gameplayControlEnabled === true;
+    });
     const before = await debugSnapshot(page);
     await page.evaluate(() => {
       addScore(50000);
