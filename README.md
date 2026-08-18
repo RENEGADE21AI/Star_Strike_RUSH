@@ -18,12 +18,15 @@ automatic weapons, Ghost Shift, a staged Command Ship, Realm Hop, and the
 Wraith Sovereign through deterministic gameplay. Training is skippable,
 checkpointed, replayable from Settings, and cannot change normal score,
 progression, achievements, receipts, competition state, or Firebase
-progression. Optional Google identity appears only after graduation.
+progression. Beacons, training craft, hazards, and pickups stage through
+readable arrivals instead of appearing on the fighter, and graduation returns
+to the hangar through a short galaxy transition. Optional Google identity
+appears only after graduation.
 
 Play: https://star-strike-rush.web.app
 
 Release truth as of 2026-08-18: the production baseline for this pass is
-`25ce52d41612ecd9ea988d9b1aab29ac6dc70646`.
+`312c0074286abdb849582f76708db703e9abf34c`.
 The authoritative live identity is the matching Hosting `/version.json` and
 backend release marker, not a source commit alone. Account A/B smoke for that
 baseline was owner-waived, not passed. Device-local progression remains
@@ -39,7 +42,7 @@ authoritative; the public weekly board described below never writes it.
   after meaningful touch/pen gameplay input.
 - Pause: the top-left HUD control or Escape. A deliberate standard-run pause
   costs one Health bar and reports the cost. Manual pauses are free during
-  First Flight, while automatic focus/visibility pauses still cost one Health.
+  First Flight, while automatic focus/visibility pauses are always free.
   Gameplay resumes through a short countdown; cancelling that countdown is
   free. Restart Run and Return to Title require a second explicit confirmation.
 - Keyboard navigation: Tab moves through title, panel, pause, reset, and Game
@@ -154,7 +157,7 @@ Important runtime guarantees include:
 - object-based collision calls with explicit visual/collision scaling;
 - per-sprite orientation, anchor, weapon, exhaust, and hitbox metadata;
 - boss vulnerability only after staging and the first attack begin;
-- automatic pause on focus loss and no in-run announcement popups;
+- free automatic pause on focus loss and no in-run announcement popups;
 - graceful local play when Firebase is unavailable.
 - device-local gameplay progression that account operations cannot replace;
 - exact browser/test Firebase SDK parity at `12.16.0`;

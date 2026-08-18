@@ -7,22 +7,20 @@ and production-deployed are distinct states.
 
 ## Production truth and pending post-launch hardening
 
-The production source baseline at the start of this focused progression pass
-was `25ce52d41612ecd9ea988d9b1aab29ac6dc70646`. The authoritative current live
+The production source baseline at the start of this focused tutorial-flow pass
+was `312c0074286abdb849582f76708db703e9abf34c`. The authoritative current live
 identity is always the SHA returned by `/version.json` and the matching backend
 release marker; a source commit or merged PR alone is not deployment evidence.
 
 This post-launch hardening pass covers:
 
-- early Colonel Arisaka portrait preload plus commit-versioned HTML asset
-  references, preventing a stale or late portrait during first-load dialogue;
-- single-owner tutorial modal accessibility, input clearing across dialogue and
-  checkpoint recovery, complete transient-combat cleanup, and resilient resume
-  routing;
-- immediate hidden-tab music suspension and time-based, state-aware restoration
-  without an arrival-volume jump;
-- deterministic visual evidence with explicit asset readiness, stable Canvas
-  frame comparison, an atomic Canvas capture, and a separate full-page capture.
+- staged tutorial beacons, fighters, hazards, and pickups with readable arrival
+  and dissipation instead of spawn-point overlap or coordinate jumps;
+- a brief objective-complete cadence before the next Colonel transmission;
+- automatic lifecycle pauses that never consume Health, while deliberate
+  standard-run pauses retain their one-Health cost;
+- boss-staging projectile pings that stop bullets without applying damage;
+- a dedicated graduation departure and hangar-return transition.
 
 They are production-ready only after the full release suite and protected-branch
 checks pass, they merge, and the guarded workflow verifies matching live Hosting
@@ -72,14 +70,14 @@ discoveries. Season Road, Season XP, tiers, and reward claims are retired.
 | Audio | Stable | Independent Music/Effects, legacy setting migration, lazy load, time-based 30/60/90/120 Hz mix |
 | Title/traffic | Stable | Measured title gap/bounds, normalized time paths, depth durations, correctly oriented patrols capped at normal fighter scale, UI-safe lanes, Reduced Motion |
 | Debug records/reset | Stable | Debug cannot persist records/progression; reset clears all progression-bearing local state |
-| Combat HUD | Stable | Pause top-left; standard manual and all automatic pauses cost one Health; First Flight manual pause is free; compact Energy/Hull instrument above touch controls bottom-left; backed score block top-right |
+| Combat HUD | Stable | Pause top-left; deliberate standard manual pause costs one Health; tutorial manual and all browser-driven automatic pauses are free; compact Energy/Hull instrument above touch controls bottom-left; backed score block top-right |
 | Boss/realm presentation | Focused pass locally verified | Supplied boss sprites are the primary render path; Wraith physical/ghost variants share the canonical 640×282 alpha mask exactly |
-| First Flight onboarding | PR #14 merged; focused visual pass locally verified | Deterministic 13-step director, explicit one-time Yes/No route, owner-supplied Colonel Arisaka portrait, fresh-galaxy arrival, arrival/dialogue input locks and shake suppression, free manual training pause, checkpoints, replay, two tutorial bosses, and no-progression assertions |
+| First Flight onboarding | PR #14 merged; tutorial-flow polish under verification | Deterministic 13-step director, explicit one-time Yes/No route, owner-supplied Colonel Arisaka portrait, visible lesson staging, arrival/dialogue input locks and shake suppression, free automatic pause, checkpoints, replay, two tutorial bosses, and no-progression assertions |
 | Production debug surface | Removed | Build strips QA scenarios/snapshots; player-facing phase skips and hitbox controls removed |
 | Firestore authorization | Stable | Emulator tests cover anonymous denial, owner privacy, bounded reads, browser-write denial |
 | Build/cache contract | Stable | Commit-versioned runtime/assets plus no-store HTML and `version.json` |
 | Player-facing UI | Focused polish locally verified | Shared glass-edged buttons/panels, explicit settings toggles, isolated destructive actions, clearer title identity, and a score-focused Game Over summary |
-| Visual QA | Stable | 63 asserted scenes spanning portrait and landscape title viewports, panels, settings danger hierarchy, reset, pause confirmation, HUD/touch clearance, Game Over, First Flight, launch states, realm UI, account offer, checkpoint resume, repeating Glory Roads, and milestone ceremonies |
+| Visual QA | Stable | 67 asserted scenes spanning portrait and landscape title viewports, panels, settings danger hierarchy, reset, pause confirmation, HUD/touch clearance, Game Over, First Flight staging and launch states, realm UI, account offer, checkpoint resume, repeating Glory Roads, and milestone ceremonies |
 
 ## Firebase identity and archive boundary
 
@@ -221,8 +219,8 @@ training entities in the local Codex and never adds a standard achievement.
 The canonical achievement catalog remains exactly 79 entries.
 
 The refinement also keeps normal manual pause at its deliberate one-Health
-cost, makes tutorial manual pause free, and charges one Health for automatic
-focus/visibility pause in either run mode. It freezes control and ordinary
+cost, makes tutorial manual pause free, and makes automatic focus/visibility
+pause free in either run mode. It freezes control and ordinary
 simulation through warp arrival and paused instructor dialogue, requires a
 damage-free evasion crossing, requires the Ghost lane boundary to be crossed
 while real Ghost protection is active, and skips redundant post-graduation
