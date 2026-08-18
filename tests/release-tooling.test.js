@@ -6,6 +6,7 @@ const test = require("node:test");
 const repoRoot = path.resolve(__dirname, "..");
 const releaseScript = fs.readFileSync(path.join(repoRoot, "scripts", "release.ps1"), "utf8");
 const smokeScript = fs.readFileSync(path.join(repoRoot, "scripts", "smoke-release.js"), "utf8");
+const verifyWorkflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "verify.yml"), "utf8");
 const packageJson = require("../package.json");
 
 test("release tooling separates backend staging from approval-gated production Hosting", () => {
@@ -65,4 +66,9 @@ test("package scripts expose check, preview, production, visual, and emulator wo
   }
   assert.match(packageJson.scripts["deploy:production"], /-Production/);
   assert.match(packageJson.scripts["deploy:preview"], /-StageBackendPreview/);
+});
+
+test("verification runs once per pull request and again for the exact main merge commit", () => {
+  assert.match(verifyWorkflow, /push:\s*\n\s*branches:\s*\n\s*- main/);
+  assert.match(verifyWorkflow, /pull_request:/);
 });
