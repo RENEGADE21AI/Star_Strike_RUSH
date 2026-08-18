@@ -227,7 +227,7 @@ test("real Firebase client keeps device progression authoritative across account
   assert.deepEqual(signedIn.deviceProgress, before.deviceProgress, "account hydration replaced device progression");
   assert.equal(signedIn.highScore, 32100);
   assert.equal(signedIn.ui.account.progressionMode, "device_local_preseason");
-  assert.equal(signedIn.ui.account.competitionMode, "paused");
+  assert.equal(signedIn.ui.account.competitionMode, "preseason_unverified");
   assert.equal(signedIn.ui.account.counters.hydrationSequences, 1);
   assert.equal(signedIn.ui.account.counters.profileCallableCalls, 1);
   assert.equal(signedIn.ui.account.counters.achievementAggregateLoads, 1);
@@ -319,6 +319,37 @@ test("real Firebase client keeps device progression authoritative across account
   const handle = `p${suffix.replace(/[^a-z0-9]/g, "").slice(-12)}`.slice(0, 16);
   const handleResult = await page.evaluate((value) => window.starStrikeOnline.claimHandle(value), handle);
   assert.deepEqual(handleResult, { ok: true, handle });
+  const privateBeforeWeekly = await db.doc(`players_private/${accountA.uid}`).get().then((snapshot) => snapshot.data());
+  const weeklyJoin = await page.evaluate(() => window.starStrikeOnline.joinWeeklyLeague());
+  assert.equal(weeklyJoin.ok, true);
+  assert.equal(weeklyJoin.league.recordTrust, "preseason_unverified");
+  assert.equal(weeklyJoin.league.members.length, 1);
+  const weeklyRun = {
+    score: 12000,
+    phaseReached: 3,
+    stats: {
+      enemiesKilled: 24,
+      bossesKilled: 1,
+      powerupsCollected: 2,
+      ghostUses: 3,
+      damageTaken: 1,
+      highestCombo: 8,
+      runDurationMs: 60000
+    },
+    receipt: { receiptId: `weekly_${suffix}` }
+  };
+  const weeklySubmit = await page.evaluate((run) => window.starStrikeOnline.submitRun(run), weeklyRun);
+  assert.equal(weeklySubmit.ok, true);
+  assert.equal(weeklySubmit.league.members[0].weeklyPoints, 1200);
+  const weeklyDuplicate = await page.evaluate((run) => window.starStrikeOnline.submitRun(run), weeklyRun);
+  assert.equal(weeklyDuplicate.ok, true);
+  assert.equal(weeklyDuplicate.alreadyProcessed, true);
+  assert.deepEqual(
+    await db.doc(`players_private/${accountA.uid}`).get().then((snapshot) => snapshot.data()),
+    privateBeforeWeekly,
+    "weekly publication mutated account progression"
+  );
+  assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress, "weekly publication mutated device progression");
 
   await page.route("**/syncPilotProfile", (route) => route.abort("failed"));
   const pending = await page.evaluate(() => window.starStrikeOnline.updateCallSign("PENDING_A"));
@@ -349,8 +380,8 @@ test("real Firebase client keeps device progression authoritative across account
   assert.equal(await page.evaluate(() => typeof window.starStrikeOnline.claimSeasonReward), "undefined");
   for (const endpoint of ["submitRunReceipt", "joinWeeklyLeague", "claimSeasonReward"]) {
     const rejection = await callableError(endpoint, endpoint === "claimSeasonReward" ? { rewardId: "season_01_tier_1" } : {});
-    assert.equal(rejection.body.error.status, "FAILED_PRECONDITION", endpoint);
-    assert.match(rejection.body.error.message, /paused|preseason|retired/i, endpoint);
+    assert.equal(rejection.body.error.status, endpoint === "claimSeasonReward" ? "FAILED_PRECONDITION" : "UNAUTHENTICATED", endpoint);
+    assert.match(rejection.body.error.message, endpoint === "claimSeasonReward" ? /retired/i : /sign in/i, endpoint);
   }
   const invariantProgress = (await debugSnapshot(page)).deviceProgress;
   await page.reload({ waitUntil: "domcontentloaded" });

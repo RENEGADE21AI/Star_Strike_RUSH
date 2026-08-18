@@ -4,31 +4,25 @@ const test = require("node:test");
 const competition = require("../functions/competition");
 const callableFunctions = require("../functions");
 
-test("server competition gate defaults closed with a controlled error", () => {
+test("server competition gate opens only the unverified preseason board", () => {
   assert.equal(typeof competition.requireCompetitionEnabled, "function");
-  assert.throws(
-    () => competition.requireCompetitionEnabled(),
-    (error) => (
-      error &&
-      error.code === "failed-precondition" &&
-      /preseason|paused/i.test(error.message) &&
-      error.details?.release?.progressionAuthority === "device_local_preseason" &&
-      error.details?.release?.competitionWritesEnabled === false &&
-      error.details?.release?.serverProgressionWritesEnabled === false
-    )
-  );
+  assert.doesNotThrow(() => competition.requireCompetitionEnabled());
+  assert.equal(competition.competitionWritesEnabled(), true);
 });
 
-test("deployed progression callables reject before authentication or Firestore", async () => {
-  for (const endpoint of [callableFunctions.submitRunReceipt, callableFunctions.joinWeeklyLeague, callableFunctions.claimSeasonReward]) {
+test("active weekly callables require authentication while retired Season claims stay closed", async () => {
+  for (const endpoint of [callableFunctions.submitRunReceipt, callableFunctions.joinWeeklyLeague]) {
     await assert.rejects(
       endpoint.run({ auth: null, data: {} }),
       (error) => (
         error &&
-        error.code === "failed-precondition" &&
-        /preseason|paused/i.test(error.message) &&
+        error.code === "unauthenticated" &&
         error.details?.release?.progressionAuthority === "device_local_preseason"
       )
     );
   }
+  await assert.rejects(
+    callableFunctions.claimSeasonReward.run({ auth: null, data: {} }),
+    (error) => error && error.code === "failed-precondition" && /retired/i.test(error.message)
+  );
 });

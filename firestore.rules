@@ -74,6 +74,12 @@ service cloud.firestore {
       }
     }
 
+    // Unverified preseason receipts are callable-only, idempotency records.
+    // They never carry or update device progression.
+    match /weekly_run_receipts/{weekId}/members/{userId}/items/{receiptId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -26,6 +26,7 @@ function releaseIdentity(sha) {
     commitSha: sha,
     packageVersion: String(packageJson.version || ""),
     progressionAuthority: String(integrity.progressionAuthority || ""),
+    competitionMode: String(integrity.competitionMode || "paused"),
     competitionWritesEnabled: integrity.serverCompetitionWritesEnabled === true,
     serverProgressionWritesEnabled: integrity.serverProgressionWritesEnabled === true,
     appCheckEnforced: integrity.serverAppCheckEnforced === true

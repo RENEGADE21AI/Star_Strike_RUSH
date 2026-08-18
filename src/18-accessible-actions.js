@@ -73,11 +73,22 @@ function titlePanelAccessibilityActions() {
   if (titleSubState === "online") return onlineAccessibilityActions();
   if (titleSubState === "records") {
     const rects = getRecordsRects();
-    return [
+    const actions = [
       accessibleRectAction("close-panel", "Close Records Network", rects.closeRect, closeTitleMetaScreen, 4),
       accessibleRectAction("legacy-archive", "Legacy preseason archive", rects.globalTab, () => invokeRectHandler(handleRecordsPanelPointerDown, rects.globalTab)),
       accessibleRectAction("weekly-status", "Weekly competition status", rects.weeklyTab, () => invokeRectHandler(handleRecordsPanelPointerDown, rects.weeklyTab))
     ];
+    const online = onlineState();
+    if (recordsPanelTab === "weekly" && !online.weeklyLeague) {
+      actions.push(accessibleRectAction(
+        "enter-weekly-board",
+        "Enter this week's unverified preseason board",
+        rects.joinLeague,
+        () => invokeRectHandler(handleRecordsPanelPointerDown, rects.joinLeague),
+        3
+      ));
+    }
+    return actions;
   }
   if (titleSubState === "achievements") {
     const rects = getAchievementsRects();

@@ -115,7 +115,9 @@ function clearAccountIdentity(onlineState, options = {}) {
   onlineState.identityService = "signed_out";
   onlineState.accountArchive = "not_loaded";
   onlineState.progressionMode = options.progressionMode || "device_local_preseason";
-  onlineState.competitionMode = options.competitiveModeEnabled ? "unknown" : "paused";
+  onlineState.competitionMode = options.competitionMode === "preseason_unverified"
+    ? "preseason_unverified"
+    : "paused";
   onlineState.networkState = onlineState.ready ? "online" : "offline";
   return onlineState;
 }

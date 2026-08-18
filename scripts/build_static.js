@@ -77,7 +77,7 @@ fs.writeFileSync(path.join(out, "version.json"), `${JSON.stringify({
   buildTimestamp: new Date().toISOString(),
   packageVersion: packageJson.version,
   progressionMode: releaseConfig.progressionAuthority,
-  competitionMode: releaseConfig.clientCompetitionWritesEnabled ? "enabled" : "paused"
+  competitionMode: String(releaseConfig.competitionMode || "paused")
 }, null, 2)}\n`, "utf8");
 
 const forbidden = ["tests", "source-art", "functions", "docs", ".git", "gdd", "readme.md"];

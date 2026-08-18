@@ -64,9 +64,10 @@ and release evidence.
 - `leaderboard_scores` is retained as a **LEGACY/PRESEASON ARCHIVE**.
 - Legacy score/phase fields are separated from future verified fields and never
   seed verified/profile progression.
-- `submitRunReceipt` and `joinWeeklyLeague` reject before auth, reads, or writes
-  while server progression writes are paused. `claimSeasonReward` is retained
-  only as an inert retired compatibility stub with the same zero-access boundary.
+- `submitRunReceipt` and `joinWeeklyLeague` now operate only the explicitly
+  unverified preseason weekly board. They are authenticated, throttled, bounded,
+  callable-only, and cannot mutate Glory or account progression.
+  `claimSeasonReward` remains an inert zero-access compatibility stub.
 - Active identity callables have payload-size bounds, per-UID throttles, safe
   errors, and a prepared-but-disabled App Check flag.
 - Public profiles migrate on touch to explicit legacy/verified record fields.
@@ -140,7 +141,8 @@ and release evidence.
   First Flight completions.
 - Firebase client emulator scenario: passed Accounts A/B, one-owner hydration,
   pending call-sign retry, auth restoration, progression non-overwrite,
-  aggregate retrieval, sign-out cleanup, and all three paused callables.
+  aggregate retrieval, sign-out cleanup, authenticated weekly-board isolation,
+  and the retired Season callable.
 - Firestore Rules emulator: 4/4 passed.
 - Visual QA: 49/49 asserted cases passed across 375×667, 390×844, 430×932,
   768×1024, and 1440×900, including title, panel, HUD, reset, Game Over, and

@@ -6,8 +6,8 @@ const { test } = require("node:test");
 const repoRoot = path.resolve(__dirname, "..");
 const competition = require(path.join(repoRoot, "functions", "competition.js"));
 
-test("identity endpoints preserve the legacy archive while progression endpoints are gated first", () => {
-  assert.equal(competition.competitionWritesEnabled(), false);
+test("identity and weekly endpoints preserve device progression and the legacy archive", () => {
+  assert.equal(competition.competitionWritesEnabled(), true);
 
   const source = fs.readFileSync(path.join(repoRoot, "functions", "index.js"), "utf8");
   const syncProfile = source.slice(
@@ -20,13 +20,9 @@ test("identity endpoints preserve the legacy archive while progression endpoints
   );
   assert.doesNotMatch(syncProfile, /tx\.(set|update|create|delete)\(leaderboardRef/);
   assert.doesNotMatch(claimHandle, /leaderboardRef|leaderboard_scores/);
-  for (const [start, end] of [
-    ["exports.joinWeeklyLeague", "function clientProfile"],
-    ["exports.submitRunReceipt", "exports.claimSeasonReward"]
-  ]) {
-    const body = source.slice(source.indexOf(start), end ? source.indexOf(end) : undefined);
-    assert.ok(body.indexOf("requireServerProgressionWritesEnabled()") < body.indexOf("authContext(request)"));
-  }
+  const submit = source.slice(source.indexOf("exports.submitRunReceipt"), source.indexOf("exports.claimSeasonReward"));
+  assert.doesNotMatch(submit, /players_private|leaderboard_scores|player_achievement|applyRunToProfile/);
+  assert.match(submit, /weekly_run_receipts/);
   const retiredSeason = source.slice(source.indexOf("exports.claimSeasonReward"));
   assert.match(retiredSeason, /Season Road is retired/);
   assert.doesNotMatch(retiredSeason, /authContext\(request\)|db\.|runTransaction/);

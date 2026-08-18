@@ -50,20 +50,21 @@ async function requirePrivate404(pathname) {
   assert.equal(response.status, 404, `${pathname} must return 404`);
 }
 
-async function requirePausedCallable(name, data = {}) {
+async function requireCallableError(name, expectedStatus, data = {}) {
   const response = await request(`${functionsBaseUrl}/${name}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ data })
   });
   const body = await response.json();
-  assert.equal(body?.error?.status, "FAILED_PRECONDITION", `${name} must reject with FAILED_PRECONDITION`);
-  assert.match(body.error.message, /paused|preseason/i, `${name} must use accurate preseason wording`);
+  assert.equal(body?.error?.status, expectedStatus, `${name} must reject with ${expectedStatus}`);
+  assert.match(body.error.message, expectedStatus === "UNAUTHENTICATED" ? /sign in/i : /retired/i, `${name} must use accurate wording`);
   const release = body?.error?.details?.release;
   assert.ok(release && typeof release === "object", `${name} must return backend release metadata`);
   assert.equal(release.commitSha, expectedCommit, `${name} backend commit SHA differs`);
   assert.equal(release.progressionAuthority, "device_local_preseason", `${name} progression authority differs`);
-  assert.equal(release.competitionWritesEnabled, false, `${name} competition writes must remain closed`);
+  assert.equal(release.competitionMode, "preseason_unverified", `${name} competition label differs`);
+  assert.equal(release.competitionWritesEnabled, true, `${name} weekly board writes must be enabled`);
   assert.equal(release.serverProgressionWritesEnabled, false, `${name} progression writes must remain closed`);
   assert.equal(release.appCheckEnforced, false, `${name} App Check must not be claimed as enforced`);
   return release;
@@ -113,7 +114,7 @@ async function requireGoogleAuthOrigin() {
   const release = await version.json();
   assert.equal(release.commitSha, expectedCommit, "deployed version.json commit differs");
   assert.equal(release.progressionMode, "device_local_preseason");
-  assert.equal(release.competitionMode, "paused");
+  assert.equal(release.competitionMode, "preseason_unverified");
   assert.match(root.headers.get("cache-control") || "", /no-store/i, "HTML must be no-store");
   assert.match(version.headers.get("cache-control") || "", /no-store/i, "version.json must be no-store");
 
@@ -141,9 +142,9 @@ async function requireGoogleAuthOrigin() {
   let backendRelease = null;
   if (verifyCallables) {
     const releases = await Promise.all([
-      requirePausedCallable("submitRunReceipt"),
-      requirePausedCallable("joinWeeklyLeague"),
-      requirePausedCallable("claimSeasonReward", { rewardId: "season_01_tier_1" })
+      requireCallableError("submitRunReceipt", "UNAUTHENTICATED"),
+      requireCallableError("joinWeeklyLeague", "UNAUTHENTICATED"),
+      requireCallableError("claimSeasonReward", "FAILED_PRECONDITION", { rewardId: "season_01_tier_1" })
     ]);
     backendRelease = releases[0];
     for (const releaseIdentity of releases.slice(1)) {

@@ -4,9 +4,6 @@ const { HttpsError, onCall } = require("firebase-functions/v2/https");
 
 const {
   ACHIEVEMENTS,
-  achievementTitle,
-  applyRunToProfile,
-  gloryRoadStateForTotal,
   publicProfileFromPrivate,
   safeCallSign,
   safeDocId,
@@ -15,13 +12,9 @@ const {
   validateRunPlausibility
 } = require("./progression");
 const {
-  divisionName,
-  competitionWritesEnabled,
   normalizeHandle,
-  performanceBand,
   publicLeagueMember,
   requireCompetitionEnabled,
-  requireServerProgressionWritesEnabled,
   validateHandle,
   weekWindow
 } = require("./competition");
@@ -59,7 +52,7 @@ function neutralPilotCallSign(uid) {
 
 function authContext(request) {
   if (!request.auth || !request.auth.uid) {
-    throw new HttpsError("unauthenticated", "Sign in is required.");
+    throw new HttpsError("unauthenticated", "Sign in is required.", { release: BACKEND_RELEASE_IDENTITY });
   }
   return { uid: request.auth.uid };
 }
@@ -73,40 +66,6 @@ function legacyArchiveFromSnapshots(publicSnap, leaderboardSnap) {
     publicSnap && publicSnap.exists ? publicSnap.data() : {},
     leaderboardSnap && leaderboardSnap.exists ? leaderboardSnap.data() : {}
   );
-}
-
-function privatePayloadFor(auth, profile, existing = {}) {
-  const road = gloryRoadStateForTotal(profile.totalGlory);
-  const now = FieldValue.serverTimestamp();
-  return {
-    uid: auth.uid,
-    email: FieldValue.delete(),
-    displayName: FieldValue.delete(),
-    photoURL: FieldValue.delete(),
-    glory: FieldValue.delete(),
-    totalGlory: profile.totalGlory,
-    prestige: road.prestige,
-    roadGlory: road.roadGlory,
-    gloryRank: road.rank.name,
-    gloryRankDisplay: road.displayRankName,
-    gloryRankIndex: road.rank.index,
-    currentSeasonId: FieldValue.delete(),
-    currentSeasonXP: FieldValue.delete(),
-    currentSeasonTier: FieldValue.delete(),
-    credits: profile.credits,
-    lifetimeRuns: profile.lifetimeRuns,
-    lifetimeScore: profile.lifetimeScore,
-    lifetimeKills: profile.lifetimeKills,
-    lifetimePowerups: profile.lifetimePowerups,
-    lifetimeGhostUses: profile.lifetimeGhostUses,
-    lifetimeBosses: profile.lifetimeBosses,
-    lifetimeDamageTaken: profile.lifetimeDamageTaken,
-    highestCombo: profile.highestCombo,
-    seasonClaimedRewardIds: FieldValue.delete(),
-    createdAt: existing.createdAt || now,
-    lastSeenAt: now,
-    updatedAt: now
-  };
 }
 
 function publicIdentityPayloadFor(auth, callSign, achievementArchiveCount, legacyRecord, existing = {}) {
@@ -130,32 +89,9 @@ function publicIdentityPayloadFor(auth, callSign, achievementArchiveCount, legac
     achievementArchiveCount,
     createdAt: existing.createdAt || now,
     updatedAt: now,
-    uid: FieldValue.delete(),
-    bestScore: FieldValue.delete(),
-    phase: FieldValue.delete(),
-    glory: FieldValue.delete(),
-    gloryRank: FieldValue.delete(),
-    gloryRankIndex: FieldValue.delete(),
-    seasonTier: FieldValue.delete(),
-    achievementsCount: FieldValue.delete()
-  };
-}
-
-function publicVerifiedPayloadFor(auth, profile, callSign, achievementsCount, existing = {}) {
-  const now = FieldValue.serverTimestamp();
-  const sanitizedCallSign = safeCallSign(callSign || existing.callSign || "");
-  return {
-    publicPilotId: publicPilotIdFor(auth.uid),
-    callSign: sanitizedCallSign.length >= 3 ? sanitizedCallSign : neutralPilotCallSign(auth.uid),
-    handle: normalizeHandle(existing.handle || ""),
-    legacyBestScore: Number(existing.legacyBestScore || 0),
-    legacyPhase: Math.max(1, Number(existing.legacyPhase || 1)),
-    verifiedBestScore: profile.bestScore,
-    verifiedPhase: profile.phase,
-    recordTrust: "verified_run_session",
-    achievementArchiveCount: achievementsCount,
-    createdAt: existing.createdAt || now,
-    updatedAt: now,
+    email: FieldValue.delete(),
+    displayName: FieldValue.delete(),
+    photoURL: FieldValue.delete(),
     uid: FieldValue.delete(),
     bestScore: FieldValue.delete(),
     phase: FieldValue.delete(),
@@ -184,6 +120,7 @@ async function leagueResponse(leagueId) {
     memberCount: Number(data.memberCount || memberSnaps.size),
     capacity: Number(data.capacity || 30),
     closesAtMs: Number(data.closesAtMs || 0),
+    recordTrust: "preseason_unverified",
     members: memberSnaps.docs.map((snapshot) => publicLeagueMember(snapshot.data()))
   };
 }
@@ -233,6 +170,13 @@ exports.syncPilotProfile = onCall(CALLABLE_OPTIONS, async (request) => {
       legacyRecord,
       publicData
     );
+    if (privateSnap.exists) {
+      tx.set(privateRef, {
+        email: FieldValue.delete(),
+        displayName: FieldValue.delete(),
+        photoURL: FieldValue.delete()
+      }, { merge: true });
+    }
     tx.set(publicRef, publicPayload, { merge: true });
     return {
       publicPilotId: publicPayload.publicPilotId,
@@ -283,26 +227,29 @@ exports.claimPilotHandle = onCall(CALLABLE_OPTIONS, async (request) => {
 });
 
 exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
-  requireServerProgressionWritesEnabled();
   requireCompetitionEnabled();
+  requirePayloadWithin(request.data, 256);
   const auth = authContext(request);
+  await enforceUidThrottle(db, {
+    endpoint: "joinWeeklyLeague",
+    uid: auth.uid,
+    maximumCalls: 6,
+    windowMs: 30000
+  });
+  const shouldJoin = request.data && request.data.join === true;
   const week = weekWindow();
   const publicRef = db.doc(`players_public/${auth.uid}`);
   const enrollmentRef = db.doc(`weekly_enrollments/${week.id}_${auth.uid}`);
 
   const assignment = await db.runTransaction(async (tx) => {
     const [publicSnap, enrollmentSnap] = await Promise.all([tx.get(publicRef), tx.get(enrollmentRef)]);
-    if (!publicSnap.exists) throw new HttpsError("failed-precondition", "Activate pilot identity before entering a league.");
+    if (!publicSnap.exists) throw new HttpsError("failed-precondition", "Activate pilot identity before entering the weekly board.");
     const publicData = publicSnap.data();
-    const handle = normalizeHandle(publicData.handle || "");
-    if (!handle) throw new HttpsError("failed-precondition", "Claim a unique handle before entering a weekly league.");
-
     if (enrollmentSnap.exists) return { leagueId: enrollmentSnap.data().leagueId };
-
-    if (publicData.recordTrust !== "verified_run_session") {
-      throw new HttpsError("failed-precondition", "A verified run-session record is required before league enrollment.");
-    }
-    const band = performanceBand(publicData.verifiedBestScore);
+    if (!shouldJoin) return { leagueId: "" };
+    const handle = normalizeHandle(publicData.handle || "");
+    if (!handle) throw new HttpsError("failed-precondition", "Claim a unique handle before entering the weekly board.");
+    const band = 0;
     const availableQuery = db.collection("weekly_leagues")
       .where("weekId", "==", week.id)
       .where("band", "==", band)
@@ -321,7 +268,7 @@ exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
       tx.create(leagueRef, {
         weekId: week.id,
         weekLabel: "MONDAY — SUNDAY UTC",
-        division: divisionName(band),
+        division: "OPEN",
         band,
         memberCount,
         capacity: 30,
@@ -336,7 +283,8 @@ exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
       callSign: safeCallSign(publicData.callSign) || neutralPilotCallSign(auth.uid),
       handle,
       weeklyPoints: 0,
-      previousBestScore: Number(publicData.verifiedBestScore || 0),
+      bestRunScore: 0,
+      recordTrust: "preseason_unverified",
       joinedAt: now,
       updatedAt: now
     });
@@ -344,7 +292,12 @@ exports.joinWeeklyLeague = onCall(CALLABLE_OPTIONS, async (request) => {
     return { leagueId: leagueRef.id };
   });
 
-  return { ok: true, league: await leagueResponse(assignment.leagueId) };
+  return {
+    ok: true,
+    mode: "preseason_unverified",
+    league: assignment.leagueId ? await leagueResponse(assignment.leagueId) : null,
+    release: BACKEND_RELEASE_IDENTITY
+  };
 });
 
 function clientProfile(profile) {
@@ -373,9 +326,15 @@ function clientProfile(profile) {
 }
 
 exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
-  requireServerProgressionWritesEnabled();
   requireCompetitionEnabled();
+  requirePayloadWithin(request.data, 2048);
   const auth = authContext(request);
+  await enforceUidThrottle(db, {
+    endpoint: "submitRunReceipt",
+    uid: auth.uid,
+    maximumCalls: 8,
+    windowMs: 60000
+  });
   const run = sanitizeRunReceipt({
     ...(request.data && request.data.receipt ? request.data.receipt : request.data || {}),
     callSign: request.data && request.data.callSign
@@ -387,122 +346,53 @@ exports.submitRunReceipt = onCall(CALLABLE_OPTIONS, async (request) => {
 
   const uid = auth.uid;
   const receiptId = safeDocId(run.clientReceiptId, `run_${Date.now()}`);
-  const privateRef = db.doc(`players_private/${uid}`);
   const publicRef = db.doc(`players_public/${uid}`);
-  const leaderboardRef = db.doc(`leaderboard_scores/${uid}`);
-  const receiptRef = db.doc(`run_receipts/${uid}/items/${receiptId}`);
   const currentWeek = weekWindow();
   const enrollmentRef = db.doc(`weekly_enrollments/${currentWeek.id}_${uid}`);
-  const achievementStateRef = db.doc(`player_achievement_state/${uid}`);
-  const achievementRefs = ACHIEVEMENTS.map((achievement) => ({
-    achievement,
-    ref: db.doc(`player_achievements/${uid}/items/${achievement.id}`)
-  }));
-
-  return db.runTransaction(async (tx) => {
-    const [privateSnap, publicSnap, leaderboardSnap, receiptSnap, enrollmentSnap, achievementStateSnap] = await Promise.all([
-      tx.get(privateRef),
-      tx.get(publicRef),
-      tx.get(leaderboardRef),
-      tx.get(receiptRef),
-      tx.get(enrollmentRef),
-      tx.get(achievementStateRef)
-    ]);
-    const baseProfile = profileFromSnapshots(privateSnap);
-    if (receiptSnap.exists) {
-      return {
-        ok: true,
-        alreadyProcessed: true,
-        receiptId,
-        profile: clientProfile(baseProfile)
-      };
+  const submission = await db.runTransaction(async (tx) => {
+    const [publicSnap, enrollmentSnap] = await Promise.all([tx.get(publicRef), tx.get(enrollmentRef)]);
+    if (!publicSnap.exists) throw new HttpsError("failed-precondition", "Activate pilot identity before publishing weekly Flight Points.");
+    if (!enrollmentSnap.exists || !enrollmentSnap.data().leagueId) {
+      throw new HttpsError("failed-precondition", "Enter the weekly board before publishing a run.");
     }
-
-    const nextProfile = applyRunToProfile(baseProfile, run);
-    const achievementState = achievementStateSnap.exists ? achievementStateSnap.data() : {};
-    const existingAchievementIds = new Set(
-      Array.isArray(achievementState.ids)
-        ? achievementState.ids.map((id) => safeDocId(id, "")).filter(Boolean)
-        : []
-    );
-    const earned = new Set(nextProfile.earnedAchievementIds || []);
-    const newAchievementRefs = achievementRefs.filter((item) => earned.has(item.achievement.id) && !existingAchievementIds.has(item.achievement.id));
-    const existingPublicCount = Math.max(
-      Number((publicSnap.exists && publicSnap.data().achievementsCount) || 0),
-      Number((leaderboardSnap.exists && leaderboardSnap.data().achievementsCount) || 0)
-    );
-    const mergedAchievementIds = Array.from(new Set([...existingAchievementIds, ...earned])).slice(0, ACHIEVEMENTS.length);
-    const achievementsCount = Math.min(ACHIEVEMENTS.length, Math.max(existingPublicCount, mergedAchievementIds.length));
-    const publicData = publicSnap.exists ? publicSnap.data() : {};
-    const privateData = privateSnap.exists ? privateSnap.data() : {};
-    const publicPayload = publicVerifiedPayloadFor(auth, nextProfile, run.callSign, achievementsCount, publicData);
-    const privatePayload = privatePayloadFor(auth, nextProfile, privateData);
-    let weeklyMemberRef = null;
-    let weeklyMemberData = null;
-    if (enrollmentSnap.exists && enrollmentSnap.data().leagueId) {
-      weeklyMemberRef = db.doc(`weekly_leagues/${enrollmentSnap.data().leagueId}/members/${uid}`);
-      const weeklyMemberSnap = await tx.get(weeklyMemberRef);
-      if (weeklyMemberSnap.exists) weeklyMemberData = weeklyMemberSnap.data();
-    }
-    const receiptPayload = {
-      uid,
+    const leagueId = String(enrollmentSnap.data().leagueId);
+    const memberRef = db.doc(`weekly_leagues/${leagueId}/members/${uid}`);
+    const receiptRef = db.doc(`weekly_run_receipts/${currentWeek.id}/members/${uid}/items/${receiptId}`);
+    const [memberSnap, receiptSnap] = await Promise.all([tx.get(memberRef), tx.get(receiptRef)]);
+    if (!memberSnap.exists) throw new HttpsError("failed-precondition", "Weekly enrollment is incomplete. Re-enter the board.");
+    if (receiptSnap.exists) return { leagueId, alreadyProcessed: true, weeklyPoints: Number(memberSnap.data().weeklyPoints || 0) };
+    const publicData = publicSnap.data();
+    const flightPoints = Math.min(999999999, Math.floor(run.score / 10));
+    const weeklyPoints = Math.max(Number(memberSnap.data().weeklyPoints || 0), flightPoints);
+    tx.create(receiptRef, {
       receiptId,
-      clientReceiptId: run.clientReceiptId,
+      publicPilotId: String(publicData.publicPilotId || publicPilotIdFor(uid)),
       score: run.score,
+      flightPoints,
       phaseReached: run.phaseReached,
       runDurationMs: run.runDurationMs,
-      enemiesKilled: run.enemiesKilled,
-      bossesKilled: run.bossesKilled,
-      powerupsCollected: run.powerupsCollected,
-      ghostUses: run.ghostUses,
-      damageTaken: run.damageTaken,
-      highestCombo: run.highestCombo,
-      gloryGained: nextProfile.grants.gloryGained,
-      creditsEarned: nextProfile.grants.creditsEarned,
-      totalGloryAfter: nextProfile.totalGlory,
-      prestigeAfter: gloryRoadStateForTotal(nextProfile.totalGlory).prestige,
-      roadGloryAfter: gloryRoadStateForTotal(nextProfile.totalGlory).roadGlory,
       clientVersion: run.clientVersion,
-      endedAtMs: Date.now(),
+      recordTrust: "preseason_unverified",
       submittedAt: FieldValue.serverTimestamp()
-    };
-
-    tx.set(privateRef, privatePayload, { merge: true });
-    tx.set(publicRef, publicPayload);
-    if (competitionWritesEnabled()) tx.set(leaderboardRef, publicPayload);
-    tx.create(receiptRef, receiptPayload);
-    tx.set(achievementStateRef, {
-      uid,
-      ids: mergedAchievementIds,
-      count: achievementsCount,
+    });
+    tx.update(memberRef, {
+      publicPilotId: String(publicData.publicPilotId || publicPilotIdFor(uid)),
+      callSign: safeCallSign(publicData.callSign) || neutralPilotCallSign(uid),
+      handle: normalizeHandle(publicData.handle || ""),
+      weeklyPoints,
+      bestRunScore: Math.max(Number(memberSnap.data().bestRunScore || 0), run.score),
+      recordTrust: "preseason_unverified",
       updatedAt: FieldValue.serverTimestamp()
-    }, { merge: true });
-    for (const item of newAchievementRefs) {
-      tx.set(item.ref, {
-        uid,
-        achievementId: item.achievement.id,
-        title: achievementTitle(item.achievement.id),
-        unlockedAt: FieldValue.serverTimestamp()
-      });
-    }
-    if (weeklyMemberRef && weeklyMemberData) {
-      tx.update(weeklyMemberRef, {
-        callSign: publicPayload.callSign,
-        handle: publicPayload.handle,
-        weeklyPoints: Math.min(999999999, Number(weeklyMemberData.weeklyPoints || 0) + Number(nextProfile.grants.gloryGained || 0)),
-        updatedAt: FieldValue.serverTimestamp()
-      });
-    }
-
-    return {
-      ok: true,
-      alreadyProcessed: false,
-      receiptId,
-      grants: nextProfile.grants,
-      newAchievementIds: newAchievementRefs.map((item) => item.achievement.id),
-      profile: clientProfile(nextProfile)
-    };
+    });
+    return { leagueId, alreadyProcessed: false, weeklyPoints };
   });
+  return {
+    ok: true,
+    ...submission,
+    mode: "preseason_unverified",
+    league: await leagueResponse(submission.leagueId),
+    release: BACKEND_RELEASE_IDENTITY
+  };
 });
 
 exports.claimSeasonReward = onCall(CALLABLE_OPTIONS, async (request) => {

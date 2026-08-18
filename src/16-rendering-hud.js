@@ -102,11 +102,11 @@ function getGameplayHudLayout() {
   const touchLike = state.inputMode === "touch" || state.inputMode === "pen";
   const energyY = touchLike ? H - 214 : H - 78;
   return {
-    pause: { x: 10, y: 10, w: 52, h: 32 },
+    pause: { x: 10, y: 10, w: 44, h: 28 },
     status: { x: 8, y: energyY - 17, w: 112, h: 56 },
     energy: { x: 18, y: energyY + 3, w: 92, h: 6 },
     health: { x: 18, y: energyY + 25, w: 92, h: 8, orientation: "horizontal" },
-    score: { x: W - 10, y: 10 + offset, w: 92, h: 38 }
+    score: { x: W - 86, y: 8 + offset, w: 78, h: 40 }
   };
 }
 function gameplayHudOpacity(player, layout) {
@@ -181,10 +181,10 @@ function drawTopRightHUD() {
   const comboGlow = clamp(state.comboPulse / 120, 0, 1);
   const layout = getGameplayHudLayout();
   const panel = {
-    x: W - layout.score.w - 8,
-    y: 7 + offset,
+    x: layout.score.x,
+    y: layout.score.y,
     w: layout.score.w,
-    h: 42
+    h: layout.score.h
   };
   ctx.save();
   const backing = ctx.createLinearGradient(panel.x, panel.y, panel.x + panel.w, panel.y);
@@ -373,8 +373,8 @@ function drawPauseButton() {
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill(); ctx.stroke();
   ctx.fillStyle = "rgba(225,247,255,0.82)";
-  ctx.fillRect(r.x + 9, r.y + 8, 3, 12);
-  ctx.fillRect(r.x + 17, r.y + 8, 3, 12);
+  ctx.fillRect(r.x + 8, r.y + 7, 3, 12);
+  ctx.fillRect(r.x + 15, r.y + 7, 3, 12);
   ctx.font = "900 7px 'Arial Narrow', Arial, sans-serif";
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";

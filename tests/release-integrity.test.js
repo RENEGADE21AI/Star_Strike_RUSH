@@ -24,13 +24,14 @@ function memoryStorage() {
   };
 }
 
-test("device-local preseason authority is explicit and client/server gates remain closed", () => {
+test("device-local progression stays closed while the unverified weekly board is explicit", () => {
   const release = require("../shared/release-integrity.json");
   assert.equal(release.progressionAuthority, "device_local_preseason");
-  assert.equal(release.clientCompetitionWritesEnabled, false);
-  assert.equal(release.serverCompetitionWritesEnabled, false);
+  assert.equal(release.clientCompetitionWritesEnabled, true);
+  assert.equal(release.serverCompetitionWritesEnabled, true);
   assert.equal(release.serverProgressionWritesEnabled, false);
   assert.equal(release.verifiedRunSessionsEnabled, false);
+  assert.equal(release.competitionMode, "preseason_unverified");
 
   const functionsSource = source("functions/index.js");
   for (const [start, end] of [
@@ -38,10 +39,11 @@ test("device-local preseason authority is explicit and client/server gates remai
     ["exports.submitRunReceipt", "exports.claimSeasonReward"]
   ]) {
     const body = functionsSource.slice(functionsSource.indexOf(start), end ? functionsSource.indexOf(end) : undefined);
-    assert.ok(body.indexOf("requireServerProgressionWritesEnabled()") >= 0);
-    assert.ok(body.indexOf("requireServerProgressionWritesEnabled()") < body.indexOf("authContext(request)"));
-    assert.ok(body.indexOf("requireServerProgressionWritesEnabled()") < body.indexOf("db."));
+    assert.doesNotMatch(body, /requireServerProgressionWritesEnabled\(\)/);
+    assert.ok(body.indexOf("requireCompetitionEnabled()") < body.indexOf("authContext(request)"));
   }
+  const submit = functionsSource.slice(functionsSource.indexOf("exports.submitRunReceipt"), functionsSource.indexOf("exports.claimSeasonReward"));
+  assert.doesNotMatch(submit, /players_private|leaderboard_scores|player_achievement|applyRunToProfile/);
   const retired = functionsSource.slice(functionsSource.indexOf("exports.claimSeasonReward"));
   assert.match(retired, /Season Road is retired/);
   assert.match(retired, /BACKEND_RELEASE_IDENTITY/);

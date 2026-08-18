@@ -83,16 +83,17 @@ test("weekly leagues live in Records and Pilot Dossier is identity plus settings
   const recordsPanel = panel.slice(panel.indexOf("function drawRecordsPanel"), panel.indexOf("function achievementTierColor"));
   assert.doesNotMatch(onlinePanel, /WEEKLY|leagueTab|joinLeague/);
   assert.match(recordsPanel, /r\.weeklyTab/);
-  assert.match(recordsPanel, /SEVEN-DAY FLIGHT LEAGUE/);
+  assert.match(recordsPanel, /PRESEASON WEEKLY BOARD/);
   assert.match(recordsPanel, /requestWeeklyLeague|joinLeague/);
 });
 
-test("run submission reads one aggregate achievement state instead of every unlock document", () => {
+test("ordinary hydration reads one aggregate while weekly submission never mutates achievements", () => {
   const source = fs.readFileSync(path.join(repoRoot, "functions", "index.js"), "utf8");
+  const sync = source.slice(source.indexOf("exports.syncPilotProfile"), source.indexOf("exports.claimPilotHandle"));
+  assert.match(sync, /player_achievement_state/);
+  assert.match(sync, /tx\.get\(achievementStateRef\)/);
   const submit = source.slice(source.indexOf("exports.submitRunReceipt"), source.indexOf("exports.claimSeasonReward"));
-  assert.match(submit, /player_achievement_state/);
-  assert.match(submit, /tx\.get\(achievementStateRef\)/);
-  assert.doesNotMatch(submit, /achievementRefs\.map\(\(item\) => tx\.get/);
+  assert.doesNotMatch(submit, /player_achievement|achievementRefs|earnedAchievement/);
 });
 
 test("supplied account art is optimized, registered, and rendered with a fallback", () => {

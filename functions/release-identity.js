@@ -2,6 +2,7 @@
 
 const {
   PROGRESSION_AUTHORITY,
+  PUBLIC_COMPETITION_MODE,
   SERVER_APP_CHECK_ENFORCED,
   SERVER_COMPETITION_WRITES_ENABLED,
   SERVER_PROGRESSION_WRITES_ENABLED
@@ -21,6 +22,9 @@ function validateReleaseIdentity(identity) {
   if (identity.competitionWritesEnabled !== SERVER_COMPETITION_WRITES_ENABLED) {
     throw new Error("Backend release identity competition mode differs from server configuration.");
   }
+  if (identity.competitionMode !== PUBLIC_COMPETITION_MODE) {
+    throw new Error("Backend release identity competition label differs from server configuration.");
+  }
   if (identity.serverProgressionWritesEnabled !== SERVER_PROGRESSION_WRITES_ENABLED) {
     throw new Error("Backend release identity progression-write mode differs from server configuration.");
   }
@@ -31,6 +35,7 @@ function validateReleaseIdentity(identity) {
     commitSha: String(identity.commitSha).toLowerCase(),
     packageVersion: String(identity.packageVersion),
     progressionAuthority: identity.progressionAuthority,
+    competitionMode: identity.competitionMode,
     competitionWritesEnabled: identity.competitionWritesEnabled,
     serverProgressionWritesEnabled: identity.serverProgressionWritesEnabled,
     appCheckEnforced: identity.appCheckEnforced
@@ -42,6 +47,7 @@ function developmentReleaseIdentity() {
     commitSha: "development",
     packageVersion: "development",
     progressionAuthority: PROGRESSION_AUTHORITY,
+    competitionMode: PUBLIC_COMPETITION_MODE,
     competitionWritesEnabled: SERVER_COMPETITION_WRITES_ENABLED,
     serverProgressionWritesEnabled: SERVER_PROGRESSION_WRITES_ENABLED,
     appCheckEnforced: SERVER_APP_CHECK_ENFORCED

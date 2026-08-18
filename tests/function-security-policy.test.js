@@ -20,8 +20,10 @@ test("profile sync minimizes provider PII and purges legacy duplicate fields", (
   assert.doesNotMatch(authBlock, /request\.auth\.token|email|displayName|photoURL/);
   assert.match(authBlock, /return \{\s*uid: request\.auth\.uid\s*\}/);
 
-  const privatePayload = source.slice(source.indexOf("function privatePayloadFor"), source.indexOf("function publicPayloadFor"));
+  const privatePayload = source.slice(source.indexOf("function publicIdentityPayloadFor"), source.indexOf("async function leagueResponse"));
   for (const field of ["email", "displayName", "photoURL"]) {
     assert.match(privatePayload, new RegExp(`${field}: FieldValue\\.delete\\(\\)`));
   }
+  const syncProfile = source.slice(source.indexOf("exports.syncPilotProfile"), source.indexOf("exports.claimPilotHandle"));
+  assert.match(syncProfile, /if \(privateSnap\.exists\)[\s\S]*tx\.set\(privateRef,[\s\S]*FieldValue\.delete/);
 });

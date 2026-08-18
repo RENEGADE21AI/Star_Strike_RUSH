@@ -63,7 +63,7 @@ test("production build pins every runtime entry to one commit and describes its 
   assert.equal(version.commitSha, expectedCommit);
   assert.equal(version.packageVersion, "1.1.0");
   assert.equal(version.progressionMode, "device_local_preseason");
-  assert.equal(version.competitionMode, "paused");
+  assert.equal(version.competitionMode, "preseason_unverified");
   assert.equal(Number.isNaN(Date.parse(version.buildTimestamp)), false);
 
   const html = fs.readFileSync(path.join(repoRoot, "dist", "index.html"), "utf8");

@@ -40,8 +40,11 @@ const cases = [
   { name: "settings-mobile-375x667", width: 375, height: 667, kind: "audio-settings" },
   { name: "reset-local-data-confirmation", width: 390, height: 844, kind: "reset-confirmation" },
   { name: "pilot-dossier", width: 390, height: 844, kind: "panel", target: "account" },
+  { name: "pilot-dossier-connected", width: 390, height: 844, kind: "connected-panel", target: "account" },
   { name: "codex-overview", width: 390, height: 844, kind: "panel", target: "codex" },
+  { name: "codex-command-ship-detail", width: 390, height: 844, kind: "codex-detail", target: "codex" },
   { name: "records-network", width: 390, height: 844, kind: "panel", target: "records" },
+  { name: "records-weekly-connected", width: 390, height: 844, kind: "connected-panel", target: "records" },
   { name: "progress-road", width: 390, height: 844, kind: "panel", target: "progress" },
   { name: "glory-road-early-prestige-0", width: 375, height: 667, kind: "scenario", scenario: "glory-road-early", expectedGlory: 2500, expectedPrestige: 0 },
   { name: "glory-road-high-prestige-0", width: 390, height: 844, kind: "scenario", scenario: "glory-road-high", expectedGlory: 250000, expectedPrestige: 0 },
@@ -403,6 +406,81 @@ async function runCase(browser, baseUrl, item) {
     evidence.after = confirmation;
     if (confirmation.ui.resetProgressConfirm !== true) errors.push("reset confirmation did not open");
     if (confirmation.runtimeErrors.length) errors.push("reset confirmation produced a runtime error");
+  } else if (item.kind === "connected-panel") {
+    await page.evaluate(() => {
+      const base = window.starStrikeOnline && typeof window.starStrikeOnline.getState === "function"
+        ? window.starStrikeOnline.getState()
+        : {};
+      window.starStrikeOnline = {
+        ...(window.starStrikeOnline || {}),
+        getState: () => ({
+          ...base,
+          ready: true,
+          user: { uid: "sanitized-qa-account" },
+          profileCallSign: "RENEGADE_21",
+          profileHandle: "renegade21",
+          identityService: "available",
+          accountArchive: "loaded",
+          progressionMode: "device_local_preseason",
+          competitionMode: "preseason_unverified",
+          lastStatus: "PILOT IDENTITY ACTIVE",
+          lastError: "",
+          weeklyLeague: {
+            id: "weekly_qa",
+            weekId: "week_qa",
+            weekLabel: "MONDAY — SUNDAY UTC",
+            division: "OPEN",
+            memberCount: 3,
+            capacity: 30,
+            recordTrust: "preseason_unverified",
+            members: [
+              { publicPilotId: "pilot_alpha", callSign: "NOVA_7", handle: "nova_7", weeklyPoints: 4825 },
+              { publicPilotId: "pilot_beta", callSign: "RIFT_2", handle: "rift_2", weeklyPoints: 3100 }
+            ]
+          }
+        })
+      };
+    });
+    if (item.target === "records") await page.evaluate(() => { recordsPanelTab = "weekly"; });
+    await openPanel(page, item.target, item.touch === true);
+    const panelState = await snapshot(page);
+    evidence.after = panelState;
+    const expected = item.target === "account" ? "online" : item.target;
+    if (panelState.ui.titleSubState !== expected || panelState.ui.titlePanelAnim < 0.94) errors.push(`${item.target} connected panel did not open`);
+    if (item.target === "account") {
+      const textFit = await page.evaluate(() => {
+        const panel = getOnlineRects().panel;
+        const rect = { x: panel.x + 20, y: panel.y + 452, w: panel.w - 40, h: 112 };
+        const maxWidth = Math.max(72, rect.w - 128);
+        ctx.save();
+        const size = fitCondensedCanvasFont("ACCOUNT CONNECTED", maxWidth, 18, 12);
+        const width = ctx.measureText("ACCOUNT CONNECTED").width;
+        ctx.restore();
+        return { width, maxWidth, size };
+      });
+      evidence.accountConnectedTextFit = textFit;
+      if (textFit.width > textFit.maxWidth + 0.5) errors.push("ACCOUNT CONNECTED exceeds its measured card lane");
+    }
+    if (panelState.runtimeErrors.length) errors.push(`${item.target} connected panel produced a runtime error`);
+  } else if (item.kind === "codex-detail") {
+    await openPanel(page, "codex");
+    await page.evaluate(() => {
+      setCodexCategory("bosses");
+      codexDiscovered.boss_standard = true;
+      codexDetailType = "boss_standard";
+      codexDetailScroll = 0;
+      updateDebugSnapshot();
+    });
+    await page.waitForTimeout(120);
+    const detailState = await snapshot(page);
+    const layout = await page.evaluate(() => codexDetailLayout(getTitlePanelRect(), "boss_standard"));
+    evidence.after = detailState;
+    evidence.codexDetailLayout = layout;
+    if (detailState.ui.titleSubState !== "codex") errors.push("Codex detail did not remain open");
+    if (!(layout.graphic.y > layout.title.y && layout.stats.y > layout.graphic.y && layout.brief.y > layout.stats.y)) {
+      errors.push("Codex encounter art, stats, and brief are not vertically ordered");
+    }
+    if (detailState.runtimeErrors.length) errors.push("Codex detail produced a runtime error");
   } else if (item.kind === "panel") {
     await openPanel(page, item.target, item.touch === true);
     const panelState = await snapshot(page);

@@ -155,6 +155,16 @@ test("arrival and paused tutorial dialogue block control and ordinary simulation
   assert.equal(context.gameplaySimulationEnabled({ gameState: "playing", transitionMode: "idle", tutorialDialogueVisible: true }), false);
 });
 
+test("enemy visual heading follows the shortest arc with a bounded turn rate", () => {
+  assert.equal(typeof context.smoothEnemyVisualHeading, "function");
+  const nearWrap = context.smoothEnemyVisualHeading(Math.PI - 0.02, -0.02, -1, -1, 0.08);
+  assert.ok(Math.abs(context.wrapGameplayAngle(nearWrap - (Math.PI - 0.02))) <= 0.081);
+  const first = context.smoothEnemyVisualHeading(undefined, 1, 1, 1, 0.08);
+  assert.ok(Number.isFinite(first));
+  const settled = context.smoothEnemyVisualHeading(first, 1, 1, 1, 0.08);
+  assert.ok(Math.abs(context.wrapGameplayAngle(settled - first)) <= 0.081);
+});
+
 test("onboarding opens on a galaxy arrival and transmissions suppress shake", () => {
   const onboardingSource = fs.readFileSync(path.join(repoRoot, "src", "17-tutorial-onboarding.js"), "utf8");
   const sceneSource = fs.readFileSync(path.join(repoRoot, "src", "17-rendering-scene.js"), "utf8");
@@ -263,7 +273,10 @@ test("public Firebase writers and rules exclude provider identity fields", () =>
     functionsSource.indexOf("function publicIdentityPayloadFor"),
     functionsSource.indexOf("async function leagueResponse")
   );
-  assert.doesNotMatch(publicBuilder, /displayName|photoURL|email/);
+  for (const field of ["displayName", "photoURL", "email"]) {
+    assert.match(publicBuilder, new RegExp(`${field}: FieldValue\\.delete\\(\\)`));
+  }
+  assert.doesNotMatch(publicBuilder, /request\.auth\.token/);
   assert.match(functionsSource, /tx\.set\(publicRef, publicPayload, \{ merge: true \}\);/);
   const syncProfile = functionsSource.slice(
     functionsSource.indexOf("exports.syncPilotProfile"),
@@ -276,9 +289,9 @@ test("public Firebase writers and rules exclude provider identity fields", () =>
   assert.match(clientSource, /httpsCallable\(functionsApi, "syncPilotProfile"\)/);
   assert.match(clientSource, /httpsCallable\(functionsApi, "claimPilotHandle"\)/);
   assert.match(clientSource, /progressionMode:\s*PROGRESSION_MODE/);
-  assert.match(clientSource, /competitionMode:\s*competitiveModeEnabled\s*\?\s*"unknown"\s*:\s*"paused"/);
-  assert.match(clientSource, /reason:\s*"device_local_preseason"/);
-  assert.match(clientSource, /Run saved as device progress/);
+  assert.match(clientSource, /const competitionMode = competitiveModeEnabled && window\.PUBLIC_COMPETITION_MODE === "preseason_unverified"/);
+  assert.match(clientSource, /localOnly:\s*true/);
+  assert.match(clientSource, /WEEKLY FLIGHT POINTS UPDATED/);
   const leaderboardReader = clientSource.slice(
     clientSource.indexOf("function applyArchiveSnapshot"),
     clientSource.indexOf("function subscribeLegacyArchive")

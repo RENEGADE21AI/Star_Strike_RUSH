@@ -5,6 +5,9 @@ const FIREBASE_CONFIG_CANDIDATES = [
 ];
 const PROGRESSION_MODE = window.PROGRESSION_AUTHORITY || "device_local_preseason";
 const competitiveModeEnabled = window.CLIENT_COMPETITION_WRITES_ENABLED === true;
+const competitionMode = competitiveModeEnabled && window.PUBLIC_COMPETITION_MODE === "preseason_unverified"
+  ? "preseason_unverified"
+  : "paused";
 const developmentHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
 const emulatorMode = developmentHost && new URLSearchParams(window.location.search).get("firebaseEmulators") === "1";
 const REFRESH_DEBOUNCE_MS = 1200;
@@ -47,7 +50,7 @@ const online = {
   identityService: "connecting",
   accountArchive: "not_loaded",
   progressionMode: PROGRESSION_MODE,
-  competitionMode: competitiveModeEnabled ? "unknown" : "paused",
+  competitionMode,
   networkState: navigator.onLine === false ? "offline" : "online",
   leaderboard: [],
   achievements: [],
@@ -61,6 +64,7 @@ const online = {
     profileCallableCalls: 0,
     achievementAggregateLoads: 0,
     archiveListenerSubscriptions: 0,
+    weeklyCallableCalls: 0,
     redirectResults: 0,
     signInStarts: 0
   }
@@ -85,7 +89,7 @@ function getState() {
     profileMeta: cloneMeta(online.profileMeta),
     onlineArchiveMeta: cloneMeta(online.onlineArchiveMeta),
     legacyRecord: online.legacyRecord ? { ...online.legacyRecord } : null,
-    weeklyLeague: null,
+    weeklyLeague: online.weeklyLeague ? JSON.parse(JSON.stringify(online.weeklyLeague)) : null,
     identityService: online.identityService,
     accountArchive: online.accountArchive,
     progressionMode: online.progressionMode,
@@ -205,6 +209,42 @@ function normalizeLegacyRecord(record) {
   };
 }
 
+function normalizeWeeklyLeague(league) {
+  if (!league || typeof league !== "object") return null;
+  return {
+    id: safeId(league.id, "").slice(0, 80),
+    weekId: safeId(league.weekId, "").slice(0, 40),
+    weekLabel: safeText(league.weekLabel, "MONDAY - SUNDAY UTC", 40),
+    division: safeText(league.division, "OPEN", 20).toUpperCase(),
+    memberCount: boundedNumber(league.memberCount, 30),
+    capacity: Math.max(1, boundedNumber(league.capacity, 30) || 30),
+    closesAtMs: boundedNumber(league.closesAtMs, 9999999999999),
+    recordTrust: "preseason_unverified",
+    members: (Array.isArray(league.members) ? league.members : []).slice(0, 30).map((member) => ({
+      publicPilotId: safeText(member && member.publicPilotId, "", 40).replace(/[^a-z0-9_]/gi, ""),
+      callSign: safeCallSign(member && member.callSign) || "PILOT",
+      handle: safeHandle(member && member.handle),
+      weeklyPoints: boundedNumber(member && member.weeklyPoints, 999999999)
+    }))
+  };
+}
+
+async function loadWeeklyLeague(join = false, generation = authGeneration) {
+  if (!competitiveModeEnabled || !auth || !auth.currentUser || !functionsApi || !window.starStrikeFirebaseApi) {
+    online.weeklyLeague = null;
+    return { ok: false, reason: "unavailable" };
+  }
+  const uid = auth.currentUser.uid;
+  online.developmentCounters.weeklyCallableCalls++;
+  const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "joinWeeklyLeague");
+  const response = await callable({ join: join === true });
+  if (!isHydrationCurrent(uid, generation)) return { stale: true };
+  const result = response && response.data ? response.data : {};
+  online.weeklyLeague = normalizeWeeklyLeague(result.league);
+  online.competitionMode = "preseason_unverified";
+  return { ok: true, league: online.weeklyLeague };
+}
+
 function knownAchievementIds() {
   const definitions = typeof window.getAchievementDefinitions === "function"
     ? window.getAchievementDefinitions()
@@ -231,6 +271,7 @@ function normalizeBackendRelease(release) {
     progressionAuthority: release.progressionAuthority === "device_local_preseason"
       ? "device_local_preseason"
       : "unknown",
+    competitionMode: release.competitionMode === "preseason_unverified" ? "preseason_unverified" : "paused",
     competitionWritesEnabled: release.competitionWritesEnabled === true,
     serverProgressionWritesEnabled: release.serverProgressionWritesEnabled === true,
     appCheckEnforced: release.appCheckEnforced === true
@@ -409,6 +450,17 @@ async function hydrateAccount(user, options = {}) {
     const result = await syncProfile(pending.pending ? pending.desiredCallSign : "", generation);
     if (!result || result.stale || !isHydrationCurrent(uid, generation)) return { stale: true };
     subscribeLegacyArchive(uid);
+    if (competitiveModeEnabled) {
+      try {
+        await loadWeeklyLeague(false, generation);
+      } catch (error) {
+        if (isHydrationCurrent(uid, generation)) {
+          online.weeklyLeague = null;
+          online.competitionMode = "unavailable";
+          setError(error, "Weekly board is temporarily unavailable.");
+        }
+      }
+    }
     setStatus(pending.pending ? "ACCOUNT UPDATED" : "PILOT IDENTITY ACTIVE");
     return result;
   })().catch((error) => {
@@ -563,15 +615,50 @@ async function claimHandle(handle) {
 }
 
 async function joinWeeklyLeague() {
-  online.weeklyLeague = null;
-  online.competitionMode = "paused";
-  setStatus("PUBLIC COMPETITION PAUSED");
-  return { ok: false, reason: "preseason_paused" };
+  if (!competitiveModeEnabled) return { ok: false, reason: "unavailable" };
+  if (!auth || !auth.currentUser) throw new Error("Sign in before entering the weekly board.");
+  if (!online.profileHandle) throw new Error("Claim a unique @handle before entering the weekly board.");
+  try {
+    const result = await loadWeeklyLeague(true, authGeneration);
+    if (result.league) setStatus("PRESEASON WEEKLY BOARD ACTIVE");
+    return result;
+  } catch (error) {
+    online.competitionMode = "unavailable";
+    setError(error, "Weekly board entry failed.");
+    throw error;
+  }
 }
 
-async function submitRun() {
-  setStatus("Run saved as device progress. Public writes are paused.");
-  return { ok: false, reason: "device_local_preseason", localOnly: true };
+async function submitRun(run = {}) {
+  if (!competitiveModeEnabled || !online.weeklyLeague) return { ok: false, reason: "not_enrolled", localOnly: true };
+  if (!auth || !auth.currentUser || !functionsApi) return { ok: false, reason: "signed_out", localOnly: true };
+  const stats = run && run.stats && typeof run.stats === "object" ? run.stats : {};
+  const priorReceipt = run && run.receipt && typeof run.receipt === "object" ? run.receipt : {};
+  const receipt = {
+    clientReceiptId: safeId(priorReceipt.receiptId || priorReceipt.clientReceiptId || `run_${Date.now()}`),
+    score: boundedNumber(run.score ?? priorReceipt.score, 999999999),
+    phaseReached: Math.max(1, boundedNumber(run.phaseReached ?? run.phase ?? priorReceipt.phaseReached, 9999) || 1),
+    runDurationMs: boundedNumber(stats.runDurationMs ?? priorReceipt.runDurationMs, 86400000),
+    enemiesKilled: boundedNumber(stats.enemiesKilled ?? priorReceipt.enemiesKilled, 1000000),
+    bossesKilled: boundedNumber(stats.bossesKilled ?? priorReceipt.bossesKilled, 1000000),
+    powerupsCollected: boundedNumber(stats.powerupsCollected ?? priorReceipt.powerupsCollected, 1000000),
+    ghostUses: boundedNumber(stats.ghostUses ?? priorReceipt.ghostUses, 1000000),
+    damageTaken: boundedNumber(stats.damageTaken ?? priorReceipt.damageTaken, 1000000),
+    highestCombo: boundedNumber(stats.highestCombo ?? priorReceipt.highestCombo, 1000000),
+    clientVersion: "web-v1"
+  };
+  const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "submitRunReceipt");
+  try {
+    const response = await callable({ receipt });
+    const result = response && response.data ? response.data : {};
+    online.weeklyLeague = normalizeWeeklyLeague(result.league) || online.weeklyLeague;
+    online.competitionMode = "preseason_unverified";
+    setStatus(result.alreadyProcessed ? "WEEKLY RUN ALREADY COUNTED" : "WEEKLY FLIGHT POINTS UPDATED");
+    return { ok: true, alreadyProcessed: result.alreadyProcessed === true, league: online.weeklyLeague };
+  } catch (error) {
+    setError(error, "Weekly Flight Points could not be published.");
+    return { ok: false, reason: "publish_failed", localOnly: true };
+  }
 }
 
 async function devSignInAccount(accountName = "account-a") {
@@ -662,6 +749,7 @@ async function bootFirebase() {
         if (typeof window.clearAccountIdentity === "function") {
           window.clearAccountIdentity(online, {
             competitiveModeEnabled,
+            competitionMode,
             progressionMode: PROGRESSION_MODE
           });
         }
