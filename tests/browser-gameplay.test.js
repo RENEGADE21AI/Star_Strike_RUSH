@@ -642,7 +642,12 @@ test("title launch and panel close use stateful spatial transitions", { timeout:
   const first = await openGame(context);
   try {
     await first.page.mouse.click(187, 310);
-    await first.page.waitForTimeout(100);
+    await first.page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.transition.mode === "title_launch"
+        && snapshot.transition.progress > 0
+        && snapshot.transition.progress < 1;
+    });
     const launching = await debugSnapshot(first.page);
     assert.equal(launching.gameState, "start");
     assert.equal(launching.transition.mode, "title_launch");
@@ -656,13 +661,19 @@ test("title launch and panel close use stateful spatial transitions", { timeout:
   const second = await openGame(context);
   try {
     await second.page.mouse.click(38, 237);
-    await second.page.waitForTimeout(350);
+    await second.page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.ui.titleSubState === "online" && snapshot.ui.titlePanelAnim > 0.8;
+    });
     const opened = await debugSnapshot(second.page);
     assert.equal(opened.ui.titleSubState, "online");
     assert.ok(opened.ui.titlePanelAnim > 0.8);
     assert.ok(opened.ui.titlePanelOrigin.x < 60);
     await second.page.mouse.click(38, 31);
-    await second.page.waitForTimeout(180);
+    await second.page.waitForFunction((openedAnim) => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+      return snapshot.ui.titlePanelTarget === 0 && snapshot.ui.titlePanelAnim < openedAnim;
+    }, opened.ui.titlePanelAnim);
     const closing = await debugSnapshot(second.page);
     assert.ok(closing.ui.titlePanelAnim < opened.ui.titlePanelAnim);
     assert.equal(closing.ui.titlePanelTarget, 0);
