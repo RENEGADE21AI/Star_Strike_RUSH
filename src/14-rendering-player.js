@@ -25,8 +25,6 @@ function drawBackground() {
     const streak = state.gameState === "playing" && s.spd > 0.9 ? 1.6 + s.spd * 1.4 : s.s;
     ctx.fillRect(s.x, s.y, Math.max(0.6, s.s * 0.75), streak);
   }
-  ctx.fillStyle = "rgba(135,190,225,0.035)";
-  for (let y = 0; y < H; y += 42) ctx.fillRect(0, y, W, 1);
   const vignette = ctx.createRadialGradient(W / 2, H * 0.48, W * 0.18, W / 2, H * 0.48, W * 0.72);
   vignette.addColorStop(0, "rgba(0,0,0,0)");
   vignette.addColorStop(1, "rgba(0,0,0,0.42)");

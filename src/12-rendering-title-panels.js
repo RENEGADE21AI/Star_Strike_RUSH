@@ -2,7 +2,7 @@ function drawTitleMetaStrip(x, y, w) {
   const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
   if (!meta) return;
   const chips = [
-    { label: "BEST", value: Number((meta.lifetime && meta.lifetime.bestScore) || highScore || 0).toLocaleString(), color: "rgba(92,238,255,0.72)" },
+    { label: "GLORY", value: formatRoadNumber(meta.totalGlory || 0), color: "rgba(92,238,255,0.72)" },
     { label: "RANK", value: String(meta.gloryRankDisplay || meta.gloryRank || "ROOKIE").toUpperCase(), color: "rgba(255,230,128,0.70)" },
     { label: "PRESTIGE", value: Number(meta.prestige || 0) > 0 ? romanPrestige(meta.prestige) : "0", color: "rgba(120,255,180,0.72)" }
   ];
@@ -158,11 +158,11 @@ function drawCodexGrid(panel) {
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 8); ctx.stroke();
     ctx.save();
-    ctx.translate(r.x + r.w / 2, r.y + 46);
+    ctx.translate(r.x + r.w / 2, r.y + 48);
     if (discovered) {
-      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.34 : 0.42, silhouette: false, stateMode: "physical", realm: 0 });
+      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.42 : 0.62, silhouette: false, stateMode: "physical", realm: 0 });
     } else {
-      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.34 : 0.42, silhouette: true, stateMode: "physical", realm: 0 });
+      drawEncounterShipGraphic(type, { scale: type.startsWith("boss") ? 0.42 : 0.62, silhouette: true, stateMode: "physical", realm: 0 });
     }
     ctx.restore();
     ctx.textAlign = "center";
@@ -247,22 +247,68 @@ function codexTacticalLines(type, meta) {
 function codexDetailLayout(panel, type) {
   const card = { x: panel.x + 18, y: panel.y + 78, w: panel.w - 36, h: panel.h - 94 };
   const boss = String(type || "").startsWith("boss");
+  const viewport = { x: card.x + 14, y: card.y + 43, w: card.w - 28, h: 154 };
   const graphic = {
-    x: card.x + card.w / 2,
-    y: card.y + (boss ? 92 : 88),
-    scale: boss ? 0.52 : 0.72,
-    bottom: card.y + 142
+    x: viewport.x + viewport.w / 2,
+    y: viewport.y + viewport.h / 2,
+    scale: boss ? 0.66 : 1.02,
+    bottom: viewport.y + viewport.h
   };
   const stats = { x: card.x + Math.round((card.w - 162) / 2), y: graphic.bottom + 12 };
   stats.bottom = stats.y + 82;
   const briefY = stats.bottom + 14;
   return {
     card,
+    viewport,
     title: { x: card.x + card.w / 2, y: card.y + 14, maxWidth: card.w - 92 },
     graphic,
     stats,
     brief: { x: card.x + 14, y: briefY, w: card.w - 28, h: Math.max(142, card.y + card.h - briefY - 12) }
   };
+}
+
+function drawCodexSpaceViewport(rect, type, scale) {
+  let seed = 0;
+  for (const character of String(type || "enemy")) seed = (seed * 31 + character.charCodeAt(0)) >>> 0;
+  const time = settingReducedMotion ? 0.35 : state.frame / 120;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 8);
+  ctx.clip();
+  const sky = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+  sky.addColorStop(0, "#081528");
+  sky.addColorStop(0.55, "#020712");
+  sky.addColorStop(1, "#00030a");
+  ctx.fillStyle = sky;
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  const travel = settingReducedMotion ? 0 : state.frame * 0.92;
+  for (let index = 0; index < 28; index++) {
+    const starSeed = (seed + index * 2654435761) >>> 0;
+    const sx = rect.x + 4 + (starSeed % Math.max(1, Math.floor(rect.w - 8)));
+    const sy = rect.y + ((Math.floor(starSeed / 97) + travel * (0.35 + (index % 5) * 0.15)) % rect.h);
+    const alpha = 0.28 + (index % 4) * 0.12;
+    ctx.fillStyle = `rgba(${index % 6 === 0 ? "126,221,255" : "255,255,255"},${alpha})`;
+    ctx.fillRect(sx, sy, index % 7 === 0 ? 1.5 : 1, settingReducedMotion ? 1 : 2 + index % 3);
+  }
+  const pathX = settingReducedMotion ? 0 : Math.sin(time * 1.1 + seed * 0.001) * Math.min(26, rect.w * 0.09);
+  const pathY = settingReducedMotion ? 0 : Math.cos(time * 0.78 + seed * 0.002) * 8;
+  const bank = settingReducedMotion ? 0 : Math.cos(time * 1.1 + seed * 0.001) * 0.13;
+  ctx.translate(rect.x + rect.w / 2 + pathX, rect.y + rect.h / 2 + pathY + 5);
+  ctx.rotate(bank);
+  drawEncounterShipGraphic(type, { scale, silhouette: false, stateMode: "physical", realm: 0 });
+  ctx.restore();
+  ctx.save();
+  ctx.strokeStyle = "rgba(112,226,255,0.34)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 8);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(112,226,255,0.55)";
+  ctx.font = FONT_TINY;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText("TACTICAL FLIGHT VIEW", rect.x + 9, rect.y + 8);
+  ctx.restore();
 }
 function drawCodexDetail(panel, type) {
   const stats = codexTypeStats(type);
@@ -287,8 +333,7 @@ function drawCodexDetail(panel, type) {
   ctx.textBaseline = "middle";
   ctx.fillText("<", backRect.x + backRect.w / 2, backRect.y + backRect.h / 2 + 1);
 
-  ctx.translate(layout.graphic.x, layout.graphic.y);
-  drawEncounterShipGraphic(type, { scale: layout.graphic.scale, silhouette: false, stateMode: "physical", realm: 0 });
+  drawCodexSpaceViewport(layout.viewport, type, layout.graphic.scale);
   ctx.restore();
 
   ctx.save();
@@ -355,7 +400,7 @@ function drawResetProgressConfirm() {
   ctx.fillText(labelName || "PILOT", r.box.x + r.box.w / 2, r.box.y + 55);
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,150,150,0.88)";
-  ctx.fillText("ERASES: SCORE, GLORY, PRESTIGE, CREDITS, STATS,", r.box.x + r.box.w / 2, r.box.y + 83);
+  ctx.fillText("ERASES: SCORE, GLORY, PRESTIGE, AND STATS,", r.box.x + r.box.w / 2, r.box.y + 83);
   ctx.fillText("RECEIPTS, ACHIEVEMENTS, CODEX, AND LAST RUN", r.box.x + r.box.w / 2, r.box.y + 99);
   ctx.fillStyle = "rgba(150,255,205,0.80)";
   ctx.fillText("PRESERVES: ACCESSIBILITY, AUDIO, CALL SIGN,", r.box.x + r.box.w / 2, r.box.y + 124);
@@ -580,13 +625,13 @@ function drawFlightNetworkCard(rect, online, user) {
   const networkStatus = connected ? "ACCOUNT CONNECTED" : "DEVICE PROGRESS";
   const networkTextX = rect.x + 112;
   const networkTextMaxWidth = Math.max(80, rect.x + rect.w - 14 - networkTextX);
-  fitCondensedCanvasFont("ACCOUNT CONNECTED", networkTextMaxWidth, 18, 13);
+  fitCondensedCanvasFont(networkStatus, networkTextMaxWidth, 18, 10, 800);
   ctx.fillStyle = connected ? "#78ffb4" : "#d8fbff";
-  ctx.fillText(networkStatus, networkTextX, rect.y + 40);
+  ctx.fillText(networkStatus, networkTextX, rect.y + 40, networkTextMaxWidth);
   ctx.font = FONT_TINY; ctx.fillStyle = "rgba(255,255,255,0.52)";
   ctx.fillText(connected ? "PILOT IDENTITY ACTIVE" : "LOCAL GAMEPLAY READY", networkTextX, rect.y + 66);
   ctx.fillStyle = "rgba(255,214,92,0.76)";
-  ctx.fillText(connected ? "PRESEASON WEEKLY BOARD ONLINE" : "WEEKLY BOARD REQUIRES ACCOUNT", networkTextX, rect.y + 82, networkTextMaxWidth);
+  ctx.fillText(connected ? "IDENTITY + RECORD ARCHIVE ONLINE" : "ONLINE ARCHIVE REQUIRES ACCOUNT", networkTextX, rect.y + 82, networkTextMaxWidth);
   ctx.restore();
 }
 function drawOnlinePanel() {
@@ -634,19 +679,25 @@ function drawOnlinePanel() {
     ctx.fillStyle = "rgba(255,184,108,0.86)";
     ctx.fillText("PUBLIC: CALL SIGN + @HANDLE APPEAR TO OTHER PLAYERS", card.x + 14, card.y + 151);
     ctx.restore();
-    const handleLabel = online.profileHandle ? `@${online.profileHandle}  •  ACCOUNT-BOUND` : (handleEditing ? `CLAIM @${handleDraft || "handle"}` : "CLAIM UNIQUE @HANDLE");
+    const handleLabel = online.profileHandle
+      ? (handleEditing ? `CHANGE TO @${handleDraft || "handle"}` : `CHANGE UNIQUE @${online.profileHandle}`)
+      : (handleEditing ? `CLAIM @${handleDraft || "handle"}` : "CLAIM UNIQUE @HANDLE");
     const identityAvailable = online.identityService !== "unavailable";
-    drawOnlineActionButton(r.claimHandle, identityAvailable ? handleLabel : "IDENTITY SERVICE OFFLINE", !!user && !online.profileHandle && identityAvailable);
+    drawOnlineActionButton(r.claimHandle, identityAvailable ? handleLabel : "IDENTITY SERVICE OFFLINE", !!user && identityAvailable);
     if (!user) drawOnlineActionButton(r.signIn, "CONNECT GOOGLE ACCOUNT", true);
     if (user) drawOnlineActionButton(r.signOut, "SIGN OUT", true);
+    if (user) {
+      if (online.accountDeletion) drawOnlineActionButton(r.deleteAccount, "CANCEL ACCOUNT DELETION", true);
+      else drawDangerActionButton(r.deleteAccount, "DELETE ACCOUNT");
+    }
     ctx.save();
     ctx.font = FONT_TINY;
     ctx.textAlign = "center";
     ctx.fillStyle = handleStatus ? "#ffd27a" : (online.lastError ? "#ff9f9f" : "rgba(255,255,255,0.48)");
     const quietStatus = handleStatus || online.lastError || (!user ? "LOCAL PLAY IS READY" : "ACCOUNT CONNECTED");
-    ctx.fillText(String(quietStatus).slice(0, 48), panel.x + panel.w / 2, panel.y + (user ? 426 : 386));
+    ctx.fillText(String(quietStatus).slice(0, 48), panel.x + panel.w / 2, panel.y + (user ? 456 : 386));
     ctx.restore();
-    drawFlightNetworkCard({ x: panel.x + 20, y: panel.y + (user ? 452 : 412), w: panel.w - 40, h: 112 }, online, user);
+    drawFlightNetworkCard({ x: panel.x + 20, y: panel.y + (user ? 482 : 412), w: panel.w - 40, h: 104 }, online, user);
   } else {
     ctx.save();
     ctx.textAlign = "left";
@@ -687,6 +738,38 @@ function drawOnlinePanel() {
     ctx.restore();
   }
 }
+
+function drawAccountDeletionConfirm() {
+  if (!deleteAccountConfirm) return;
+  const r = getAccountDeletionConfirmRects();
+  ctx.save();
+  ctx.fillStyle = "rgba(0,2,8,0.90)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(25,5,10,0.98)";
+  ctx.strokeStyle = "rgba(255,92,102,0.78)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(r.box.x, r.box.y, r.box.w, r.box.h, 12); ctx.fill(); ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#ff9aa3";
+  ctx.font = "800 25px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  ctx.fillText("DELETE PILOT ACCOUNT?", W / 2, r.box.y + 22);
+  ctx.font = FONT_SMALL;
+  ctx.fillStyle = "#fff";
+  ctx.fillText("YOU HAVE 72 HOURS TO CANCEL.", W / 2, r.box.y + 68);
+  ctx.font = FONT_TINY;
+  ctx.fillStyle = "rgba(255,255,255,0.72)";
+  const lines = [
+    "AFTER 72 HOURS, ACCOUNT DATA IS PERMANENTLY DELETED:",
+    "GLORY, HIGH SCORES, WORLD RECORDS, HANDLES,",
+    "ACHIEVEMENTS, CODEX DATA, AND ALL ACCOUNT PROGRESSION.",
+    "GOOGLE SIGN-IN WILL NO LONGER RESTORE THIS PILOT."
+  ];
+  lines.forEach((line, index) => ctx.fillText(line, W / 2, r.box.y + 108 + index * 22, r.box.w - 28));
+  drawOnlineActionButton(r.cancel, "KEEP MY ACCOUNT", true);
+  drawDangerActionButton(r.confirm, "BEGIN 72-HOUR DELETION");
+  ctx.restore();
+}
 function drawRecordsPanel() {
   const r = getRecordsRects();
   const panel = r.panel;
@@ -700,7 +783,7 @@ function drawRecordsPanel() {
   ctx.strokeStyle = "rgba(92,238,255,0.12)";
   ctx.beginPath(); ctx.moveTo(panel.x + 20, panel.y + 84); ctx.lineTo(panel.x + panel.w - 20, panel.y + 84); ctx.stroke();
   ctx.restore();
-  drawAccountTab(r.globalTab, "ARCHIVE", recordsPanelTab === "global");
+  drawAccountTab(r.globalTab, "WORLD", recordsPanelTab === "global");
   drawAccountTab(r.weeklyTab, "WEEKLY", recordsPanelTab === "weekly");
 
   if (recordsPanelTab === "weekly") {
@@ -713,29 +796,46 @@ function drawRecordsPanel() {
     ctx.textBaseline = "top";
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,255,255,0.52)";
-    ctx.fillText("PRESEASON WEEKLY BOARD", card.x + 16, card.y + 16);
+    ctx.fillText("WEEKLY LEAGUES", card.x + 16, card.y + 16);
     ctx.font = "900 23px 'Arial Narrow', Arial, sans-serif";
     ctx.fillStyle = "#ffe67a";
     ctx.shadowColor = "rgba(255,214,92,0.45)";
     ctx.shadowBlur = 10;
-    ctx.fillText(league ? `${String(league.division || "OPEN")} BOARD` : (competitionEnabled ? "WEEKLY RECORDS" : "OFFLINE"), card.x + 16, card.y + 37);
+    ctx.fillText(league ? `${String(league.division || "OPEN")} BOARD` : (competitionEnabled ? "WEEKLY RECORDS" : "PAUSED"), card.x + 16, card.y + 37);
     ctx.shadowBlur = 0;
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,255,255,0.64)";
     ctx.fillText(
       league
-        ? `${league.memberCount || 0}/${league.capacity || 30} PILOTS  •  UNVERIFIED FLIGHT POINTS`
-        : (competitionEnabled ? "UP TO 30 PILOTS • UNVERIFIED FLIGHT POINTS" : "WEEKLY BOARD IS CURRENTLY UNAVAILABLE"),
+        ? `${league.memberCount || 0}/${league.capacity || 30} PILOTS  •  SERVER RECORD ARCHIVE`
+        : (competitionEnabled ? "UP TO 30 PILOTS • AUTHORITATIVE RUNS" : "AUTHORITATIVE RUN VERIFIER REQUIRED"),
       card.x + 16,
       card.y + 75
     );
     ctx.fillText(
       league
         ? String(league.weekLabel || "MONDAY - SUNDAY UTC")
-        : (competitionEnabled ? "CLAIM A HANDLE, THEN ENTER THIS WEEK'S BOARD" : "DEVICE PROGRESS CONTINUES OFFLINE"),
+        : (competitionEnabled ? "CLAIM A HANDLE, THEN ENTER THIS WEEK'S BOARD" : "PUBLIC WRITES REMAIN SAFELY CLOSED"),
       card.x + 16,
       card.y + 94
     );
+    const leagues = Array.isArray(online.weeklyLeagues) ? online.weeklyLeagues : [];
+    if (leagues.length > 1) {
+      const selectedIndex = Math.max(0, leagues.findIndex((entry) => entry.id === online.selectedWeeklyLeagueId));
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(255,255,255,0.58)";
+      ctx.fillText(`LEAGUE ${selectedIndex + 1} / ${leagues.length}`, card.x + card.w - 86, card.y + 16);
+      for (const [rect, glyph] of [[r.leaguePrev, "‹"], [r.leagueNext, "›"]]) {
+        ctx.fillStyle = "rgba(255,214,92,0.10)";
+        ctx.strokeStyle = "rgba(255,214,92,0.50)";
+        ctx.beginPath(); ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 4); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#ffe67a";
+        ctx.font = "700 19px Arial, sans-serif";
+        ctx.fillText(glyph, rect.x + rect.w / 2, rect.y + 1);
+      }
+      ctx.textAlign = "left";
+      ctx.font = FONT_TINY;
+    }
     let listY = panel.y + 226;
     const members = league && Array.isArray(league.members) ? league.members.slice(0, 10) : [];
     if (members.length) {
@@ -758,14 +858,14 @@ function drawRecordsPanel() {
     } else {
       ctx.fillStyle = "rgba(255,255,255,0.48)";
       const empty = !competitionEnabled
-        ? "THE PRESEASON WEEKLY BOARD IS OFFLINE."
+        ? "WEEKLY LEAGUES ARE PAUSED."
         : (!user ? "SIGN IN FROM YOUR PILOT DOSSIER TO ENTER." : (!online.profileHandle ? "CLAIM YOUR @HANDLE IN THE PILOT DOSSIER FIRST." : "ENTER TO FIND YOUR WEEKLY GROUP."));
       ctx.fillText(empty, panel.x + 24, listY);
       const formatCard = { x: panel.x + 20, y: listY + 33, w: panel.w - 40, h: 188 };
       drawDossierCard(formatCard, "#ffd65c");
       ctx.fillStyle = "rgba(255,255,255,0.48)";
       ctx.fillText("WEEKLY BOARD FORMAT", formatCard.x + 16, formatCard.y + 15);
-      const divisions = ["OPEN", "7 DAYS", "BEST RUN", "UNVERIFIED"];
+      const divisions = ["5 DIVISIONS", "7 DAYS", "BEST RUN", "VERIFIED"];
       divisions.forEach((division, index) => {
         const badgeW = 70;
         const badgeX = formatCard.x + 14 + index * 76;
@@ -779,9 +879,9 @@ function drawRecordsPanel() {
       });
       ctx.textAlign = "left";
       const rules = [
-        ["01", "OPEN PRESEASON GROUP", "UP TO 30 ACCOUNT PILOTS"],
+        ["01", "SKILL-MATCHED LEAGUES", "UP TO 30 ACCOUNT PILOTS"],
         ["02", "SEVEN-DAY RESET", "A FRESH BOARD BEGINS EVERY MONDAY"],
-        ["03", "UNVERIFIED FLIGHT POINTS", "YOUR BEST ACCEPTED RUN SETS THE LADDER"]
+        ["03", "AUTHORITATIVE FLIGHT POINTS", "ONLY TRUSTED RUNS MAY SET THE LADDER"]
       ];
       rules.forEach((rule, index) => {
         const ruleY = formatCard.y + 78 + index * 34;
@@ -798,7 +898,7 @@ function drawRecordsPanel() {
     ctx.restore();
     const competitionAvailable = online.competitionMode !== "unavailable";
     const actionLabel = !competitionEnabled
-      ? "WEEKLY BOARD UNAVAILABLE"
+      ? "WEEKLY BOARD PAUSED"
       : (competitionAvailable ? (league ? "WEEKLY BOARD ACTIVE • AUTO UPDATES" : "ENTER THIS WEEK'S BOARD") : "WEEKLY BOARD SERVICE OFFLINE");
     drawOnlineActionButton(r.joinLeague, actionLabel, competitionEnabled && !!user && !!online.profileHandle && competitionAvailable && !league);
     return;
@@ -822,18 +922,18 @@ function drawRecordsPanel() {
   ctx.fillText(Number(highScore || 0).toLocaleString(), summary.x + summary.w - 16, summary.y + 33);
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.48)";
-  ctx.fillText("PUBLIC ARCHIVE WRITES PAUSED", summary.x + summary.w - 16, summary.y + 66);
+  ctx.fillText("PUBLIC RECORD WRITES PAUSED", summary.x + summary.w - 16, summary.y + 66);
   ctx.textAlign = "left";
   let listY = panel.y + 198;
   ctx.font = FONT_TINY;
   if (leaderboard.length) {
     ctx.fillStyle = "rgba(255,255,255,0.48)";
-    ctx.fillText("LEGACY/PRESEASON ARCHIVE • UNVERIFIED", panel.x + 22, listY);
+    ctx.fillText("SERVER RECORD ARCHIVE", panel.x + 22, listY);
     listY += 22;
     leaderboard.slice(0, 10).forEach((row, index) => {
       const who = String(row.callSign || "PILOT").slice(0, 12);
       const handle = row.handle ? ` @${String(row.handle).slice(0, 16)}` : "";
-      const score = Number(row.legacyBestScore || row.bestScore || 0).toLocaleString();
+      const score = Number(row.verifiedBestScore || 0).toLocaleString();
       ctx.fillStyle = index === 0 ? "rgba(255,224,118,0.12)" : (index % 2 ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.05)");
       ctx.fillRect(panel.x + 20, listY - 6, panel.w - 40, 31);
       ctx.strokeStyle = index === 0 ? "rgba(255,224,118,0.34)" : "rgba(255,255,255,0.07)";
@@ -844,12 +944,12 @@ function drawRecordsPanel() {
       ctx.fillText(score, panel.x + panel.w - 22, listY);
       ctx.textAlign = "left";
       ctx.fillStyle = "rgba(255,255,255,0.35)";
-      ctx.fillText("ARCHIVE SCORE • UNVERIFIED", panel.x + 29, listY + 12);
+      ctx.fillText(`SERVER-ACCEPTED ARCHIVE • PHASE ${Number(row.verifiedPhase || 1)}`, panel.x + 29, listY + 12);
       listY += 34;
     });
   } else {
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText(user ? "NO LEGACY ARCHIVE RECORDS FOUND." : "YOUR RUNS COUNT ONLY TOWARD DEVICE PROGRESS.", panel.x + 22, listY);
+    ctx.fillText(user ? "NO SERVER RECORD ARCHIVE ENTRIES." : "SIGN IN TO VIEW THE RECORD ARCHIVE.", panel.x + 22, listY);
     const archive = { x: panel.x + 20, y: listY + 34, w: panel.w - 40, h: 222 };
     drawDossierCard(archive, "#5ceeff");
     const radarX = archive.x + 78;
@@ -889,7 +989,7 @@ function drawRecordsPanel() {
       ctx.font = FONT_TINY;
     });
     ctx.fillStyle = "rgba(120,255,180,0.54)";
-    ctx.fillText("DEVICE PROGRESS ACTIVE • PUBLIC WRITES PAUSED", archive.x + 16, archive.y + archive.h - 22);
+    ctx.fillText("DEVICE PROGRESS • PUBLIC RECORD WRITES ARE PAUSED", archive.x + 16, archive.y + archive.h - 22);
   }
   ctx.restore();
   drawPanelCloseButton(r.closeRect);

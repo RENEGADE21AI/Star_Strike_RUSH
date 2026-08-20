@@ -198,11 +198,12 @@ function restoreTutorialFocus(dom) {
   });
 }
 
-function tutorialAccessibleButton(label, action, primary = false) {
+function tutorialAccessibleButton(label, action, primary = false, disabled = false) {
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = label;
   button.dataset.onboardingAction = action;
+  button.disabled = disabled;
   button.style.cssText = [
     "min-height:44px",
     "padding:10px 16px",
@@ -229,8 +230,8 @@ function setTutorialAccessibleSurface(message, actions = []) {
   dom.live.textContent = message;
   dom.actions.replaceChildren();
   for (const item of actions) {
-    const button = tutorialAccessibleButton(item.label, item.action, item.primary);
-    button.addEventListener("click", item.handler);
+    const button = tutorialAccessibleButton(item.label, item.action, item.primary, item.disabled === true);
+    if (!button.disabled) button.addEventListener("click", item.handler);
     dom.actions.appendChild(button);
   }
   dom.actions.style.display = hasActions ? "flex" : "none";
@@ -602,12 +603,19 @@ function updateTutorialLiveRegion() {
   const message = tutorialDirector.dialogueVisible
     ? `${TUTORIAL_INSTRUCTOR.name}. ${lines}`
     : `${definition.objective}. ${prompt}`;
-  const signature = `${tutorialDirector.stepId}|${tutorialDirector.dialogueVisible}|${state.inputMode}|${message}`;
+  const transmissionReady = !tutorialDirector.dialogueVisible || tutorialTransmissionCanAdvance(tutorialDirector.dialogueReveal);
+  const signature = `${tutorialDirector.stepId}|${tutorialDirector.dialogueVisible}|${transmissionReady}|${state.inputMode}|${message}`;
   if (signature === tutorialLiveSignature) return;
   tutorialLiveSignature = signature;
   if (tutorialDirector.dialogueVisible) {
     setTutorialAccessibleSurface(message, [
-      { label: "Continue", action: "continue", primary: true, handler: advanceTutorialDialogue }
+      {
+        label: "Continue",
+        action: "continue",
+        primary: true,
+        disabled: !transmissionReady,
+        handler: advanceTutorialDialogue
+      }
     ]);
   } else {
     setTutorialAccessibleSurface(message);
@@ -616,10 +624,7 @@ function updateTutorialLiveRegion() {
 
 function advanceTutorialDialogue() {
   if (!tutorialDirector || !tutorialDirector.dialogueVisible) return false;
-  if (tutorialDirector.dialogueReveal < 1 && !settingReducedMotion) {
-    tutorialDirector.dialogueReveal = 1;
-    return true;
-  }
+  if (!tutorialTransmissionCanAdvance(tutorialDirector.dialogueReveal)) return false;
   if (tutorialDirector.stepId === "graduation") {
     if (typeof clearGameplayInput === "function") clearGameplayInput();
     if (!tutorialDirector.completed) completeTutorialGraduation({ presentDialogue: false });
@@ -876,6 +881,11 @@ function activateTutorialStep() {
     tutorialRuntime.evasionLaneX = emitterPlan.x;
     tutorialRuntime.evasionDamageTakenStart = state.runStats.damageTaken;
     tutorialRuntime.evasionVolleyActive = false;
+    tutorialRuntime.evasionPracticeFrames = 0;
+    tutorialRuntime.evasionVolleysCleared = 0;
+    tutorialRuntime.evasionNextVolleyFrames = 0;
+    tutorialRuntime.evasionTravelDistance = 0;
+    tutorialRuntime.evasionPreviousPosition = { x: state.player.x, y: state.player.y };
     spawnEnemy(emitterPlan.type, emitterPlan.x, emitterPlan.y, { forceSpawn: true });
     const emitter = state.enemies[state.enemies.length - 1];
     if (emitter) {
@@ -1007,7 +1017,11 @@ function updateTutorialDirectorRuntime() {
   tutorialDirector.elapsedFrames++;
   tutorialDirector.inputMode = state.inputMode;
   if (tutorialDirector.dialogueVisible) {
-    if (!settingReducedMotion) tutorialDirector.dialogueReveal = Math.min(1, tutorialDirector.dialogueReveal + 0.025);
+    if (!settingReducedMotion) {
+      const revealBefore = tutorialDirector.dialogueReveal;
+      tutorialDirector.dialogueReveal = Math.min(1, tutorialDirector.dialogueReveal + 0.025);
+      if (revealBefore < 1 && tutorialDirector.dialogueReveal >= 1) updateTutorialLiveRegion();
+    }
     return;
   }
   if (tutorialRuntime.pendingStepAdvanceFrames > 0) {
@@ -1044,25 +1058,40 @@ function updateTutorialDirectorRuntime() {
     if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
   } else if (step === "evasion") {
     const emitter = state.enemies.find((enemy) => enemy.tutorialEvasionEmitter);
-    if (!tutorialRuntime.evasionVolleyActive && !tutorialRuntime.playerTransit && emitter && emitter.tutorialArrivalComplete) {
+    const activeVolleyExists = state.enemyBullets.some((bullet) => bullet.tutorialVolleyId === tutorialRuntime.evasionVolleyId);
+    if (tutorialRuntime.evasionVolleyActive && !activeVolleyExists) {
+      tutorialRuntime.evasionVolleyActive = false;
+      tutorialRuntime.evasionVolleysCleared++;
+      tutorialRuntime.evasionNextVolleyFrames = 24;
+    }
+    if (tutorialRuntime.evasionNextVolleyFrames > 0) tutorialRuntime.evasionNextVolleyFrames--;
+    if (!tutorialRuntime.playerTransit && emitter && emitter.tutorialArrivalComplete) tutorialRuntime.evasionPracticeFrames++;
+    if (!tutorialRuntime.evasionVolleyActive && tutorialRuntime.evasionNextVolleyFrames <= 0 &&
+        !tutorialRuntime.playerTransit && emitter && emitter.tutorialArrivalComplete &&
+        tutorialRuntime.evasionVolleysCleared < 3) {
       spawnTutorialEvasionVolley();
       tutorialRuntime.controlLocked = false;
       clearGameplayInput();
     }
+    if (tutorialRuntime.evasionPreviousPosition) {
+      tutorialRuntime.evasionTravelDistance += Math.hypot(
+        state.player.x - tutorialRuntime.evasionPreviousPosition.x,
+        state.player.y - tutorialRuntime.evasionPreviousPosition.y
+      );
+    }
+    tutorialRuntime.evasionPreviousPosition = { x: state.player.x, y: state.player.y };
     const tookDamage = state.runStats.damageTaken > tutorialRuntime.evasionDamageTakenStart;
     if (tookDamage) {
       resetTutorialLesson("evasion", ["That lane was live.", "Cross after the volley opens."]);
       return;
     }
     tutorialRuntime.evasionCrossed = tutorialEvasionSucceeded({
-      startSide: tutorialRuntime.evasionStartSide,
-      targetSide: tutorialRuntime.evasionTargetSide,
-      laneX: tutorialRuntime.evasionLaneX,
-      startX: tutorialRuntime.evasionStartX,
-      volleyActive: tutorialRuntime.evasionVolleyActive,
       damageTakenStart: tutorialRuntime.evasionDamageTakenStart,
       damageTakenCurrent: state.runStats.damageTaken,
-      playerX: state.player.x
+      practiceFrames: tutorialRuntime.evasionPracticeFrames,
+      volleysCleared: tutorialRuntime.evasionVolleysCleared,
+      travelDistance: tutorialRuntime.evasionTravelDistance,
+      emitterAlive: !!emitter
     });
     if (tutorialObjectiveComplete(tutorialDirector, tutorialRuntime)) scheduleTutorialStepAdvance();
   } else if (step === "ghost_shift") {
@@ -1451,26 +1480,6 @@ function drawTutorialTrainingEnvironment() {
   ctx.save();
   ctx.fillStyle = "rgba(8,54,73,0.055)";
   ctx.fillRect(0, 82, W, H - 82);
-  ctx.strokeStyle = "rgba(66,196,228,0.09)";
-  ctx.lineWidth = 1;
-  for (let y = 118; y < H; y += 62) {
-    ctx.beginPath();
-    ctx.moveTo(16, y);
-    ctx.lineTo(W - 16, y);
-    ctx.stroke();
-  }
-  for (let x = 38; x < W; x += 58) {
-    ctx.beginPath();
-    ctx.moveTo(x, 100);
-    ctx.lineTo(W / 2 + (x - W / 2) * 1.8, H);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = "rgba(112,231,255,0.13)";
-  for (let ring = 0; ring < 4; ring++) {
-    ctx.beginPath();
-    ctx.ellipse(W / 2, H * 0.82, 70 + ring * 64, 18 + ring * 22, 0, Math.PI, TAU);
-    ctx.stroke();
-  }
   ctx.font = "900 8px Arial, sans-serif";
   ctx.fillStyle = "rgba(120,232,255,0.44)";
   ctx.textAlign = "left";
@@ -1607,7 +1616,7 @@ function drawTutorialTransmission() {
   if (current && row < 3) ctx.fillText(current, panel.x + 98, panel.y + 48 + row * 19);
   ctx.font = "900 7px Arial, sans-serif";
   ctx.fillStyle = "rgba(180,237,250,0.52)";
-  ctx.fillText(tutorialDirector.dialogueReveal < 1 ? "TAP TO REVEAL" : "TAP OR PRESS ENTER TO CONTINUE", panel.x + 98, panel.y + 100);
+  ctx.fillText(tutorialDirector.dialogueReveal < 1 ? "RECEIVING TRANSMISSION…" : "TAP OR PRESS ENTER / SPACE TO CONTINUE", panel.x + 98, panel.y + 100);
   ctx.restore();
 }
 

@@ -79,14 +79,15 @@ let codexDetailType = null;
 let codexCategory = "enemies";
 let codexScroll = 0;
 let resetProgressConfirm = false;
+let deleteAccountConfirm = false;
 let pauseConfirmAction = "";
 let pauseConfirmPreviousNotice = "";
 
-const FONT_TITLE = "900 52px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
-const FONT_HUGE = "900 58px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+const FONT_TITLE = "800 52px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+const FONT_HUGE = "800 58px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
 const FONT_SUBTITLE = "700 18px 'Arial Narrow', Arial, sans-serif";
 const FONT_HUD = "700 16px 'Arial Narrow', Arial, sans-serif";
-const FONT_COMBO = "900 20px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+const FONT_COMBO = "800 20px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
 const FONT_SMALL = "700 12px 'Arial Narrow', Arial, sans-serif";
 const FONT_TINY = "700 10px 'Arial Narrow', Arial, sans-serif";
 const FONT_BUTTON = "900 15px 'Arial Narrow', Arial, sans-serif";
@@ -187,6 +188,12 @@ function accountIdentityAccessibilityKey() {
     ? service.getAccessibilityKey()
     : "signed-out|";
 }
+function accountIdentityOverlaySnapshot() {
+  const service = window.starStrikeOnline;
+  return service && typeof service.getOverlayState === "function"
+    ? service.getOverlayState()
+    : {};
+}
 function editableCallSign() {
   const online = accountIdentitySnapshot();
   return online.user ? sanitizeCallSign(online.profileCallSign || "") : callSign;
@@ -277,15 +284,11 @@ function beginHandleEditing() {
     setHandleStatus("IDENTITY SERVICE IS OFFLINE", 180);
     return false;
   }
-  if (online.profileHandle) {
-    setHandleStatus("HANDLE IS LOCKED TO THIS ACCOUNT", 150);
-    return false;
-  }
   handleEditing = true;
-  handleDraft = "";
-  handleInputEl.value = "";
+  handleDraft = String(online.profileHandle || "");
+  handleInputEl.value = handleDraft;
   handleInputEl.tabIndex = 0;
-  setHandleStatus("PUBLIC • CLAIM ONCE", 0);
+  setHandleStatus(online.profileHandle ? "CHOOSE A NEW UNIQUE PUBLIC HANDLE" : "CHOOSE A UNIQUE PUBLIC HANDLE", 0);
   handleInputEl.focus();
   return true;
 }
@@ -397,17 +400,10 @@ function loadCodexDiscovered() {
 function gloryForScore(score) {
   return Math.floor(Math.max(0, Math.floor(score || 0)) / 10);
 }
-function creditsForRun(score, phase, stats) {
-  const s = Math.max(0, Math.floor(score || 0));
-  const p = Math.max(1, Math.floor(phase || 1));
-  const bossBonus = Math.max(0, Math.floor((stats && stats.bosses) || 0)) * 25;
-  return clamp(Math.floor(s / 120) + p * 2 + bossBonus, 0, 1500);
-}
 function makeDefaultMetaProgress() {
   return {
     version: META_PROGRESS_SCHEMA_VERSION,
     totalGlory: 0,
-    credits: 0,
     lifetime: {
       runs: 0,
       score: 0,
@@ -429,7 +425,6 @@ function sanitizeStoredMetaProgress(raw) {
   const data = raw && typeof raw === "object" ? raw : {};
   const lifetime = data.lifetime && typeof data.lifetime === "object" ? data.lifetime : {};
   base.totalGlory = normalizedGloryInteger(data.totalGlory ?? data.glory);
-  base.credits = Math.max(0, Math.floor(data.credits || 0));
   base.lifetime.runs = Math.max(0, Math.floor(lifetime.runs || 0));
   base.lifetime.score = Math.max(0, Math.floor(lifetime.score || 0));
   base.lifetime.kills = Math.max(0, Math.floor(lifetime.kills || 0));
@@ -446,7 +441,6 @@ function sanitizeStoredMetaProgress(raw) {
       score: Math.max(0, Math.floor((receipt && receipt.score) || 0)),
       phaseReached: Math.max(1, Math.floor((receipt && receipt.phaseReached) || 1)),
       gloryGained: Math.max(0, Math.floor((receipt && receipt.gloryGained) || 0)),
-      creditsEarned: Math.max(0, Math.floor((receipt && receipt.creditsEarned) || 0)),
       totalGloryAfter: Math.max(0, Math.floor((receipt && receipt.totalGloryAfter) || 0)),
       prestigeAfter: Math.max(0, Math.floor((receipt && receipt.prestigeAfter) || 0)),
       roadGloryAfter: Math.max(0, Math.floor((receipt && receipt.roadGloryAfter) || 0)),
@@ -491,7 +485,6 @@ function currentMetaSnapshot() {
     nextGloryRank: road.rank.nextName,
     nextGloryThreshold: road.rank.nextThreshold,
     rankProgress: road.rank.progress,
-    credits: progress.credits,
     lifetime: { ...progress.lifetime }
   };
 }
@@ -529,12 +522,9 @@ function applyRunMetaProgress() {
   const receipt = currentRunReceiptSnapshot();
   const beforeGlory = progress.totalGlory;
   const beforeRoad = gloryRoadStateForTotal(beforeGlory);
-  const beforeCredits = progress.credits;
   const gloryGained = gloryForScore(receipt.score);
-  const creditsEarned = creditsForRun(receipt.score, receipt.phaseReached, { bosses: receipt.bossesKilled });
 
   progress.totalGlory += gloryGained;
-  progress.credits += creditsEarned;
   progress.lifetime.runs++;
   progress.lifetime.score += receipt.score;
   progress.lifetime.kills += receipt.enemiesKilled;
@@ -553,7 +543,6 @@ function applyRunMetaProgress() {
     score: receipt.score,
     phaseReached: receipt.phaseReached,
     gloryGained,
-    creditsEarned,
     totalGloryAfter: progress.totalGlory,
     prestigeAfter: afterRoad.prestige,
     roadGloryAfter: afterRoad.roadGlory,
@@ -573,9 +562,6 @@ function applyRunMetaProgress() {
     prestigeAfter: afterRoad.prestige,
     roadGloryBefore: beforeRoad.roadGlory,
     roadGloryAfter: afterRoad.roadGlory,
-    creditsBefore: beforeCredits,
-    creditsAfter: progress.credits,
-    creditsEarned,
     rankBefore: beforeRoad.displayRankName,
     rankAfter: afterRoad.displayRankName,
     rankIndexBefore: beforeRoad.rank.index,
@@ -738,12 +724,16 @@ const state = {
   joystick: { active: false, id: null, cx: 0, cy: 0, ax: 0, ay: 0, radius: 56 },
   inputMode: "keyboard",
   lastTouchAt: -Infinity,
-  inputHintTimer: 144,
+  inputHintTimer: 0,
+  inputHintAcknowledged: false,
   debugErrors: [],
   safeLanes: [],
   playerRealm: 0,
   difficultySamples: [],
   difficultyDeaths: 0,
+  verifiedRunLedger: null,
+  verifiedRunSession: null,
+  verifiedRunPromise: null,
   runMode: "standard",
   pausedReason: "",
   pauseNotice: "",
@@ -824,12 +814,17 @@ function addScore(basePoints) {
 function addFlatScore(points) {
   state.score += points;
 }
-function noteKill(basePoints) {
+function recordTrustedRunEvent(type, detail = {}) {
+  if (state.runMode !== "standard" || typeof appendTrustedRunEvent !== "function") return false;
+  return appendTrustedRunEvent(state.verifiedRunLedger, state.frame, type, detail);
+}
+function noteKill(basePoints, enemyType = "", enemyId = "") {
   state.comboKills++;
   state.difficulty.killStreak++;
   state.runStats.kills++;
   state.runStats.highestCombo = Math.max(state.runStats.highestCombo || 0, state.comboKills);
   refreshMultiplier();
   addScore(basePoints);
+  recordTrustedRunEvent("kill", { kind: enemyType, entityId: `enemy_${enemyId}` });
 }
 function resetCombo() { state.comboKills = 0; refreshMultiplier(); state.difficulty.killStreak = 0; }

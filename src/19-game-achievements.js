@@ -92,6 +92,15 @@ function resetLocalAchievements() {
   return localAchievementIds.slice();
 }
 
+function replaceLocalAchievementArchive(ids) {
+  localAchievementIds = typeof saveLocalAchievementIds === "function"
+    ? saveLocalAchievementIds(localStorage, Array.isArray(ids) ? ids : [], LOCAL_ACHIEVEMENT_IDS)
+    : [];
+  return localAchievementIds.slice();
+}
+
+globalThis.replaceLocalAchievementArchive = replaceLocalAchievementArchive;
+
 function mergedAchievementIds(onlineIds = []) {
   return typeof mergeAchievementIds === "function"
     ? mergeAchievementIds(localAchievementIds, onlineIds, LOCAL_ACHIEVEMENT_IDS)
@@ -169,15 +178,33 @@ function finalizeLocalRunAchievements() {
   unlockLocalAchievementsForRun(run);
 }
 
-function publishWeeklyRunIfEligible() {
-  if (state.runMode !== "standard") return false;
+function beginOnlineVerifiedRun() {
   const service = window.starStrikeOnline;
-  if (!service || typeof service.getState !== "function" || typeof service.submitRun !== "function") return false;
+  if (!service || typeof service.getState !== "function" || typeof service.startVerifiedRun !== "function") return false;
   const status = service.getState();
-  if (!status.user || !status.weeklyLeague || status.competitionMode !== "preseason_unverified") return false;
-  Promise.resolve(service.submitRun(buildOnlineRunPayload())).catch(() => {});
+  if (!status.user || status.competitionMode !== "verified_world_records" || status.progressionChoice) return false;
+  state.verifiedRunPromise = Promise.resolve(service.startVerifiedRun()).then((result) => {
+    if (result && result.ok && result.session) state.verifiedRunSession = result.session;
+    return result;
+  }).catch(() => ({ ok: false }));
   return true;
 }
+
+function publishVerifiedRunIfEligible() {
+  if (state.runMode !== "standard" || !state.verifiedRunLedger || !state.verifiedRunPromise) return false;
+  const service = window.starStrikeOnline;
+  if (!service || typeof service.submitRun !== "function") return false;
+  const ledger = state.verifiedRunLedger;
+  Promise.resolve(state.verifiedRunPromise).then((started) => {
+    const session = started && started.ok ? started.session : state.verifiedRunSession;
+    if (!session || typeof trustedRunEvidence !== "function") return null;
+    return service.submitRun({ evidence: trustedRunEvidence(ledger, session) });
+  }).catch(() => {});
+  return true;
+}
+
+globalThis.beginOnlineVerifiedRun = beginOnlineVerifiedRun;
+globalThis.publishVerifiedRunIfEligible = publishVerifiedRunIfEligible;
 
 function requestOnlineSignIn() {
   callOnlineService("signIn", "ONLINE NOT READY");
@@ -192,5 +219,5 @@ function requestOnlineRefresh() {
 }
 
 function requestWeeklyLeague() {
-  callOnlineService("joinWeeklyLeague", "PUBLIC COMPETITION PAUSED");
+  callOnlineService("joinWeeklyLeague", "WEEKLY LEAGUE SERVICE OFFLINE");
 }

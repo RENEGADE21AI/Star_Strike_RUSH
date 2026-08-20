@@ -84,6 +84,7 @@ function getOnlineRects() {
   const claimHandle = { x: innerX, y: panel.y + 278, w: panel.w - 40, h: 32 };
   const signIn = { x: innerX, y: panel.y + 326, w: panel.w - 40, h: 34 };
   const signOut = { x: innerX, y: panel.y + 372, w: panel.w - 40, h: 30 };
+  const deleteAccount = { x: innerX, y: panel.y + 414, w: panel.w - 40, h: 30 };
   const btnW = 64, btnH = 28, gap = 10, btnY = panel.y + 150;
   const low = { x: innerX, y: btnY, w: btnW, h: btnH };
   const med = { x: innerX + (btnW + gap), y: btnY, w: btnW, h: btnH };
@@ -98,7 +99,16 @@ function getOnlineRects() {
   const effects = { x: innerX + audioW + audioGap, y: btnY + 210, w: audioW, h: 30 };
   const replayTraining = { x: innerX, y: btnY + 252, w: panel.w - 40, h: 32 };
   const reset = { x: innerX, y: btnY + 304, w: panel.w - 40, h: 32 };
-  return { panel, closeRect, pilotTab, settingsTab, editCallSign, claimHandle, signIn, signOut, low, med, high, shake, reset, motion, flash, contrast, music, effects, replayTraining };
+  return { panel, closeRect, pilotTab, settingsTab, editCallSign, claimHandle, signIn, signOut, deleteAccount, low, med, high, shake, reset, motion, flash, contrast, music, effects, replayTraining };
+}
+
+function getAccountDeletionConfirmRects() {
+  const box = { x: 28, y: 168, w: W - 56, h: 330 };
+  return {
+    box,
+    cancel: { x: box.x + 18, y: box.y + 244, w: box.w - 36, h: 34 },
+    confirm: { x: box.x + 18, y: box.y + 286, w: box.w - 36, h: 34 }
+  };
 }
 function getRecordsRects() {
   const panel = getTitlePanelRect();
@@ -107,8 +117,10 @@ function getRecordsRects() {
   const tabW = Math.floor((panel.w - 40 - tabGap) / 2);
   const globalTab = { x: panel.x + 20, y: panel.y + 50, w: tabW, h: 28 };
   const weeklyTab = { x: globalTab.x + tabW + tabGap, y: globalTab.y, w: tabW, h: 28 };
+  const leaguePrev = { x: panel.x + panel.w - 74, y: panel.y + 102, w: 22, h: 24 };
+  const leagueNext = { x: panel.x + panel.w - 46, y: panel.y + 102, w: 22, h: 24 };
   const joinLeague = { x: panel.x + 20, y: panel.y + panel.h - 58, w: panel.w - 40, h: 34 };
-  return { panel, closeRect, globalTab, weeklyTab, joinLeague };
+  return { panel, closeRect, globalTab, weeklyTab, leaguePrev, leagueNext, joinLeague };
 }
 function getAchievementsRects() {
   const panel = getTitlePanelRect();

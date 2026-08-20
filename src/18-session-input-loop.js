@@ -5,6 +5,7 @@ function startPlayingSession() {
   }
   const transitionStars = state.stars;
   setupSession("playing", { preserveStars: true });
+  if (typeof beginOnlineVerifiedRun === "function") beginOnlineVerifiedRun();
   state.lastArrivalContinuity = {
     starsPreserved: state.stars === transitionStars,
     playerX: state.player.x,
@@ -25,6 +26,8 @@ function beginGame() {
   if (typeof prepareGameplayMusic === "function") prepareGameplayMusic();
   if (typeof playGameSound === "function") playGameSound("launch", 0.9);
   if (state.gameState === "start") {
+    const accountState = typeof accountIdentitySnapshot === "function" ? accountIdentitySnapshot() : {};
+    if (accountState.progressionChoice && accountState.progressionChoice.required) return false;
     titlePanelTarget = 0;
     state.sceneTransition = {
       mode: "title_launch",
@@ -154,6 +157,9 @@ function setupSession(mode = "start", options = {}) {
   state.wingmen = [];
   state.pendingSpawns = [];
   state.score = 0;
+  state.verifiedRunLedger = typeof createTrustedRunLedger === "function" ? createTrustedRunLedger() : null;
+  state.verifiedRunSession = null;
+  state.verifiedRunPromise = null;
   state.runStartingHighScore = highScore;
   state.newHighScore = false;
   state.multiplier = 1;
@@ -218,6 +224,8 @@ function setupSession(mode = "start", options = {}) {
   state.runStats.activeFrames = 0;
   state.runStats.startedAtMs = Date.now();
   state.runStats.metaApplied = false;
+  state.inputHintTimer = 0;
+  state.inputHintAcknowledged = false;
   lastRunMeta = null;
   state.gameState = mode;
   state.runMode = "standard";
@@ -280,6 +288,11 @@ function enterGameOver() {
     return;
   }
   state.gameState = "gameover";
+  state.playerRealm = 0;
+  if (state.player) {
+    state.player.ghostTimer = 0;
+    state.player.dashTimer = 0;
+  }
   clearGameplayInput();
   previousHighScore = state.runStartingHighScore;
   state.newHighScore = typeof isNewRunRecord === "function"
@@ -308,7 +321,7 @@ function enterGameOver() {
   state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
   if (typeof recordDifficultySample === "function") recordDifficultySample(true);
   if (progressionAllowed) finalizeLocalRunAchievements();
-  if (progressionAllowed && typeof publishWeeklyRunIfEligible === "function") publishWeeklyRunIfEligible();
+  if (progressionAllowed && typeof publishVerifiedRunIfEligible === "function") publishVerifiedRunIfEligible();
   if (typeof startGloryCelebrations === "function") {
     startGloryCelebrations(progressionResult && progressionResult.presentationEvents);
   }
@@ -393,7 +406,8 @@ canvas.addEventListener("pointerdown", (e) => {
     const nextMode = nextGameplayInputMode(state.inputMode, pointerKind, Date.now(), state.lastTouchAt, e.buttons || 1);
     state.inputMode = nextMode.mode;
     state.lastTouchAt = nextMode.lastTouchAt;
-    state.inputHintTimer = 144;
+    state.inputHintTimer = 0;
+    state.inputHintAcknowledged = true;
   }
   if (state.gameState !== "playing") {
     if (state.gameState === "start" && typeof onboardingUiMode !== "undefined" && onboardingUiMode !== "none") return;
@@ -539,6 +553,8 @@ function isMoveKey(key) {
          key === "w" || key === "a" || key === "s" || key === "d" ||
          key === "W" || key === "A" || key === "S" || key === "D";
 }
+const tutorialDialogueHeldKeys = new Set();
+
 window.addEventListener("keydown", (e) => {
   if (e.defaultPrevented) return;
   if (handleEditing) {
@@ -574,6 +590,16 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (state.gameState === "start") {
+    if (deleteAccountConfirm) {
+      if (k === "Escape") { e.preventDefault(); deleteAccountConfirm = false; }
+      else if (k === "Enter" || k === " ") e.preventDefault();
+      return;
+    }
+    const accountState = typeof accountIdentitySnapshot === "function" ? accountIdentitySnapshot() : {};
+    if (accountState.progressionChoice && accountState.progressionChoice.required) {
+      if (k === "Enter" || k === " " || k === "Escape") e.preventDefault();
+      return;
+    }
     if (["codex", "achievements", "progress"].includes(titleSubState) && titlePanelAnim > 0.02 && (k === "ArrowUp" || k === "ArrowDown" || k === "PageUp" || k === "PageDown")) {
       e.preventDefault();
       const delta = (k === "ArrowUp" || k === "PageUp") ? -148 : 148;
@@ -630,7 +656,13 @@ window.addEventListener("keydown", (e) => {
       (k === "Enter" || k === " ")
     ) {
       e.preventDefault();
+      if (tutorialDialogueHeldKeys.has(k) || e.repeat) return;
+      tutorialDialogueHeldKeys.add(k);
       advanceTutorialDialogue();
+      return;
+    }
+    if (k === " " && tutorialDialogueHeldKeys.has(" ")) {
+      e.preventDefault();
       return;
     }
     const action = typeof gameplayActionForKey === "function" ? gameplayActionForKey(k) : (isMoveKey(k) ? "move" : null);
@@ -644,7 +676,8 @@ window.addEventListener("keydown", (e) => {
       const nextMode = nextGameplayInputMode(state.inputMode, "keyboard", Date.now(), state.lastTouchAt, 0);
       state.inputMode = nextMode.mode;
       state.lastTouchAt = nextMode.lastTouchAt;
-      state.inputHintTimer = 144;
+      state.inputHintTimer = 0;
+      state.inputHintAcknowledged = true;
     }
     if (action && (action.startsWith("move_") || action === "move")) {
       e.preventDefault();
@@ -659,6 +692,7 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => {
   const k = e.key;
+  tutorialDialogueHeldKeys.delete(k);
   if (k === "ArrowUp" || k === "w" || k === "W") state.keyboard.up = false;
   if (k === "ArrowDown" || k === "s" || k === "S") state.keyboard.down = false;
   if (k === "ArrowLeft" || k === "a" || k === "A") state.keyboard.left = false;
@@ -769,7 +803,7 @@ function update() {
 
   state.runStats.activeFrames = Math.max(0, Math.floor(state.runStats.activeFrames || 0)) + 1;
   state.framesSinceLastDrop++;
-  state.inputHintTimer = Math.max(0, (state.inputHintTimer || 0) - 1);
+  if (!state.inputHintAcknowledged) state.inputHintTimer = Math.min(600, Math.max(0, state.inputHintTimer || 0) + 1);
   if (state.powerupDropCooldown > 0) state.powerupDropCooldown--;
   state.comboPulse = Math.max(0, state.comboPulse - 1);
 
@@ -1225,7 +1259,6 @@ function applyDevelopmentQaScenario() {
     lastRunMeta = {
       gloryGained: 420,
       gloryAfter: progressionCase.after,
-      creditsEarned: 168,
       prestigeAfter: afterRoad.prestige,
       roadGloryAfter: afterRoad.roadGlory,
       rankAfter: afterRoad.displayRankName,

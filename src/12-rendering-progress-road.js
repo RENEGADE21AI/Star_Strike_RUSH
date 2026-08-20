@@ -1,7 +1,7 @@
 function buildGloryRoadLayout(rect, meta) {
-  const nodes = makeGloryRoadNodes();
-  const roadGlory = Math.max(0, Math.floor(meta.roadGlory || 0));
-  const activeIndex = currentRoadIndexForThresholds(nodes, roadGlory);
+  const totalGlory = Math.max(0, Math.floor(meta.totalGlory || 0));
+  const nodes = makeGloryRoadNodes(Math.max(1, Number(meta.prestige || 0) + 1));
+  const activeIndex = currentRoadIndexForThresholds(nodes, totalGlory);
   const roadX = Math.round(rect.x + rect.w / 2);
   return nodes.map((node, index) => {
     const y = rect.y + ROAD_GLORY_START_Y + (nodes.length - 1 - index) * ROAD_GLORY_GAP;
@@ -19,7 +19,7 @@ function buildGloryRoadLayout(rect, meta) {
       radius: node.major ? 12 : 8,
       side,
       active: index === activeIndex,
-      reached: node.threshold < GLORY_ROAD_LENGTH && roadGlory >= node.threshold,
+      reached: totalGlory >= node.threshold,
       cardRect: { x: cardX, y: y - cardH / 2, w: cardW, h: cardH },
       detail: gloryNodeDetail(node, meta)
     };
@@ -33,7 +33,7 @@ function focusTitleProgressOnCurrent() {
     return;
   }
   const r = getProgressRects();
-  const marker = roadMarkerPositionForGlory(buildGloryRoadLayout(r.contentRect, meta), meta.roadGlory);
+  const marker = roadMarkerPositionForGlory(buildGloryRoadLayout(r.contentRect, meta), meta.totalGlory);
   const targetY = marker ? marker.y : r.contentRect.y + r.contentRect.h * 0.64;
   titleProgressScroll = targetY - (r.contentRect.y + r.contentRect.h * 0.64);
   clampTitleProgressScroll();
@@ -100,7 +100,7 @@ function drawProgressSummary(panel, meta) {
   ctx.fillText(String(meta.gloryRankDisplay || meta.gloryRank || "Rookie Pilot").toUpperCase().slice(0, 24), x + 9, y + 6);
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.70)";
-  ctx.fillText(`${Number(meta.roadGlory || 0).toLocaleString()} / ${Number(GLORY_ROAD_LENGTH).toLocaleString()} ROAD`, x + 9, y + 24);
+  ctx.fillText(`${Number(meta.roadGlory || 0).toLocaleString()} / ${Number(GLORY_ROAD_LENGTH).toLocaleString()} CURRENT LOOP`, x + 9, y + 24);
   ctx.textAlign = "right";
   ctx.fillStyle = "rgba(255,230,128,0.90)";
   ctx.fillText(`${meta.prestigeLabel || "PRESTIGE 0"} • ${formatRoadNumber(meta.totalGlory)} TOTAL`, x + w - 9, y + 7);
@@ -193,7 +193,7 @@ function drawGloryRoadContent(rect, meta) {
     ship: "#ffe680", shadow: "rgba(255,230,128,0.85)", flame: "rgba(120,255,180,0.78)"
   };
   ctx.save();
-  const marker = roadMarkerPositionForGlory(layout, meta.roadGlory);
+  const marker = roadMarkerPositionForGlory(layout, meta.totalGlory);
   for (let i = 1; i < layout.length; i++) {
     const previous = layout[i - 1];
     const item = layout[i];
@@ -223,7 +223,7 @@ function drawGloryRoadContent(rect, meta) {
   ctx.textBaseline = "top";
   ctx.font = FONT_TINY;
   ctx.fillStyle = "rgba(255,255,255,0.48)";
-  ctx.fillText(`${meta.prestigeLabel || "PRESTIGE 0"} • GLORY ROAD`, roadX, rect.y + 8);
+  ctx.fillText(`${meta.prestigeLabel || "PRESTIGE 0"} • CONTINUOUS GLORY ROAD`, roadX, rect.y + 8);
   for (const item of layout) {
     const card = item.cardRect;
     ctx.strokeStyle = item.active ? "rgba(255,230,128,0.48)" : item.reached ? "rgba(120,255,180,0.24)" : "rgba(255,255,255,0.10)";

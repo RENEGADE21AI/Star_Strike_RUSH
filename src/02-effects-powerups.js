@@ -176,10 +176,34 @@ function getWingman(side) { return state.wingmen.find(w => w.side === side) || n
 function refreshWingmen(timer = 1500) { for (const w of state.wingmen) w.timer = Math.max(w.timer, timer); }
 function addWingmanSide(side, timer = 1500) {
   const existing = getWingman(side);
-  if (existing) { existing.timer = Math.max(existing.timer, timer); return existing; }
+  if (existing) {
+    existing.timer = Math.max(existing.timer, timer);
+    if (existing.phase === "departing") {
+      existing.phase = "arriving";
+      existing.arrivalElapsed = 0;
+      existing.arrivalFromX = existing.x;
+      existing.arrivalFromY = existing.y;
+      existing.rotation = 0;
+    }
+    return existing;
+  }
   const p = state.player;
   const target = wingmanFormationTarget(p, side);
-  const w = { x: target.x, y: target.y, side, timer, fire: 0 };
+  const startX = clamp(target.x + side * 28, 18, W - 18);
+  const w = {
+    x: startX,
+    y: H + 34,
+    side,
+    timer,
+    fire: 0,
+    phase: "arriving",
+    arrivalElapsed: 0,
+    arrivalDuration: 34,
+    arrivalFromX: startX,
+    arrivalFromY: H + 34,
+    rotation: 0,
+    hitFlash: 0
+  };
   state.wingmen.push(w);
   return w;
 }
@@ -195,7 +219,7 @@ function spawnWingmen(count) {
   else refreshWingmen(timer);
 }
 function fireWingman(w) {
-  if (w.fire > 0) return;
+  if (w.phase !== "active" || w.fire > 0) return;
   state.bullets.push({ x: w.x, y: w.y - 12, vx: 0, vy: -8.2, life: 80, r: 3, kind: getPlayerShotKind(), realm: state.playerRealm, damage: 0.75 });
   if (typeof playGameSound === "function") playGameSound("player_fire", 0.18);
   w.fire = 18;
@@ -223,6 +247,7 @@ function attemptGhost() {
     state.playerRealm = 1 - state.playerRealm;
     state.runStats.abilityUses++;
     state.runStats.realmHops++;
+    recordTrustedRunEvent("ghost");
     state.fx.flash = Math.max(state.fx.flash, 4);
     state.comboPulse = Math.max(state.comboPulse, 6);
     spawnParticles(p.x, p.y, 10, state.playerRealm === 0 ? "#bfe8ff" : "#d9b6ff", 0.9);
@@ -249,6 +274,7 @@ function attemptGhost() {
   state.runStats.abilityUses++;
   if (profile.phaseThroughDebris) state.runStats.ghostUses++;
   else state.runStats.dashUses++;
+  recordTrustedRunEvent("ghost");
   state.difficulty.ghostGrace = profile.phaseThroughDebris ? 60 : 24;
   state.fx.flash = Math.max(state.fx.flash, 6);
   spawnParticles(p.x, p.y, profile.label === "DASH" ? 16 : 10, profile.label === "DASH" ? "#ffcc78" : "#fff", profile.label === "DASH" ? 1.35 : 1.05);

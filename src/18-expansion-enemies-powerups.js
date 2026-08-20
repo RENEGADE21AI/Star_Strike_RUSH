@@ -225,13 +225,14 @@ function onEnemyDestroyed(e) {
     }
   } else if (e.type === "carrier" && (e.launchCount || 0) === 0) {
     addFlatScore(120);
+    recordTrustedRunEvent("bonus", { kind: "carrier_no_launch" });
     showMessage("CARRIER BONUS", 55);
   }
 }
 
 function finishEnemyDestroyed(e, index, allowDrop = true) {
   if (!e || index < 0) return;
-  noteKill(e.reward || enemyScoreForType(e.type));
+  noteKill(e.reward || enemyScoreForType(e.type), e.type, e.id);
   spawnDeathBurst(e.x, e.y, e.type === "purple" ? 22 : e.type === "phantom" ? 18 : e.type === "carrier" ? 24 : 14);
   if (typeof playGameSound === "function") playGameSound("destroy", e.type === "carrier" ? 1.1 : 0.72);
   onEnemyDestroyed(e);

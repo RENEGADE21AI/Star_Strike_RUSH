@@ -7,9 +7,9 @@ function drawTitleAndButtons() {
   ctx.transform(1, 0, -0.09, 1, 0, 0);
   ctx.shadowColor = "rgba(100,220,255,0.55)";
   ctx.shadowBlur = 16;
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 3;
   ctx.strokeStyle = "rgba(0,0,0,0.72)";
-  ctx.font = "900 68px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  ctx.font = "800 68px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
   const name = "STAR STRIKE";
   const nameMeasure = ctx.measureText(name);
   const nameTargetWidth = Math.min(W - 20, Math.max(W * 0.88, nameMeasure.width));
@@ -20,7 +20,7 @@ function drawTitleAndButtons() {
   ctx.strokeText(name, 0, 0);
   ctx.fillText(name, 0, 0);
   ctx.restore();
-  ctx.font = "900 88px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  ctx.font = "800 88px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
   const rush = "RUSH";
   const rushMeasure = ctx.measureText(rush);
   const rushTargetWidth = Math.min(W - 34, Math.max(W * 0.66, rushMeasure.width));
@@ -193,11 +193,64 @@ function drawTitleAndButtons() {
   ctx.fillText(`DEVICE BEST  ${Number(highScore || 0).toLocaleString()}`, W / 2, statusY + 4);
   if (typeof currentMetaSnapshot === "function") {
     const meta = currentMetaSnapshot();
-    const rankLine = `${String(meta.gloryRankDisplay || meta.gloryRank).toUpperCase()}  •  ${String(meta.prestigeLabel || "PRESTIGE 0").toUpperCase()}`;
+    const rankLine = `${String(meta.gloryRankDisplay || meta.gloryRank).toUpperCase()}  •  ${formatRoadNumber(meta.totalGlory)} GLORY  •  P${Number(meta.prestige || 0)}`;
     ctx.font = FONT_TINY;
     ctx.fillStyle = "rgba(255,230,128,0.88)";
     ctx.textAlign = "center";
     ctx.fillText(rankLine, W / 2, statusY + 21);
+  }
+  ctx.restore();
+}
+
+function getProgressionChoiceRects() {
+  const panel = { x: 24, y: 170, w: W - 48, h: 328 };
+  return {
+    panel,
+    account: { x: panel.x + 18, y: panel.y + 180, w: panel.w - 36, h: 48 },
+    device: { x: panel.x + 18, y: panel.y + 242, w: panel.w - 36, h: 48 }
+  };
+}
+
+function drawProgressionChoiceOverlay() {
+  const online = window.starStrikeOnline && window.starStrikeOnline.getState ? window.starStrikeOnline.getState() : {};
+  const choice = online.progressionChoice;
+  if (!choice || !choice.required) return;
+  const r = getProgressionChoiceRects();
+  const format = (profile) => {
+    const lifetime = profile && profile.lifetime ? profile.lifetime : {};
+    return `${Number(profile && profile.totalGlory || 0).toLocaleString()} GLORY  •  BEST ${Number(lifetime.bestScore || 0).toLocaleString()}`;
+  };
+  ctx.save();
+  ctx.fillStyle = "rgba(0,3,10,0.88)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(5,13,27,0.98)";
+  ctx.strokeStyle = "rgba(95,226,255,0.72)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(r.panel.x, r.panel.y, r.panel.w, r.panel.h, 12);
+  ctx.fill();
+  ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#fff";
+  ctx.font = "800 24px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  ctx.fillText("CHOOSE YOUR PROGRESSION", W / 2, r.panel.y + 22);
+  ctx.font = FONT_SMALL;
+  ctx.fillStyle = "rgba(226,242,250,0.78)";
+  ctx.fillText("SAVES ARE REPLACED — NEVER COMBINED", W / 2, r.panel.y + 57);
+  ctx.font = FONT_TINY;
+  ctx.fillStyle = "#7ee7ff";
+  ctx.fillText(`ACCOUNT  ${format(choice.account)}`, W / 2, r.panel.y + 93);
+  ctx.fillStyle = "#ffd47a";
+  ctx.fillText(`DEVICE  ${format(choice.device)}`, W / 2, r.panel.y + 120);
+  ctx.fillStyle = "rgba(255,255,255,0.58)";
+  ctx.fillText("THE SELECTED SAVE REPLACES THE OTHER. THIS CANNOT BE ADDED TOGETHER.", W / 2, r.panel.y + 148);
+  drawPressButton(r.account, choice.status === "saving" ? "SAVING..." : "KEEP ACCOUNT PROGRESS", false, "rgba(20,126,196,0.24)");
+  drawPressButton(r.device, choice.status === "saving" ? "SAVING..." : "KEEP DEVICE PROGRESS", false, "rgba(190,126,30,0.20)");
+  if (choice.status === "error") {
+    ctx.fillStyle = "#ff9a9a";
+    ctx.font = FONT_TINY;
+    ctx.fillText("SAVE FAILED — CHECK YOUR CONNECTION AND TRY AGAIN", W / 2, r.panel.y + 302);
   }
   ctx.restore();
 }
@@ -210,6 +263,8 @@ function drawStartScreen() {
   drawTitleAndButtons();
   drawSettingsAndCodexPanels();
   drawResetProgressConfirm();
+  drawProgressionChoiceOverlay();
+  drawAccountDeletionConfirm();
 }
 function drawGameOverScreen() {
   const buttons = getGameOverButtons();
@@ -243,7 +298,7 @@ function drawGameOverScreen() {
   ctx.fillStyle = "#fff";
   ctx.shadowColor = "rgba(255,92,104,0.36)";
   ctx.shadowBlur = 12;
-  ctx.font = "900 42px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
+  ctx.font = "800 42px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
   ctx.fillText("GAME OVER", W / 2, panel.y + 34);
   ctx.shadowBlur = 0;
   ctx.fillStyle = "rgba(207,231,242,0.52)";
@@ -275,7 +330,7 @@ function drawGameOverScreen() {
         : { label: "TO NEXT", value: formatRoadNumber(Math.max(0, Number((meta.snapshot && meta.snapshot.nextGloryThreshold) || GLORY_ROAD_LENGTH) - Number(meta.roadGloryAfter || 0))) };
     const summary = [
       { label: "GLORY", value: `+${Number(meta.gloryGained || 0).toLocaleString()}`, color: "#ffe680" },
-      { label: "CREDITS", value: `+${Number(meta.creditsEarned || 0).toLocaleString()}`, color: "#79efff" },
+      { label: "TOTAL", value: Number(meta.gloryAfter || 0).toLocaleString(), color: "#79efff" },
       { ...nextChip, color: "#78ffb4" }
     ];
     const chipW = 86;
