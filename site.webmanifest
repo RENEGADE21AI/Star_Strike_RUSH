@@ -1,7 +1,7 @@
 {
   "name": "Star Strike RUSH",
   "short_name": "Star Strike",
-  "description": "A portrait-first arcade space shooter with cinematic First Flight training, boss encounters, and device-local preseason progression.",
+  "description": "A portrait-first arcade space shooter with cinematic First Flight training, permanent Glory, achievements, and realm-shifting bosses.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

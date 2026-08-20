@@ -3,10 +3,10 @@ const FIREBASE_CONFIG_CANDIDATES = [
   "/__/firebase/init.json",
   "src/firebase-config.local.json"
 ];
-const PROGRESSION_MODE = window.PROGRESSION_AUTHORITY || "device_local_preseason";
+const PROGRESSION_MODE = window.PROGRESSION_AUTHORITY || "explicit_account_or_device";
 const competitiveModeEnabled = window.CLIENT_COMPETITION_WRITES_ENABLED === true;
-const competitionMode = competitiveModeEnabled && window.PUBLIC_COMPETITION_MODE === "preseason_unverified"
-  ? "preseason_unverified"
+const competitionMode = competitiveModeEnabled && window.PUBLIC_COMPETITION_MODE === "verified_world_records"
+  ? "verified_world_records"
   : "paused";
 const developmentHost = ["127.0.0.1", "localhost"].includes(window.location.hostname);
 const emulatorMode = developmentHost && new URLSearchParams(window.location.search).get("firebaseEmulators") === "1";
@@ -45,8 +45,12 @@ const online = {
   profileHandle: "",
   profileMeta: null,
   onlineArchiveMeta: null,
+  progressionChoice: null,
+  accountDeletion: null,
   legacyRecord: null,
   weeklyLeague: null,
+  weeklyLeagues: [],
+  selectedWeeklyLeagueId: "",
   identityService: "connecting",
   accountArchive: "not_loaded",
   progressionMode: PROGRESSION_MODE,
@@ -88,8 +92,12 @@ function getState() {
     profileHandle: online.profileHandle,
     profileMeta: cloneMeta(online.profileMeta),
     onlineArchiveMeta: cloneMeta(online.onlineArchiveMeta),
+    progressionChoice: cloneMeta(online.progressionChoice),
+    accountDeletion: cloneMeta(online.accountDeletion),
     legacyRecord: online.legacyRecord ? { ...online.legacyRecord } : null,
     weeklyLeague: online.weeklyLeague ? JSON.parse(JSON.stringify(online.weeklyLeague)) : null,
+    weeklyLeagues: online.weeklyLeagues.map((league) => JSON.parse(JSON.stringify(league))),
+    selectedWeeklyLeagueId: online.selectedWeeklyLeagueId,
     identityService: online.identityService,
     accountArchive: online.accountArchive,
     progressionMode: online.progressionMode,
@@ -108,6 +116,13 @@ function getState() {
 
 function getAccessibilityKey() {
   return `${online.user ? "signed-in" : "signed-out"}|${safeHandle(online.profileHandle)}`;
+}
+
+function getOverlayState() {
+  return {
+    progressionChoice: cloneMeta(online.progressionChoice),
+    accountDeletion: cloneMeta(online.accountDeletion)
+  };
 }
 
 function setStatus(message) {
@@ -183,7 +198,11 @@ function normalizeArchiveMeta(meta) {
     gloryRank: rankName,
     gloryRankDisplay: safeText(road.displayRankName, rankName, 40),
     gloryRankIndex: safeGloryRankIndex(road.rank.index, rankName),
-    credits: boundedNumber(meta && meta.credits, 999999999),
+    codexDiscoveries: Array.from(new Set(
+      (Array.isArray(meta && meta.codexDiscoveries) ? meta.codexDiscoveries : [])
+        .map((id) => safeId(id, ""))
+        .filter(Boolean)
+    )).slice(0, 100),
     lifetime: {
       runs: boundedNumber(meta && meta.lifetime && meta.lifetime.runs, 1000000),
       score: boundedNumber(meta && meta.lifetime && meta.lifetime.score, 999999999),
@@ -219,7 +238,7 @@ function normalizeWeeklyLeague(league) {
     memberCount: boundedNumber(league.memberCount, 30),
     capacity: Math.max(1, boundedNumber(league.capacity, 30) || 30),
     closesAtMs: boundedNumber(league.closesAtMs, 9999999999999),
-    recordTrust: "preseason_unverified",
+    recordTrust: "verified_run_session",
     members: (Array.isArray(league.members) ? league.members : []).slice(0, 30).map((member) => ({
       publicPilotId: safeText(member && member.publicPilotId, "", 40).replace(/[^a-z0-9_]/gi, ""),
       callSign: safeCallSign(member && member.callSign) || "PILOT",
@@ -236,12 +255,20 @@ async function loadWeeklyLeague(join = false, generation = authGeneration) {
   }
   const uid = auth.currentUser.uid;
   online.developmentCounters.weeklyCallableCalls++;
-  const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "joinWeeklyLeague");
-  const response = await callable({ join: join === true });
+  const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, join ? "joinWeeklyLeague" : "listWeeklyLeagues");
+  const response = await callable(join ? { join: true } : {});
   if (!isHydrationCurrent(uid, generation)) return { stale: true };
   const result = response && response.data ? response.data : {};
-  online.weeklyLeague = normalizeWeeklyLeague(result.league);
-  online.competitionMode = "preseason_unverified";
+  online.weeklyLeagues = (Array.isArray(result.leagues) ? result.leagues : [])
+    .map(normalizeWeeklyLeague)
+    .filter(Boolean);
+  const activeLeagueId = safeId(result.activeLeagueId || (result.league && result.league.id), "");
+  online.selectedWeeklyLeagueId = online.weeklyLeagues.some((league) => league.id === online.selectedWeeklyLeagueId)
+    ? online.selectedWeeklyLeagueId
+    : (activeLeagueId || (online.weeklyLeagues[0] && online.weeklyLeagues[0].id) || "");
+  online.weeklyLeague = online.weeklyLeagues.find((league) => league.id === online.selectedWeeklyLeagueId)
+    || normalizeWeeklyLeague(result.league);
+  online.competitionMode = "verified_world_records";
   return { ok: true, league: online.weeklyLeague };
 }
 
@@ -268,10 +295,10 @@ function normalizeBackendRelease(release) {
       ? String(release.commitSha).toLowerCase()
       : "development",
     packageVersion: safeText(release.packageVersion, "development", 30),
-    progressionAuthority: release.progressionAuthority === "device_local_preseason"
-      ? "device_local_preseason"
+    progressionAuthority: release.progressionAuthority === "explicit_account_or_device"
+      ? "explicit_account_or_device"
       : "unknown",
-    competitionMode: release.competitionMode === "preseason_unverified" ? "preseason_unverified" : "paused",
+    competitionMode: release.competitionMode === "verified_world_records" ? "verified_world_records" : "paused",
     competitionWritesEnabled: release.competitionWritesEnabled === true,
     serverProgressionWritesEnabled: release.serverProgressionWritesEnabled === true,
     appCheckEnforced: release.appCheckEnforced === true
@@ -348,31 +375,64 @@ function teardownArchiveListener() {
   archiveListenerUid = "";
 }
 
-function applyArchiveSnapshot(snapshot) {
+function applyWorldRecordSnapshot(snapshot) {
   online.leaderboard = snapshot.docs.map((documentSnapshot) => {
     const data = documentSnapshot.data();
     return {
-      uid: String(data.uid || documentSnapshot.id).slice(0, 128),
+      publicPilotId: safeText(data.publicPilotId, "", 40).replace(/[^a-z0-9_]/gi, ""),
       callSign: safeCallSign(data.callSign || ""),
       handle: safeHandle(data.handle || ""),
-      legacyBestScore: boundedNumber(data.legacyBestScore || data.bestScore, 999999999),
       verifiedBestScore: boundedNumber(data.verifiedBestScore, 999999999),
-      legacyPhase: Math.max(1, boundedNumber(data.legacyPhase || data.phase, 9999) || 1),
       verifiedPhase: Math.max(1, boundedNumber(data.verifiedPhase, 9999) || 1),
-      achievementsCount: boundedNumber(data.achievementArchiveCount || data.achievementsCount, 79),
-      recordTrust: "legacy_unverified"
+      recordTrust: "verified_run_session"
     };
   });
 }
 
-function subscribeLegacyArchive(uid) {
+function selectWeeklyLeague(leagueId) {
+  const id = safeId(leagueId, "");
+  const league = online.weeklyLeagues.find((entry) => entry.id === id);
+  if (!league) return false;
+  online.selectedWeeklyLeagueId = league.id;
+  online.weeklyLeague = league;
+  return true;
+}
+
+function updateProgressionChoiceState() {
+  const deviceProgress = typeof window.currentMetaSnapshot === "function" ? window.currentMetaSnapshot() : {};
+  const accountProgression = online.onlineArchiveMeta || {};
+  const kind = typeof window.progressionSelectionKind === "function"
+    ? window.progressionSelectionKind(deviceProgress, accountProgression)
+    : "same";
+  if (kind === "account_only") {
+    if (typeof window.replaceDeviceProgression === "function") {
+      window.replaceDeviceProgression(accountProgression, online.achievements, accountProgression.codexDiscoveries || []);
+    }
+    online.progressionChoice = null;
+    return kind;
+  }
+  if (kind === "conflict" || kind === "device_only") {
+    online.progressionChoice = {
+      required: true,
+      kind,
+      status: "waiting",
+      device: cloneMeta(deviceProgress),
+      account: cloneMeta(accountProgression)
+    };
+    return kind;
+  }
+  online.progressionChoice = null;
+  return kind;
+}
+
+function subscribeWorldRecords(uid) {
   if (!db || !auth || !auth.currentUser || auth.currentUser.uid !== uid) return;
   if (archiveUnsubscribe && archiveListenerUid === uid) return;
   teardownArchiveListener();
   const { collection, limit, onSnapshot, orderBy, query } = window.starStrikeFirebaseApi;
   const archiveQuery = query(
-    collection(db, "leaderboard_scores"),
-    orderBy("bestScore", "desc"),
+    collection(db, "world_records"),
+    orderBy("verifiedBestScore", "desc"),
     limit(10)
   );
   archiveListenerUid = uid;
@@ -381,12 +441,12 @@ function subscribeLegacyArchive(uid) {
     archiveQuery,
     (snapshot) => {
       if (!auth || !auth.currentUser || auth.currentUser.uid !== uid) return;
-      applyArchiveSnapshot(snapshot);
-      setStatus("LEGACY/PRESEASON ARCHIVE LOADED");
+      applyWorldRecordSnapshot(snapshot);
+      setStatus("WORLD RECORD ARCHIVE LOADED");
     },
     (error) => {
       if (!auth || !auth.currentUser || auth.currentUser.uid !== uid) return;
-      setError(error, "Legacy archive could not be loaded.");
+      setError(error, "World Records could not be loaded.");
     }
   );
 }
@@ -412,6 +472,12 @@ async function syncProfile(explicitCallSign = "", generation = authGeneration) {
   online.profileMeta = online.onlineArchiveMeta;
   online.legacyRecord = normalizeLegacyRecord(result.legacyRecord || {});
   online.achievements = normalizeAchievementArchive(result.achievementArchive || {});
+  online.accountDeletion = result.accountDeletion && result.accountDeletion.status === "pending" ? {
+    status: "pending",
+    requestedAtMs: boundedNumber(result.accountDeletion.requestedAtMs, 9999999999999),
+    deletesAfterMs: boundedNumber(result.accountDeletion.deletesAfterMs, 9999999999999)
+  } : null;
+  updateProgressionChoiceState();
   online.backendRelease = normalizeBackendRelease(result.release);
   online.developmentCounters.achievementAggregateLoads++;
   online.accountArchive = "loaded";
@@ -449,7 +515,7 @@ async function hydrateAccount(user, options = {}) {
     }
     const result = await syncProfile(pending.pending ? pending.desiredCallSign : "", generation);
     if (!result || result.stale || !isHydrationCurrent(uid, generation)) return { stale: true };
-    subscribeLegacyArchive(uid);
+    subscribeWorldRecords(uid);
     if (competitiveModeEnabled) {
       try {
         await loadWeeklyLeague(false, generation);
@@ -537,6 +603,82 @@ async function refresh() {
   return result;
 }
 
+async function chooseProgression(choice) {
+  if (!online.ready || !auth || !auth.currentUser || !functionsApi) throw new Error("Account progression service is unavailable.");
+  if (choice !== "device" && choice !== "account") throw new Error("Choose device or account progression.");
+  if (online.progressionChoice) online.progressionChoice.status = "saving";
+  const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "chooseProgressionSource");
+  const deviceProgress = typeof window.currentMetaSnapshot === "function" ? window.currentMetaSnapshot() : {};
+  const payload = {
+    choice,
+    deviceBindingId: typeof window.getLocalPilotSeed === "function" ? window.getLocalPilotSeed() : "",
+    deviceProgress,
+    achievementIds: typeof window.getLocalAchievementIds === "function" ? window.getLocalAchievementIds() : [],
+    codexDiscoveries: typeof window.getLocalCodexIds === "function" ? window.getLocalCodexIds() : []
+  };
+  try {
+    const response = await callable(payload);
+    const result = response && response.data ? response.data : {};
+    const selected = normalizeArchiveMeta(result.accountProgression || {});
+    online.onlineArchiveMeta = selected;
+    online.profileMeta = selected;
+    if (choice === "account" && typeof window.replaceDeviceProgression === "function") {
+      window.replaceDeviceProgression(selected, online.achievements, selected.codexDiscoveries || []);
+    }
+    online.progressionChoice = null;
+    setStatus(choice === "account" ? "ACCOUNT PROGRESSION LOADED" : "DEVICE PROGRESSION ASSIGNED TO ACCOUNT");
+    notify("PROGRESSION CHOICE SAVED");
+    return { ok: true, choice, accountProgression: selected };
+  } catch (error) {
+    if (online.progressionChoice) online.progressionChoice.status = "error";
+    setError(error, "Progression choice could not be saved.");
+    throw error;
+  }
+}
+
+async function startVerifiedRun() {
+  if (!competitiveModeEnabled) return { ok: false, reason: "competition_paused" };
+  if (!auth || !auth.currentUser || !functionsApi) return { ok: false, reason: "signed_out" };
+  const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "startVerifiedRun");
+  try {
+    const response = await callable({ clientVersion: "web-v1" });
+    const result = response && response.data ? response.data : {};
+    const session = result.session && typeof result.session === "object" ? {
+      id: safeId(result.session.id, ""),
+      challenge: safeText(result.session.challenge, "", 128),
+      startedAtMs: boundedNumber(result.session.startedAtMs, 9999999999999),
+      expiresAtMs: boundedNumber(result.session.expiresAtMs, 9999999999999)
+    } : null;
+    return session && session.id && session.challenge ? { ok: true, session } : { ok: false, reason: "invalid_session" };
+  } catch (error) {
+    setError(error, "Verified run session could not start. Device play remains available.");
+    return { ok: false, reason: "start_failed" };
+  }
+}
+
+async function requestAccountDeletion() {
+  if (!auth || !auth.currentUser || !functionsApi) throw new Error("Sign in before deleting an account.");
+  const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "requestAccountDeletion");
+  const response = await callable({ confirm: "DELETE MY PILOT ACCOUNT" });
+  const result = response && response.data ? response.data : {};
+  online.accountDeletion = {
+    status: "pending",
+    requestedAtMs: boundedNumber(result.requestedAtMs, 9999999999999),
+    deletesAfterMs: boundedNumber(result.deletesAfterMs, 9999999999999)
+  };
+  setStatus("ACCOUNT DELETION SCHEDULED — 72 HOURS TO CANCEL");
+  return { ok: true, ...online.accountDeletion };
+}
+
+async function cancelAccountDeletion() {
+  if (!auth || !auth.currentUser || !functionsApi) throw new Error("Sign in to cancel account deletion.");
+  const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "cancelAccountDeletion");
+  await callable({});
+  online.accountDeletion = null;
+  setStatus("ACCOUNT DELETION CANCELLED");
+  return { ok: true, status: "cancelled" };
+}
+
 async function signIn() {
   if (!online.ready || !auth || !window.starStrikeFirebaseApi) {
     setStatus("Firebase identity is still connecting.");
@@ -579,7 +721,8 @@ async function signOutOnline() {
   try {
     teardownArchiveListener();
     await window.starStrikeFirebaseApi.signOut(auth);
-    setStatus("Signed out. Device progress is unchanged.");
+    if (typeof window.resetProgressData === "function") window.resetProgressData();
+    setStatus("SIGNED OUT — LOCAL PROGRESSION CLEARED");
     notify("SIGNED OUT");
   } catch (error) {
     setError(error, "Sign-out failed.");
@@ -606,7 +749,7 @@ async function claimHandle(handle) {
     const messages = {
       handle_taken: "That @handle is already claimed.",
       invalid_handle: "That @handle is not valid.",
-      account_conflict: "This account already owns a different @handle.",
+      account_conflict: "This handle update could not be completed.",
       signed_out: "Sign in to claim a handle.",
       backend_unavailable: "Identity service is temporarily unavailable."
     };
@@ -615,12 +758,12 @@ async function claimHandle(handle) {
 }
 
 async function joinWeeklyLeague() {
-  if (!competitiveModeEnabled) return { ok: false, reason: "unavailable" };
+  if (!competitiveModeEnabled) return { ok: false, reason: "competition_paused" };
   if (!auth || !auth.currentUser) throw new Error("Sign in before entering the weekly board.");
   if (!online.profileHandle) throw new Error("Claim a unique @handle before entering the weekly board.");
   try {
     const result = await loadWeeklyLeague(true, authGeneration);
-    if (result.league) setStatus("PRESEASON WEEKLY BOARD ACTIVE");
+    if (result.league) setStatus("WEEKLY LEAGUE ACTIVE");
     return result;
   } catch (error) {
     online.competitionMode = "unavailable";
@@ -630,33 +773,29 @@ async function joinWeeklyLeague() {
 }
 
 async function submitRun(run = {}) {
-  if (!competitiveModeEnabled || !online.weeklyLeague) return { ok: false, reason: "not_enrolled", localOnly: true };
+  if (!competitiveModeEnabled) return { ok: false, reason: "competition_paused", localOnly: true };
   if (!auth || !auth.currentUser || !functionsApi) return { ok: false, reason: "signed_out", localOnly: true };
-  const stats = run && run.stats && typeof run.stats === "object" ? run.stats : {};
-  const priorReceipt = run && run.receipt && typeof run.receipt === "object" ? run.receipt : {};
-  const receipt = {
-    clientReceiptId: safeId(priorReceipt.receiptId || priorReceipt.clientReceiptId || `run_${Date.now()}`),
-    score: boundedNumber(run.score ?? priorReceipt.score, 999999999),
-    phaseReached: Math.max(1, boundedNumber(run.phaseReached ?? run.phase ?? priorReceipt.phaseReached, 9999) || 1),
-    runDurationMs: boundedNumber(stats.runDurationMs ?? priorReceipt.runDurationMs, 86400000),
-    enemiesKilled: boundedNumber(stats.enemiesKilled ?? priorReceipt.enemiesKilled, 1000000),
-    bossesKilled: boundedNumber(stats.bossesKilled ?? priorReceipt.bossesKilled, 1000000),
-    powerupsCollected: boundedNumber(stats.powerupsCollected ?? priorReceipt.powerupsCollected, 1000000),
-    ghostUses: boundedNumber(stats.ghostUses ?? priorReceipt.ghostUses, 1000000),
-    damageTaken: boundedNumber(stats.damageTaken ?? priorReceipt.damageTaken, 1000000),
-    highestCombo: boundedNumber(stats.highestCombo ?? priorReceipt.highestCombo, 1000000),
-    clientVersion: "web-v1"
-  };
+  const evidence = run && run.evidence && typeof run.evidence === "object" ? run.evidence : null;
+  if (!evidence || !evidence.sessionId || !evidence.challenge) return { ok: false, reason: "no_verified_session", localOnly: true };
   const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "submitRunReceipt");
   try {
-    const response = await callable({ receipt });
+    const response = await callable({ evidence });
     const result = response && response.data ? response.data : {};
     online.weeklyLeague = normalizeWeeklyLeague(result.league) || online.weeklyLeague;
-    online.competitionMode = "preseason_unverified";
-    setStatus(result.alreadyProcessed ? "WEEKLY RUN ALREADY COUNTED" : "WEEKLY FLIGHT POINTS UPDATED");
-    return { ok: true, alreadyProcessed: result.alreadyProcessed === true, league: online.weeklyLeague };
+    online.competitionMode = "verified_world_records";
+    if (result.accountProgression) {
+      online.onlineArchiveMeta = normalizeArchiveMeta(result.accountProgression);
+      online.profileMeta = online.onlineArchiveMeta;
+    }
+    setStatus(result.alreadyProcessed ? "SERVER RUN ALREADY COUNTED" : "SERVER RECORD UPDATED");
+    return {
+      ok: true,
+      alreadyProcessed: result.alreadyProcessed === true,
+      verifiedScore: boundedNumber(result.score, 999999999),
+      league: online.weeklyLeague
+    };
   } catch (error) {
-    setError(error, "Weekly Flight Points could not be published.");
+    setError(error, "Verified run could not be published.");
     return { ok: false, reason: "publish_failed", localOnly: true };
   }
 }
@@ -686,12 +825,18 @@ async function devSignInAccount(accountName = "account-a") {
 window.starStrikeOnline = {
   getState,
   getAccessibilityKey,
+  getOverlayState,
   signIn,
   signOut: signOutOnline,
   refresh,
+  chooseProgression,
+  requestAccountDeletion,
+  cancelAccountDeletion,
   updateCallSign,
   claimHandle,
   joinWeeklyLeague,
+  selectWeeklyLeague,
+  startVerifiedRun,
   submitRun,
   ...(emulatorMode ? { devSignInAccount } : {})
 };

@@ -48,7 +48,15 @@ function publicPilotIdFor(uid) {
 }
 
 function accountArchiveMeta(privateData = {}) {
-  return normalizeProfile(privateData && typeof privateData === "object" ? privateData : {});
+  const source = privateData && typeof privateData === "object" ? privateData : {};
+  return {
+    ...normalizeProfile(source),
+    codexDiscoveries: Array.from(new Set(
+      (Array.isArray(source.codexDiscoveries) ? source.codexDiscoveries : [])
+        .map((id) => String(id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40))
+        .filter(Boolean)
+    )).slice(0, 100)
+  };
 }
 
 function legacyRecord(publicData = {}, leaderboardData = {}) {

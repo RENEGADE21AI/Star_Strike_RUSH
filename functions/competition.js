@@ -78,23 +78,15 @@ function competitionActivationState(config = {}) {
   );
 }
 
-function preseasonCompetitionActivationState(config = {}) {
-  return (
-    config.progressionWritesEnabled !== true &&
-    config.competitionWritesEnabled === true &&
-    config.verifiedRunSessionsEnabled !== true
-  );
-}
-
 function requireCompetitionEnabled() {
-  if (PUBLIC_COMPETITION_MODE !== "preseason_unverified" || !preseasonCompetitionActivationState({
+  if (PUBLIC_COMPETITION_MODE !== "verified_world_records" || !competitionActivationState({
     progressionWritesEnabled: SERVER_PROGRESSION_WRITES_ENABLED,
     competitionWritesEnabled: SERVER_COMPETITION_WRITES_ENABLED,
     verifiedRunSessionsEnabled: VERIFIED_RUN_SESSIONS_ENABLED
   })) {
     throw new HttpsError(
       "failed-precondition",
-      "The preseason weekly board is unavailable.",
+      "Public record writes and Weekly Leagues are paused pending an authoritative run verifier.",
       { release: BACKEND_RELEASE_IDENTITY }
     );
   }
@@ -108,7 +100,7 @@ function requireServerProgressionWritesEnabled() {
   if (!SERVER_PROGRESSION_WRITES_ENABLED) {
     throw new HttpsError(
       "failed-precondition",
-      "Account progression writes are paused while device-local preseason progression is authoritative.",
+      "Account progression writes are unavailable.",
       { release: BACKEND_RELEASE_IDENTITY }
     );
   }
@@ -119,7 +111,6 @@ module.exports = {
   HANDLE_MAX_LENGTH,
   HANDLE_MIN_LENGTH,
   competitionActivationState,
-  preseasonCompetitionActivationState,
   divisionName,
   competitionWritesEnabled,
   normalizeHandle,
