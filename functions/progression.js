@@ -84,7 +84,7 @@ function gloryRoadStateForTotal(value) {
     prestige,
     roadGlory,
     rank,
-    displayRankName: prestige > 0 ? `${rank.name} ${romanPrestige(prestige)}` : rank.name
+    displayRankName: prestige > 0 ? `${rank.name} ${romanPrestige(prestige + 1)}` : rank.name
   };
 }
 
@@ -160,15 +160,13 @@ function validateRunPlausibility(run) {
 
 function computeRunGrants(run) {
   return {
-    gloryGained: Math.floor(run.score / 10),
-    creditsEarned: clamp(Math.floor(run.score / 120) + run.phaseReached * 2 + run.bossesKilled * 25, 0, 1500)
+    gloryGained: Math.floor(run.score / 10)
   };
 }
 
 function defaultProfile() {
   return {
     totalGlory: 0,
-    credits: 0,
     lifetimeRuns: 0,
     lifetimeScore: 0,
     lifetimeKills: 0,
@@ -185,7 +183,6 @@ function defaultProfile() {
 function normalizeProfile(profile = {}) {
   const base = defaultProfile();
   base.totalGlory = intValue(profile.totalGlory ?? profile.glory);
-  base.credits = intValue(profile.credits);
   base.lifetimeRuns = intValue(profile.lifetimeRuns, 1000000);
   base.lifetimeScore = intValue(profile.lifetimeScore);
   base.lifetimeKills = intValue(profile.lifetimeKills, 1000000);
@@ -240,7 +237,6 @@ function applyRunToProfile(profile, run) {
   const grants = computeRunGrants(run);
   const gloryBefore = next.totalGlory;
   next.totalGlory += grants.gloryGained;
-  next.credits += grants.creditsEarned;
   next.lifetimeRuns += 1;
   next.lifetimeScore += run.score;
   next.lifetimeKills += run.enemiesKilled;

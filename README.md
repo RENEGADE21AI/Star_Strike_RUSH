@@ -25,12 +25,13 @@ appears only after graduation.
 
 Play: https://star-strike-rush.web.app
 
-Release truth as of 2026-08-18: the production baseline for this pass is
-`312c0074286abdb849582f76708db703e9abf34c`.
+Release truth as of 2026-08-20: the production baseline for this pass is
+`a24de81e9572eb828fb4ad1a37860fb06d994552`.
 The authoritative live identity is the matching Hosting `/version.json` and
-backend release marker, not a source commit alone. Account A/B smoke for that
-baseline was owner-waived, not passed. Device-local progression remains
-authoritative; the public weekly board described below never writes it.
+backend release marker, not a source commit alone. This pass introduces an
+explicit account-or-device progression choice. A security review kept public
+World Record and Weekly League writes fail-closed pending an authoritative run
+verifier; it is not live until both release identities match the new merge.
 
 ## Controls
 
@@ -41,14 +42,15 @@ authoritative; the public weekly board described below never writes it.
 - Touch or pen: use the virtual joystick and ability button. They appear only
   after meaningful touch/pen gameplay input.
 - Pause: the top-left HUD control or Escape. A deliberate standard-run pause
-  costs one Health bar and reports the cost. Manual pauses are free during
-  First Flight, while automatic focus/visibility pauses are always free.
+  costs one Health bar and reports the cost. Every tutorial pause, including
+  automatic focus/visibility pause, is free; every standard-run pause costs one
+  Health, with duplicate browser lifecycle events coalesced into one charge.
   Gameplay resumes through a short countdown; cancelling that countdown is
   free. Restart Run and Return to Title require a second explicit confirmation.
 - Keyboard navigation: Tab moves through title, panel, pause, reset, and Game
   Over actions; Enter or Space activates the focused control and Escape backs
   out safely. Focus outlines track the matching Canvas control.
-- HUD: Energy sits above segmented Health in the classic bottom-left layout;
+- HUD: the Ghost meter sits above segmented Health in the classic bottom-left layout;
   Score, Hi-Score, and Combo stay compact at the top-right.
 
 Boss encounters render their supplied boss artwork. The Wraith Sovereign uses
@@ -62,9 +64,9 @@ Game Over: glass-edged panels, clear primary and destructive actions, readable
 single-column mobile achievement cards, an unobtrusive combat HUD, and a
 score-focused end-of-run summary. Settings expose explicit ON/OFF state and
 apply immediately on this device. Reset Local Data remains a separate,
-plain-language destructive confirmation. Records distinguishes the best score
-stored on this device from the unverified public preseason archive and states
-when public writes are paused.
+plain-language destructive confirmation. Records distinguishes device best
+from the server record archive and clearly marks public writes and Weekly
+Leagues paused.
 
 Short landscape phone windows keep the portrait playfield intact and show a
 static gutter-only rotation cue. Resizing or rotating clears held touch input so
@@ -157,9 +159,9 @@ Important runtime guarantees include:
 - object-based collision calls with explicit visual/collision scaling;
 - per-sprite orientation, anchor, weapon, exhaust, and hitbox metadata;
 - boss vulnerability only after staging and the first attack begin;
-- free automatic pause on focus loss and no in-run announcement popups;
+- one-Health standard-run pause on manual or lifecycle pause, coalesced per interruption;
 - graceful local play when Firebase is unavailable.
-- device-local gameplay progression that account operations cannot replace;
+- explicit account-or-device progression replacement with no additive merge;
 - exact browser/test Firebase SDK parity at `12.16.0`;
 - one canonical 79-entry achievement catalog generated for browser and server.
 - no player-facing developer shortcuts or phase skips in the shipped build.
@@ -167,32 +169,38 @@ Important runtime guarantees include:
 See `src/README.md`, `docs/ASSET_MANIFEST.md`, and `PROJECT_STATUS.md` for the
 detailed contracts and current support boundary.
 
-## Preseason authority and Firebase boundary
+The completed security review and fail-closed competition decision are recorded
+in `docs/SECURITY_REVIEW_2026-08-20.md`.
 
-`PROGRESSION_AUTHORITY = "device_local_preseason"` is the release model until
-verified run sessions exist:
+## Progression authority and Firebase boundary
 
-- Gameplay progression is **DEVICE PROGRESS** and authoritative on this device.
-- Firebase provides **ACCOUNT IDENTITY** and a **LEGACY ACCOUNT ARCHIVE**.
-- Sign-in, auth restoration, refresh, account switching, and account call-sign
-  publication do not change cumulative Glory, derived Prestige, Credits,
-  lifetime statistics, high score, local achievements, or Codex discovery.
-- Glory is permanent and never consumed. The visible Glory Road repeats every
-  300,000 Glory; Prestige and current-road position are derived from the same
-  cumulative total rather than stored as separate currencies.
-- Existing `leaderboard_scores` documents are preserved and shown only as a
-  **LEGACY/PRESEASON ARCHIVE** with `recordTrust = "legacy_unverified"`.
-- New run progression does not publish to Firebase. Signed-in pilots with a
-  public handle may enter the **PRESEASON WEEKLY BOARD**. Its server-owned
-  enrollment and idempotent best-run receipts publish only explicitly
-  **UNVERIFIED FLIGHT POINTS**; they never change Glory, Prestige, Credits,
-  lifetime statistics, achievements, the legacy archive, or device progress.
-  Verified run sessions and all server progression writes remain disabled. The
-  former Season reward callable is an inert compatibility endpoint.
+`PROGRESSION_AUTHORITY = "explicit_account_or_device"` is the active model:
+
+- Signed-out play uses the device save. When a signed-in account and device
+  contain different meaningful progress, the player must keep exactly one;
+  the selected snapshot replaces the other and the two are never added.
+- Assigning a device save to an account also binds that device-save identity to
+  the account, preventing one accumulated save from being copied across
+  multiple accounts. Signing out clears gameplay progression from the device.
+- Firebase provides private account progression, public game identity, and a
+  server record archive. Public record and Weekly League writes remain paused
+  until an authoritative verifier exists. Provider email, Google
+  name, avatar, Firebase UID, and authentication data never become public game
+  identity.
+- Existing `leaderboard_scores` documents remain a read-only **LEGACY ARCHIVE**
+  with `recordTrust = "legacy_unverified"`; they never seed verified records.
+- The dormant run-receipt code ignores caller-supplied numeric score, but a
+  security review proved browser-authored events are not authoritative proof of
+  gameplay. Its gates therefore reject before auth or Firestore work. Direct
+  Firestore writes remain denied.
+- Weekly League membership and scoring remain server-owned and fail-closed.
+  The former Season reward callable is an inert compatibility endpoint and
+  cannot read, write, or grant anything.
 
 Google sign-in activates account identity, an account-scoped published call
-sign, an optional immutable `@handle`, one achievement archive aggregate, and
-authenticated legacy-archive reads. A failed signed-in call-sign publication is
+sign, a unique but changeable `@handle`, one achievement archive aggregate, and
+authenticated archive reads. Handle changes are transactional: a new handle is
+reserved before the account's old registry entry is released. A failed signed-in call-sign publication is
 stored under that Firebase UID and retried after reconnect or restored auth; it
 never changes the guest call sign or device progression.
 
@@ -205,21 +213,21 @@ retry when the same account returns.
 ## Permanent Glory Road
 
 There is one long-term progression Road. Score converts to permanent cumulative
-Glory at 10:1, while Credits continue as the separate earned balance. The Road
-visually repeats every 300,000 Glory:
+Glory at 10:1. Credits have been retired from saves, rewards, receipts, and UI.
+Each completed 300,000-Glory block derives one Prestige:
 
 ```text
 Prestige = floor(totalGlory / 300000)
-current Road Glory = totalGlory % 300000
+Glory within current rank cycle = totalGlory % 300000
 ```
 
-Completing a Road never subtracts or resets Glory. Current rank and Road nodes
-use the modulo position; total Glory and Prestige preserve the full lifetime
-accomplishment. Titles accumulate a Prestige suffix after the first completed
-Road (`Ace`, `Ace I`, `Ace II`, ...). Checkpoints, rank-ups, and the terminal
-Star Eternal rollover are recognized explicitly when progression is applied at
-Game Over and use accessibility-aware celebrations. Prestige grants no combat
-power.
+Completing a Road never subtracts, resets, or visually sends the pilot backward.
+The route extends continuously at absolute thresholds: Ace is 15,000 Glory,
+Ace II is 315,000, Ace III is 615,000, and so on. Nodes are generated from the
+current absolute range instead of a hard-coded Prestige ceiling, including
+Prestige 50 and beyond. Checkpoints, rank-ups, and Star Eternal/Prestige
+boundaries are recognized explicitly when progression is applied at Game Over
+and use accessibility-aware celebrations. Prestige grants no combat power.
 
 Ordinary clients cannot invoke the achievement migration. The Admin-only,
 dry-run-by-default command is:

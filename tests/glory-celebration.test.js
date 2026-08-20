@@ -65,7 +65,7 @@ test("celebrations auto-complete and Reduced Motion shortens motion exposure", (
   const data = JSON.parse(result);
   assert.ok(data.reduced < data.standard);
   assert.equal(data.active, false);
-  assert.equal(data.copy.value, "ACE II");
+  assert.equal(data.copy.value, "ACE III");
 });
 
 test("celebration layout keeps checkpoint copy and the focused Continue target separated", () => {

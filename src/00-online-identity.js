@@ -107,16 +107,20 @@ function clearAccountIdentity(onlineState, options = {}) {
   onlineState.profileHandle = "";
   onlineState.profileMeta = null;
   onlineState.onlineArchiveMeta = null;
+  onlineState.progressionChoice = null;
+  onlineState.accountDeletion = null;
   onlineState.legacyRecord = null;
   onlineState.weeklyLeague = null;
+  onlineState.weeklyLeagues = [];
+  onlineState.selectedWeeklyLeagueId = "";
   onlineState.achievements = [];
   onlineState.leaderboard = [];
   onlineState.pendingCallSign = false;
   onlineState.identityService = "signed_out";
   onlineState.accountArchive = "not_loaded";
-  onlineState.progressionMode = options.progressionMode || "device_local_preseason";
-  onlineState.competitionMode = options.competitionMode === "preseason_unverified"
-    ? "preseason_unverified"
+  onlineState.progressionMode = options.progressionMode || "explicit_account_or_device";
+  onlineState.competitionMode = options.competitionMode === "verified_world_records"
+    ? "verified_world_records"
     : "paused";
   onlineState.networkState = onlineState.ready ? "online" : "offline";
   return onlineState;

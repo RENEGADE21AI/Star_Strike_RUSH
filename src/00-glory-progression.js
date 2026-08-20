@@ -1,5 +1,5 @@
 const GLORY_ROAD_LENGTH = 300000;
-const META_PROGRESS_SCHEMA_VERSION = 2;
+const META_PROGRESS_SCHEMA_VERSION = 3;
 
 const GLORY_RANKS = Object.freeze([
   Object.freeze({ threshold: 0, name: "Rookie Pilot" }),
@@ -62,7 +62,7 @@ function rankForRoadGlory(value) {
 function displayGloryRankName(rankName, prestige) {
   const base = String(rankName || "Rookie Pilot");
   const value = normalizedGloryInteger(prestige);
-  return value > 0 ? `${base} ${romanPrestige(value)}` : base;
+  return value > 0 ? `${base} ${romanPrestige(value + 1)}` : base;
 }
 
 function gloryRoadStateForTotal(value) {

@@ -66,11 +66,23 @@ test("Road ship follows the curve between milestones instead of snapping to a re
 test("Glory Road header prioritizes permanent total Glory over unrelated score", () => {
   const { gloryRoadHeaderChips } = loadRoadData();
   assert.deepEqual(
-    gloryRoadHeaderChips({ totalGlory: 925000, gloryRankDisplay: "Ace III", prestige: 3 }),
+    gloryRoadHeaderChips({ totalGlory: 925000, gloryRankDisplay: "Ace IV", prestige: 3 }),
     [
       { label: "TOTAL", value: "925K", tone: "cyan" },
-      { label: "RANK", value: "ACE III", tone: "gold" },
+      { label: "RANK", value: "ACE IV", tone: "gold" },
       { label: "PRESTIGE", value: "III", tone: "green" }
     ]
   );
+});
+
+test("Glory Road generates one continuous absolute route through extreme Prestige", () => {
+  const { GLORY_RANKS, GLORY_ROAD_LENGTH } = require("../src/00-glory-progression.js");
+  const { makeContinuousGloryRoadNodes } = loadRoadData();
+  const nodes = makeContinuousGloryRoadNodes(GLORY_RANKS, GLORY_ROAD_LENGTH, 50);
+  assert.ok(nodes.length > 850, "Prestige 50 should be generated, not hard-coded or truncated");
+  assert.deepEqual(nodes.map((node) => node.threshold), nodes.map((node) => node.threshold).sort((a, b) => a - b));
+  assert.equal(nodes.find((node) => node.threshold === 315000).label, "ACE II");
+  assert.equal(nodes.find((node) => node.threshold === 615000).label, "ACE III");
+  assert.equal(nodes.some((node) => node.threshold === 15015000 && node.label === "ACE LI"), true);
+  assert.equal(new Set(nodes.map((node) => node.id)).size, nodes.length);
 });

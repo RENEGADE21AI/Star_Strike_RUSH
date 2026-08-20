@@ -191,7 +191,7 @@ function drawGloryCelebration() {
   ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
   ctx.fillStyle = terminal ? "#ffe680" : "#79eaff";
   ctx.fillText(copy.eyebrow, W / 2, layout.eyebrowY);
-  ctx.font = terminal ? "900 28px Impact, Haettenschweiler, sans-serif" : "900 24px Impact, Haettenschweiler, sans-serif";
+  ctx.font = terminal ? "800 28px Impact, Haettenschweiler, sans-serif" : "800 24px Impact, Haettenschweiler, sans-serif";
   ctx.fillStyle = "#fff";
   ctx.fillText(copy.title, W / 2, layout.titleY);
   ctx.font = terminal ? "900 15px 'Arial Narrow', Arial, sans-serif" : "900 14px 'Arial Narrow', Arial, sans-serif";

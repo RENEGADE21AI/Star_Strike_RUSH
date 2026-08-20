@@ -38,8 +38,7 @@ test("server computes run grants without trusting browser-reported rewards", () 
   });
 
   assert.deepEqual(computeRunGrants(run), {
-    gloryGained: 300,
-    creditsEarned: 56
+    gloryGained: 300
   });
 });
 
@@ -79,7 +78,6 @@ test("run application advances server profile and achievements from sanitized st
   });
   const profile = applyRunToProfile({
     totalGlory: 900,
-    credits: 50,
     lifetimeRuns: 2,
     lifetimeScore: 1500,
     lifetimeKills: 10,
@@ -93,7 +91,7 @@ test("run application advances server profile and achievements from sanitized st
   }, run);
 
   assert.equal(profile.totalGlory, 1900);
-  assert.equal(profile.credits, 224);
+  assert.equal("credits" in profile, false);
   assert.equal(profile.lifetimeRuns, 3);
   assert.equal(profile.bestScore, 10000);
   assert.equal(profile.phase, 8);

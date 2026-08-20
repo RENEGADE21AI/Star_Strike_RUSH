@@ -271,14 +271,34 @@ function updateEnemies() {
   }
   resolveEnemySpacing();
   for (const e of state.enemies) {
-    if (typeof smoothEnemyVisualHeading !== "function") continue;
-    e.visualHeading = smoothEnemyVisualHeading(
-      e.visualHeading,
-      e.x - (Number.isFinite(e.prevX) ? e.prevX : e.x),
-      e.y - (Number.isFinite(e.prevY) ? e.prevY : e.y),
-      e.escape ? -1 : 1,
-      e.spawnMode === "boss" ? 0.11 : 0.075
+    const previousX = Number.isFinite(e.prevX) ? e.prevX : e.x;
+    const previousY = Number.isFinite(e.prevY) ? e.prevY : e.y;
+    const desiredX = e.x;
+    const desiredY = e.y;
+    const distance = Math.hypot(desiredX - previousX, desiredY - previousY);
+    const scripted = (e.tutorialArrival && !e.tutorialArrivalComplete) || e.tutorialTarget || e.spawnMode === "boss" || e.launchFrames > 0;
+    if (scripted || distance <= 0.001 || typeof spacecraftMotionStep !== "function") {
+      e.visualHeading = smoothEnemyVisualHeading(
+        e.visualHeading,
+        desiredX - previousX,
+        desiredY - previousY,
+        e.escape ? -1 : 1,
+        scripted ? 0.18 : 0.09
+      );
+      e.flightHeading = e.visualHeading;
+      continue;
+    }
+    const turnRate = e.escape ? 0.24 : e.type === "orange" || e.type === "splitter_shard" ? 0.14 : 0.09;
+    const motion = spacecraftMotionStep(
+      { x: previousX, y: previousY, heading: e.flightHeading },
+      { x: desiredX, y: desiredY },
+      distance,
+      turnRate
     );
+    e.x = previousX + motion.dx;
+    e.y = previousY + motion.dy;
+    e.flightHeading = motion.heading;
+    e.visualHeading = motion.heading;
   }
   if (typeof updateExpansionSupportEffects === "function") updateExpansionSupportEffects();
   state.enemies = state.enemies.filter(e => e.hp > 0);
@@ -327,6 +347,7 @@ function damagePlayer(amount = 1) {
   d.lastHitFrame = state.frame;
   p.hp -= amount;
   state.runStats.damageTaken += Math.max(1, Math.floor(amount || 1));
+  recordTrustedRunEvent("damage", { amount });
   p.inv = amount >= 2 ? 70 : 60;
   p.energy = clamp(p.energy + 12, 0, p.maxEnergy);
   state.difficulty.grace = 120;
@@ -345,6 +366,7 @@ function damagePlayer(amount = 1) {
 function collectPowerup(pu) {
   const p = state.player;
   state.runStats.powerups++;
+  recordTrustedRunEvent("powerup", { kind: pu.type });
   const particlesBefore = state.particles.length;
   spawnPowerupCollectBurst(pu);
   const pickupParticles = state.particles.slice(particlesBefore);
@@ -414,6 +436,7 @@ function updateCollisions() {
             const deadBoss = state.boss;
             spawnBossDeath(deadBoss);
             addFlatScore(BOSS_SCORE.wraith);
+            recordTrustedRunEvent("boss", { kind: "wraith", entityId: `boss_wraith_${state.phase}_${state.frame}` });
             state.runStats.bosses++;
             resetCombo();
             bossRewardDrops(deadBoss.x, deadBoss.y);
@@ -423,6 +446,7 @@ function updateCollisions() {
             state.waveMoodTimer = 120;
             state.lastWaveTemplateName = null;
             state.phase++;
+            recordTrustedRunEvent("phase", { phase: state.phase });
             state.phaseTimer = 0;
             state.waveTimer = 0;
             state.waveRest = 18;
@@ -446,6 +470,7 @@ function updateCollisions() {
             const deadBoss = state.boss;
             spawnBossDeath(deadBoss);
             addFlatScore(BOSS_SCORE.standard);
+            recordTrustedRunEvent("boss", { kind: "standard", entityId: `boss_standard_${state.phase}_${state.frame}` });
             state.runStats.bosses++;
             resetCombo();
             bossRewardDrops(deadBoss.x, deadBoss.y);
@@ -455,6 +480,7 @@ function updateCollisions() {
             state.waveMoodTimer = 120;
             state.lastWaveTemplateName = null;
             state.phase++;
+            recordTrustedRunEvent("phase", { phase: state.phase });
             state.phaseTimer = 0;
             state.waveTimer = 0;
             state.waveRest = 18;
@@ -480,6 +506,7 @@ function updateCollisions() {
             const deadBoss = state.boss;
             spawnBossDeath(deadBoss);
             addFlatScore(BOSS_SCORE[deadBoss.mode] || BOSS_SCORE.standard);
+            recordTrustedRunEvent("boss", { kind: deadBoss.mode, entityId: `boss_${deadBoss.mode}_${state.phase}_${state.frame}` });
             state.runStats.bosses++;
             resetCombo();
             bossRewardDrops(deadBoss.x, deadBoss.y);
@@ -489,6 +516,7 @@ function updateCollisions() {
             state.waveMoodTimer = 120;
             state.lastWaveTemplateName = null;
             state.phase++;
+            recordTrustedRunEvent("phase", { phase: state.phase });
             state.phaseTimer = 0;
             state.waveTimer = 0;
             state.waveRest = 18;
@@ -531,7 +559,7 @@ function updateCollisions() {
         if (e.hp <= 0) {
           if (typeof finishEnemyDestroyed === "function") finishEnemyDestroyed(e, j, true);
           else {
-            noteKill(e.reward || enemyScoreForType(e.type));
+            noteKill(e.reward || enemyScoreForType(e.type), e.type, e.id);
             spawnDeathBurst(e.x, e.y, e.type === "purple" ? 22 : e.type === "phantom" ? 18 : 14);
             if (shouldDropPowerupNow()) { dropPowerup(e.x, e.y); registerPowerupDrop(240, 360); }
             else state.killsSinceLastDrop++;
@@ -547,7 +575,7 @@ function updateCollisions() {
     const b = state.enemyBullets[i];
     if (b.realm != null && b.realm !== state.playerRealm) continue;
     const wingmanProtected = p.ghostTimer > 0;
-    if (!wingmanProtected) {
+    {
       let wingmanBlocked = false;
       for (let w = state.wingmen.length - 1; w >= 0; w--) {
         const wm = state.wingmen[w];
@@ -556,9 +584,11 @@ function updateCollisions() {
           { key: "wingman", x: wm.x, y: wm.y, fallbackRadius: 12 }
         )) {
           state.enemyBullets.splice(i, 1);
-          state.wingmen.splice(w, 1);
-          spawnParticles(wm.x, wm.y, 10, "#f6f", 0.8);
-          if (typeof playGameSound === "function") playGameSound("wingman_hit", 0.85);
+          const immune = wingmanProtected || wm.phase === "arriving" || wm.phase === "departing";
+          wm.hitFlash = 8;
+          spawnParticles(wm.x, wm.y, immune ? 5 : 10, immune ? "#bff6ff" : "#f6f", immune ? 0.42 : 0.8);
+          if (!immune) state.wingmen.splice(w, 1);
+          if (typeof playGameSound === "function") playGameSound("wingman_hit", immune ? 0.34 : 0.85);
           wingmanBlocked = true;
           break;
         }
@@ -598,7 +628,7 @@ function updateCollisions() {
   for (let i = state.enemies.length - 1; i >= 0; i--) {
     const e = state.enemies[i];
     const wingmanProtected = p.ghostTimer > 0;
-    if (!wingmanProtected) {
+    {
       let wingmanHit = false;
       for (let w = state.wingmen.length - 1; w >= 0; w--) {
         const wm = state.wingmen[w];
@@ -606,12 +636,15 @@ function updateCollisions() {
           { key: e.type, x: e.x, y: e.y, fallbackRadius: e.r || 12, scale: e.collisionScale == null ? 1 : e.collisionScale },
           { key: "wingman", x: wm.x, y: wm.y, fallbackRadius: 12 }
         )) {
-          state.wingmen.splice(w, 1);
+          if (wm.phase === "departing") continue;
+          const immune = wingmanProtected || wm.phase === "arriving";
+          if (!immune) state.wingmen.splice(w, 1);
           if (typeof onEnemyDestroyed === "function") onEnemyDestroyed(e);
           state.enemies.splice(i, 1);
-          spawnParticles(wm.x, wm.y, 12, "#f6f", 0.9);
+          wm.hitFlash = 8;
+          spawnParticles(wm.x, wm.y, immune ? 7 : 12, immune ? "#bff6ff" : "#f6f", immune ? 0.55 : 0.9);
           spawnDeathBurst(e.x, e.y, 10);
-          if (typeof playGameSound === "function") playGameSound("wingman_hit", 0.92);
+          if (typeof playGameSound === "function") playGameSound("wingman_hit", immune ? 0.42 : 0.92);
           wingmanHit = true;
           break;
         }
@@ -702,6 +735,7 @@ function updateWavesAndPhaseAndPressure() {
   if (bossLocked) { updatePendingSpawns(); return; }
   if (state.phaseTimer >= phaseDuration(state.phase)) {
     state.phase++;
+    recordTrustedRunEvent("phase", { phase: state.phase });
     state.phaseTimer = 0;
     state.waveTimer = 0;
     state.waveRest = 18;

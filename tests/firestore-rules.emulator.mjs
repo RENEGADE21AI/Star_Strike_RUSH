@@ -34,12 +34,14 @@ before(async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
     await Promise.all([
-      setDoc(doc(db, "players_private/alice"), { uid: "alice", credits: 10 }),
-      setDoc(doc(db, "players_private/bob"), { uid: "bob", credits: 20 }),
+      setDoc(doc(db, "players_private/alice"), { uid: "alice", totalGlory: 10 }),
+      setDoc(doc(db, "players_private/bob"), { uid: "bob", totalGlory: 20 }),
       setDoc(doc(db, "players_public/alice"), { uid: "alice", callSign: "ALPHA", bestScore: 100 }),
       setDoc(doc(db, "players_public/bob"), { uid: "bob", callSign: "BRAVO", bestScore: 200 }),
       setDoc(doc(db, "leaderboard_scores/alice"), { uid: "alice", callSign: "ALPHA", bestScore: 100 }),
       setDoc(doc(db, "leaderboard_scores/bob"), { uid: "bob", callSign: "BRAVO", bestScore: 200 }),
+      setDoc(doc(db, "world_records/alice"), { publicPilotId: "pilot_alpha", callSign: "ALPHA", verifiedBestScore: 100, recordTrust: "verified_run_session" }),
+      setDoc(doc(db, "world_records/bob"), { publicPilotId: "pilot_bravo", callSign: "BRAVO", verifiedBestScore: 200, recordTrust: "verified_run_session" }),
       setDoc(doc(db, "player_achievements/alice/items/first_run"), { achievementId: "first_run" }),
       setDoc(doc(db, "player_achievement_state/alice"), { uid: "alice", ids: ["first_run"], count: 1 }),
       setDoc(doc(db, "run_receipts/alice/items/run_1"), { receiptId: "run_1" }),
@@ -47,7 +49,10 @@ before(async () => {
       setDoc(doc(db, "handle_registry/alpha"), { uid: "alice" }),
       setDoc(doc(db, "weekly_enrollments/week_alice"), { uid: "alice" }),
       setDoc(doc(db, "weekly_leagues/league_1"), { memberCount: 1 }),
-      setDoc(doc(db, "weekly_run_receipts/week_1/members/alice/items/run_1"), { score: 100 })
+      setDoc(doc(db, "weekly_run_receipts/week_1/members/alice/items/run_1"), { score: 100 }),
+      setDoc(doc(db, "verified_run_sessions/alice/sessions/run_1"), { challenge: "secret" }),
+      setDoc(doc(db, "device_progress_bindings/hash_1"), { uid: "alice" }),
+      setDoc(doc(db, "account_deletion_requests/alice"), { uid: "alice", status: "pending" })
     ]);
   });
 });
@@ -63,6 +68,7 @@ test("unauthenticated browsers cannot read or write game data", async () => {
   const db = environment.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(db, "players_public/alice")));
   await assertFails(getDoc(doc(db, "leaderboard_scores/alice")));
+  await assertFails(getDoc(doc(db, "world_records/alice")));
   await assertFails(getDoc(doc(db, "players_private/alice")));
   await assertFails(setDoc(doc(db, "players_public/attacker"), { callSign: "ATTACKER" }));
 });
@@ -71,12 +77,15 @@ test("authenticated users can read bounded public records but cannot mutate them
   const db = environment.authenticatedContext("alice").firestore();
   await assertSucceeds(getDoc(doc(db, "players_public/bob")));
   await assertSucceeds(getDoc(doc(db, "leaderboard_scores/bob")));
+  await assertSucceeds(getDoc(doc(db, "world_records/bob")));
   const publicRows = await assertSucceeds(getDocs(query(collection(db, "players_public"), limit(25))));
   assert.equal(publicRows.size, 2);
   await assertFails(getDocs(collection(db, "players_public")));
   await assertFails(getDocs(query(collection(db, "leaderboard_scores"), limit(26))));
+  await assertFails(getDocs(query(collection(db, "world_records"), limit(26))));
   await assertFails(setDoc(doc(db, "players_public/alice"), { callSign: "FORGED" }));
   await assertFails(updateDoc(doc(db, "leaderboard_scores/alice"), { bestScore: 999999999 }));
+  await assertFails(updateDoc(doc(db, "world_records/alice"), { verifiedBestScore: 999999999 }));
   await assertFails(deleteDoc(doc(db, "players_public/bob")));
 });
 
@@ -91,7 +100,7 @@ test("private progression and receipts are owner-readable and browser-immutable"
   await assertSucceeds(getDoc(doc(aliceDb, "run_receipts/alice/items/run_1")));
   await assertSucceeds(getDoc(doc(aliceDb, "season_reward_claims/alice/items/reward_1")));
   await assertFails(getDoc(doc(bobDb, "player_achievements/alice/items/first_run")));
-  await assertFails(updateDoc(doc(aliceDb, "players_private/alice"), { credits: 999999999 }));
+  await assertFails(updateDoc(doc(aliceDb, "players_private/alice"), { totalGlory: 999999999 }));
   await assertFails(setDoc(doc(aliceDb, "run_receipts/alice/items/forged"), { score: 999999999 }));
   await assertFails(setDoc(doc(aliceDb, "player_achievement_state/alice"), { ids: ["everything"] }));
 });
@@ -104,4 +113,7 @@ test("handle and league internals remain callable-only", async () => {
   await assertFails(getDoc(doc(db, "weekly_leagues/league_1")));
   await assertFails(getDoc(doc(db, "weekly_run_receipts/week_1/members/alice/items/run_1")));
   await assertFails(setDoc(doc(db, "weekly_run_receipts/week_1/members/alice/items/forged"), { score: 999999999 }));
+  await assertFails(getDoc(doc(db, "verified_run_sessions/alice/sessions/run_1")));
+  await assertFails(getDoc(doc(db, "device_progress_bindings/hash_1")));
+  await assertFails(getDoc(doc(db, "account_deletion_requests/alice")));
 });

@@ -18,10 +18,10 @@ function spawnMine(x, y, extra = {}) {
 
 function spawnAsteroid(kind, x, y, extra = {}) {
   const data = {
-    small_debris: { r: 11, hp: 1, vy: 3.2, vx: rand(-0.35, 0.35), damage: 1, color: "#978a80" },
-    rock_asteroid: { r: 18, hp: 3, vy: 2.2, vx: rand(-0.24, 0.24), damage: 1, color: "#8f8170" },
-    iron_asteroid: { r: 24, hp: 7, vy: 1.45, vx: rand(-0.12, 0.12), damage: 1, color: "#8b9296" },
-    comet_shard: { r: 13, hp: 2, vy: 3.7, vx: rand(-0.55, 0.55), damage: 1, color: "#c4eaff", trail: true }
+    small_debris: { r: 11, hp: asteroidDurability("small_debris"), vy: 3.2, vx: rand(-0.35, 0.35), damage: 1, color: "#978a80" },
+    rock_asteroid: { r: 18, hp: asteroidDurability("rock_asteroid"), vy: 2.2, vx: rand(-0.24, 0.24), damage: 1, color: "#8f8170" },
+    iron_asteroid: { r: 24, hp: asteroidDurability("iron_asteroid"), vy: 1.45, vx: rand(-0.12, 0.12), damage: 1, color: "#8b9296" },
+    comet_shard: { r: 13, hp: asteroidDurability("comet_shard"), vy: 3.7, vx: rand(-0.55, 0.55), damage: 1, color: "#c4eaff", trail: true }
   }[kind] || { r: 16, hp: 2, vy: 2.1, vx: 0, damage: 1, color: "#8f8170" };
   const asteroid = Object.assign({
     kind,
@@ -200,6 +200,29 @@ function explodeHazard(d) {
   }
 }
 
+function spawnAsteroidDestruction(d) {
+  const scale = clamp(Number(d && d.r || 16) / 24, 0.45, 1);
+  const color = d.color || "#cbd3d8";
+  spawnParticles(d.x, d.y, Math.round(18 + 18 * scale), color, 0.72 + scale * 0.42);
+  spawnParticles(d.x, d.y, Math.round(8 + 9 * scale), "#fff", 0.68 + scale * 0.28);
+  state.particles.push({
+    kind: "ring",
+    x: d.x,
+    y: d.y,
+    vx: 0,
+    vy: 0,
+    life: Math.round(18 + 8 * scale),
+    maxLife: Math.round(18 + 8 * scale),
+    size: Math.max(5, d.r * 0.34),
+    color,
+    lineWidth: 1.5 + scale
+  });
+  enforceParticleCap();
+  kickShake(2 + scale * 2.5);
+  state.fx.flash = Math.max(state.fx.flash, settingReducedFlash ? 0 : Math.round(2 + scale * 2));
+  if (typeof playGameSound === "function") playGameSound("enemy_destroy", 0.42 + scale * 0.28);
+}
+
 function updateExpansionHazards() {
   const p = state.player;
   for (let i = state.debris.length - 1; i >= 0; i--) {
@@ -224,6 +247,8 @@ function updateExpansionHazards() {
     d.x += d.vx || 0;
     d.y += d.vy || 0;
     d.rot = (d.rot || 0) + (d.vr || 0);
+    d.hitFlash = Math.max(0, Number(d.hitFlash || 0) - 1);
+    d.hitPulse = Math.max(0, Number(d.hitPulse || 0) - 0.14);
     d.life = (d.life || 600) - 1;
     if (d.armTimer > 0) {
       d.armTimer--;
@@ -237,10 +262,13 @@ function updateExpansionHazards() {
       )) {
         d.hp -= b.damage || 1;
         b.life = 0;
-        spawnParticles(b.x, b.y, 4, "#fff", 0.45);
+        d.hitFlash = 8;
+        d.hitPulse = 1;
+        spawnParticles(b.x, b.y, 6, "#fff", 0.52);
+        if (typeof playGameSound === "function") playGameSound("enemy_hit", 0.38);
         if (d.hp <= 0) {
           if (d.kind === "mine" || d.kind === "energy_mine") explodeHazard(d);
-          else spawnParticles(d.x, d.y, 16, d.color || "#999", 0.75);
+          else spawnAsteroidDestruction(d);
           d.dead = true;
           break;
         }
@@ -598,6 +626,7 @@ function handleExpansionBossSpecialHit(bullet, boss) {
       boss.bayOpen = 0;
       boss.attackTimer = Math.max(boss.attackTimer || 0, 72);
       addFlatScore(25);
+      recordTrustedRunEvent("bonus", { kind: "boss_bay" });
       spawnParticles(boss.x + off, bayY, 18, "#ffd47a", 0.75);
       applyBossHitFeedback(boss, boss.x + off, bayY);
       showMessage("BAY DISABLED", 50);

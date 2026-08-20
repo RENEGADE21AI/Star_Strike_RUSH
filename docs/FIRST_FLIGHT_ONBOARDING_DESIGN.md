@@ -76,7 +76,7 @@ Persisted fields:
 
 When onboarding state is absent, the game always asks exactly “Is this your
 first time here, pilot?” It does not inspect high score, runs, cumulative Glory,
-derived Prestige, Credits, achievements, or Codex discovery. Yes stores
+derived Prestige, achievements, or Codex discovery. Yes stores
 `in_progress` and opens the separate call-sign prelaunch briefing. No stores
 `skipped` and immediately reveals the ordinary title. In-progress players
 receive Resume Training, Restart Training, and Skip for Now. Completion and
@@ -155,9 +155,10 @@ optimized PNG and its single manifest entry; dialogue and onboarding logic
 remain unchanged.
 
 Transmission cards contain the speaker label, at most two short lines, and a
- restrained type reveal. First confirm reveals the complete text; second
-confirm advances. Enter, Space, pointer, and accessible DOM buttons are
-equivalent. Reduced Motion makes text immediate and removes scan motion.
+restrained self-typing reveal. Continue remains disabled until the current
+sentence has fully appeared; repeated Enter, Space, pointer, and assistive
+activation cannot reveal or advance it early. After completion those inputs are
+equivalent. Reduced Motion uses an immediate readable reveal and removes scan motion.
 Effects-enabled transmissions use short procedural radio chirps.
 
 Representative final copy:
@@ -256,7 +257,7 @@ return directly to title and do not reopen account setup.
 - no recent receipt is created;
 - `submitRunReceipt`, `joinWeeklyLeague`, and the retired
   `claimSeasonReward` compatibility endpoint are never called;
-- cumulative Glory, derived Prestige, Credits, lifetime statistics, account
+- cumulative Glory, derived Prestige, lifetime statistics, account
   archive, public records, and the 79 achievement IDs remain unchanged.
 
 The director snapshots progression-bearing storage on entry and exposes

@@ -11,7 +11,8 @@
 ## Global Constraints
 
 - Do not change cumulative Glory, Prestige, rank, milestone, reward, or combat semantics.
-- Preserve device-local preseason progression and all closed Firebase gates.
+- Preserve the configured account-or-device progression authority and Firebase
+  write gates; never infer a different live configuration from this old plan.
 - Respect Reduced Motion, Reduced Flash, Effects, and screen-shake settings.
 - Protect 375x667 mobile layout and keyboard focus visibility.
 

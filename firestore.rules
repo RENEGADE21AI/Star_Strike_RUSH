@@ -28,6 +28,14 @@ service cloud.firestore {
     }
 
     match /leaderboard_scores/{userId} {
+      // Historical archive only. Verified current records live in
+      // world_records and are written exclusively by trusted Functions.
+      allow get: if signedIn();
+      allow list: if signedIn() && request.query.limit <= 25;
+      allow create, update, delete: if false;
+    }
+
+    match /world_records/{userId} {
       allow get: if signedIn();
       allow list: if signedIn() && request.query.limit <= 25;
       allow create, update, delete: if false;
@@ -74,9 +82,23 @@ service cloud.firestore {
       }
     }
 
-    // Unverified preseason receipts are callable-only, idempotency records.
-    // They never carry or update device progression.
+    // Weekly score receipts are callable-only idempotency records. The server
+    // calculates their points from a one-time verified run session.
     match /weekly_run_receipts/{weekId}/members/{userId}/items/{receiptId} {
+      allow read, write: if false;
+    }
+
+    // Verification challenges, device-save bindings, and deletion deadlines
+    // are server internals. They must never be enumerated by browsers.
+    match /verified_run_sessions/{userId}/verified_sessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    match /device_progress_bindings/{bindingHash} {
+      allow read, write: if false;
+    }
+
+    match /account_deletion_requests/{userId} {
       allow read, write: if false;
     }
 

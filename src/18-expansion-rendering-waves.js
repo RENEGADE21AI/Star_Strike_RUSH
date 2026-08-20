@@ -197,7 +197,12 @@ function drawExpansionHazards() {
     ctx.translate(d.x, d.y);
     ctx.rotate(d.rot || 0);
     const spawnScale = d.spawnScale == null ? 1 : d.spawnScale;
-    if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, d.kind, 0, 0, { scale: spawnScale })) {
+    const hitScale = 1 + Math.min(0.08, Number(d.hitPulse || 0) * 0.065);
+    ctx.scale(hitScale, hitScale);
+    if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, d.kind, 0, 0, {
+      scale: spawnScale,
+      hitFlash: clamp(Number(d.hitFlash || 0) / 8, 0, 1)
+    })) {
       ctx.restore();
       continue;
     }

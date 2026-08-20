@@ -32,17 +32,21 @@ Live Firebase Hosting URL: `https://star-strike-rush.web.app`.
 Persistence:
 
 - Local high score, call sign, settings, and codex discoveries use localStorage.
-- Cumulative Glory, Credits, lifetime stats, and recent run receipts use
-  localStorage. Prestige and current-road Glory are always derived from total
-  Glory; they are not independently mutable balances.
+- Cumulative Glory, lifetime stats, and recent run receipts use localStorage.
+  Prestige and within-cycle Glory are always derived from total Glory; Credits
+  are not an active currency.
 - Firebase Auth supports Google sign-in.
-- Cloud Firestore stores account identity plus a legacy account archive. It is
-  not authoritative for device gameplay progression.
-- Cloud Functions operate an explicitly unverified weekly social board without
-  changing device progression. Dormant server progression math retains matching
-  Glory/Prestige semantics. The former Season reward endpoint is an inert stub.
-- The game remains playable signed out; account actions never replace device
-  progress.
+- Cloud Firestore stores private account progression, public game identity,
+  a server record archive, dormant Weekly League data, and a legacy archive.
+- When account and device saves differ, the pilot selects exactly one; it
+  replaces the other and no additive merge exists. A device binding prevents
+  copying one accumulated local save into multiple accounts. Sign-out clears
+  local gameplay progression.
+- Cloud Functions retain a fail-closed run-challenge design for future trusted
+  verification. Browser event ledgers are not authoritative, so public record,
+  league, and run-progression writes remain paused. Direct Firestore writes
+  remain denied. The former Season reward endpoint is an inert compatibility stub.
+- The game remains playable signed out and offline after assets load.
 
 Source layout:
 
@@ -123,22 +127,22 @@ start flow instead of a dashboard-style menu. Progression is mostly presented
 after the run, but the title screen should always make long-term identity and
 goals visible.
 
-### Permanent Glory and repeating Road
+### Permanent Glory and continuous Road
 
 Glory is one permanent cumulative value. It never resets, decreases, or gets
-spent when a Road is completed. The Glory Road is a repeating visual journey of
-exactly 300,000 Glory:
+spent when a 300,000-Glory loop is completed:
 
 - `prestige = floor(totalGlory / 300000)`
 - `roadGlory = totalGlory % 300000`
 
-Prestige is therefore the compressed record of completed Roads, not another
+Prestige is therefore the compressed record of completed loops, not another
 currency or a destructive reset transaction. At 300,200 total Glory the player
-is Prestige 1 with 200 Glory on the new Road; the stored total remains 300,200.
+is Prestige 1 with 200 Glory inside that rank cycle; the stored total remains
+300,200 and the Road continues forward from its absolute position.
 Prestige grants status only and never adds HP, damage, score multipliers, better
 abilities, powerup odds, or other combat advantages.
 
-Current Road ranks, based on `roadGlory`, are:
+Base-cycle ranks are:
 
 - 0: Rookie Pilot.
 - 1,000: Star Cadet.
@@ -151,42 +155,44 @@ Current Road ranks, based on `roadGlory`, are:
 - 175,000: Solar Legend.
 - 300,000: Star Eternal and Road completion.
 
-After the first completed Road, the player's displayed title carries the
-Prestige suffix: Ace, Ace I, Ace II, and so on. The terminal Star Eternal event
-belongs to the completed Road; immediately after rollover the current rank is
-derived from the remainder near the start of the next Road.
+After the first completed loop, the player's displayed title carries the next
+ordinal suffix: Ace, Ace II, Ace III, and so on. Therefore Ace II is at 315,000
+total Glory and Ace III is at 615,000. The terminal Star Eternal event belongs
+to the completed loop, but neither the saved total nor the visual route moves
+backward.
 
 Midpoint checkpoints repeat with the ranks in every Prestige cycle. Progression
-application—not rendering—translates each relative threshold into an absolute
+application—not rendering—translates each base threshold into an absolute
 cumulative threshold and emits ordered checkpoint, rank, or terminal Prestige
 events. A terminal event combines Star Eternal, Glory Road completion, and the
-new Prestige so the player never receives two redundant major ceremonies.
+new Prestige so the player never receives two redundant major ceremonies. Road
+nodes are generated around the absolute visible range, with no hard-coded
+Prestige ceiling; Prestige 50 and beyond follow the same math.
 
 ### Progression presentation
 
 - Score converts to Glory at 10:1 and adds to cumulative `totalGlory` exactly
-  once at normal Game Over. Credits and lifetime statistics continue to apply.
-- Tutorial and debug runs cannot award Glory, Prestige, Credits, milestones,
+  once at normal Game Over. Lifetime statistics continue to apply.
+- Tutorial and debug runs cannot award Glory, Prestige, milestones,
   achievements, or receipts.
 - Ordinary checkpoints receive short energy/chime celebrations. Named ranks use
   stronger rings, typography, and particles. Intensity grows with Road position.
 - The 300,000 terminal threshold receives the most substantial concise ceremony:
   Star Eternal, Glory Road Complete, the new Prestige, and explicit reassurance
-  that Glory endures while the Road begins again.
+  that Glory endures while the journey continues.
 - Celebrations run after progression is committed and before Game Over controls
   become interactive. They honor Reduced Motion, Reduced Flash, Screen Shake,
   and Effects settings.
-- Game Over shows Glory gained, Credits gained, the relevant next-rank or
-  Prestige context, and a single `VIEW ROAD` action. It never shows a Season
-  tier or Season XP.
+- Game Over shows Glory gained, the relevant next-rank or Prestige context, and
+  a single `VIEW ROAD` action. It has no Credit or Season summary.
 
 ### Glory Road screen
 
 Road opens one focused, long, winding vertical Glory journey. The player ship,
-reached nodes, rank, and auto-focus use the current modulo Road position. The
-header keeps total cumulative Glory and Prestige visible so rollover cannot be
-mistaken for lost progress. Tapping a node shows its current-Road threshold,
-reached/locked state, Prestige context, and absolute cumulative requirement.
+reached nodes, rank, and auto-focus use absolute cumulative thresholds. The
+header keeps total cumulative Glory and Prestige visible. Tapping a node shows
+its base-cycle threshold, reached/locked state, Prestige context, and absolute
+cumulative requirement.
 There are no tabs, reward cards, claim buttons, lanes, or temporary tiers.
 
 Title meta placement remains compact: Play is dominant; the upper strip shows
@@ -196,25 +202,27 @@ focused surfaces rather than a dashboard.
 
 ### Persistence and account boundary
 
-Local schema migration preserves cumulative Glory, Credits, lifetime stats,
+Local schema migration preserves cumulative Glory, lifetime stats,
 high score, achievements, Codex, settings, identity, onboarding, and historical
 receipt data. Obsolete Season XP/tier/claim fields are dropped from the active
 normalized schema without reversing rewards already reflected in balances and
 without replaying historical milestone ceremonies.
 
-Firebase remains account identity plus legacy archive during preseason.
-Sign-in, sign-out, refresh, and account switching never overwrite device Glory
-or derived Prestige. The online weekly board stores only server-owned
-enrollment, sanitized public identity, and an idempotent unverified best-run
-score. Dormant server progression uses the same cumulative Glory/Prestige math
-but remains closed.
+Firebase stores account progression separately from a signed-out device save.
+Sign-in with conflicting meaningful saves pauses at an explicit replacement
+choice; it never merges Glory or Prestige. Verified run sessions update the
+selected signed-in account, World Records, and Weekly League standings through
+server-owned transactions. The server ignores a caller score and calculates the
+accepted result from validated event evidence.
 `claimSeasonReward()` exists only as a retired compatibility callable that
 rejects before authentication, Firestore reads, or writes.
 
 The game must remain functional if Firebase is unavailable or the player is
-signed out. Firestore rules and callable-only writes protect scope but cannot
-prove browser gameplay; every weekly value is therefore labeled unverified and
-never treated as progression or a verified record.
+signed out. Firestore rules and callable-only writes protect scope. Receipt
+validation blocks arbitrary scores, replays, duplicate entities, invalid event
+kinds, impossible rates, and invalid phase timing; it is not equivalent to
+executing the complete game simulation on a trusted server. App Check remains
+prepared but unenforced.
 
 ## 6. Progression And Boss Rotation
 

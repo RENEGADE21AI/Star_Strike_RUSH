@@ -61,70 +61,96 @@ function roadMarkerPositionForGlory(layout, roadGloryValue) {
   return { x: last.dotX, y: last.dotY };
 }
 
-function makeGloryRoadNodes() {
+function roadRankDisplayName(rankName, prestigeCycle) {
+  const base = String(rankName || "Rank");
+  const cycle = Math.max(0, Math.floor(Number(prestigeCycle) || 0));
+  return cycle > 0 ? `${base} ${roadPrestigeNumeral(cycle + 1)}` : base;
+}
+
+function makeContinuousGloryRoadNodes(ranksValue, roadLengthValue, maxPrestigeCycleValue = 0) {
+  const ranks = Array.isArray(ranksValue) ? ranksValue : [];
+  const roadLength = Math.max(1, Math.floor(Number(roadLengthValue) || 1));
+  const maxPrestigeCycle = Math.max(0, Math.floor(Number(maxPrestigeCycleValue) || 0));
   const nodes = [];
-  for (let index = 0; index < GLORY_RANKS.length; index++) {
-    const rank = GLORY_RANKS[index];
-    nodes.push({
-      id: `glory_rank_${index}`,
-      type: rank.threshold === GLORY_ROAD_LENGTH ? "terminal" : "rank",
-      label: String(rank.name || "Rank").toUpperCase(),
-      sub: rank.threshold === GLORY_ROAD_LENGTH ? "ROAD COMPLETE" : `${formatRoadNumber(rank.threshold)} GLORY`,
-      threshold: rank.threshold,
-      major: index === 0 || index === GLORY_RANKS.length - 1 || index % 2 === 0,
-      detail: rank.threshold === GLORY_ROAD_LENGTH
-        ? "Complete this Road as Star Eternal and earn the next Prestige. Total Glory endures."
-        : `Current-loop rank at ${Number(rank.threshold).toLocaleString()} Glory.`,
-      reward: rank.threshold === GLORY_ROAD_LENGTH ? "Next Prestige Road" : `${rank.name} pilot title`
-    });
-    const next = GLORY_RANKS[index + 1];
-    if (next) {
-      const midway = Math.floor(rank.threshold + (next.threshold - rank.threshold) * 0.5);
+  for (let prestigeCycle = 0; prestigeCycle <= maxPrestigeCycle; prestigeCycle++) {
+    const cycleBase = prestigeCycle * roadLength;
+    for (let index = 0; index < ranks.length; index++) {
+      const rank = ranks[index];
+      const relativeThreshold = Math.max(0, Math.floor(Number(rank.threshold) || 0));
+      if (prestigeCycle > 0 && relativeThreshold === 0) continue;
+      const terminal = relativeThreshold === roadLength;
+      const threshold = cycleBase + relativeThreshold;
+      const rankDisplay = roadRankDisplayName(rank.name, prestigeCycle);
       nodes.push({
-        id: `glory_checkpoint_${index}`,
-        type: "checkpoint",
-        label: `${formatRoadNumber(midway)} GLORY`,
-        sub: "ROUTE CHECKPOINT",
-        threshold: midway,
-        major: false,
-        detail: `Checkpoint between ${rank.name} and ${next.name}.`,
-        reward: "Journey milestone"
+        id: `glory_rank_p${prestigeCycle}_${index}`,
+        type: terminal ? "terminal" : "rank",
+        label: rankDisplay.toUpperCase(),
+        sub: terminal ? `PRESTIGE ${roadPrestigeNumeral(prestigeCycle + 1)} EARNED` : `${formatRoadNumber(threshold)} TOTAL GLORY`,
+        threshold,
+        roadThreshold: relativeThreshold,
+        prestigeCycle,
+        major: index === 0 || terminal || index % 2 === 0,
+        detail: terminal
+          ? "Complete this Road as Star Eternal. Total Glory endures and the flightpath continues."
+          : `${rankDisplay} at ${Number(threshold).toLocaleString()} permanent total Glory.`,
+        reward: terminal ? `Prestige ${roadPrestigeNumeral(prestigeCycle + 1)}` : `${rankDisplay} pilot title`
       });
+      const next = ranks[index + 1];
+      if (next) {
+        const midway = Math.floor(relativeThreshold + (Number(next.threshold) - relativeThreshold) * 0.5);
+        const absoluteMidway = cycleBase + midway;
+        nodes.push({
+          id: `glory_checkpoint_p${prestigeCycle}_${index}`,
+          type: "checkpoint",
+          label: `${formatRoadNumber(absoluteMidway)} GLORY`,
+          sub: "ROUTE CHECKPOINT",
+          threshold: absoluteMidway,
+          roadThreshold: midway,
+          prestigeCycle,
+          major: false,
+          detail: `Checkpoint between ${roadRankDisplayName(rank.name, prestigeCycle)} and ${roadRankDisplayName(next.name, prestigeCycle)}.`,
+          reward: "Journey milestone"
+        });
+      }
     }
   }
   return nodes.sort((a, b) => a.threshold - b.threshold || (a.type === "checkpoint" ? -1 : 1));
 }
 
-function getProgressRoadContentHeight() {
-  const gloryStepCount = Math.max(1, makeGloryRoadNodes().length);
+function makeGloryRoadNodes(maxPrestigeCycle = 0) {
+  return makeContinuousGloryRoadNodes(GLORY_RANKS, GLORY_ROAD_LENGTH, maxPrestigeCycle);
+}
+
+function getProgressRoadContentHeight(metaValue) {
+  const meta = metaValue || (typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : {});
+  const gloryStepCount = Math.max(1, makeGloryRoadNodes(Math.max(1, Number(meta.prestige || 0) + 1)).length);
   return 72 + gloryStepCount * ROAD_GLORY_GAP;
 }
 
-function currentRoadIndexForThresholds(nodes, roadGloryValue) {
-  const roadGlory = Math.max(0, Math.min(GLORY_ROAD_LENGTH - 1, Math.floor(Number(roadGloryValue) || 0)));
+function currentRoadIndexForThresholds(nodes, totalGloryValue) {
+  const totalGlory = Math.max(0, Math.floor(Number(totalGloryValue) || 0));
   let index = 0;
   for (let i = 0; i < nodes.length; i++) {
-    if (roadGlory >= nodes[i].threshold && nodes[i].threshold < GLORY_ROAD_LENGTH) index = i;
+    if (totalGlory >= nodes[i].threshold) index = i;
   }
   return index;
 }
 
 function gloryNodeDetail(node, meta) {
-  const roadGlory = Math.max(0, Math.floor(meta.roadGlory || 0));
-  const prestige = Math.max(0, Math.floor(meta.prestige || 0));
-  const reached = node.threshold < GLORY_ROAD_LENGTH && roadGlory >= node.threshold;
-  const absoluteRequirement = prestige * GLORY_ROAD_LENGTH + node.threshold;
+  const totalGlory = Math.max(0, Math.floor(meta.totalGlory || 0));
+  const prestige = Math.max(0, Math.floor(node.prestigeCycle || 0));
+  const reached = totalGlory >= node.threshold;
   return {
     id: node.id,
     tab: "glory",
     title: node.label,
     subtitle: node.type === "checkpoint" ? "GLORY CHECKPOINT" : node.type === "terminal" ? "GLORY ROAD SUMMIT" : "GLORY RANK",
     status: reached ? "REACHED" : "LOCKED",
-    requirement: `${Number(node.threshold).toLocaleString()} / ${Number(GLORY_ROAD_LENGTH).toLocaleString()} current Road`,
+    requirement: `${Number(node.threshold).toLocaleString()} TOTAL GLORY`,
     reward: node.reward,
     detail: node.detail,
     progress: `${Number(meta.totalGlory || 0).toLocaleString()} total • ${meta.prestigeLabel || "PRESTIGE 0"}`,
-    absoluteRequirement,
+    absoluteRequirement: node.threshold,
     prestige
   };
 }
@@ -132,10 +158,10 @@ function gloryNodeDetail(node, meta) {
 function getProgressDetailById(id) {
   const meta = typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null;
   if (!meta) return null;
-  const node = makeGloryRoadNodes().find((item) => item.id === id);
+  const node = makeGloryRoadNodes(Math.max(1, Number(meta.prestige || 0) + 1)).find((item) => item.id === id);
   return node ? gloryNodeDetail(node, meta) : null;
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { formatRoadNumber, gloryRoadHeaderChips, roadMarkerPositionForGlory };
+  module.exports = { formatRoadNumber, gloryRoadHeaderChips, makeContinuousGloryRoadNodes, roadMarkerPositionForGlory };
 }

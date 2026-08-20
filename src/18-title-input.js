@@ -15,6 +15,34 @@ function resetProgressData() {
   encounterCard = null;
 }
 
+function replaceDeviceProgression(profile, achievementIds = [], codexIds = []) {
+  const selected = profile && typeof profile === "object" ? profile : {};
+  metaProgress = sanitizeStoredMetaProgress({
+    version: META_PROGRESS_SCHEMA_VERSION,
+    totalGlory: selected.totalGlory,
+    lifetime: selected.lifetime,
+    recentReceipts: [],
+    lastUpdatedAtMs: Date.now()
+  });
+  highScore = Math.max(0, Math.floor(Number(metaProgress.lifetime.bestScore) || 0));
+  previousHighScore = highScore;
+  highScoreDirty = true;
+  saveHighScore();
+  saveMetaProgress();
+  codexDiscovered = Object.fromEntries((Array.isArray(codexIds) ? codexIds : []).map((id) => [String(id), true]));
+  codexHasNew = false;
+  saveCodexDiscovered();
+  if (typeof replaceLocalAchievementArchive === "function") replaceLocalAchievementArchive(achievementIds);
+  lastRunMeta = null;
+  encounterQueue = [];
+  encounterCard = null;
+  return currentMetaSnapshot();
+}
+
+globalThis.resetProgressData = resetProgressData;
+globalThis.replaceDeviceProgression = replaceDeviceProgression;
+globalThis.getLocalCodexIds = () => Object.keys(codexDiscovered).filter((id) => codexDiscovered[id]);
+
 function titlePanelHit(x, y) {
   const panel = getTitlePanelRect();
   return titlePanelAnim > 0.02 && x >= panel.x && x <= panel.x + panel.w && y >= panel.y && y <= panel.y + panel.h;
@@ -190,6 +218,15 @@ function handleOnlinePanelPointerDown(x, y) {
   }
   if (accountPanelTab === "pilot" && hitRect(r.signIn, x, y)) { requestOnlineSignIn(); return true; }
   if (accountPanelTab === "pilot" && hitRect(r.signOut, x, y)) { requestOnlineSignOut(); return true; }
+  if (accountPanelTab === "pilot" && hitRect(r.deleteAccount, x, y)) {
+    const online = accountIdentitySnapshot();
+    if (online.accountDeletion) {
+      Promise.resolve(window.starStrikeOnline.cancelAccountDeletion()).catch(() => {});
+    } else {
+      deleteAccountConfirm = true;
+    }
+    return true;
+  }
   if (accountPanelTab === "settings" && hitRect(r.low, x, y)) { settingMaxParticles = 300; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.med, x, y)) { settingMaxParticles = 600; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
   if (accountPanelTab === "settings" && hitRect(r.high, x, y)) { settingMaxParticles = 900; MAX_PARTICLES = settingMaxParticles; saveSettings(); return true; }
@@ -214,6 +251,17 @@ function handleRecordsPanelPointerDown(x, y) {
   if (hitRect(r.closeRect, x, y)) { closeTitleMetaScreen(); return true; }
   if (hitRect(r.globalTab, x, y)) { recordsPanelTab = "global"; return true; }
   if (hitRect(r.weeklyTab, x, y)) { recordsPanelTab = "weekly"; return true; }
+  if (recordsPanelTab === "weekly" && (hitRect(r.leaguePrev, x, y) || hitRect(r.leagueNext, x, y))) {
+    const online = accountIdentitySnapshot();
+    const leagues = Array.isArray(online.weeklyLeagues) ? online.weeklyLeagues : [];
+    if (leagues.length && window.starStrikeOnline && typeof window.starStrikeOnline.selectWeeklyLeague === "function") {
+      const current = Math.max(0, leagues.findIndex((league) => league.id === online.selectedWeeklyLeagueId));
+      const direction = hitRect(r.leaguePrev, x, y) ? -1 : 1;
+      const next = (current + direction + leagues.length) % leagues.length;
+      window.starStrikeOnline.selectWeeklyLeague(leagues[next].id);
+    }
+    return true;
+  }
   if (recordsPanelTab === "weekly" && hitRect(r.joinLeague, x, y)) { requestWeeklyLeague(); return true; }
   return true;
 }
@@ -258,6 +306,24 @@ function handleOpenTitlePanelPointerDown(x, y, pointerId = null) {
 
 function handleTitlePointerDown(x, y, pointerId = null) {
   if (state.sceneTransition.mode !== "idle") return true;
+  if (deleteAccountConfirm) {
+    const r = getAccountDeletionConfirmRects();
+    if (hitRect(r.cancel, x, y)) { deleteAccountConfirm = false; return true; }
+    if (hitRect(r.confirm, x, y)) {
+      deleteAccountConfirm = false;
+      Promise.resolve(window.starStrikeOnline.requestAccountDeletion()).catch(() => {});
+      return true;
+    }
+    return true;
+  }
+  const online = accountIdentitySnapshot();
+  if (online.progressionChoice && online.progressionChoice.required) {
+    const r = getProgressionChoiceRects();
+    if (online.progressionChoice.status === "saving") return true;
+    if (hitRect(r.account, x, y)) { window.starStrikeOnline.chooseProgression("account").catch(() => {}); return true; }
+    if (hitRect(r.device, x, y)) { window.starStrikeOnline.chooseProgression("device").catch(() => {}); return true; }
+    return true;
+  }
   if (resetProgressConfirm) return handleResetProgressConfirmDown(x, y);
   if (titlePanelAnim > 0.02) return handleOpenTitlePanelPointerDown(x, y, pointerId);
 

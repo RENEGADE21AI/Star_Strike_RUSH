@@ -777,10 +777,16 @@ test("debug runs cannot persist records or progression across reload", { timeout
       return snapshot.gameState === "playing" && snapshot.input.gameplayControlEnabled === true;
     });
     const before = await debugSnapshot(page);
-    await page.evaluate(() => {
+    const immediateScore = await page.evaluate(() => {
       addScore(50000);
       saveMilestone();
       window.dispatchEvent(new Event("beforeunload"));
+      return state.score;
+    });
+    assert.ok(immediateScore >= 50000);
+    await page.waitForFunction(() => {
+      const node = document.querySelector("#debugSnapshot");
+      return !!node?.textContent && JSON.parse(node.textContent).score >= 50000;
     });
     const during = await debugSnapshot(page);
     assert.ok(during.score >= 50000);
@@ -846,7 +852,7 @@ test("Reset Local Data clears every progression store and preserves settings and
     assert.equal(reset.deviceProgress.totalGlory, 0);
     assert.equal(reset.deviceProgress.prestige, 0);
     assert.equal(reset.deviceProgress.roadGlory, 0);
-    assert.equal(reset.deviceProgress.credits, 0);
+    assert.equal("credits" in reset.deviceProgress, false);
     assert.equal(reset.deviceProgress.lifetime.runs, 0);
     assert.deepEqual(reset.localAchievements, []);
     const preserved = await page.evaluate(() => ({
@@ -915,14 +921,14 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
     });
     await page.waitForFunction(() => {
       const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
-      return snapshot.gameState === "playing"
-        && snapshot.player.hp === 1
-        && snapshot.ui.pauseNotice === "PAUSE NEEDS 1 SPARE HEALTH BAR";
+      return snapshot.gameState === "gameover"
+        && snapshot.player.hp === 0
+        && snapshot.ui.pauseNotice === "PAUSE COST: 1 HEALTH BAR";
     });
     const refused = await debugSnapshot(page);
-    assert.equal(refused.gameState, "playing");
-    assert.equal(refused.player.hp, 1);
-    assert.equal(refused.ui.pauseNotice, "PAUSE NEEDS 1 SPARE HEALTH BAR");
+    assert.equal(refused.gameState, "gameover");
+    assert.equal(refused.player.hp, 0);
+    assert.equal(refused.ui.pauseNotice, "PAUSE COST: 1 HEALTH BAR");
 
     const automatic = await page.evaluate(() => {
       state.player.hp = 3;
@@ -951,8 +957,8 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
       };
     });
     assert.equal(automatic.game.gameState, "paused");
-    assert.equal(automatic.game.player.hp, 3, "automatic lifecycle pauses must not deduct health");
-    assert.equal(automatic.game.ui.pauseNotice, "AUTO-PAUSED: NO HEALTH COST");
+    assert.equal(automatic.game.player.hp, 2, "one lifecycle interruption must deduct exactly one Health");
+    assert.equal(automatic.game.ui.pauseNotice, "AUTO-PAUSE COST: 1 HEALTH BAR");
     assert.equal(automatic.music.hidden, true);
     assert.equal(automatic.music.tracks.gameplay.paused, true);
     assert.equal(automatic.music.tracks.gameplay.volume, 0.17, "hiding pauses immediately without mutating the saved mix level");
@@ -974,8 +980,8 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
       document.dispatchEvent(new Event("visibilitychange"));
       return { hp: state.player.hp, gameState: state.gameState };
     });
-    assert.equal(lethalAutomatic.hp, 1, "automatic pause must remain safe at one health");
-    assert.equal(lethalAutomatic.gameState, "paused", "automatic pause must pause rather than end the run");
+    assert.equal(lethalAutomatic.hp, 0, "automatic pause uses the same one-Health cost at one remaining Health");
+    assert.equal(lethalAutomatic.gameState, "gameover", "a lethal automatic pause ends the standard run deterministically");
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

@@ -43,13 +43,16 @@ test("release tooling separates backend staging from approval-gated production H
 test("release smoke verifies SHA, authority, cache, headers, private 404s, and callable modes", () => {
   assert.match(smokeScript, /release\.commitSha, expectedCommit/);
   assert.match(smokeScript, /backend commit SHA differs/);
-  assert.match(smokeScript, /device_local_preseason/);
-  assert.match(smokeScript, /competitionMode, "preseason_unverified"/);
+  assert.match(smokeScript, /explicit_account_or_device/);
+  assert.match(smokeScript, /competitionMode, "paused_pending_authoritative_verifier"/);
   assert.match(smokeScript, /cache-control/);
   assert.match(smokeScript, /content-security-policy/);
   assert.match(smokeScript, /requirePrivate404\("\/firestore\.rules"\)/);
-  assert.match(smokeScript, /requireCallableError\("submitRunReceipt", "UNAUTHENTICATED"/);
-  assert.match(smokeScript, /requireCallableError\("joinWeeklyLeague", "UNAUTHENTICATED"/);
+  assert.match(smokeScript, /"startVerifiedRun"/);
+  assert.match(smokeScript, /"submitRunReceipt"/);
+  assert.match(smokeScript, /"listWeeklyLeagues"/);
+  assert.match(smokeScript, /"joinWeeklyLeague"/);
+  assert.match(smokeScript, /"requestAccountDeletion"/);
   assert.match(smokeScript, /requireCallableError\("claimSeasonReward", "FAILED_PRECONDITION"/);
 });
 

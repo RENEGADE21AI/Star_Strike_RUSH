@@ -84,7 +84,7 @@ function test(name, fn) {
   }
 }
 
-test("local meta migration preserves cumulative Glory, Credits, and lifetime while retiring Season state", () => {
+test("local meta migration preserves cumulative Glory and lifetime while retiring Credits and Season state", () => {
   const context = loadGameContext();
   const result = runInGame(context, `
     const migrated = sanitizeStoredMetaProgress({
@@ -99,9 +99,9 @@ test("local meta migration preserves cumulative Glory, Credits, and lifetime whi
   `);
   const data = JSON.parse(result);
 
-  assert.equal(data.migrated.version, 2);
+  assert.equal(data.migrated.version, 3);
   assert.equal(data.migrated.totalGlory, 600123);
-  assert.equal(data.migrated.credits, 876);
+  assert.equal("credits" in data.migrated, false);
   assert.equal(data.migrated.lifetime.runs, 9);
   assert.equal(data.migrated.lifetime.bestScore, 7000);
   assert.equal(data.keys.includes("currentSeason"), false);
@@ -123,12 +123,12 @@ test("local meta migration is idempotent and derives Prestige without storing a 
   assert.equal(data.snapshot.prestige, 3);
   assert.equal(data.snapshot.roadGlory, 25000);
   assert.equal(data.snapshot.gloryRank, "Ace");
-  assert.equal(data.snapshot.gloryRankDisplay, "Ace III");
+  assert.equal(data.snapshot.gloryRankDisplay, "Ace IV");
   assert.equal("prestige" in data.second, false);
   assert.equal("roadGlory" in data.second, false);
 });
 
-test("legacy saves below, at, and above the Road boundary preserve total Glory exactly", () => {
+test("legacy saves below, at, and above the Road boundary preserve total Glory exactly and retire Credits", () => {
   const context = loadGameContext();
   const result = runInGame(context, `
     JSON.stringify([299999, 300000, 600123].map((totalGlory) => {
@@ -148,7 +148,7 @@ test("legacy saves below, at, and above the Road boundary preserve total Glory e
   assert.deepEqual(data.map((entry) => entry.snapshot.prestige), [0, 1, 2]);
   assert.deepEqual(data.map((entry) => entry.snapshot.roadGlory), [299999, 0, 123]);
   for (const entry of data) {
-    assert.equal(entry.migrated.credits, 77);
+    assert.equal("credits" in entry.migrated, false);
     assert.equal(entry.migrated.lifetime.runs, 4);
     assert.equal("prestige" in entry.migrated, false);
     assert.equal("roadGlory" in entry.migrated, false);

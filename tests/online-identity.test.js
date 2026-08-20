@@ -45,7 +45,7 @@ function loadHydrationContract(overrides = {}) {
       readAccountIdentityState: () => ({ pending: false, desiredCallSign: "" })
     },
     isHydrationCurrent: () => true,
-    subscribeLegacyArchive: () => {},
+    subscribeWorldRecords: () => {},
     loadWeeklyLeague: async () => ({ ok: false, reason: "disabled" }),
     setStatus: () => {},
     setError: () => {},
@@ -91,7 +91,7 @@ test("sign-out clears every account-scoped identity field without touching guest
   assert.equal(online.leaderboard.length, 0);
   assert.equal(online.identityService, "signed_out");
   assert.equal(online.accountArchive, "not_loaded");
-  assert.equal(online.progressionMode, "device_local_preseason");
+  assert.equal(online.progressionMode, "explicit_account_or_device");
   assert.equal(online.competitionMode, "paused");
   assert.equal(online.networkState, "online");
   assert.equal(online.pendingCallSign, false);
@@ -191,7 +191,7 @@ test("forced refreshes coalesce with an in-flight UID hydration and refresh agai
       syncCalls++;
       return new Promise((resolve) => pendingResolvers.push(resolve));
     },
-    subscribeLegacyArchive: () => { listenerCalls++; }
+    subscribeWorldRecords: () => { listenerCalls++; }
   });
   const user = { uid: "account-a" };
 
@@ -228,7 +228,7 @@ test("an auth generation change releases a stale UID promise without letting it 
       return new Promise((resolve) => pendingResolvers.push({ generation, resolve }));
     },
     isHydrationCurrent: (_uid, generation) => generation === context.authGeneration,
-    subscribeLegacyArchive: () => { listenerCalls++; }
+    subscribeWorldRecords: () => { listenerCalls++; }
   });
   const accountA = { uid: "account-a" };
 

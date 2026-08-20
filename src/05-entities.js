@@ -116,16 +116,34 @@ function firePlayer() {
   const cooldown = p.rapid > 0 ? 10 : 14;
   if (p.fire > 0) return;
   const kind = getPlayerShotKind();
-  const tipX = p.x, tipY = p.y - 16;
+  const playerSprite = typeof spriteMeta === "function" ? spriteMeta("player") : null;
+  const origin = playerSprite && playerSprite.projectileOrigin ? playerSprite.projectileOrigin : { offsetX: 0, offsetY: -20 };
+  const tipX = p.x + origin.offsetX, tipY = p.y + origin.offsetY;
   const pierce = p.piercing > 0 ? 1 : 0;
   if (p.spread > 0) {
-    const spreadY = p.y - 15.7;
-    state.bullets.push({ x: p.x - 11, y: spreadY, vx: -2.3, vy: -8.6, life: 90, r: 3, kind, realm: state.playerRealm, damage: 0.75 });
-    state.bullets.push({ x: p.x, y: spreadY, vx: 0, vy: -9.0, life: 90, r: 3, kind, realm: state.playerRealm, damage: 1, pierce });
-    state.bullets.push({ x: p.x + 11, y: spreadY, vx: 2.3, vy: -8.6, life: 90, r: 3, kind, realm: state.playerRealm, damage: 0.75 });
+    const mounts = playerSprite && Array.isArray(playerSprite.spreadProjectileOrigins)
+      ? playerSprite.spreadProjectileOrigins
+      : [{ offsetX: -10, offsetY: -13 }, origin, { offsetX: 10, offsetY: -13 }];
+    const velocities = [{ vx: -2.3, vy: -8.6 }, { vx: 0, vy: -9 }, { vx: 2.3, vy: -8.6 }];
+    for (let index = 0; index < 3; index++) {
+      const mount = mounts[index] || origin;
+      const velocity = velocities[index];
+      state.bullets.push({
+        x: p.x + Number(mount.offsetX || 0),
+        y: p.y + Number(mount.offsetY || 0),
+        vx: velocity.vx,
+        vy: velocity.vy,
+        life: 90,
+        r: 3,
+        kind,
+        realm: state.playerRealm,
+        damage: index === 1 ? 1 : 0.75,
+        pierce: index === 1 ? pierce : 0
+      });
+    }
     state.difficulty.shotsFired += 3;
   } else {
-    state.bullets.push({ x: p.x, y: p.y - 16, vx: 0, vy: -9.0, life: 90, r: 3, kind, realm: state.playerRealm, damage: 1, pierce });
+    state.bullets.push({ x: tipX, y: tipY, vx: 0, vy: -9.0, life: 90, r: 3, kind, realm: state.playerRealm, damage: 1, pierce });
     state.difficulty.shotsFired += 1;
   }
   if (p.rapid > 0) spawnRapidFireMuzzleParticles(tipX, tipY);
@@ -137,8 +155,43 @@ function updateWingmen() {
   const p = state.player;
   for (let i = state.wingmen.length - 1; i >= 0; i--) {
     const w = state.wingmen[i];
-    w.timer--; w.fire--;
+    w.fire--;
+    w.hitFlash = Math.max(0, Number(w.hitFlash || 0) - 1);
     const target = wingmanFormationTarget(p, w.side);
+    if (w.phase === "arriving") {
+      w.arrivalElapsed = Math.min(w.arrivalDuration, Number(w.arrivalElapsed || 0) + 1);
+      const progress = clamp(w.arrivalElapsed / Math.max(1, w.arrivalDuration || 34), 0, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      w.x = Number(w.arrivalFromX) + (target.x - Number(w.arrivalFromX)) * eased;
+      w.y = Number(w.arrivalFromY) + (target.y - Number(w.arrivalFromY)) * eased;
+      w.rotation = 0;
+      if (progress >= 1) {
+        w.phase = "active";
+        w.x = target.x;
+        w.y = target.y;
+        w.fire = 10;
+      }
+      continue;
+    }
+    if (w.phase === "departing") {
+      const targetRotation = w.side < 0 ? -Math.PI : Math.PI;
+      const delta = wrapGameplayAngle(targetRotation - Number(w.rotation || 0));
+      w.rotation = wrapGameplayAngle(Number(w.rotation || 0) + clamp(delta, -0.18, 0.18));
+      const speed = 8.4;
+      w.x += Math.sin(w.rotation) * speed;
+      w.y -= Math.cos(w.rotation) * speed;
+      const playerDx = w.x - p.x;
+      const playerDy = w.y - p.y;
+      const playerDistance = Math.max(0.001, Math.hypot(playerDx, playerDy));
+      if (playerDistance < WINGMAN_MIN_PLAYER_DISTANCE + 8) {
+        const correction = WINGMAN_MIN_PLAYER_DISTANCE + 8 - playerDistance;
+        w.x += playerDx / playerDistance * correction;
+        w.y += playerDy / playerDistance * correction;
+      }
+      if (w.y > H + 54 || w.x < -54 || w.x > W + 54) state.wingmen.splice(i, 1);
+      continue;
+    }
+    w.timer--;
     w.x += (target.x - w.x) * 0.22;
     w.y += (target.y - w.y) * 0.22;
     const dx = w.x - p.x;
@@ -154,7 +207,12 @@ function updateWingmen() {
         w.y = target.y;
       }
     }
-    if (w.timer <= 0) { state.wingmen.splice(i, 1); continue; }
+    if (w.timer <= 0) {
+      w.phase = "departing";
+      w.rotation = 0;
+      w.fire = 99999;
+      continue;
+    }
     fireWingman(w);
   }
 }

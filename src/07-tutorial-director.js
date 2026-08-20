@@ -215,15 +215,20 @@ function tutorialObjectiveComplete(director, runtime = {}) {
   return false;
 }
 
+function tutorialTransmissionCanAdvance(dialogueReveal) {
+  return Number(dialogueReveal) >= 1;
+}
+
 function tutorialReachedSide(playerX, laneX, side) {
   return side === "left" ? Number(playerX) < Number(laneX) : Number(playerX) > Number(laneX);
 }
 
 function tutorialEvasionSucceeded(runtime = {}) {
-  return runtime.volleyActive === true &&
-    tutorialReachedSide(runtime.startX, runtime.laneX, runtime.startSide) &&
+  return Number(runtime.practiceFrames) >= 300 &&
+    Number(runtime.volleysCleared) >= 3 &&
+    Number(runtime.travelDistance) >= 120 &&
     Number(runtime.damageTakenCurrent) === Number(runtime.damageTakenStart) &&
-    tutorialReachedSide(runtime.playerX, runtime.laneX, runtime.targetSide);
+    runtime.emitterAlive === true;
 }
 
 function tutorialGhostLaneSucceeded(runtime = {}) {
@@ -291,6 +296,7 @@ Object.assign(globalThis, {
   tutorialTransitPosition,
   tutorialPickupPosition,
   tutorialEvasionSucceeded,
+  tutorialTransmissionCanAdvance,
   tutorialGhostLaneSucceeded,
   applyTutorialBossOverride,
   recoverTutorialRuntime,

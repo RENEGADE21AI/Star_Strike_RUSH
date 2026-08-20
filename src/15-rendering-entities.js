@@ -3,10 +3,13 @@ function drawWingmen() {
   for (const w of state.wingmen) {
     if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "wingman", w.x, w.y, {
       alpha,
+      rotation: Number(w.rotation || 0),
+      hitFlash: clamp(Number(w.hitFlash || 0) / 8, 0, 1),
       filter: state.player && state.player.ghostTimer > 0 ? "hue-rotate(22deg) saturate(1.35)" : ""
     })) continue;
     ctx.save();
     ctx.translate(w.x, w.y);
+    ctx.rotate(Number(w.rotation || 0));
     ctx.globalAlpha = alpha;
     if (state.player && state.player.ghostTimer > 0) { ctx.shadowColor = "rgba(100,255,255,0.8)"; ctx.shadowBlur = 10; }
     ctx.save();

@@ -48,7 +48,7 @@ test("Codex detail places the encounter graphic below its title and all data bel
 
 test("Flight Network connected status is fitted to the card's measured text lane", () => {
   const source = fs.readFileSync(path.join(repoRoot, "src", "12-rendering-title-panels.js"), "utf8");
-  assert.match(source, /fitCondensedCanvasFont\("ACCOUNT CONNECTED"/);
+  assert.match(source, /fitCondensedCanvasFont\(networkStatus/);
   assert.match(source, /networkTextMaxWidth/);
 });
 
@@ -115,16 +115,14 @@ test("settings and destructive actions use distinct, truthful controls", () => {
   assert.ok(layout.reset.y + layout.reset.h < layout.panel.y + layout.panel.h, "Reset must remain inside the panel");
 });
 
-test("Records separates this device's best from the unverified public archive", () => {
+test("Records separates device best from the server archive and paused competition", () => {
   const source = fs.readFileSync(path.join(repoRoot, "src", "12-rendering-title-panels.js"), "utf8");
   assert.match(source, /DEVICE RECORD • THIS DEVICE/);
-  assert.match(source, /LEGACY\/PRESEASON ARCHIVE • UNVERIFIED/);
-  assert.match(source, /PUBLIC ARCHIVE WRITES PAUSED/);
-  assert.match(source, /DEVICE PROGRESS ACTIVE • PUBLIC WRITES PAUSED/);
-  assert.match(source, /PRESEASON WEEKLY BOARD/);
-  assert.match(source, /UNVERIFIED FLIGHT POINTS/);
-  assert.doesNotMatch(source, /CONNECT TO PUBLISH RECORDS/);
-  assert.doesNotMatch(source, /PRIOR BEST SCORE SETS YOUR DIVISION/);
+  assert.match(source, /PUBLIC RECORD WRITES PAUSED/);
+  assert.match(source, /SERVER-ACCEPTED ARCHIVE • PHASE/);
+  assert.match(source, /WEEKLY LEAGUES/);
+  assert.match(source, /AUTHORITATIVE FLIGHT POINTS/);
+  assert.doesNotMatch(source, /PRESEASON|UNVERIFIED FLIGHT POINTS/);
 });
 
 test("visual QA covers the full player journey and polished terminal states", () => {

@@ -69,7 +69,7 @@ function drawControls() {
   ctx.fillText(label, actCx, actCy - 1);
   ctx.font = "800 7px Arial, sans-serif";
   ctx.fillStyle = visuallyReady ? "rgba(220,255,241,0.72)" : "rgba(225,238,245,0.42)";
-  ctx.fillText(controlEnabled ? (ready || wraith ? "READY" : `${Math.ceil(profile.cost)} ENERGY`) : "LOCKED", actCx, actCy + 13);
+  ctx.fillText(controlEnabled ? (ready || wraith ? "READY" : `${Math.ceil(profile.cost)} CHARGE`) : "LOCKED", actCx, actCy + 13);
   ctx.restore();
 }
 function drawDesktopControlHint() {
@@ -77,12 +77,13 @@ function drawDesktopControlHint() {
     state.inputMode === "touch" ||
     state.inputMode === "pen" ||
     state.gameState !== "playing" ||
-    state.inputHintTimer <= 0 ||
+    state.inputHintAcknowledged === true ||
+    state.inputHintTimer < 180 ||
     (typeof currentGameplayControlEnabled === "function" && !currentGameplayControlEnabled())
   ) return;
   const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
   const text = `MOVE  WASD / ARROWS    ${profile.label}  SPACE / SHIFT`;
-  const fade = clamp(state.inputHintTimer / 42, 0, 1);
+  const fade = clamp((state.inputHintTimer - 180) / 42, 0, 1);
   ctx.save();
   ctx.globalAlpha = fade;
   ctx.font = "900 9px 'Arial Narrow', Arial, sans-serif";
@@ -102,7 +103,7 @@ function getGameplayHudLayout() {
   const touchLike = state.inputMode === "touch" || state.inputMode === "pen";
   const energyY = touchLike ? H - 214 : H - 78;
   return {
-    pause: { x: 10, y: 10, w: 44, h: 28 },
+    pause: { x: 10, y: 10, w: 34, h: 34 },
     status: { x: 8, y: energyY - 17, w: 112, h: 56 },
     energy: { x: 18, y: energyY + 3, w: 92, h: 6 },
     health: { x: 18, y: energyY + 25, w: 92, h: 8, orientation: "horizontal" },
@@ -142,7 +143,7 @@ function drawLeftStatusHUD() {
   ctx.textAlign = "left";
   ctx.textBaseline = "bottom";
   ctx.fillStyle = "rgba(203,231,242,0.62)";
-  ctx.fillText("ENERGY", energy.x, energy.y - 3);
+  ctx.fillText(actionProfile.label, energy.x, energy.y - 3);
   ctx.textAlign = "right";
   ctx.fillStyle = enough ? "rgba(127,255,199,0.92)" : "rgba(255,183,120,0.86)";
   ctx.fillText(`${Math.round(p.energy)}${enough ? "  READY" : ""}`, energy.x + energy.w, energy.y - 3);
@@ -163,7 +164,7 @@ function drawLeftStatusHUD() {
   ctx.textBaseline = "top";
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(235,245,255,0.60)";
-  ctx.fillText("HULL", health.x, health.y - 9);
+  ctx.fillText("HEALTH", health.x, health.y - 9);
   ctx.textAlign = "right";
   ctx.fillStyle = p.hp <= 1 ? "#ff8a92" : "rgba(235,245,255,0.54)";
   ctx.fillText(`${p.hp} / ${segments}`, health.x + health.w, health.y - 9);
@@ -369,20 +370,20 @@ function drawPauseButton() {
   fill.addColorStop(0, "rgba(16,32,48,0.78)");
   fill.addColorStop(1, "rgba(3,9,20,0.64)");
   ctx.fillStyle = fill;
-  ctx.strokeStyle = "rgba(180,235,255,0.34)";
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = "rgba(225,247,255,0.82)";
-  ctx.fillRect(r.x + 8, r.y + 7, 3, 12);
-  ctx.fillRect(r.x + 15, r.y + 7, 3, 12);
-  ctx.font = "900 7px 'Arial Narrow', Arial, sans-serif";
-  ctx.textAlign = "right";
-  ctx.textBaseline = "middle";
   const trainingFree = state.runMode === "tutorial";
+  ctx.strokeStyle = trainingFree ? "rgba(126,240,210,0.54)" : "rgba(255,86,102,0.82)";
+  ctx.lineWidth = trainingFree ? 1 : 1.5;
+  ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 9); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "rgba(225,247,255,0.82)";
+  ctx.fillRect(r.x + 12, r.y + 10, 3, 14);
+  ctx.fillRect(r.x + 19, r.y + 10, 3, 14);
+  ctx.font = "800 7px 'Arial Narrow', Arial, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "top";
   ctx.fillStyle = trainingFree
     ? "rgba(126,240,210,0.78)"
     : state.player && state.player.hp > 1 ? "rgba(255,126,136,0.88)" : "rgba(190,205,215,0.42)";
-  ctx.fillText(trainingFree ? "FREE" : "-1", r.x + r.w - 4, r.y + r.h / 2);
+  ctx.fillText(trainingFree ? "0" : "-1", r.x + r.w - 3, r.y + 2);
   ctx.restore();
 }
 function drawPauseOverlay() {

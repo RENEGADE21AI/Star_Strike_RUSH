@@ -1,199 +1,147 @@
 # Star Strike RUSH Firebase Data Model
 
 Firebase project: `star-strike-rush`
-Firestore database: `(default)`, Standard edition, `nam5 (United States)`
-Firebase Hosting live URL: `https://star-strike-rush.web.app`
 
-The game uses Firebase Auth for Google account identity, Cloud Firestore for
-identity plus a preserved legacy account archive, and Cloud Functions for
-privileged identity mutations. Gameplay progression remains authoritative on
-the device. Browser writes are denied.
+Firestore database: `(default)`, Standard edition, `nam5`
 
-Client and server competition writes are enabled only for the explicitly
-unverified preseason weekly board. Server progression writes and verified run
-sessions remain disabled. Profile identity sync, handle claims, weekly
-enrollment, and idempotent weekly best-run receipts may operate when Firebase is
-configured. Weekly receipts cannot mutate Glory, Prestige, Credits, lifetime
-stats, achievements, public verified fields, or the legacy archive. The former
-Season reward callable remains a retired, zero-access compatibility stub.
+Hosting: `https://star-strike-rush.web.app`
 
-Firebase web config is loaded at runtime. Real API keys must not be committed to
-the repository. Local development can use ignored `src/firebase-config.local.json`
-copied from `src/firebase-config.example.json`; deployed Firebase Hosting can use
-the reserved `/__/firebase/init.json` endpoint. Rotated browser keys should be
-restricted in Google Cloud by HTTP referrer and API.
+Firebase Auth owns Google sign-in. Firestore stores private account progression,
+public game identity, a server record archive, dormant Weekly League data, and
+historical archives. Cloud Functions own every mutation. Browser writes are
+denied. New public record, league, and run-progression writes are fail-closed.
 
-Current live browser API key posture:
+The active authority is `explicit_account_or_device`: when both account and
+device contain different meaningful progression, the player selects exactly one
+snapshot. Replacement is never additive. A one-way device binding prevents the
+same device save from being assigned to several accounts, and sign-out clears
+the device's gameplay progression.
 
-- The key string is not stored in this repository.
-- The Firebase Hosting app reads config from `/__/firebase/init.json`.
-- The key is API-restricted to Firebase-related services.
-- The key is browser-restricted to the Firebase Hosting domains and local
-  development origins.
+Firebase browser configuration is loaded from Hosting's reserved
+`/__/firebase/init.json`; ignored local configuration is supported for
+development. Credentials, service-account keys, and tokens must never be
+committed.
 
-## Collections
+## Identity and progression
 
 ### `players_private/{uid}`
 
-Owner-only legacy account archive. It is not queryable and is never merged into
-device progression. Historical progression-shaped fields are preserved for
-archive display and migration analysis only. Provider email, name, and avatar
-fields are deleted by the identity callable.
+Owner-readable account progression. Server writes include cumulative Glory,
+derived Prestige/current Road position, lifetime statistics, best score/phase,
+Codex IDs, and timestamps. Credits and Season-shaped active fields are not
+written. Provider email, display name, and avatar are deleted on identity
+hydration.
 
 ### `players_public/{uid}`
 
-Authenticated players can read bounded public player profiles. Browser writes
-are denied. Public identity is deliberately game-only: provider names, emails,
-avatars, authentication fields, and redundant UID fields are removed.
+Authenticated, bounded public reads; no browser writes.
 
-- `publicPilotId`: opaque deterministic public game identifier.
-- `callSign`: account call sign confirmed by the server.
-- `handle`: normalized unique account-bound public handle.
-- `legacyBestScore`, `legacyPhase`: preserved unverified archive values.
-- `verifiedBestScore`, `verifiedPhase`: reserved for future verified run
-  sessions; never derived from legacy fields.
-- `recordTrust`: `legacy_unverified`, `no_record`, or a future
+- `publicPilotId`: opaque public game identifier, not Firebase UID.
+- `callSign`: validated server-confirmed public call sign.
+- `handle`: unique, normalized, changeable public identifier.
+- `legacyBestScore`, `legacyPhase`: explicitly unverified archive values.
+- `verifiedBestScore`, `verifiedPhase`: accepted run-session maxima only.
+- `recordTrust`: `legacy_unverified`, `no_record`, or
   `verified_run_session`.
-- `achievementArchiveCount`: sanitized aggregate archive count.
-- `createdAt`
-- `updatedAt`
+- `achievementArchiveCount`, `createdAt`, `updatedAt`.
 
-`syncPilotProfile` migrates this document on touch. It first preserves maximum
-legacy score/phase values from the old public document and
-`leaderboard_scores`, then deletes `uid`, `bestScore`, `phase`, `glory`,
-`gloryRank`, `gloryRankIndex`, `seasonTier`, and `achievementsCount`. The Admin
-cleanup script is dry-run by default and idempotent.
+`syncPilotProfile` migrates old public fields on touch, preserves maximum legacy
+values before deleting ambiguous names, and never promotes a legacy score into
+a verified field.
+
+### `device_progress_bindings/{bindingHash}`
+
+Server-only ownership binding for a local save identity. Once assigned, the
+same binding cannot be assigned to another UID. The raw device seed is not
+stored; the document key and stored value use its SHA-256 digest.
+
+### `account_deletion_requests/{uid}`
+
+Server-only 72-hour deletion deadline. `requestAccountDeletion` creates it;
+`cancelAccountDeletion` removes it before the deadline; the scheduled Admin
+purge deletes account Auth and associated Firestore data after expiry.
+
+## Dormant records and run sessions
+
+### `verified_run_sessions/{uid}/verified_sessions/{sessionId}`
+
+Future one-time server-issued challenge with start/expiry timestamps and
+submitted status. It is never browser-readable. The active gate rejects before
+auth or Firestore work. If an authoritative verifier is later implemented, a submission must match the challenge,
+remain within time and size bounds, use contiguous sequence numbers and
+monotonic ticks, contain only allowed event kinds, avoid duplicate entity IDs,
+respect event-rate ceilings, and report ordered time-bounded phase events.
+
+The dormant server calculates score and run facts from an event ledger, but a
+completed security review proved browser-authored events alone can be forged.
+It must not be enabled until trusted server replay establishes the outcomes.
+
+### `run_receipts/{uid}/items/{sessionId}`
+
+Owner-readable accepted receipt history. It stores the server-calculated score,
+phase, duration, public pilot ID, trust marker, and timestamp. It contains no
+retired Credits field.
+
+### `world_records/{uid}`
+
+Authenticated bounded reads; server-only writes. Existing entries remain an
+archive containing public pilot ID, call sign, handle, prior accepted best
+score/phase, trust marker, and timestamps. New writes are paused.
 
 ### `leaderboard_scores/{uid}`
 
-This collection is a **LEGACY/PRESEASON ARCHIVE**, not a live leaderboard or
-verified progression source. Authenticated reads are limited to queries with
-`limit <= 25`; browser writes and new run writes are disabled. Existing
-documents remain in place.
+Read-only **LEGACY ARCHIVE**. Historical data remains in place and is never used
+to construct verified score or account progression.
 
-### `run_receipts/{uid}/items/{receiptId}`
+## Weekly Leagues
 
-Owner-only historical progression receipt archive. Browser writes are denied.
-New progression receipts remain paused while server progression writes are
-disabled. Dormant
-receipt fields include:
+- `weekly_leagues/{leagueId}`: server-owned weekly division/capacity metadata.
+- `weekly_leagues/{leagueId}/members/{uid}`: server-only standings row.
+- `weekly_enrollments/{weekId_uid}`: server-only membership pointer.
+- `weekly_run_receipts/{weekId}/members/{uid}/items/{sessionId}`: server-only
+  idempotency receipt.
 
-- score
-- phase reached
-- run duration
-- enemies killed
-- bosses killed
-- powerups collected
-- ghost uses
-- damage taken
-- highest combo
-- Glory gained
-- Credits earned
-- cumulative Glory, derived Prestige, and current-road Glory after the run
-- client version
-- submitted server timestamp
+The data model and sanitized responses are retained, but both list/join and
+scoring are fail-closed while authoritative run verification is unavailable.
+Firebase UID is never returned in a public member payload.
 
-The active `submitRunReceipt()` does not write this collection. It writes only
-the separate unverified weekly idempotency record described below.
+## Handles
 
-### `season_reward_claims/{uid}/items/{rewardId}`
+`handle_registry/{handle}` is server-only. Handle changes run in a transaction:
+the requested handle must be free or already owned by the caller, the public
+identity/record/league row is updated, and the caller's previous registry entry
+is deleted. Two accounts cannot own the same normalized handle.
 
-Retired owner historical reward-claim archive. Browser writes are denied and no
-new claims exist. Historical documents may record:
+## Achievements and historical archives
 
-- reward id
-- reward type
-- amount
-- tier
-- lane
-- claimed server timestamp
+- `player_achievement_state/{uid}`: server-only aggregate returned in sanitized
+  form by `syncPilotProfile`.
+- `player_achievements/{uid}/items/{achievementId}`: owner-readable history;
+  server-only writes preserve original timestamps.
+- `season_reward_claims/{uid}/items/{rewardId}`: owner-readable historical
+  archive only. The retired `claimSeasonReward` compatibility callable performs
+  no auth check, Firestore read, Firestore write, or grant.
 
-The active game has no Season Road, Season XP, tier, or reward-claim path.
-`claimSeasonReward()` remains temporarily as an inert compatibility endpoint;
-it rejects before auth, reads, or writes. Historical documents are preserved
-because deleting prior records is unnecessary and could erase audit context.
+The canonical catalog remains `shared/achievements.json` with exactly 79 IDs.
+The completed production aggregate migration must not be rerun for this pass.
 
-### `player_achievements/{uid}/items/{achievementId}`
+## Account deletion coverage
 
-Owner-only achievement records. Browser writes are denied; accepted run receipts
-are not currently accepted. Historical documents and timestamps remain for
-Admin aggregate migration and audit.
+After the 72-hour deadline, the scheduled Admin purge removes Auth plus private
+and public profiles, handle ownership, records, receipts, achievements, session
+challenges, device bindings, league enrollment/member rows, historical account
+subcollections, rate-limit documents, and the deletion request. League member
+counts are decremented transactionally. Deletion does not expose identity data
+to clients.
 
-### `player_achievement_state/{uid}`
+## Security boundary
 
-Server-only achievement aggregate. Ordinary account hydration receives
-sanitized valid IDs and count through `syncPilotProfile`; it does not list up to
-79 individual documents. The aggregate migration records `schemaVersion`,
-`migratedAt`, and `sourceCount` and is additive and idempotent.
+Firestore Rules provide owner reads only where required, bounded authenticated
+public reads, and a deny-all fallback. Registries, record writes, league
+internals, progression choice, run sessions, and deletion requests are
+callable/Admin only.
 
-### Competition collections
-
-- `handle_registry/{handle}`: server-only unique-handle ownership registry.
-- `weekly_leagues/{leagueId}`: server-only open-group allocation for one UTC
-  week (maximum 30 pilots).
-- `weekly_leagues/{leagueId}/members/{uid}`: server-only standings rows with
-  opaque `publicPilotId`, call sign, handle, and unverified Flight Points. The
-  sanitized client payload does not include the Firebase UID.
-- `weekly_enrollments/{weekId_uid}`: server-only pointer to a pilot's weekly group.
-- `weekly_run_receipts/{weekId}/members/{uid}/items/{receiptId}`: server-only,
-  idempotent unverified scoring receipt. It contains bounded run facts and
-  `recordTrust = preseason_unverified`, never progression rewards.
-
-The client receives a sanitized league payload from `joinWeeklyLeague()`; these
-collections have no direct browser reads or writes.
-
-The complete 79-entry achievement catalog is generated from
-`shared/achievements.json`; this document does not maintain a duplicate list.
-
-## Active Preseason Weekly Board
-
-This is an online social board, not verified progression:
-
-1. The player opens the Pilot Dossier and signs in with Google.
-2. The game calls `syncPilotProfile()` for identity and a sanitized legacy
-   archive response. It does not synchronize gameplay progression.
-3. A pilot can atomically claim one immutable public handle and enter one open
-   weekly group.
-4. On standard Game Over, the client builds a bounded run-fact payload.
-5. Signed-in clients submit the receipt to `submitRunReceipt()`.
-6. The server validates bounds/plausibility and records only the best
-   `floor(score / 10)` unverified Flight Points for that weekly group.
-7. A repeated receipt ID is idempotent.
-8. The callable returns at most 30 sanitized rows with opaque public pilot ID,
-   call sign, handle, and Flight Points; Firebase UID is never returned.
-9. Glory and every other progression value stay device-local and unchanged.
-10. No Season reward system is part of this flow.
-
-Because the browser is not an authoritative run session, this board must never
-be described as verified. A future verified system requires a separate design
-and cannot be activated by this board's flags.
-
-## Meta Layer Scope
-
-Implemented now:
-
-- Score to cumulative Glory at 10:1.
-- One repeating 300,000-Glory Road with derived Prestige and current-loop rank.
-- Ordered checkpoint, rank-up, and terminal Prestige events at Game Over.
-- End-of-run device-local Glory, Credits, records, achievements, and Codex
-  discovery.
-- Account identity and handle publication.
-- Legacy account/archive display separated from device progress.
-- Closed callable source retained for future verified run receipts and weekly
-  leagues; the former Season claim name is only an inert compatibility stub.
-
-Explicitly not implemented yet:
-
-- AdMob rewarded ads.
-- Missions, practice, run history, and accessibility settings sync.
-- Server-issued run sessions, replay/signed telemetry verification, App Check
-  enforcement, verified public scoring, active leagues, active server rewards,
-  and an idempotent offline submission outbox.
-
-## Production Note
-
-Do not re-enable `COMPETITIVE_MODE_ENABLED` until server-issued sessions and
-gameplay attestation are implemented and abuse-tested. Firestore rules and
-callable-only writes prevent arbitrary document writes, but they cannot
-independently verify gameplay reported by a browser. Never deploy new rules
-alone; deploy and validate their matching Functions contract first.
+App Check support remains configured behind
+`serverAppCheckEnforced = false`; it is not live enforcement. Browser telemetry
+is not equivalent to executing the game simulation on a trusted server, so the
+record and league gates remain closed.

@@ -46,10 +46,11 @@ function onlineAccessibilityActions() {
   ];
   if (accountPanelTab === "pilot") {
     actions.push(accessibleRectAction("edit-call-sign", "Edit public call sign", rects.editCallSign, () => invokeRectHandler(handleOnlinePanelPointerDown, rects.editCallSign)));
-    if (online.user && !online.profileHandle) {
-      actions.push(accessibleRectAction("claim-handle", "Claim unique public handle", rects.claimHandle, () => invokeRectHandler(handleOnlinePanelPointerDown, rects.claimHandle)));
+    if (online.user) actions.push(accessibleRectAction("claim-handle", online.profileHandle ? "Change unique public handle" : "Claim unique public handle", rects.claimHandle, () => invokeRectHandler(handleOnlinePanelPointerDown, rects.claimHandle)));
+    if (online.user) {
+      actions.push(accessibleRectAction("sign-out", "Sign out", rects.signOut, () => invokeRectHandler(handleOnlinePanelPointerDown, rects.signOut)));
+      actions.push(accessibleRectAction("delete-account", online.accountDeletion ? "Cancel scheduled account deletion" : "Delete account", rects.deleteAccount, () => invokeRectHandler(handleOnlinePanelPointerDown, rects.deleteAccount)));
     }
-    if (online.user) actions.push(accessibleRectAction("sign-out", "Sign out", rects.signOut, () => invokeRectHandler(handleOnlinePanelPointerDown, rects.signOut)));
     else actions.push(accessibleRectAction("connect-account", "Connect Google account", rects.signIn, () => invokeRectHandler(handleOnlinePanelPointerDown, rects.signIn)));
   } else {
     actions.push(
@@ -75,14 +76,20 @@ function titlePanelAccessibilityActions() {
     const rects = getRecordsRects();
     const actions = [
       accessibleRectAction("close-panel", "Close Records Network", rects.closeRect, closeTitleMetaScreen, 4),
-      accessibleRectAction("legacy-archive", "Legacy preseason archive", rects.globalTab, () => invokeRectHandler(handleRecordsPanelPointerDown, rects.globalTab)),
+      accessibleRectAction("world-records", "Server record archive", rects.globalTab, () => invokeRectHandler(handleRecordsPanelPointerDown, rects.globalTab)),
       accessibleRectAction("weekly-status", "Weekly competition status", rects.weeklyTab, () => invokeRectHandler(handleRecordsPanelPointerDown, rects.weeklyTab))
     ];
     const online = onlineState();
+    if (recordsPanelTab === "weekly" && Array.isArray(online.weeklyLeagues) && online.weeklyLeagues.length > 1) {
+      actions.push(
+        accessibleRectAction("previous-weekly-league", "View previous weekly league", rects.leaguePrev, () => invokeRectHandler(handleRecordsPanelPointerDown, rects.leaguePrev), 3),
+        accessibleRectAction("next-weekly-league", "View next weekly league", rects.leagueNext, () => invokeRectHandler(handleRecordsPanelPointerDown, rects.leagueNext), 3)
+      );
+    }
     if (recordsPanelTab === "weekly" && !online.weeklyLeague) {
       actions.push(accessibleRectAction(
         "enter-weekly-board",
-        "Enter this week's unverified preseason board",
+        "Enter this week's league",
         rects.joinLeague,
         () => invokeRectHandler(handleRecordsPanelPointerDown, rects.joinLeague),
         3
@@ -127,6 +134,9 @@ function syncGameAccessibleSurface(force = false) {
   const onlineKey = typeof accountIdentityAccessibilityKey === "function"
     ? accountIdentityAccessibilityKey()
     : "signed-out|";
+  const accountState = typeof accountIdentityOverlaySnapshot === "function"
+    ? accountIdentityOverlaySnapshot()
+    : {};
   const stateKey = [
     state.gameState,
     state.sceneTransition && state.sceneTransition.mode,
@@ -139,6 +149,7 @@ function syncGameAccessibleSurface(force = false) {
     typeof gloryCelebrationActive === "function" && gloryCelebrationActive(),
     typeof gloryCelebrationState !== "undefined" ? gloryCelebrationState.index : 0,
     resetProgressConfirm,
+    deleteAccountConfirm,
     pauseConfirmAction,
     accountPanelTab,
     achievementCategory,
@@ -150,6 +161,8 @@ function syncGameAccessibleSurface(force = false) {
     settingMusicEnabled,
     settingEffectsEnabled,
     onlineKey,
+    JSON.stringify((accountState || {}).progressionChoice || null),
+    JSON.stringify((accountState || {}).accountDeletion || null),
     callSignEditing,
     handleEditing,
     layoutKey
@@ -159,6 +172,38 @@ function syncGameAccessibleSurface(force = false) {
 
   if (onboardingActive || callSignEditing || handleEditing) {
     clearGameAccessibleSurface();
+    return;
+  }
+  if (state.gameState === "start" && deleteAccountConfirm) {
+    const rects = getAccountDeletionConfirmRects();
+    setGameAccessibleSurface({
+      mode: "delete-account-confirm",
+      label: "Delete pilot account confirmation",
+      message: "Deletion is permanent after a 72-hour cancellation period and removes account data, Glory, high scores, World Records, handles, achievements, Codex data, and account progression.",
+      modal: true,
+      actions: [
+        accessibleRectAction("keep-account", "Keep my account", rects.cancel, () => { deleteAccountConfirm = false; }),
+        accessibleRectAction("begin-account-deletion", "Begin 72-hour account deletion", rects.confirm, () => {
+          deleteAccountConfirm = false;
+          window.starStrikeOnline.requestAccountDeletion().catch(() => {});
+        })
+      ],
+      onEscape: () => { deleteAccountConfirm = false; return true; }
+    });
+    return;
+  }
+  if (state.gameState === "start" && accountState.progressionChoice && accountState.progressionChoice.required) {
+    const rects = getProgressionChoiceRects();
+    setGameAccessibleSurface({
+      mode: "progression-choice",
+      label: "Choose account or device progression",
+      message: "Choose which progression to keep. The selected save replaces the other and the values are never combined.",
+      modal: true,
+      actions: [
+        accessibleRectAction("keep-account-progress", "Keep account progression", rects.account, () => window.starStrikeOnline.chooseProgression("account")),
+        accessibleRectAction("keep-device-progress", "Keep device progression", rects.device, () => window.starStrikeOnline.chooseProgression("device"))
+      ]
+    });
     return;
   }
   if (state.gameState === "paused" || state.gameState === "resuming") {

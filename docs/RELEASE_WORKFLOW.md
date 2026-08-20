@@ -1,9 +1,10 @@
 # Firebase Release Workflow
 
 Star Strike RUSH uses Node.js 22 and the locked repository Firebase CLI. The
-release model is `device_local_preseason`. The explicitly unverified preseason
-weekly board is enabled, while server progression writes, verified run sessions,
-and App Check enforcement remain disabled.
+release model is `explicit_account_or_device`. Account progression replacement
+is enabled. World Record publication, Weekly Leagues, and run-progression
+writes are fail-closed pending an authoritative verifier. App Check enforcement
+remains disabled and must not be claimed live.
 
 ## Release stages
 
@@ -30,8 +31,8 @@ locally, and changes no resources. `-StageBackendPreview`:
 6. deploys the exact emulator-tested Rules idempotently after Functions;
 7. deploys indexes only when the complete range changed them;
 8. deploys a commit-named Hosting preview and verifies headers, private 404s,
-   authentication enforcement for the two weekly callables, retirement of the
-   Season callable, Google Identity acceptance of the exact preview origin, and
+   release identity for every active callable, retirement of the Season
+   compatibility callable, Google Identity acceptance of the exact preview origin, and
    equality of intended, Hosting, and backend SHAs;
 9. writes a sanitized ignored staging report and stops before live Hosting.
 

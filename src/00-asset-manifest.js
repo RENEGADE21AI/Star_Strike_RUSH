@@ -2,8 +2,9 @@ const RAW_SPRITE_MANIFEST = {
   player: {
     source: "assets/sprites/player.png",
     render: { width: 40, height: 48, anchorX: 0.5, anchorY: 0.5, rotationOriginX: 0.5, rotationOriginY: 0.5, glow: "#78f6ff" },
-    collision: [{ offsetX: 0, offsetY: 1, radius: 9 }],
-    projectileOrigin: { offsetX: 0, offsetY: -18 }
+    collision: [{ offsetX: 0, offsetY: -8, radius: 4.5 }, { offsetX: 0, offsetY: 1, radius: 6.5 }, { offsetX: 0, offsetY: 10, radius: 4.5 }],
+    projectileOrigin: { offsetX: 0, offsetY: -20 },
+    spreadProjectileOrigins: [{ offsetX: -10, offsetY: -13 }, { offsetX: 0, offsetY: -20 }, { offsetX: 10, offsetY: -13 }]
   },
   wingman: {
     source: "assets/sprites/wingman.png",
@@ -15,8 +16,8 @@ const RAW_SPRITE_MANIFEST = {
   orange: { source: "assets/sprites/enemy-orange.png", render: { width: 33, height: 29, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 8.5 }] },
   purple: { source: "assets/sprites/enemy-purple.png", render: { width: 43, height: 38, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 14 }] },
   phantom: { source: "assets/sprites/enemy-phantom.png", render: { width: 37, height: 39, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 11.5 }] },
-  splitter: { source: "assets/sprites/enemy-splitter.png", render: { width: 36, height: 37, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 12 }] },
-  splitter_shard: { source: "assets/sprites/enemy-splitter-shard.png", render: { width: 15, height: 20, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 6 }] },
+  splitter: { source: "assets/sprites/enemy-splitter.png", render: { width: 50, height: 51, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 17 }] },
+  splitter_shard: { source: "assets/sprites/enemy-splitter-shard.png", render: { width: 24, height: 31, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 9 }] },
   carrier: { source: "assets/sprites/enemy-carrier.png", render: { width: 58, height: 55, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 1, radius: 18 }, { offsetX: -17, offsetY: 4, radius: 9 }, { offsetX: 17, offsetY: 4, radius: 9 }] },
   siphon: { source: "assets/sprites/enemy-siphon.png", render: { width: 27, height: 40, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 11 }] , projectileOrigin: { offsetX: 0, offsetY: 11 } },
   leech: { source: "assets/sprites/enemy-leech.png", render: { width: 43, height: 39, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 13 }] },

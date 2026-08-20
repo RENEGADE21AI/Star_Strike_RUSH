@@ -141,6 +141,37 @@ function smoothEnemyVisualHeading(current, dx, dy, fallbackY = 1, maxTurn = 0.08
   return wrapGameplayAngle(Number(current) + Math.max(-turn, Math.min(turn, delta)));
 }
 
+function spacecraftMotionStep(craft, target, speedValue, maxTurn = 0.08) {
+  const x = Number(craft && craft.x) || 0;
+  const y = Number(craft && craft.y) || 0;
+  const targetX = Number(target && target.x);
+  const targetY = Number(target && target.y);
+  const desiredX = Number.isFinite(targetX) ? targetX - x : 0;
+  const desiredY = Number.isFinite(targetY) ? targetY - y : 1;
+  const targetHeading = Math.atan2(desiredY, desiredX) - Math.PI / 2;
+  const currentHeading = Number.isFinite(Number(craft && craft.heading))
+    ? wrapGameplayAngle(Number(craft.heading))
+    : wrapGameplayAngle(targetHeading);
+  const turnLimit = Math.max(0.01, Number(maxTurn) || 0.08);
+  const delta = wrapGameplayAngle(targetHeading - currentHeading);
+  const heading = wrapGameplayAngle(currentHeading + Math.max(-turnLimit, Math.min(turnLimit, delta)));
+  const requestedSpeed = Math.max(0, Number(speedValue) || Math.hypot(desiredX, desiredY));
+  // A thruster craft turns its nose before applying full forward thrust. The
+  // cosine throttle prevents a tight correction (especially Recycle) from
+  // briefly flying away from its route or appearing to reverse/strafe.
+  const remainingTurn = wrapGameplayAngle(targetHeading - heading);
+  const speed = requestedSpeed * Math.max(0, Math.cos(remainingTurn));
+  return {
+    heading,
+    dx: -Math.sin(heading) * speed,
+    dy: Math.cos(heading) * speed
+  };
+}
+
+function asteroidDurability(kind) {
+  return ["small_debris", "rock_asteroid", "iron_asteroid", "comet_shard"].includes(String(kind || "")) ? 12 : null;
+}
+
 globalThis.simulateReachableDistance = simulateReachableDistance;
 globalThis.debrisSafeGap = debrisSafeGap;
 globalThis.createDoubleDebrisPlan = createDoubleDebrisPlan;
@@ -153,3 +184,5 @@ globalThis.createSiphonShot = createSiphonShot;
 globalThis.ghostActionProfile = ghostActionProfile;
 globalThis.wrapGameplayAngle = wrapGameplayAngle;
 globalThis.smoothEnemyVisualHeading = smoothEnemyVisualHeading;
+globalThis.spacecraftMotionStep = spacecraftMotionStep;
+globalThis.asteroidDurability = asteroidDurability;

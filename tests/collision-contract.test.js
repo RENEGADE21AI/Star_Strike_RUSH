@@ -25,8 +25,8 @@ test("object-based collision contract checks every boss circle", () => {
 
 test("collision scale grows asteroid danger with its visual spawn scale", () => {
   const player = entity("player", 100, 100, 9);
-  assert.equal(context.manifestCollision(entity("boss_wall", 129, 100, 20.5, 0.25), player), false);
-  assert.equal(context.manifestCollision(entity("boss_wall", 129, 100, 20.5, 1), player), true);
+  assert.equal(context.manifestCollision(entity("boss_wall", 126, 100, 20.5, 0.25), player), false);
+  assert.equal(context.manifestCollision(entity("boss_wall", 126, 100, 20.5, 1), player), true);
 });
 
 test("collision API rejects positional arguments", () => {

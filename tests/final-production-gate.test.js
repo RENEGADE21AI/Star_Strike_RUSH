@@ -273,9 +273,9 @@ test("backend release identity is generated from the exact release SHA and expos
     assert.deepEqual(generated, {
       commitSha: releaseSha,
       packageVersion: "1.1.0",
-      progressionAuthority: "device_local_preseason",
-      competitionMode: "preseason_unverified",
-      competitionWritesEnabled: true,
+      progressionAuthority: "explicit_account_or_device",
+      competitionMode: "paused_pending_authoritative_verifier",
+      competitionWritesEnabled: false,
       serverProgressionWritesEnabled: false,
       appCheckEnforced: false
     });
@@ -298,8 +298,8 @@ test("CI release report proves build/marker parity without claiming deployment",
     const outputPath = path.join(fixture, "staged-release-report.json");
     fs.writeFileSync(versionPath, JSON.stringify({
       commitSha: releaseSha,
-      progressionMode: "device_local_preseason",
-      competitionMode: "preseason_unverified"
+      progressionMode: "explicit_account_or_device",
+      competitionMode: "paused_pending_authoritative_verifier"
     }));
     let result = spawnSync(process.execPath, [
       backendGeneratorScript,
@@ -321,7 +321,7 @@ test("CI release report proves build/marker parity without claiming deployment",
     assert.equal(report.releaseSha, releaseSha);
     assert.equal(report.hostingBuildShaVerified, true);
     assert.equal(report.backendMarkerShaVerified, true);
-    assert.equal(report.competitionMode, "preseason_unverified");
+    assert.equal(report.competitionMode, "paused_pending_authoritative_verifier");
     assert.equal(report.firebaseDeploymentPerformed, false);
     assert.equal(report.humanApprovalRequired, true);
     assert.equal("email" in report, false);
@@ -347,8 +347,8 @@ test("release smoke fails a stale backend SHA even when paused callables return 
       response.writeHead(200, { ...securityHeaders, "content-type": "application/json" });
       response.end(JSON.stringify({
         commitSha: releaseSha,
-        progressionMode: "device_local_preseason",
-        competitionMode: "preseason_unverified"
+        progressionMode: "explicit_account_or_device",
+        competitionMode: "paused_pending_authoritative_verifier"
       }));
       return;
     }
@@ -365,20 +365,28 @@ test("release smoke fails a stale backend SHA even when paused callables return 
       response.end(JSON.stringify({ authUri: "https://accounts.google.com/o/oauth2/auth" }));
       return;
     }
-    if (["/submitRunReceipt", "/joinWeeklyLeague", "/claimSeasonReward"].some((prefix) => request.url.startsWith(prefix))) {
+    if ([
+      "/syncPilotProfile", "/claimPilotHandle", "/listWeeklyLeagues", "/joinWeeklyLeague",
+      "/startVerifiedRun", "/submitRunReceipt", "/chooseProgressionSource",
+      "/requestAccountDeletion", "/cancelAccountDeletion", "/claimSeasonReward"
+    ].some((prefix) => request.url.startsWith(prefix))) {
       const retired = request.url.startsWith("/claimSeasonReward");
+      const competitionPaused = ["/listWeeklyLeagues", "/joinWeeklyLeague", "/startVerifiedRun", "/submitRunReceipt"]
+        .some((prefix) => request.url.startsWith(prefix));
       response.writeHead(400, { "content-type": "application/json" });
       response.end(JSON.stringify({
         error: {
-          status: retired ? "FAILED_PRECONDITION" : "UNAUTHENTICATED",
-          message: retired ? "Season Road is retired." : "Sign in is required.",
+          status: retired || competitionPaused ? "FAILED_PRECONDITION" : "UNAUTHENTICATED",
+          message: retired
+            ? "Season Road is retired."
+            : (competitionPaused ? "Public record writes are paused pending an authoritative run verifier." : "Sign in is required."),
           details: {
             release: {
               commitSha: backendSha,
               packageVersion: "1.1.0",
-              progressionAuthority: "device_local_preseason",
-              competitionMode: "preseason_unverified",
-              competitionWritesEnabled: true,
+              progressionAuthority: "explicit_account_or_device",
+              competitionMode: "paused_pending_authoritative_verifier",
+              competitionWritesEnabled: false,
               serverProgressionWritesEnabled: false,
               appCheckEnforced: false
             }
@@ -439,8 +447,8 @@ test("release smoke proves the staged origin can initiate Google authentication"
       response.writeHead(200, { ...securityHeaders, "content-type": "application/json" });
       response.end(JSON.stringify({
         commitSha: releaseSha,
-        progressionMode: "device_local_preseason",
-        competitionMode: "preseason_unverified"
+        progressionMode: "explicit_account_or_device",
+        competitionMode: "paused_pending_authoritative_verifier"
       }));
       return;
     }
