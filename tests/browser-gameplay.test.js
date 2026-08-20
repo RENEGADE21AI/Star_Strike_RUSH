@@ -777,10 +777,16 @@ test("debug runs cannot persist records or progression across reload", { timeout
       return snapshot.gameState === "playing" && snapshot.input.gameplayControlEnabled === true;
     });
     const before = await debugSnapshot(page);
-    await page.evaluate(() => {
+    const immediateScore = await page.evaluate(() => {
       addScore(50000);
       saveMilestone();
       window.dispatchEvent(new Event("beforeunload"));
+      return state.score;
+    });
+    assert.ok(immediateScore >= 50000);
+    await page.waitForFunction(() => {
+      const node = document.querySelector("#debugSnapshot");
+      return !!node?.textContent && JSON.parse(node.textContent).score >= 50000;
     });
     const during = await debugSnapshot(page);
     assert.ok(during.score >= 50000);
