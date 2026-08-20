@@ -4,20 +4,21 @@ const test = require("node:test");
 const competition = require("../functions/competition");
 const callableFunctions = require("../functions");
 
-test("server competition gate opens only the unverified preseason board", () => {
+test("server competition gate remains closed pending an authoritative verifier", () => {
   assert.equal(typeof competition.requireCompetitionEnabled, "function");
-  assert.doesNotThrow(() => competition.requireCompetitionEnabled());
-  assert.equal(competition.competitionWritesEnabled(), true);
+  assert.throws(() => competition.requireCompetitionEnabled(), /authoritative run verifier/i);
+  assert.equal(competition.competitionWritesEnabled(), false);
 });
 
-test("active weekly callables require authentication while retired Season claims stay closed", async () => {
-  for (const endpoint of [callableFunctions.submitRunReceipt, callableFunctions.joinWeeklyLeague]) {
+test("competition callables reject before authentication while the retired reward endpoint stays inert", async () => {
+  for (const endpoint of [callableFunctions.startVerifiedRun, callableFunctions.submitRunReceipt, callableFunctions.listWeeklyLeagues, callableFunctions.joinWeeklyLeague]) {
     await assert.rejects(
       endpoint.run({ auth: null, data: {} }),
       (error) => (
         error &&
-        error.code === "unauthenticated" &&
-        error.details?.release?.progressionAuthority === "device_local_preseason"
+        error.code === "failed-precondition" &&
+        /authoritative run verifier/i.test(error.message) &&
+        error.details?.release?.progressionAuthority === "explicit_account_or_device"
       )
     );
   }

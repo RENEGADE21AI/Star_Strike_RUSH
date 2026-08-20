@@ -24,14 +24,14 @@ function memoryStorage() {
   };
 }
 
-test("device-local progression stays closed while the unverified weekly board is explicit", () => {
+test("account or device progression selection stays active while public competition fails closed", () => {
   const release = require("../shared/release-integrity.json");
-  assert.equal(release.progressionAuthority, "device_local_preseason");
-  assert.equal(release.clientCompetitionWritesEnabled, true);
-  assert.equal(release.serverCompetitionWritesEnabled, true);
+  assert.equal(release.progressionAuthority, "explicit_account_or_device");
+  assert.equal(release.clientCompetitionWritesEnabled, false);
+  assert.equal(release.serverCompetitionWritesEnabled, false);
   assert.equal(release.serverProgressionWritesEnabled, false);
   assert.equal(release.verifiedRunSessionsEnabled, false);
-  assert.equal(release.competitionMode, "preseason_unverified");
+  assert.equal(release.competitionMode, "paused_pending_authoritative_verifier");
 
   const functionsSource = source("functions/index.js");
   for (const [start, end] of [
@@ -39,12 +39,14 @@ test("device-local progression stays closed while the unverified weekly board is
     ["exports.submitRunReceipt", "exports.claimSeasonReward"]
   ]) {
     const body = functionsSource.slice(functionsSource.indexOf(start), end ? functionsSource.indexOf(end) : undefined);
-    assert.doesNotMatch(body, /requireServerProgressionWritesEnabled\(\)/);
     assert.ok(body.indexOf("requireCompetitionEnabled()") < body.indexOf("authContext(request)"));
   }
   const submit = functionsSource.slice(functionsSource.indexOf("exports.submitRunReceipt"), functionsSource.indexOf("exports.claimSeasonReward"));
-  assert.doesNotMatch(submit, /players_private|leaderboard_scores|player_achievement|applyRunToProfile/);
-  const retired = functionsSource.slice(functionsSource.indexOf("exports.claimSeasonReward"));
+  assert.match(submit, /players_private|player_achievement|applyRunToProfile/);
+  assert.match(submit, /world_records/);
+  assert.doesNotMatch(submit, /leaderboard_scores/);
+  assert.match(source("functions/competition.js"), /authoritative run verifier/);
+  const retired = functionsSource.slice(functionsSource.indexOf("exports.claimSeasonReward"), functionsSource.indexOf("exports.purgeExpiredVerifiedRunSessions"));
   assert.match(retired, /Season Road is retired/);
   assert.match(retired, /BACKEND_RELEASE_IDENTITY/);
   assert.doesNotMatch(retired, /authContext\(request\)|db\.|runTransaction|applySeasonReward/);

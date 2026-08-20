@@ -77,23 +77,26 @@ test("server-authoritative lifetime milestones unlock from the accumulated profi
   assert.ok(earnedAchievementIdsForRun(run).includes("first_sortie"));
 });
 
-test("weekly leagues live in Records and Pilot Dossier is identity plus settings", () => {
+test("Records exposes paused Weekly League surfaces while Pilot Dossier remains identity plus settings", () => {
   const panel = fs.readFileSync(path.join(repoRoot, "src", "12-rendering-title-panels.js"), "utf8");
   const onlinePanel = panel.slice(panel.indexOf("function drawOnlinePanel"), panel.indexOf("function drawRecordsPanel"));
   const recordsPanel = panel.slice(panel.indexOf("function drawRecordsPanel"), panel.indexOf("function achievementTierColor"));
   assert.doesNotMatch(onlinePanel, /WEEKLY|leagueTab|joinLeague/);
   assert.match(recordsPanel, /r\.weeklyTab/);
-  assert.match(recordsPanel, /PRESEASON WEEKLY BOARD/);
+  assert.match(recordsPanel, /WEEKLY LEAGUES/);
+  assert.match(recordsPanel, /SERVER RECORD ARCHIVE/);
   assert.match(recordsPanel, /requestWeeklyLeague|joinLeague/);
 });
 
-test("ordinary hydration reads one aggregate while weekly submission never mutates achievements", () => {
+test("ordinary hydration reads one aggregate while the gated server run path preserves aggregate parity", () => {
   const source = fs.readFileSync(path.join(repoRoot, "functions", "index.js"), "utf8");
   const sync = source.slice(source.indexOf("exports.syncPilotProfile"), source.indexOf("exports.claimPilotHandle"));
   assert.match(sync, /player_achievement_state/);
   assert.match(sync, /tx\.get\(achievementStateRef\)/);
   const submit = source.slice(source.indexOf("exports.submitRunReceipt"), source.indexOf("exports.claimSeasonReward"));
-  assert.doesNotMatch(submit, /player_achievement|achievementRefs|earnedAchievement/);
+  assert.match(submit, /player_achievement_state/);
+  assert.match(submit, /player_achievements/);
+  assert.match(submit, /earnedAchievementIds/);
 });
 
 test("supplied account art is optimized, registered, and rendered with a fallback", () => {

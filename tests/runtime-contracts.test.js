@@ -112,7 +112,7 @@ test("gameplay renders compact classic HUD without announcement popups", () => {
   assert.doesNotMatch(hudSource, /devStatsVisible|drawDebugHitboxes/);
 });
 
-test("manual standard pause costs one health while training and automatic pauses are free", () => {
+test("every standard pause costs one health while every training pause is free", () => {
   const decision = (player, reason, runMode) => JSON.parse(JSON.stringify(context.pauseHealthDecision(player, reason, runMode)));
   assert.deepEqual(
     decision({ hp: 5, maxHp: 5 }, "manual", "standard"),
@@ -120,11 +120,11 @@ test("manual standard pause costs one health while training and automatic pauses
   );
   assert.deepEqual(
     decision({ hp: 5, maxHp: 5 }, "visibility", "standard"),
-    { allowed: true, cost: 0, remainingHp: 5, message: "AUTO-PAUSED: NO HEALTH COST" }
+    { allowed: true, cost: 1, remainingHp: 4, message: "AUTO-PAUSE COST: 1 HEALTH BAR" }
   );
   assert.deepEqual(
     decision({ hp: 1, maxHp: 5 }, "manual", "standard"),
-    { allowed: false, cost: 0, remainingHp: 1, message: "PAUSE NEEDS 1 SPARE HEALTH BAR" }
+    { allowed: true, cost: 1, remainingHp: 0, message: "PAUSE COST: 1 HEALTH BAR" }
   );
   assert.deepEqual(
     decision({ hp: 1, maxHp: 5 }, "manual", "tutorial"),
@@ -135,11 +135,11 @@ test("manual standard pause costs one health while training and automatic pauses
   assert.equal(hp, 5);
   assert.deepEqual(
     decision({ hp: 3, maxHp: 5 }, "focus", "tutorial"),
-    { allowed: true, cost: 0, remainingHp: 3, message: "AUTO-PAUSED: NO HEALTH COST" }
+    { allowed: true, cost: 0, remainingHp: 3, message: "TRAINING AUTO-PAUSED: NO HEALTH COST" }
   );
   assert.deepEqual(
     decision({ hp: 1, maxHp: 5 }, "visibility", "tutorial"),
-    { allowed: true, cost: 0, remainingHp: 1, message: "AUTO-PAUSED: NO HEALTH COST" }
+    { allowed: true, cost: 0, remainingHp: 1, message: "TRAINING AUTO-PAUSED: NO HEALTH COST" }
   );
   const inputSource = fs.readFileSync(path.join(repoRoot, "src", "18-session-input-loop.js"), "utf8");
   assert.match(inputSource, /decision\.cost > 0 && state\.player\.hp <= 0/);
@@ -155,14 +155,40 @@ test("arrival and paused tutorial dialogue block control and ordinary simulation
   assert.equal(context.gameplaySimulationEnabled({ gameState: "playing", transitionMode: "idle", tutorialDialogueVisible: true }), false);
 });
 
-test("enemy visual heading follows the shortest arc with a bounded turn rate", () => {
-  assert.equal(typeof context.smoothEnemyVisualHeading, "function");
-  const nearWrap = context.smoothEnemyVisualHeading(Math.PI - 0.02, -0.02, -1, -1, 0.08);
-  assert.ok(Math.abs(context.wrapGameplayAngle(nearWrap - (Math.PI - 0.02))) <= 0.081);
-  const first = context.smoothEnemyVisualHeading(undefined, 1, 1, 1, 0.08);
-  assert.ok(Number.isFinite(first));
-  const settled = context.smoothEnemyVisualHeading(first, 1, 1, 1, 0.08);
-  assert.ok(Math.abs(context.wrapGameplayAngle(settled - first)) <= 0.081);
+test("enemy spacecraft turn and displacement stay aligned without strafing or reversing", () => {
+  assert.equal(typeof context.spacecraftMotionStep, "function");
+  let craft = { x: 100, y: 40, heading: 0 };
+  for (let frame = 0; frame < 90; frame++) {
+    const step = context.spacecraftMotionStep(craft, { x: 220, y: 160 }, 3.2, 0.08);
+    const forwardX = -Math.sin(step.heading);
+    const forwardY = Math.cos(step.heading);
+    const displacement = Math.hypot(step.dx, step.dy);
+    assert.ok(displacement >= 0);
+    if (displacement > 0) {
+      assert.ok((step.dx * forwardX + step.dy * forwardY) / displacement > 0.995);
+      const toTargetX = 220 - craft.x;
+      const toTargetY = 160 - craft.y;
+      assert.ok(step.dx * toTargetX + step.dy * toTargetY >= 0, "forward thrust must not carry the craft away from its route");
+    }
+    craft = { x: craft.x + step.dx, y: craft.y + step.dy, heading: step.heading };
+  }
+  assert.ok(Math.hypot(craft.x - 100, craft.y - 40) > 40, "the craft must turn and make meaningful forward progress");
+  const recycle = context.spacecraftMotionStep({ x: 20, y: 650, heading: 0 }, { x: 20, y: -80 }, 11.5, 0.18);
+  assert.ok(Math.abs(context.wrapGameplayAngle(recycle.heading)) <= 0.181, "a recycle U-turn must be tight but continuous");
+});
+
+test("splitter silhouettes and collision bodies read as substantial enemies", () => {
+  assert.ok(context.SPRITE_MANIFEST.splitter.render.width >= 48);
+  assert.ok(context.SPRITE_MANIFEST.splitter.collision[0].radius >= 16);
+  assert.ok(context.SPRITE_MANIFEST.splitter_shard.render.width >= 22);
+  assert.ok(context.SPRITE_MANIFEST.splitter_shard.collision[0].radius >= 8);
+});
+
+test("ordinary asteroids share durable twelve-hit hulls", () => {
+  for (const kind of ["small_debris", "rock_asteroid", "iron_asteroid", "comet_shard"]) {
+    assert.equal(context.asteroidDurability(kind), 12);
+  }
+  assert.equal(context.asteroidDurability("boss_wall"), null);
 });
 
 test("onboarding opens on a galaxy arrival and transmissions suppress shake", () => {
@@ -289,12 +315,13 @@ test("public Firebase writers and rules exclude provider identity fields", () =>
   assert.match(clientSource, /httpsCallable\(functionsApi, "syncPilotProfile"\)/);
   assert.match(clientSource, /httpsCallable\(functionsApi, "claimPilotHandle"\)/);
   assert.match(clientSource, /progressionMode:\s*PROGRESSION_MODE/);
-  assert.match(clientSource, /const competitionMode = competitiveModeEnabled && window\.PUBLIC_COMPETITION_MODE === "preseason_unverified"/);
-  assert.match(clientSource, /localOnly:\s*true/);
-  assert.match(clientSource, /WEEKLY FLIGHT POINTS UPDATED/);
+  assert.match(clientSource, /const competitionMode = competitiveModeEnabled && window\.PUBLIC_COMPETITION_MODE === "verified_world_records"/);
+  assert.match(clientSource, /httpsCallable\(functionsApi, "startVerifiedRun"\)/);
+  assert.match(clientSource, /httpsCallable\(functionsApi, "submitRunReceipt"\)/);
+  assert.match(clientSource, /competition_paused/);
   const leaderboardReader = clientSource.slice(
-    clientSource.indexOf("function applyArchiveSnapshot"),
-    clientSource.indexOf("function subscribeLegacyArchive")
+    clientSource.indexOf("function applyWorldRecordSnapshot"),
+    clientSource.indexOf("function subscribeWorldRecords")
   );
   assert.doesNotMatch(leaderboardReader, /displayName|photoURL|email/);
 

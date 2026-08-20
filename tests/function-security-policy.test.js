@@ -11,7 +11,7 @@ test("callable Functions use one bounded production resource policy", () => {
   assert.match(source, /maxInstances:\s*10/);
   assert.match(source, /concurrency:\s*40/);
   assert.match(source, /timeoutSeconds:\s*30/);
-  assert.equal((source.match(/onCall\(CALLABLE_OPTIONS/g) || []).length, 5);
+  assert.equal((source.match(/onCall\(CALLABLE_OPTIONS/g) || []).length, 10);
   assert.equal((source.match(/onCall\(\{\s*region:/g) || []).length, 0);
 });
 

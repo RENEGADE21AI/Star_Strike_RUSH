@@ -422,8 +422,8 @@ async function runCase(browser, baseUrl, item) {
           profileHandle: "renegade21",
           identityService: "available",
           accountArchive: "loaded",
-          progressionMode: "device_local_preseason",
-          competitionMode: "preseason_unverified",
+          progressionMode: "explicit_account_or_device",
+          competitionMode: "paused",
           lastStatus: "PILOT IDENTITY ACTIVE",
           lastError: "",
           weeklyLeague: {
@@ -433,7 +433,7 @@ async function runCase(browser, baseUrl, item) {
             division: "OPEN",
             memberCount: 3,
             capacity: 30,
-            recordTrust: "preseason_unverified",
+            recordTrust: "verified_run_session",
             members: [
               { publicPilotId: "pilot_alpha", callSign: "NOVA_7", handle: "nova_7", weeklyPoints: 4825 },
               { publicPilotId: "pilot_beta", callSign: "RIFT_2", handle: "rift_2", weeklyPoints: 3100 }

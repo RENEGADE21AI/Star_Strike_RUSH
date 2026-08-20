@@ -23,9 +23,14 @@ test("active identity callables bound payload size and use safe structured error
   const source = fs.readFileSync(path.resolve(__dirname, "../functions/index.js"), "utf8");
   for (const [start, end, maximumBytes] of [
     ["exports.syncPilotProfile", "exports.claimPilotHandle", 1024],
-    ["exports.claimPilotHandle", "exports.joinWeeklyLeague", 512],
+    ["exports.claimPilotHandle", "exports.requestAccountDeletion", 512],
+    ["exports.requestAccountDeletion", "exports.cancelAccountDeletion", 128],
+    ["exports.cancelAccountDeletion", "exports.joinWeeklyLeague", 64],
     ["exports.joinWeeklyLeague", "function clientProfile", 256],
-    ["exports.submitRunReceipt", "exports.claimSeasonReward", 2048]
+    ["exports.listWeeklyLeagues", "exports.chooseProgressionSource", 64],
+    ["exports.chooseProgressionSource", "exports.startVerifiedRun", 8192],
+    ["exports.startVerifiedRun", "exports.submitRunReceipt", 256],
+    ["exports.submitRunReceipt", "exports.claimSeasonReward", 524288]
   ]) {
     const body = source.slice(source.indexOf(start), source.indexOf(end));
     assert.match(body, new RegExp(`requirePayloadWithin\\(request\\.data, ${maximumBytes}\\)`));

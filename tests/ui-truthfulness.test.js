@@ -6,7 +6,7 @@ const { test } = require("node:test");
 
 const repoRoot = path.resolve(__dirname, "..");
 
-test("preseason weekly scoring is explicit and never presented as verified", () => {
+test("competition activates only with verified run sessions", () => {
   const evaluateCompetitionGate = (verifiedRunSessionsEnabled) => {
     const context = {
       globalThis: null,
@@ -17,7 +17,7 @@ test("preseason weekly scoring is explicit and never presented as verified", () 
       Date,
       CLIENT_COMPETITION_WRITES_ENABLED: true,
       VERIFIED_RUN_SESSIONS_ENABLED: verifiedRunSessionsEnabled,
-      PUBLIC_COMPETITION_MODE: "preseason_unverified"
+      PUBLIC_COMPETITION_MODE: "verified_world_records"
     };
     context.globalThis = context;
     vm.createContext(context);
@@ -25,8 +25,8 @@ test("preseason weekly scoring is explicit and never presented as verified", () 
     return { enabled: context.COMPETITIVE_MODE_ENABLED, mode: context.PUBLIC_COMPETITION_MODE };
   };
 
-  assert.deepEqual(evaluateCompetitionGate(false), { enabled: true, mode: "preseason_unverified" });
-  assert.deepEqual(evaluateCompetitionGate(true), { enabled: false, mode: "preseason_unverified" });
+  assert.deepEqual(evaluateCompetitionGate(false), { enabled: false, mode: "verified_world_records" });
+  assert.deepEqual(evaluateCompetitionGate(true), { enabled: true, mode: "verified_world_records" });
 });
 
 test("Pilot Dossier does not expose manual sync or refresh controls", () => {
@@ -36,14 +36,16 @@ test("Pilot Dossier does not expose manual sync or refresh controls", () => {
   assert.match(source, /PUBLIC: CALL SIGN \+ @HANDLE/);
 });
 
-test("Records presents the live weekly board as preseason and unverified", () => {
+test("Records truthfully presents a server archive and paused Weekly Leagues", () => {
   const source = fs.readFileSync(path.join(repoRoot, "src/12-rendering-title-panels.js"), "utf8");
   const accessible = fs.readFileSync(path.join(repoRoot, "src/18-accessible-actions.js"), "utf8");
-  assert.match(source, /PRESEASON WEEKLY BOARD/);
-  assert.match(source, /UNVERIFIED FLIGHT POINTS/);
-  assert.doesNotMatch(source, /MATCHED BY VERIFIED BEST|(?<!UN)VERIFIED FLIGHT POINTS/);
+  assert.match(source, /WEEKLY LEAGUES/);
+  assert.match(source, /AUTHORITATIVE FLIGHT POINTS/);
+  assert.match(source, /PUBLIC RECORD WRITES PAUSED/);
+  assert.match(source, /SERVER RECORD ARCHIVE/);
+  assert.doesNotMatch(source, /PRESEASON|UNVERIFIED FLIGHT POINTS/);
   assert.match(accessible, /enter-weekly-board/);
-  assert.match(accessible, /unverified preseason board/);
+  assert.match(accessible, /this week's league/i);
 });
 
 test("primary title hierarchy hides unused Credits", () => {

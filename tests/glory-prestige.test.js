@@ -32,8 +32,8 @@ test("Glory Road derives Prestige and within-road Glory without consuming cumula
 test("rank derives from current Road position and display titles accumulate Prestige", () => {
   assert.equal(rankForRoadGlory(15000).name, "Ace");
   assert.equal(gloryRoadStateForTotal(15000).displayRankName, "Ace");
-  assert.equal(gloryRoadStateForTotal(315000).displayRankName, "Ace I");
-  assert.equal(gloryRoadStateForTotal(615000).displayRankName, "Ace II");
+  assert.equal(gloryRoadStateForTotal(315000).displayRankName, "Ace II");
+  assert.equal(gloryRoadStateForTotal(615000).displayRankName, "Ace III");
   assert.equal(gloryRoadStateForTotal(301000).rank.name, "Star Cadet");
   assert.equal(gloryRoadStateForTotal(600000).rank.name, "Rookie Pilot");
   assert.equal(romanPrestige(3), "III");

@@ -96,22 +96,37 @@ test("tutorial advancement requires the real action for every mechanic lesson", 
   assert.equal(api.tutorialObjectiveComplete(director, { realmHops: 1, realmThreatAvoided: true, realmsMatched: true }), true);
 });
 
-test("evasion requires an active damage-free volley crossing to the intended side", () => {
+test("evasion requires sustained, damage-free practice across three live volleys", () => {
   const api = loadDirector();
   const base = {
-    startSide: "left",
-    targetSide: "right",
-    laneX: 187.5,
-    startX: 145,
-    volleyActive: true,
     damageTakenStart: 2,
-    damageTakenCurrent: 2
+    damageTakenCurrent: 2,
+    practiceFrames: 300,
+    volleysCleared: 3,
+    travelDistance: 120,
+    emitterAlive: true
   };
-  assert.equal(api.tutorialEvasionSucceeded({ ...base, playerX: 250 }), true);
-  assert.equal(api.tutorialEvasionSucceeded({ ...base, startX: 220, playerX: 250 }), false);
-  assert.equal(api.tutorialEvasionSucceeded({ ...base, playerX: 150 }), false);
-  assert.equal(api.tutorialEvasionSucceeded({ ...base, playerX: 250, volleyActive: false }), false);
-  assert.equal(api.tutorialEvasionSucceeded({ ...base, playerX: 250, damageTakenCurrent: 3 }), false);
+  assert.equal(api.tutorialEvasionSucceeded(base), true);
+  assert.equal(api.tutorialEvasionSucceeded({ ...base, damageTakenCurrent: 3 }), false);
+  assert.equal(api.tutorialEvasionSucceeded({ ...base, practiceFrames: 299 }), false);
+  assert.equal(api.tutorialEvasionSucceeded({ ...base, volleysCleared: 2 }), false);
+  assert.equal(api.tutorialEvasionSucceeded({ ...base, travelDistance: 119 }), false);
+  assert.equal(api.tutorialEvasionSucceeded({ ...base, emitterAlive: false }), false);
+});
+
+test("transmissions cannot be skipped or advanced while their text is typing", () => {
+  const api = loadDirector();
+  assert.equal(api.tutorialTransmissionCanAdvance(0), false);
+  assert.equal(api.tutorialTransmissionCanAdvance(0.999), false);
+  assert.equal(api.tutorialTransmissionCanAdvance(1), true);
+  assert.equal(api.tutorialTransmissionCanAdvance(7), true);
+});
+
+test("a held Space transmission key must be released before it can advance", () => {
+  const sessionInput = fs.readFileSync(path.join(repoRoot, "src", "18-session-input-loop.js"), "utf8");
+  assert.match(sessionInput, /tutorialDialogueHeldKeys\.has\(k\) \|\| e\.repeat/);
+  assert.match(sessionInput, /tutorialDialogueHeldKeys\.add\(k\)[\s\S]*advanceTutorialDialogue\(\)/);
+  assert.match(sessionInput, /tutorialDialogueHeldKeys\.delete\(k\)/);
 });
 
 test("Ghost lesson requires crossing the lane boundary while real Ghost protection is active", () => {

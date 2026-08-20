@@ -14,14 +14,9 @@ const projectId = "star-strike-rush";
 const functionsBase = `http://127.0.0.1:5101/${projectId}/us-central1`;
 const authBase = "http://127.0.0.1:9199";
 const mimeTypes = new Map([
-  [".css", "text/css; charset=utf-8"],
-  [".html", "text/html; charset=utf-8"],
-  [".js", "text/javascript; charset=utf-8"],
-  [".json", "application/json; charset=utf-8"],
-  [".mp3", "audio/mpeg"],
-  [".png", "image/png"],
-  [".svg", "image/svg+xml"],
-  [".webp", "image/webp"]
+  [".css", "text/css; charset=utf-8"], [".html", "text/html; charset=utf-8"],
+  [".js", "text/javascript; charset=utf-8"], [".json", "application/json; charset=utf-8"],
+  [".mp3", "audio/mpeg"], [".png", "image/png"], [".svg", "image/svg+xml"], [".webp", "image/webp"]
 ]);
 
 let server;
@@ -31,29 +26,13 @@ let db;
 
 function localMetaSeed() {
   return {
-    version: 1,
+    schemaVersion: 3,
     totalGlory: 4321,
-    currentSeason: {
-      id: "season_01",
-      name: "Launch Flight",
-      xp: 6789,
-      tier: 7,
-      claimedRewardIds: ["season_01_tier_1"]
-    },
-    credits: 2468,
     lifetime: {
-      runs: 12,
-      score: 98765,
-      kills: 444,
-      powerups: 33,
-      ghostUses: 22,
-      bosses: 11,
-      damageTaken: 55,
-      highestCombo: 19,
-      bestScore: 32100,
-      bestPhase: 17
+      runs: 12, score: 98765, kills: 444, powerups: 33, ghostUses: 22,
+      bosses: 11, damageTaken: 55, highestCombo: 19, bestScore: 32100, bestPhase: 17
     },
-    recentReceipts: [{ receiptId: "device_receipt", score: 32100 }],
+    recentReceipts: [{ receiptId: "device_receipt", score: 32100, gloryGained: 3210 }],
     lastUpdatedAtMs: 1720000000000
   };
 }
@@ -63,11 +42,7 @@ async function createEmulatorAccount(name) {
   const response = await fetch(`${authBase}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-star-strike-rush`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      email,
-      password: "StarStrike-Test-Only-2026",
-      returnSecureToken: true
-    })
+    body: JSON.stringify({ email, password: "StarStrike-Test-Only-2026", returnSecureToken: true })
   });
   const body = await response.json();
   if (!response.ok) throw new Error(`Auth emulator account creation failed: ${JSON.stringify(body)}`);
@@ -77,19 +52,17 @@ async function createEmulatorAccount(name) {
 async function seedAccount(account, options = {}) {
   await Promise.all([
     db.doc(`players_private/${account.uid}`).set({
-      uid: account.uid,
-      glory: options.glory ?? 999999,
-      currentSeasonXP: options.seasonXP ?? 999999,
-      currentSeasonTier: 50,
-      credits: 999999,
-      lifetimeRuns: 888,
-      lifetimeScore: 777777,
+      totalGlory: options.glory ?? 999999,
+      lifetimeRuns: options.runs ?? 8,
+      lifetimeScore: options.score ?? 777777,
       lifetimeKills: 666,
-      lifetimePowerups: 555,
-      lifetimeGhostUses: 444,
-      lifetimeBosses: 333,
-      lifetimeDamageTaken: 222,
-      highestCombo: 111
+      lifetimePowerups: 55,
+      lifetimeGhostUses: 44,
+      lifetimeBosses: 33,
+      lifetimeDamageTaken: 22,
+      highestCombo: 11,
+      bestScore: options.accountBest ?? 555555,
+      phase: options.accountPhase ?? 88
     }),
     db.doc(`players_public/${account.uid}`).set({
       uid: account.uid,
@@ -111,12 +84,7 @@ async function seedAccount(account, options = {}) {
       phase: options.leaderboardPhase ?? 99,
       achievementsCount: 2
     }),
-    db.doc(`player_achievement_state/${account.uid}`).set({
-      uid: account.uid,
-      ids: ["first_sortie", "mythic_score"],
-      count: 2,
-      schemaVersion: 2
-    })
+    db.doc(`player_achievement_state/${account.uid}`).set({ ids: ["first_sortie", "mythic_score"], count: 2, schemaVersion: 2 })
   ]);
 }
 
@@ -124,7 +92,7 @@ async function debugSnapshot(page) {
   return page.evaluate(() => JSON.parse(document.querySelector("#debugSnapshot").textContent));
 }
 
-async function waitForOnlineState(page, predicateSource, argument, timeoutMs = 30000) {
+async function waitForOnlineState(page, predicateSource, argument, timeoutMs = 45000) {
   const deadline = Date.now() + timeoutMs;
   let latest = null;
   while (Date.now() < deadline) {
@@ -137,38 +105,29 @@ async function waitForOnlineState(page, predicateSource, argument, timeoutMs = 3
 
 async function callableError(name, data = {}) {
   const response = await fetch(`${functionsBase}/${name}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ data })
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data })
   });
-  const body = await response.json();
-  return { status: response.status, body };
+  return { status: response.status, body: await response.json() };
 }
 
 before(async () => {
   assert.equal(process.env.FIRESTORE_EMULATOR_HOST, "127.0.0.1:8180");
   if (!admin.apps.length) admin.initializeApp({ projectId });
   db = admin.firestore();
-
   server = http.createServer((request, response) => {
     const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
-    const pathname = decodeURIComponent(requestUrl.pathname);
-    const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+    const relative = requestUrl.pathname === "/" ? "index.html" : decodeURIComponent(requestUrl.pathname).replace(/^\/+/, "");
     const resolved = path.resolve(repoRoot, relative);
     if (!resolved.startsWith(`${repoRoot}${path.sep}`) || !fs.existsSync(resolved) || fs.statSync(resolved).isDirectory()) {
       response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       response.end("Not found");
       return;
     }
-    response.writeHead(200, {
-      "cache-control": "no-store",
-      "content-type": mimeTypes.get(path.extname(resolved).toLowerCase()) || "application/octet-stream"
-    });
+    response.writeHead(200, { "cache-control": "no-store", "content-type": mimeTypes.get(path.extname(resolved).toLowerCase()) || "application/octet-stream" });
     fs.createReadStream(resolved).pipe(response);
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  baseUrl = `http://127.0.0.1:${address.port}`;
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
   browser = await chromium.launch({ headless: true });
 });
 
@@ -178,23 +137,18 @@ after(async () => {
   if (admin.apps.length) await Promise.all(admin.apps.map((app) => app.delete()));
 });
 
-test("real Firebase client keeps device progression authoritative across account identity flows", async () => {
-  const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 100000).toString(36)}`.slice(-14);
+test("real Firebase client replaces rather than merges progression while competition remains fail-closed", { timeout: 180_000 }, async () => {
+  const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 100000).toString(36)}`.slice(-12);
   const accountAName = `a-${suffix}`;
   const accountBName = `b-${suffix}`;
-  const [accountA, accountB] = await Promise.all([
-    createEmulatorAccount(accountAName),
-    createEmulatorAccount(accountBName)
-  ]);
+  const [accountA, accountB] = await Promise.all([createEmulatorAccount(accountAName), createEmulatorAccount(accountBName)]);
   await Promise.all([
-    seedAccount(accountA, { callSign: "ARCHIVE_A" }),
-    seedAccount(accountB, { callSign: "ARCHIVE_B", publicBest: 222222, leaderboardBest: 333333 })
+    seedAccount(accountA, { callSign: "ARCHIVE_A", glory: 999999 }),
+    seedAccount(accountB, { callSign: "ARCHIVE_B", glory: 1200, accountBest: 900 })
   ]);
 
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await context.addInitScript((seed) => {
-    if (sessionStorage.getItem("firebase-client-fixture-seeded") === "1") return;
-    sessionStorage.setItem("firebase-client-fixture-seeded", "1");
     localStorage.setItem("star_strike_rush_meta_v1", JSON.stringify(seed));
     localStorage.setItem("star_strike_rush_high_score_v1", "32100");
     localStorage.setItem("star_strike_rush_callsign_v1", "GUEST_ONLY");
@@ -208,193 +162,107 @@ test("real Firebase client keeps device progression authoritative across account
   await page.waitForFunction(() => window.starStrikeOnline?.getState().ready === true, null, { timeout: 90000 });
   await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent, null, { timeout: 90000 });
 
-  const before = await debugSnapshot(page);
-  assert.equal(before.deviceProgress.totalGlory, 4321);
-  assert.equal(before.deviceProgress.prestige, 0);
-  assert.equal(before.deviceProgress.roadGlory, 4321);
-  assert.equal(before.deviceProgress.credits, 2468);
-  assert.deepEqual(before.deviceProgress.lifetime, localMetaSeed().lifetime);
-  assert.equal(await page.evaluate(() => "currentSeason" in JSON.parse(localStorage.getItem("star_strike_rush_meta_v1"))), false);
+  const deviceBefore = await debugSnapshot(page);
+  assert.equal(deviceBefore.deviceProgress.totalGlory, 4321);
+  assert.equal("credits" in deviceBefore.deviceProgress, false);
 
   await page.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountAName);
-  await waitForOnlineState(
-    page,
-    (state, uid) => state.user?.uid === uid && state.accountArchive === "loaded",
-    accountA.uid,
-    45000
-  );
-  let signedIn = await debugSnapshot(page);
-  assert.deepEqual(signedIn.deviceProgress, before.deviceProgress, "account hydration replaced device progression");
-  assert.equal(signedIn.highScore, 32100);
-  assert.equal(signedIn.ui.account.progressionMode, "device_local_preseason");
-  assert.equal(signedIn.ui.account.competitionMode, "preseason_unverified");
-  assert.equal(signedIn.ui.account.counters.hydrationSequences, 1);
-  assert.equal(signedIn.ui.account.counters.profileCallableCalls, 1);
-  assert.equal(signedIn.ui.account.counters.achievementAggregateLoads, 1);
-  assert.equal(signedIn.ui.account.counters.archiveListenerSubscriptions, 1);
-  assert.equal(
-    (await page.evaluate(() => window.starStrikeOnline.getState().backendRelease)).progressionAuthority,
-    "device_local_preseason"
-  );
-  assert.deepEqual(
-    await page.evaluate(() => window.starStrikeOnline.getState().achievements),
-    ["first_sortie", "mythic_score"]
-  );
-  const archive = await page.evaluate(() => window.starStrikeOnline.getState());
-  assert.equal(archive.onlineArchiveMeta.totalGlory, 999999);
-  assert.equal(archive.onlineArchiveMeta.prestige, 3);
-  assert.equal(archive.onlineArchiveMeta.roadGlory, 99999);
-  assert.equal(archive.legacyRecord.legacyBestScore, 999999);
-  assert.equal(archive.legacyRecord.verifiedBestScore, 0);
-  assert.equal(archive.legacyRecord.recordTrust, "legacy_unverified");
-  const cleanedPublicProfile = await db.doc(`players_public/${accountA.uid}`).get().then((snapshot) => snapshot.data());
-  assert.equal(cleanedPublicProfile.legacyBestScore, 999999);
-  assert.equal(cleanedPublicProfile.legacyPhase, 99);
-  assert.equal(cleanedPublicProfile.verifiedBestScore, 0);
-  assert.equal(cleanedPublicProfile.verifiedPhase, 1);
-  assert.equal(cleanedPublicProfile.recordTrust, "legacy_unverified");
-  for (const field of [
-    "uid",
-    "bestScore",
-    "phase",
-    "glory",
-    "gloryRank",
-    "gloryRankIndex",
-    "seasonTier",
-    "achievementsCount"
-  ]) {
-    assert.equal(field in cleanedPublicProfile, false, `obsolete public field remained: ${field}`);
-  }
+  await waitForOnlineState(page, (state, uid) => state.user?.uid === uid && state.accountArchive === "loaded", accountA.uid);
+  let online = await page.evaluate(() => window.starStrikeOnline.getState());
+  assert.equal(online.progressionChoice.required, true);
+  assert.equal(online.progressionChoice.kind, "conflict");
+  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 4321, "hydration changed device progression before consent");
+  assert.equal(online.progressionMode, "explicit_account_or_device");
+  assert.equal(online.competitionMode, "paused");
+  assert.equal(online.backendRelease.progressionAuthority, "explicit_account_or_device");
 
-  await page.evaluate(() => window.starStrikeOnline.refresh());
-  await page.waitForTimeout(200);
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress, "account refresh replaced device progression");
+  await page.evaluate(() => window.starStrikeOnline.chooseProgression("account"));
+  await page.waitForFunction(() => window.starStrikeOnline.getState().progressionChoice === null);
+  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 999999);
+  assert.notEqual((await debugSnapshot(page)).deviceProgress.totalGlory, 1004320, "progression was combined");
+
+  const cleaned = await db.doc(`players_public/${accountA.uid}`).get().then((snapshot) => snapshot.data());
+  assert.equal(cleaned.legacyBestScore, 999999);
+  assert.equal(cleaned.legacyPhase, 99);
+  assert.equal(cleaned.verifiedBestScore, 0);
+  for (const field of ["uid", "bestScore", "phase", "glory", "gloryRank", "gloryRankIndex", "seasonTier", "achievementsCount"]) {
+    assert.equal(field in cleaned, false, `obsolete public field remained: ${field}`);
+  }
 
   const published = await page.evaluate(() => window.starStrikeOnline.updateCallSign("ACCOUNT_A"));
   assert.equal(published.published, true);
-  assert.equal(await db.doc(`players_public/${accountA.uid}`).get().then((snapshot) => snapshot.data().callSign), "ACCOUNT_A");
   assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_callsign_v1")), "GUEST_ONLY");
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress, "call-sign publication replaced device progression");
+
+  const handleOne = `p${suffix}`.slice(0, 16);
+  const handleTwo = `q${suffix}`.slice(0, 16);
+  assert.deepEqual(await page.evaluate((value) => window.starStrikeOnline.claimHandle(value), handleOne), { ok: true, handle: handleOne });
+  assert.deepEqual(await page.evaluate((value) => window.starStrikeOnline.claimHandle(value), handleTwo), { ok: true, handle: handleTwo });
+  assert.equal((await db.doc(`handle_registry/${handleOne}`).get()).exists, false, "old handle stayed reserved after change");
+  assert.equal((await db.doc(`handle_registry/${handleTwo}`).get()).data().uid, accountA.uid);
+
+  const leagueJoin = await page.evaluate(() => window.starStrikeOnline.joinWeeklyLeague());
+  assert.equal(leagueJoin.ok, false);
+  assert.equal(leagueJoin.reason, "competition_paused");
+  assert.equal((await page.evaluate(() => window.starStrikeOnline.getState().weeklyLeagues)).length, 0);
+  assert.deepEqual(await page.evaluate(() => window.starStrikeOnline.startVerifiedRun()), { ok: false, reason: "competition_paused" });
+  assert.equal((await page.evaluate(() => window.starStrikeOnline.submitRun({ evidence: { sessionId: "forged", challenge: "forged", events: [] } }))).ok, false);
+  assert.equal((await db.doc(`world_records/${accountA.uid}`).get()).exists, false);
+
+  const deletion = await page.evaluate(() => window.starStrikeOnline.requestAccountDeletion());
+  assert.equal(deletion.status, "pending");
+  assert.equal(deletion.deletesAfterMs - deletion.requestedAtMs, 72 * 60 * 60 * 1000);
+  await page.evaluate(() => window.starStrikeOnline.cancelAccountDeletion());
+  assert.equal((await db.doc(`account_deletion_requests/${accountA.uid}`).get()).exists, false);
+
+  await page.evaluate(() => window.starStrikeOnline.signOut());
+  await page.waitForFunction(() => window.starStrikeOnline.getState().user === null);
+  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 0, "sign-out retained account progression locally");
+  assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_callsign_v1")), "GUEST_ONLY");
+
+  await page.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountBName);
+  await waitForOnlineState(page, (state, uid) => state.user?.uid === uid && state.accountArchive === "loaded", accountB.uid);
+  await page.waitForFunction(() => window.starStrikeOnline.getState().progressionChoice === null);
+  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 1200);
+  assert.deepEqual(await page.evaluate((value) => window.starStrikeOnline.claimHandle(value), handleOne), { ok: true, handle: handleOne });
+  await assert.rejects(page.evaluate((value) => window.starStrikeOnline.claimHandle(value), handleTwo), /already claimed/i);
+  assert.notEqual(await page.evaluate(() => window.starStrikeOnline.getState().profileCallSign), "ACCOUNT_A");
+
+  await page.evaluate(() => window.starStrikeOnline.signOut());
+  await page.waitForFunction(() => window.starStrikeOnline.getState().user === null);
+  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 0);
+  await page.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountAName);
+  await waitForOnlineState(page, (state, uid) => state.user?.uid === uid && state.accountArchive === "loaded", accountA.uid);
+  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 999999, "account progression did not return exactly");
+  assert.equal(await page.evaluate(() => window.starStrikeOnline.getState().profileHandle), handleTwo);
 
   const secondContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await secondContext.addInitScript(({ uid, seed }) => {
-    localStorage.setItem("star_strike_rush_meta_v1", JSON.stringify(seed));
+  await secondContext.addInitScript((uid) => {
     localStorage.setItem(`star_strike_rush_account_identity_v1:${uid}`, JSON.stringify({
-      uid,
-      desiredCallSign: "STALE_A",
-      publishedCallSign: "STALE_A",
-      pending: false,
-      status: "published",
-      updatedAtMs: 1
+      uid, desiredCallSign: "STALE_A", publishedCallSign: "STALE_A", pending: false, status: "published", updatedAtMs: 1
     }));
-  }, { uid: accountA.uid, seed: localMetaSeed() });
+  }, accountA.uid);
   const secondPage = await secondContext.newPage();
   await secondPage.goto(`${baseUrl}/?debug=1&firebaseEmulators=1`, { waitUntil: "domcontentloaded" });
   await secondPage.waitForFunction(() => window.starStrikeOnline?.getState().ready === true, null, { timeout: 90000 });
   await secondPage.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountAName);
-  await secondPage.waitForFunction(
-    (uid) => window.starStrikeOnline?.getState().user?.uid === uid
-      && window.starStrikeOnline?.getState().accountArchive === "loaded",
-    accountA.uid,
-    { timeout: 90000 }
-  );
+  await waitForOnlineState(secondPage, (state, uid) => state.user?.uid === uid && state.accountArchive === "loaded", accountA.uid);
   assert.equal(await secondPage.evaluate(() => window.starStrikeOnline.getState().profileCallSign), "ACCOUNT_A");
-  assert.equal(
-    await secondPage.evaluate((uid) => window.readAccountIdentityState(localStorage, uid).publishedCallSign, accountA.uid),
-    "ACCOUNT_A",
-    "server call sign did not replace the stale second-device cache"
-  );
-  const secondDevicePublished = await secondPage.evaluate(() => window.starStrikeOnline.updateCallSign("STARFOX"));
-  assert.equal(secondDevicePublished.published, true);
-  await page.evaluate(() => window.starStrikeOnline.refresh());
-  await page.waitForFunction(() => window.starStrikeOnline.getState().profileCallSign === "STARFOX", null, { timeout: 90000 });
-  assert.equal(
-    await page.evaluate((uid) => window.readAccountIdentityState(localStorage, uid).publishedCallSign, accountA.uid),
-    "STARFOX",
-    "first device did not accept the newer server-confirmed call sign"
-  );
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress);
+  assert.equal(await secondPage.evaluate((uid) => window.readAccountIdentityState(localStorage, uid).publishedCallSign, accountA.uid), "ACCOUNT_A");
   await secondContext.close();
 
-  const handle = `p${suffix.replace(/[^a-z0-9]/g, "").slice(-12)}`.slice(0, 16);
-  const handleResult = await page.evaluate((value) => window.starStrikeOnline.claimHandle(value), handle);
-  assert.deepEqual(handleResult, { ok: true, handle });
-  const privateBeforeWeekly = await db.doc(`players_private/${accountA.uid}`).get().then((snapshot) => snapshot.data());
-  const weeklyJoin = await page.evaluate(() => window.starStrikeOnline.joinWeeklyLeague());
-  assert.equal(weeklyJoin.ok, true);
-  assert.equal(weeklyJoin.league.recordTrust, "preseason_unverified");
-  assert.equal(weeklyJoin.league.members.length, 1);
-  const weeklyRun = {
-    score: 12000,
-    phaseReached: 3,
-    stats: {
-      enemiesKilled: 24,
-      bossesKilled: 1,
-      powerupsCollected: 2,
-      ghostUses: 3,
-      damageTaken: 1,
-      highestCombo: 8,
-      runDurationMs: 60000
-    },
-    receipt: { receiptId: `weekly_${suffix}` }
-  };
-  const weeklySubmit = await page.evaluate((run) => window.starStrikeOnline.submitRun(run), weeklyRun);
-  assert.equal(weeklySubmit.ok, true);
-  assert.equal(weeklySubmit.league.members[0].weeklyPoints, 1200);
-  const weeklyDuplicate = await page.evaluate((run) => window.starStrikeOnline.submitRun(run), weeklyRun);
-  assert.equal(weeklyDuplicate.ok, true);
-  assert.equal(weeklyDuplicate.alreadyProcessed, true);
-  assert.deepEqual(
-    await db.doc(`players_private/${accountA.uid}`).get().then((snapshot) => snapshot.data()),
-    privateBeforeWeekly,
-    "weekly publication mutated account progression"
-  );
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress, "weekly publication mutated device progression");
-
-  await page.route("**/syncPilotProfile", (route) => route.abort("failed"));
-  const pending = await page.evaluate(() => window.starStrikeOnline.updateCallSign("PENDING_A"));
-  assert.equal(pending.storageSucceeded, true);
-  assert.equal(pending.pending, true);
-  assert.equal((await page.evaluate((uid) => window.readAccountIdentityState(localStorage, uid), accountA.uid)).desiredCallSign, "PENDING_A");
-  await page.unroute("**/syncPilotProfile");
-  await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await page.waitForFunction(() => window.starStrikeOnline.getState().pendingCallSign === false);
-  assert.equal(await db.doc(`players_public/${accountA.uid}`).get().then((snapshot) => snapshot.data().callSign), "PENDING_A");
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress);
-
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction((uid) => {
-    const state = window.starStrikeOnline?.getState();
-    return state?.user?.uid === uid && state.accountArchive === "loaded";
-  }, accountA.uid, { timeout: 90000 });
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress, "restored auth replaced device progression");
-  assert.equal((await debugSnapshot(page)).ui.account.counters.hydrationSequences, 1);
-
-  await page.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountBName);
-  await page.waitForFunction((uid) => window.starStrikeOnline.getState().user?.uid === uid, accountB.uid);
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, before.deviceProgress, "account switch replaced device progression");
-  assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_callsign_v1")), "GUEST_ONLY");
-  assert.equal((await page.evaluate((uid) => window.readAccountIdentityState(localStorage, uid), accountA.uid)).publishedCallSign, "PENDING_A");
-  assert.notEqual((await page.evaluate((uid) => window.readAccountIdentityState(localStorage, uid), accountB.uid)).publishedCallSign, "PENDING_A");
-
-  assert.equal(await page.evaluate(() => typeof window.starStrikeOnline.claimSeasonReward), "undefined");
-  for (const endpoint of ["submitRunReceipt", "joinWeeklyLeague", "claimSeasonReward"]) {
-    const rejection = await callableError(endpoint, endpoint === "claimSeasonReward" ? { rewardId: "season_01_tier_1" } : {});
-    assert.equal(rejection.body.error.status, endpoint === "claimSeasonReward" ? "FAILED_PRECONDITION" : "UNAUTHENTICATED", endpoint);
-    assert.match(rejection.body.error.message, endpoint === "claimSeasonReward" ? /retired/i : /sign in/i, endpoint);
+  for (const endpoint of ["chooseProgressionSource", "requestAccountDeletion"]) {
+    const rejection = await callableError(endpoint, {});
+    assert.equal(rejection.body.error.status, "UNAUTHENTICATED", endpoint);
   }
-  const invariantProgress = (await debugSnapshot(page)).deviceProgress;
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction((uid) => window.starStrikeOnline?.getState().user?.uid === uid, accountB.uid, { timeout: 90000 });
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, invariantProgress);
+  for (const endpoint of ["startVerifiedRun", "submitRunReceipt", "joinWeeklyLeague", "listWeeklyLeagues"]) {
+    const rejection = await callableError(endpoint, {});
+    assert.equal(rejection.body.error.status, "FAILED_PRECONDITION", endpoint);
+    assert.match(rejection.body.error.message, /authoritative run verifier/i);
+  }
+  const retired = await callableError("claimSeasonReward", {});
+  assert.equal(retired.body.error.status, "FAILED_PRECONDITION");
+  assert.match(retired.body.error.message, /retired/i);
 
-  await page.evaluate(() => window.starStrikeOnline.signOut());
-  await page.waitForFunction(() => window.starStrikeOnline.getState().user === null);
-  const signedOut = await page.evaluate(() => window.starStrikeOnline.getState());
-  assert.equal(signedOut.leaderboard.length, 0);
-  assert.equal(signedOut.achievements.length, 0);
-  assert.equal(signedOut.profileCallSign, "");
-  assert.deepEqual((await debugSnapshot(page)).deviceProgress, invariantProgress);
   assert.deepEqual(runtimeErrors, []);
   await context.close();
 });
