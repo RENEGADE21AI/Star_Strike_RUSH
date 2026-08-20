@@ -5,7 +5,6 @@
 - Preserved comparison commit: `529aca1`.
 - Release-integrity starting commit:
   `d5a298fd5cb9d653b2013c6a3e5d894342a1e5e0`.
-- Release-integrity feature branch: `codex/release-integrity-preseason`.
 - Final production-gate starting commit:
   `419395afda3061754d98a74d42fcfd9aed2dc0af`.
 - Final production-gate branch: `codex/final-production-gate`.
@@ -41,9 +40,8 @@ and release evidence.
 
 - Defined separate configuration for client competition writes, server
   competition writes, server progression writes, and progression authority.
-- Device progression remains authoritative. Account hydration stores Firebase
-  metadata as `onlineArchiveMeta` and has no API capable of merging it into
-  local gameplay progression.
+- Account and device progression remain distinct. When both are meaningful the
+  player selects exactly one replacement snapshot; they are never merged.
 - The later permanent-progression pass retired Season XP, tiers, reward lanes,
   and claims in favor of one cumulative Glory Road. Prestige is derived from
   full 300,000-Glory blocks and never consumes Glory.
@@ -61,12 +59,12 @@ and release evidence.
 
 ### Server and legacy-data boundary
 
-- `leaderboard_scores` is retained as a **LEGACY/PRESEASON ARCHIVE**.
+- `leaderboard_scores` is retained as a **LEGACY ARCHIVE**.
 - Legacy score/phase fields are separated from future verified fields and never
   seed verified/profile progression.
-- `submitRunReceipt` and `joinWeeklyLeague` now operate only the explicitly
-  unverified preseason weekly board. They are authenticated, throttled, bounded,
-  callable-only, and cannot mutate Glory or account progression.
+- `startVerifiedRun`, `submitRunReceipt`, and Weekly League callables use
+  server-issued one-time sessions. The server ignores caller score, validates a
+  bounded event ledger, and calculates accepted score and account progression.
   `claimSeasonReward` remains an inert zero-access compatibility stub.
 - Active identity callables have payload-size bounds, per-UID throttles, safe
   errors, and a prepared-but-disabled App Check flag.
@@ -213,10 +211,10 @@ Playable URL: https://star-strike-rush.web.app
   patrol size or flight behavior.
 - Gave mobile Achievement Vault entries a readable single-column layout with
   measured description wrapping and clear progress.
-- Kept the classic bottom-left Energy/Hull hierarchy while shrinking its
+- Kept the classic bottom-left Ghost/Health hierarchy while shrinking its
   footprint and explicitly protecting the touch joystick and ability control.
 - Rebuilt Game Over as an end-of-run flight record with final score, device
-  best, Glory/Credits, rank or Prestige context, and clear next actions.
+  best, Glory, rank or Prestige context, and clear next actions.
 - Extended asserted visual QA to the Pilot Dossier, Settings, reset
   confirmation, Records, Codex overview, progression road, touch HUD, and Game
   Over rather than treating screenshot creation alone as success.

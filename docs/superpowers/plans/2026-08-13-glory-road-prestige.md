@@ -8,12 +8,13 @@
 - Milestones repeat per Prestige cycle and are emitted by progression application, never inferred by rendering.
 - Star Eternal and the corresponding Prestige rollover are one terminal event.
 - Prestige is status only and never affects gameplay.
-- Device-local preseason progression remains authoritative; Firebase account/archive data cannot replace it.
+- The contemporary authority is explicit account-or-device replacement; this
+  historical plan must not be used to reintroduce additive merging.
 
 ## Implementation slices
 
 1. Add pure browser Glory math for Road state, display ranks, repeated absolute milestone detection, escalation intensity, and a bounded presentation queue. Lock it with deterministic boundary and multi-Prestige tests.
-2. Migrate the local meta schema to v2 without changing cumulative Glory, Credits, lifetime stats, achievements, Codex, settings, identity, or onboarding. Retire active Season fields and strip Season XP from new receipts without replaying historical milestones.
+2. Migrate local meta data without changing cumulative Glory, lifetime stats, achievements, Codex, settings, identity, or onboarding. Retire obsolete secondary-currency and Season fields without replaying historical milestones.
 3. Apply standard-run progress exactly once, attach structured milestone data, and initialize a post-run celebration queue only after combat ends. Tutorial/debug runs remain non-progressing.
 4. Replace the two-tab progression panel with one Glory Road using current-loop values, permanent Prestige/total context, concise node details, and rollover-correct scroll focus.
 5. Replace title and Game Over Season presentation with Prestige/Glory data. Make View Road always open the one Road.

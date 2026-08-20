@@ -7,12 +7,12 @@ after the files they depend on, because the current code intentionally shares gl
   tuned collision circles, preload state, and procedural fallback bridge.
 - `00-accessible-surface.js`: semantic action overlays, live status, modal focus
   containment, and focus restoration for the Canvas interface.
-- `00-competition.js`: public-handle normalization, UTC weekly windows,
-  performance bands, and league labels shared by client UI rules.
+- `00-competition.js`: unique changeable public-handle normalization, UTC weekly
+  windows, verified-session activation gates, performance bands, and league labels.
 - `00-identity.js`: call-sign validation, neutral identity generation, and the
   public-profile field whitelist.
-- `00-gameplay-rules.js`: deterministic Debris Warden route generation, Siphon
-  aim/range calculations, and boss-specific action profiles.
+- `00-gameplay-rules.js`: deterministic Debris Warden routes, Siphon aim/range,
+  forward-thrust spacecraft steering, asteroid durability, and boss actions.
 - `00-input-actions.js`: explicit gameplay actions and meaningful-input mode
   switching for keyboard, mouse, touch, and pen.
 - `00-onboarding-state.js`: versioned First Flight persistence, explicit
@@ -44,8 +44,8 @@ after the files they depend on, because the current code intentionally shares gl
   isolated destructive reset confirmation.
 - `00-glory-progression.js`: canonical browser Glory Road, Prestige, rank, and
   repeating milestone math.
-- `12-progress-road-data.js`: the single Glory Road's repeating rank/checkpoint
-  nodes and concise Prestige-aware detail payloads.
+- `12-progress-road-data.js`: the single Glory Road's continuous absolute
+  rank/checkpoint nodes and scalable Prestige-aware detail payloads.
 - `12-rendering-progress-road.js`: winding Glory Road layout and rendering.
 - `12-glory-celebration.js`: ordered checkpoint, rank-up, and Prestige rollover
   presentation after progression is applied at Game Over.
@@ -55,7 +55,8 @@ after the files they depend on, because the current code intentionally shares gl
 - `15-rendering-entities.js`: wingmen, bullets, enemies, bosses, powerups, particles.
 - `16-rendering-hud.js`: top-left paid pause control, guarded restart/exit
   confirmation, compact backed top-right score block, edge-safe bottom-left
-  Energy/Hull instrument, touch controls, warnings, and damage flash.
+  Ghost/Health instrument, inactivity-only controls hint, touch controls,
+  warnings, and damage flash.
 - `17-rendering-scene.js`: outer fog, top-level draw orchestration, and the
   time-based top-down galaxy transit shared by title Play and First Flight.
 - `17-tutorial-onboarding.js`: First Flight runtime director, accessible
@@ -83,11 +84,11 @@ after the files they depend on, because the current code intentionally shares gl
   and developer stat controls are not part of the runtime.
 - `19-game-achievements.js`: per-run and lifetime achievement ladders, progress
   metrics, run stat payloads, and account-identity hooks called by the game loop.
-- `20-firebase-online.js`: Firebase Auth, callable profile/handle services,
-  graceful backend-unavailable state, and the explicit recovery competition
-  gate. Public score/league submission and leaderboard subscription remain
-  disabled until server-issued run verification ships. It intentionally does
-  not commit Firebase API keys; it loads config from Firebase Hosting
+- `20-firebase-online.js`: Firebase Auth, unique mutable handles, explicit
+  account-or-device progression selection, 72-hour deletion controls,
+  server-issued run sessions, World Records, Weekly Leagues, and graceful
+  backend-unavailable state. It intentionally does not commit Firebase API keys;
+  it loads config from Firebase Hosting
   `/__/firebase/init.json` or ignored `src/firebase-config.local.json`.
 
 ## Firebase Config
