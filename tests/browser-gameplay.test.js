@@ -795,7 +795,14 @@ test("debug runs cannot persist records or progression across reload", { timeout
     assert.equal(await page.evaluate(() => localStorage.getItem("star_strike_rush_high_score_v1")), "100");
 
     await page.reload({ waitUntil: "commit" });
-    await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent);
+    await page.waitForFunction(() => {
+      const node = document.querySelector("#debugSnapshot");
+      if (!node?.textContent) return false;
+      const snapshot = JSON.parse(node.textContent);
+      return snapshot.highScore === 100 &&
+        snapshot.deviceProgress?.totalGlory === 55 &&
+        snapshot.localAchievements?.includes("first_sortie");
+    });
     const reloaded = await debugSnapshot(page);
     assert.equal(reloaded.highScore, 100);
     assert.equal(reloaded.deviceProgress.totalGlory, 55);

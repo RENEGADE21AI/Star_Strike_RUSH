@@ -15,6 +15,12 @@ const identityToolkitBaseUrl = String(
   process.env.IDENTITY_TOOLKIT_BASE_URL ||
   "https://identitytoolkit.googleapis.com"
 ).replace(/\/$/, "");
+const readinessAttempts = allowHttpSmoke
+  ? Math.max(1, Math.min(10, Number.parseInt(process.env.SMOKE_READINESS_ATTEMPTS || "7", 10) || 7))
+  : 7;
+const readinessDelayMs = allowHttpSmoke
+  ? Math.max(0, Math.min(10000, Number.parseInt(process.env.SMOKE_READINESS_DELAY_MS || "5000", 10) || 0))
+  : 5000;
 
 if (!/^https:\/\//.test(baseUrl) && !(
   allowHttpSmoke &&
@@ -43,6 +49,24 @@ async function request(url, options = {}) {
     signal: AbortSignal.timeout(30000)
   });
   return response;
+}
+
+async function waitForHostingRelease() {
+  let responses = null;
+  for (let attempt = 1; attempt <= readinessAttempts; attempt++) {
+    const cacheBuster = `smoke=${Date.now()}-${attempt}`;
+    responses = await Promise.all([
+      request(`${baseUrl}/?${cacheBuster}`, { cache: "no-store" }),
+      request(`${baseUrl}/version.json?${cacheBuster}`, { cache: "no-store" })
+    ]);
+    if (responses.every((response) => response.status === 200)) return responses;
+    if (attempt < readinessAttempts) {
+      await Promise.all(responses.map((response) => response.arrayBuffer().catch(() => {})));
+      console.error(`Hosting release not ready (attempt ${attempt}/${readinessAttempts}); retrying.`);
+      await new Promise((resolve) => setTimeout(resolve, readinessDelayMs));
+    }
+  }
+  return responses;
 }
 
 async function requirePrivate404(pathname) {
@@ -77,24 +101,33 @@ async function requireGoogleAuthOrigin() {
   assert.equal(config.projectId, projectId, "Firebase Hosting init config project differs");
   assert.ok(typeof config.apiKey === "string" && config.apiKey.length > 10, "Firebase browser API key is missing");
 
-  const response = await request(
-    `${identityToolkitBaseUrl}/v1/accounts:createAuthUri?key=${encodeURIComponent(config.apiKey)}`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        referer: `${baseUrl}/`
-      },
-      body: JSON.stringify({
-        continueUri: `${baseUrl}/`,
-        providerId: "google.com"
-      })
-    }
-  );
+  let response = null;
   let body = {};
-  try {
-    body = await response.json();
-  } catch {}
+  for (let attempt = 1; attempt <= readinessAttempts; attempt++) {
+    response = await request(
+      `${identityToolkitBaseUrl}/v1/accounts:createAuthUri?key=${encodeURIComponent(config.apiKey)}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          referer: `${baseUrl}/`
+        },
+        body: JSON.stringify({
+          continueUri: `${baseUrl}/`,
+          providerId: "google.com"
+        })
+      }
+    );
+    body = {};
+    try {
+      body = await response.json();
+    } catch {}
+    if (response.status === 200) break;
+    const retryableStatus = [403, 404, 429, 500, 502, 503, 504].includes(response.status);
+    if (!retryableStatus || attempt === readinessAttempts) break;
+    console.error(`Google Auth origin not ready (attempt ${attempt}/${readinessAttempts}); retrying.`);
+    await new Promise((resolve) => setTimeout(resolve, readinessDelayMs));
+  }
   assert.equal(
     response.status,
     200,
@@ -104,11 +137,7 @@ async function requireGoogleAuthOrigin() {
 }
 
 (async () => {
-  const cacheBuster = `smoke=${Date.now()}`;
-  const [root, version] = await Promise.all([
-    request(`${baseUrl}/?${cacheBuster}`, { cache: "no-store" }),
-    request(`${baseUrl}/version.json?${cacheBuster}`, { cache: "no-store" })
-  ]);
+  const [root, version] = await waitForHostingRelease();
   assert.equal(root.status, 200, "root must return 200");
   assert.equal(version.status, 200, "version.json must return 200");
   const release = await version.json();
