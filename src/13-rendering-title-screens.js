@@ -202,58 +202,6 @@ function drawTitleAndButtons() {
   ctx.restore();
 }
 
-function getProgressionChoiceRects() {
-  const panel = { x: 24, y: 170, w: W - 48, h: 328 };
-  return {
-    panel,
-    account: { x: panel.x + 18, y: panel.y + 180, w: panel.w - 36, h: 48 },
-    device: { x: panel.x + 18, y: panel.y + 242, w: panel.w - 36, h: 48 }
-  };
-}
-
-function drawProgressionChoiceOverlay() {
-  const online = window.starStrikeOnline && window.starStrikeOnline.getState ? window.starStrikeOnline.getState() : {};
-  const choice = online.progressionChoice;
-  if (!choice || !choice.required) return;
-  const r = getProgressionChoiceRects();
-  const format = (profile) => {
-    const lifetime = profile && profile.lifetime ? profile.lifetime : {};
-    return `${Number(profile && profile.totalGlory || 0).toLocaleString()} GLORY  •  BEST ${Number(lifetime.bestScore || 0).toLocaleString()}`;
-  };
-  ctx.save();
-  ctx.fillStyle = "rgba(0,3,10,0.88)";
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "rgba(5,13,27,0.98)";
-  ctx.strokeStyle = "rgba(95,226,255,0.72)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(r.panel.x, r.panel.y, r.panel.w, r.panel.h, 12);
-  ctx.fill();
-  ctx.stroke();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillStyle = "#fff";
-  ctx.font = "800 24px Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif";
-  ctx.fillText("CHOOSE YOUR PROGRESSION", W / 2, r.panel.y + 22);
-  ctx.font = FONT_SMALL;
-  ctx.fillStyle = "rgba(226,242,250,0.78)";
-  ctx.fillText("SAVES ARE REPLACED — NEVER COMBINED", W / 2, r.panel.y + 57);
-  ctx.font = FONT_TINY;
-  ctx.fillStyle = "#7ee7ff";
-  ctx.fillText(`ACCOUNT  ${format(choice.account)}`, W / 2, r.panel.y + 93);
-  ctx.fillStyle = "#ffd47a";
-  ctx.fillText(`DEVICE  ${format(choice.device)}`, W / 2, r.panel.y + 120);
-  ctx.fillStyle = "rgba(255,255,255,0.58)";
-  ctx.fillText("THE SELECTED SAVE REPLACES THE OTHER. THIS CANNOT BE ADDED TOGETHER.", W / 2, r.panel.y + 148);
-  drawPressButton(r.account, choice.status === "saving" ? "SAVING..." : "KEEP ACCOUNT PROGRESS", false, "rgba(20,126,196,0.24)");
-  drawPressButton(r.device, choice.status === "saving" ? "SAVING..." : "KEEP DEVICE PROGRESS", false, "rgba(190,126,30,0.20)");
-  if (choice.status === "error") {
-    ctx.fillStyle = "#ff9a9a";
-    ctx.font = FONT_TINY;
-    ctx.fillText("SAVE FAILED — CHECK YOUR CONNECTION AND TRY AGAIN", W / 2, r.panel.y + 302);
-  }
-  ctx.restore();
-}
 function drawStartScreen() {
   drawTitleSun();
   drawMenuFlights();
@@ -263,7 +211,6 @@ function drawStartScreen() {
   drawTitleAndButtons();
   drawSettingsAndCodexPanels();
   drawResetProgressConfirm();
-  drawProgressionChoiceOverlay();
   drawAccountDeletionConfirm();
 }
 function drawGameOverScreen() {

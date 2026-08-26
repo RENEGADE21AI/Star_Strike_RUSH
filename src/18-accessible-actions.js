@@ -161,7 +161,7 @@ function syncGameAccessibleSurface(force = false) {
     settingMusicEnabled,
     settingEffectsEnabled,
     onlineKey,
-    JSON.stringify((accountState || {}).progressionChoice || null),
+    JSON.stringify((accountState || {}).progressionResolution || null),
     JSON.stringify((accountState || {}).accountDeletion || null),
     callSignEditing,
     handleEditing,
@@ -189,20 +189,6 @@ function syncGameAccessibleSurface(force = false) {
         })
       ],
       onEscape: () => { deleteAccountConfirm = false; return true; }
-    });
-    return;
-  }
-  if (state.gameState === "start" && accountState.progressionChoice && accountState.progressionChoice.required) {
-    const rects = getProgressionChoiceRects();
-    setGameAccessibleSurface({
-      mode: "progression-choice",
-      label: "Choose account or device progression",
-      message: "Choose which progression to keep. The selected save replaces the other and the values are never combined.",
-      modal: true,
-      actions: [
-        accessibleRectAction("keep-account-progress", "Keep account progression", rects.account, () => window.starStrikeOnline.chooseProgression("account")),
-        accessibleRectAction("keep-device-progress", "Keep device progression", rects.device, () => window.starStrikeOnline.chooseProgression("device"))
-      ]
     });
     return;
   }

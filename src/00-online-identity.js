@@ -107,7 +107,7 @@ function clearAccountIdentity(onlineState, options = {}) {
   onlineState.profileHandle = "";
   onlineState.profileMeta = null;
   onlineState.onlineArchiveMeta = null;
-  onlineState.progressionChoice = null;
+  onlineState.progressionResolution = null;
   onlineState.accountDeletion = null;
   onlineState.legacyRecord = null;
   onlineState.weeklyLeague = null;
@@ -118,7 +118,7 @@ function clearAccountIdentity(onlineState, options = {}) {
   onlineState.pendingCallSign = false;
   onlineState.identityService = "signed_out";
   onlineState.accountArchive = "not_loaded";
-  onlineState.progressionMode = options.progressionMode || "explicit_account_or_device";
+  onlineState.progressionMode = options.progressionMode || "automatic_best_account_or_device";
   onlineState.competitionMode = options.competitionMode === "verified_world_records"
     ? "verified_world_records"
     : "paused";

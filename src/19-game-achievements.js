@@ -182,7 +182,7 @@ function beginOnlineVerifiedRun() {
   const service = window.starStrikeOnline;
   if (!service || typeof service.getState !== "function" || typeof service.startVerifiedRun !== "function") return false;
   const status = service.getState();
-  if (!status.user || status.competitionMode !== "verified_world_records" || status.progressionChoice) return false;
+  if (!status.user || status.competitionMode !== "verified_world_records" || status.progressionResolution) return false;
   state.verifiedRunPromise = Promise.resolve(service.startVerifiedRun()).then((result) => {
     if (result && result.ok && result.session) state.verifiedRunSession = result.session;
     return result;

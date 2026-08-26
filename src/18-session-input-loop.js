@@ -26,8 +26,6 @@ function beginGame() {
   if (typeof prepareGameplayMusic === "function") prepareGameplayMusic();
   if (typeof playGameSound === "function") playGameSound("launch", 0.9);
   if (state.gameState === "start") {
-    const accountState = typeof accountIdentitySnapshot === "function" ? accountIdentitySnapshot() : {};
-    if (accountState.progressionChoice && accountState.progressionChoice.required) return false;
     titlePanelTarget = 0;
     state.sceneTransition = {
       mode: "title_launch",
@@ -593,11 +591,6 @@ window.addEventListener("keydown", (e) => {
     if (deleteAccountConfirm) {
       if (k === "Escape") { e.preventDefault(); deleteAccountConfirm = false; }
       else if (k === "Enter" || k === " ") e.preventDefault();
-      return;
-    }
-    const accountState = typeof accountIdentitySnapshot === "function" ? accountIdentitySnapshot() : {};
-    if (accountState.progressionChoice && accountState.progressionChoice.required) {
-      if (k === "Enter" || k === " " || k === "Escape") e.preventDefault();
       return;
     }
     if (["codex", "achievements", "progress"].includes(titleSubState) && titlePanelAnim > 0.02 && (k === "ArrowUp" || k === "ArrowDown" || k === "PageUp" || k === "PageDown")) {

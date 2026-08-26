@@ -19,29 +19,29 @@ function accountProfileFromClient(raw = {}) {
   });
 }
 
-function profileHasProgress(profile) {
+function profilePriority(profile, achievementCount = 0, codexCount = 0) {
   const normalized = normalizeProfile(profile);
-  return normalized.totalGlory > 0 || normalized.lifetimeRuns > 0 || normalized.lifetimeScore > 0 ||
-    normalized.lifetimeKills > 0 || normalized.lifetimePowerups > 0 || normalized.lifetimeGhostUses > 0 ||
-    normalized.lifetimeBosses > 0 || normalized.bestScore > 0 || normalized.phase > 1;
+  return [
+    normalized.totalGlory,
+    normalized.bestScore,
+    Math.max(0, Math.floor(Number(achievementCount) || 0)),
+    normalized.phase,
+    normalized.lifetimeScore,
+    normalized.lifetimeBosses,
+    normalized.lifetimeKills,
+    normalized.lifetimeRuns,
+    Math.max(0, Math.floor(Number(codexCount) || 0))
+  ];
 }
 
-function profileFingerprint(profile) {
-  const normalized = normalizeProfile(profile);
-  return JSON.stringify(normalized);
-}
-
-function accountProgressionChoiceState(deviceProfile, accountProfile) {
-  const deviceMeaningful = profileHasProgress(deviceProfile);
-  const accountMeaningful = profileHasProgress(accountProfile);
-  if (!deviceMeaningful && !accountMeaningful) return { kind: "empty", deviceMeaningful, accountMeaningful };
-  if (deviceMeaningful && !accountMeaningful) return { kind: "device_only", deviceMeaningful, accountMeaningful };
-  if (!deviceMeaningful && accountMeaningful) return { kind: "account_only", deviceMeaningful, accountMeaningful };
-  return {
-    kind: profileFingerprint(deviceProfile) === profileFingerprint(accountProfile) ? "same" : "conflict",
-    deviceMeaningful,
-    accountMeaningful
-  };
+function bestProgressionSource(deviceProfile, accountProfile, details = {}) {
+  const devicePriority = profilePriority(deviceProfile, details.deviceAchievementCount, details.deviceCodexCount);
+  const accountPriority = profilePriority(accountProfile, details.accountAchievementCount, details.accountCodexCount);
+  for (let index = 0; index < devicePriority.length; index++) {
+    if (devicePriority[index] > accountPriority[index]) return "device";
+    if (accountPriority[index] > devicePriority[index]) return "account";
+  }
+  return "account";
 }
 
 function replacementProfileForChoice(choice, deviceProfile, accountProfile) {
@@ -51,8 +51,7 @@ function replacementProfileForChoice(choice, deviceProfile, accountProfile) {
 
 module.exports = {
   accountProfileFromClient,
-  accountProgressionChoiceState,
-  profileFingerprint,
-  profileHasProgress,
+  bestProgressionSource,
+  profilePriority,
   replacementProfileForChoice
 };

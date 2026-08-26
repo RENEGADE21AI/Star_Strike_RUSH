@@ -45,6 +45,7 @@ function loadHydrationContract(overrides = {}) {
       readAccountIdentityState: () => ({ pending: false, desiredCallSign: "" })
     },
     isHydrationCurrent: () => true,
+    resolveBestProgression: async () => ({ ok: true, selectedSource: "account" }),
     subscribeWorldRecords: () => {},
     loadWeeklyLeague: async () => ({ ok: false, reason: "disabled" }),
     setStatus: () => {},
@@ -91,7 +92,7 @@ test("sign-out clears every account-scoped identity field without touching guest
   assert.equal(online.leaderboard.length, 0);
   assert.equal(online.identityService, "signed_out");
   assert.equal(online.accountArchive, "not_loaded");
-  assert.equal(online.progressionMode, "explicit_account_or_device");
+  assert.equal(online.progressionMode, "automatic_best_account_or_device");
   assert.equal(online.competitionMode, "paused");
   assert.equal(online.networkState, "online");
   assert.equal(online.pendingCallSign, false);

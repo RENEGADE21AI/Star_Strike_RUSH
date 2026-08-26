@@ -69,6 +69,16 @@ test("per-UID throttling allows its bound then rejects without logging payloads"
   );
 });
 
+test("account progression callable permits only automatic best-save resolution", () => {
+  const source = fs.readFileSync(path.resolve(__dirname, "../functions/index.js"), "utf8");
+  const body = source.slice(
+    source.indexOf("exports.chooseProgressionSource"),
+    source.indexOf("exports.startVerifiedRun")
+  );
+  assert.match(body, /choice !== "best"/);
+  assert.doesNotMatch(body, /choice === "(?:account|device)"/);
+});
+
 test("App Check preparation is explicit but remains disabled until live verification", () => {
   assert.equal(release.SERVER_APP_CHECK_ENFORCED, false);
   const source = fs.readFileSync(path.resolve(__dirname, "../functions/index.js"), "utf8");

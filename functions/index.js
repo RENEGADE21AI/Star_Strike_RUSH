@@ -33,7 +33,7 @@ const {
   publicPilotIdFor
 } = require("./profile-archive");
 const { enforceUidThrottle, requirePayloadWithin } = require("./callable-security");
-const { accountProfileFromClient } = require("./account-progression-choice");
+const { accountProfileFromClient, bestProgressionSource } = require("./account-progression-choice");
 const { ACCOUNT_DELETION_GRACE_MS } = require("./account-deletion");
 const {
   TRUSTED_RUN_MAX_DURATION_MS,
@@ -451,21 +451,15 @@ exports.chooseProgressionSource = onCall(CALLABLE_OPTIONS, async (request) => {
     maximumCalls: 4,
     windowMs: 60000
   });
-  const choice = String(request.data && request.data.choice || "");
-  if (choice !== "account" && choice !== "device") {
-    throw new HttpsError("invalid-argument", "Choose either account progression or device progression.");
+  const choice = String(request.data && request.data.choice || "best");
+  if (choice !== "best") {
+    throw new HttpsError("invalid-argument", "Progression resolution mode is invalid.");
   }
   const privateRef = db.doc(`players_private/${auth.uid}`);
-  if (choice === "account") {
-    const snapshot = await privateRef.get();
-    return { ok: true, choice, accountProgression: clientProfile(snapshot.exists ? snapshot.data() : {}), release: BACKEND_RELEASE_IDENTITY };
-  }
   const bindingId = String(request.data && request.data.deviceBindingId || "");
-  if (!/^[A-Za-z0-9_-]{8,128}$/.test(bindingId)) {
-    throw new HttpsError("invalid-argument", "This device save is missing its progression binding.");
-  }
-  const bindingHash = crypto.createHash("sha256").update(bindingId).digest("hex");
-  const bindingRef = db.doc(`device_progress_bindings/${bindingHash}`);
+  const bindingIsValid = /^[A-Za-z0-9_-]{8,128}$/.test(bindingId);
+  const bindingHash = bindingIsValid ? crypto.createHash("sha256").update(bindingId).digest("hex") : "";
+  const bindingRef = bindingIsValid ? db.doc(`device_progress_bindings/${bindingHash}`) : null;
   const selectedProfile = accountProfileFromClient(request.data && request.data.deviceProgress);
   const validAchievementIds = new Set(ACHIEVEMENTS.map((achievement) => achievement.id));
   const achievementIds = Array.from(new Set(
@@ -479,9 +473,36 @@ exports.chooseProgressionSource = onCall(CALLABLE_OPTIONS, async (request) => {
       .filter(Boolean)
   )).slice(0, 100);
   const achievementStateRef = db.doc(`player_achievement_state/${auth.uid}`);
-  await db.runTransaction(async (tx) => {
-    const [privateSnap, bindingSnap] = await Promise.all([tx.get(privateRef), tx.get(bindingRef)]);
-    if (bindingSnap.exists && bindingSnap.data().uid !== auth.uid) {
+  const resolution = await db.runTransaction(async (tx) => {
+    const reads = [tx.get(privateRef), tx.get(achievementStateRef)];
+    if (bindingIsValid) reads.push(tx.get(bindingRef));
+    const [privateSnap, achievementStateSnap, bindingSnap = null] = await Promise.all(reads);
+    const accountProfile = privateSnap.exists ? privateSnap.data() : {};
+    const accountAchievementIds = achievementStateSnap && achievementStateSnap.exists && Array.isArray(achievementStateSnap.data().ids)
+      ? achievementStateSnap.data().ids.filter((id) => validAchievementIds.has(id)).slice(0, ACHIEVEMENTS.length)
+      : [];
+    const accountCodexDiscoveries = Array.isArray(accountProfile.codexDiscoveries)
+      ? accountProfile.codexDiscoveries.slice(0, 100)
+      : [];
+    const bindingOwnedElsewhere = Boolean(bindingSnap && bindingSnap.exists && bindingSnap.data().uid !== auth.uid);
+    const selectedSource = !bindingIsValid || bindingOwnedElsewhere
+      ? "account"
+      : bestProgressionSource(selectedProfile, accountProfile, {
+        deviceAchievementCount: achievementIds.length,
+        accountAchievementCount: accountAchievementIds.length,
+        deviceCodexCount: codexDiscoveries.length,
+        accountCodexCount: accountCodexDiscoveries.length
+      });
+    if (selectedSource === "account") {
+      return {
+        selectedSource,
+        profile: accountProfile,
+        achievementIds: accountAchievementIds,
+        codexDiscoveries: accountCodexDiscoveries,
+        bindingProtected: bindingOwnedElsewhere
+      };
+    }
+    if (bindingOwnedElsewhere) {
       throw new HttpsError("failed-precondition", "This device save has already been assigned to another pilot account.");
     }
     const now = FieldValue.serverTimestamp();
@@ -501,8 +522,24 @@ exports.chooseProgressionSource = onCall(CALLABLE_OPTIONS, async (request) => {
       sourceCount: achievementIds.length,
       updatedAt: now
     });
+    return {
+      selectedSource: "device",
+      profile: { ...selectedProfile, codexDiscoveries },
+      achievementIds,
+      codexDiscoveries,
+      bindingProtected: false
+    };
   });
-  return { ok: true, choice, accountProgression: clientProfile({ ...selectedProfile, codexDiscoveries }), release: BACKEND_RELEASE_IDENTITY };
+  return {
+    ok: true,
+    choice,
+    selectedSource: resolution.selectedSource,
+    bindingProtected: resolution.bindingProtected,
+    accountProgression: clientProfile(resolution.profile),
+    achievementIds: resolution.achievementIds,
+    codexDiscoveries: resolution.codexDiscoveries,
+    release: BACKEND_RELEASE_IDENTITY
+  };
 });
 
 exports.startVerifiedRun = onCall(CALLABLE_OPTIONS, async (request) => {

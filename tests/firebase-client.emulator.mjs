@@ -46,7 +46,7 @@ async function createEmulatorAccount(name) {
   });
   const body = await response.json();
   if (!response.ok) throw new Error(`Auth emulator account creation failed: ${JSON.stringify(body)}`);
-  return { uid: body.localId, email };
+  return { uid: body.localId, email, idToken: body.idToken };
 }
 
 async function seedAccount(account, options = {}) {
@@ -103,9 +103,14 @@ async function waitForOnlineState(page, predicateSource, argument, timeoutMs = 4
   throw new Error(`Timed out waiting for Firebase client state: ${JSON.stringify(latest)}`);
 }
 
-async function callableError(name, data = {}) {
+async function callableError(name, data = {}, idToken = "") {
   const response = await fetch(`${functionsBase}/${name}`, {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data })
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(idToken ? { authorization: `Bearer ${idToken}` } : {})
+    },
+    body: JSON.stringify({ data })
   });
   return { status: response.status, body: await response.json() };
 }
@@ -137,13 +142,13 @@ after(async () => {
   if (admin.apps.length) await Promise.all(admin.apps.map((app) => app.delete()));
 });
 
-test("real Firebase client replaces rather than merges progression while competition remains fail-closed", { timeout: 180_000 }, async () => {
+test("real Firebase client replaces rather than merges progression while competition remains fail-closed", { timeout: 360_000 }, async () => {
   const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 100000).toString(36)}`.slice(-12);
   const accountAName = `a-${suffix}`;
   const accountBName = `b-${suffix}`;
   const [accountA, accountB] = await Promise.all([createEmulatorAccount(accountAName), createEmulatorAccount(accountBName)]);
   await Promise.all([
-    seedAccount(accountA, { callSign: "ARCHIVE_A", glory: 999999 }),
+    seedAccount(accountA, { callSign: "ARCHIVE_A", glory: 1000 }),
     seedAccount(accountB, { callSign: "ARCHIVE_B", glory: 1200, accountBest: 900 })
   ]);
 
@@ -168,18 +173,19 @@ test("real Firebase client replaces rather than merges progression while competi
 
   await page.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountAName);
   await waitForOnlineState(page, (state, uid) => state.user?.uid === uid && state.accountArchive === "loaded", accountA.uid);
+  await page.waitForFunction(() => {
+    const state = window.starStrikeOnline.getState();
+    return state.developmentCounters.progressionResolutions >= 1 && state.progressionResolution === null;
+  });
   let online = await page.evaluate(() => window.starStrikeOnline.getState());
-  assert.equal(online.progressionChoice.required, true);
-  assert.equal(online.progressionChoice.kind, "conflict");
-  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 4321, "hydration changed device progression before consent");
-  assert.equal(online.progressionMode, "explicit_account_or_device");
+  assert.equal(online.progressionResolution, null);
+  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 4321, "automatic comparison did not retain the stronger device save");
+  assert.equal(online.onlineArchiveMeta.totalGlory, 4321, "stronger device save was not assigned to the account");
+  assert.equal(online.progressionMode, "automatic_best_account_or_device");
   assert.equal(online.competitionMode, "paused");
-  assert.equal(online.backendRelease.progressionAuthority, "explicit_account_or_device");
-
-  await page.evaluate(() => window.starStrikeOnline.chooseProgression("account"));
-  await page.waitForFunction(() => window.starStrikeOnline.getState().progressionChoice === null);
-  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 999999);
-  assert.notEqual((await debugSnapshot(page)).deviceProgress.totalGlory, 1004320, "progression was combined");
+  assert.equal(online.backendRelease.progressionAuthority, "automatic_best_account_or_device");
+  assert.equal(typeof await page.evaluate(() => window.starStrikeOnline.chooseProgression), "undefined", "manual progression choice remained exposed");
+  assert.notEqual((await debugSnapshot(page)).deviceProgress.totalGlory, 5321, "progression was combined");
 
   const cleaned = await db.doc(`players_public/${accountA.uid}`).get().then((snapshot) => snapshot.data());
   assert.equal(cleaned.legacyBestScore, 999999);
@@ -221,7 +227,7 @@ test("real Firebase client replaces rather than merges progression while competi
 
   await page.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountBName);
   await waitForOnlineState(page, (state, uid) => state.user?.uid === uid && state.accountArchive === "loaded", accountB.uid);
-  await page.waitForFunction(() => window.starStrikeOnline.getState().progressionChoice === null);
+  await page.waitForFunction(() => window.starStrikeOnline.getState().progressionResolution === null && window.starStrikeOnline.getState().developmentCounters.progressionResolutions >= 2);
   assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 1200);
   assert.deepEqual(await page.evaluate((value) => window.starStrikeOnline.claimHandle(value), handleOne), { ok: true, handle: handleOne });
   await assert.rejects(page.evaluate((value) => window.starStrikeOnline.claimHandle(value), handleTwo), /already claimed/i);
@@ -232,7 +238,7 @@ test("real Firebase client replaces rather than merges progression while competi
   assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 0);
   await page.evaluate((name) => window.starStrikeOnline.devSignInAccount(name), accountAName);
   await waitForOnlineState(page, (state, uid) => state.user?.uid === uid && state.accountArchive === "loaded", accountA.uid);
-  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 999999, "account progression did not return exactly");
+  assert.equal((await debugSnapshot(page)).deviceProgress.totalGlory, 4321, "account progression did not return exactly");
   assert.equal(await page.evaluate(() => window.starStrikeOnline.getState().profileHandle), handleTwo);
 
   const secondContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -249,6 +255,10 @@ test("real Firebase client replaces rather than merges progression while competi
   assert.equal(await secondPage.evaluate(() => window.starStrikeOnline.getState().profileCallSign), "ACCOUNT_A");
   assert.equal(await secondPage.evaluate((uid) => window.readAccountIdentityState(localStorage, uid).publishedCallSign, accountA.uid), "ACCOUNT_A");
   await secondContext.close();
+
+  const retiredOverride = await callableError("chooseProgressionSource", { choice: "device" }, accountA.idToken);
+  assert.equal(retiredOverride.body.error.status, "INVALID_ARGUMENT");
+  assert.match(retiredOverride.body.error.message, /resolution mode/i);
 
   for (const endpoint of ["chooseProgressionSource", "requestAccountDeletion"]) {
     const rejection = await callableError(endpoint, {});
