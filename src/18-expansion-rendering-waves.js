@@ -263,13 +263,14 @@ function drawExpansionHazards() {
 function drawExpansionBoss(b) {
   if (!b || !isExpansionBossMode(b.mode)) return false;
   const hpPct = b.hp / b.maxHp;
-  const bob = Math.sin(state.frame * 0.04 + b.movePhase) * 1.5;
+  const transform = bossVisualTransform(b);
+  const bob = transform.y - b.y;
   const bossMeta = typeof getCodexMeta === "function" ? getCodexMeta("boss_" + b.mode) : { color: "#fff" };
   if (typeof drawBossAura === "function") drawBossAura(b.x, b.y + bob, b.w, bossMeta.color || "#ffffff");
   ctx.save();
   ctx.translate(b.x, b.y + bob);
-  ctx.rotate(Math.sin(state.frame * 0.022 + b.movePhase) * 0.025);
-  const hitScale = 1 + Math.min(0.055, (b.hitPulse || 0) * 0.045);
+  ctx.rotate(transform.rotation);
+  const hitScale = transform.scale;
   ctx.scale(hitScale, hitScale);
   if (!(typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, `boss_${b.mode}`, 0, 0, { hitFlash: clamp((b.hitFlash || 0) / 10, 0, 1) }))) {
     drawExpansionBossShip(b.mode, false, 1);

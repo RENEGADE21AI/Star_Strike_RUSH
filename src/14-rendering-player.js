@@ -38,8 +38,9 @@ function drawBackground() {
 function drawPlayer() {
   const p = state.player;
   if (state.gameState !== "playing" && state.gameState !== "gameover") return;
-  const tilt = clamp(p.vx / 80, -0.06, 0.06);
-  const bob = Math.sin(state.frame * 0.18 + p.x * 0.02) * 0.6;
+  const transform = playerVisualTransform(p);
+  const tilt = transform.rotation;
+  const bob = transform.y - p.y;
   if (typeof drawSpriteAsset === "function") {
     const realmActive = isWraithActive();
     const ghostActive = p.ghostTimer > 0;

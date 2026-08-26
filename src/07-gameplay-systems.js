@@ -17,6 +17,76 @@ function resolveEnemySpacing() {
   for (const e of state.enemies) e.x = clamp(e.x, margin, W - margin);
 }
 
+function playerVisualTransform(player = state.player, frame = state.frame) {
+  const x = Number(player && player.x) || 0;
+  const y = Number(player && player.y) || 0;
+  return {
+    x,
+    y: y + Math.sin(frame * 0.18 + x * 0.02) * 0.6,
+    rotation: clamp((Number(player && player.vx) || 0) / 80, -0.06, 0.06),
+    scale: 1
+  };
+}
+
+function enemyVisualTransform(enemy) {
+  const x = Number(enemy && enemy.x) || 0;
+  const y = Number(enemy && enemy.y) || 0;
+  const previousX = Number.isFinite(enemy && enemy.prevX) ? enemy.prevX : x;
+  const previousY = Number.isFinite(enemy && enemy.prevY) ? enemy.prevY : y;
+  const dx = x - previousX;
+  const dy = y - previousY;
+  const fallbackY = enemy && enemy.escape ? -1 : 1;
+  const rotation = Number.isFinite(enemy && enemy.visualHeading)
+    ? enemy.visualHeading
+    : Math.atan2(Math.hypot(dx, dy) > 0.001 ? dy : fallbackY, Math.hypot(dx, dy) > 0.001 ? dx : 0) - Math.PI / 2;
+  const arrivalScale = Number.isFinite(enemy && enemy.tutorialVisualScale) ? enemy.tutorialVisualScale : 1;
+  const hitScale = 1 + Math.min(0.12, (Number(enemy && enemy.hitPulse) || 0) * 0.08);
+  const typeScale = enemy && enemy.type === "red" ? 1.05 : 1;
+  const collisionScale = Number.isFinite(enemy && enemy.collisionScale) ? enemy.collisionScale : 1;
+  return { x, y, rotation, scale: hitScale * arrivalScale * typeScale * collisionScale };
+}
+
+function bossVisualTransform(boss, frame = state.frame) {
+  const x = Number(boss && boss.x) || 0;
+  const y = Number(boss && boss.y) || 0;
+  if (boss && boss.mode === "wraith") {
+    const phase = Number(boss.movePhase) || 0;
+    return {
+      x,
+      y: y + Math.sin(frame * 0.045 + phase) * 2.2,
+      rotation: Math.sin(frame * 0.02 + phase) * 0.04,
+      scale: 1
+    };
+  }
+  if (!boss || boss.mode === "standard") {
+    return {
+      x,
+      y: y + Math.sin(frame * 0.05 + (Number(boss && boss.step) || 0)) * 1.4,
+      rotation: Math.sin(frame * 0.03) * 0.02,
+      scale: 1
+    };
+  }
+  const phase = Number(boss.movePhase) || 0;
+  return {
+    x,
+    y: y + Math.sin(frame * 0.04 + phase) * 1.5,
+    rotation: Math.sin(frame * 0.022 + phase) * 0.025,
+    scale: 1 + Math.min(0.055, (Number(boss.hitPulse) || 0) * 0.045)
+  };
+}
+
+function playerCollisionBody(player = state.player) {
+  return { key: "player", ...playerVisualTransform(player), fallbackRadius: 14 };
+}
+
+function enemyCollisionBody(enemy) {
+  return { key: enemy.type, ...enemyVisualTransform(enemy), fallbackRadius: enemy.r || 12 };
+}
+
+function bossCollisionBody(boss) {
+  return { key: bossSpriteKey(boss.mode), ...bossVisualTransform(boss), fallbackRadius: Math.max(18, (boss.w || 80) * 0.32) };
+}
+
 function updateEnemies() {
   const margin = 20;
   const p = state.player;
@@ -407,10 +477,9 @@ function bossSpriteKey(mode) { return `boss_${mode || "standard"}`; }
 function playerBulletSpriteKey() { return "player_bullet"; }
 function enemyBulletSpriteKey(kind) { return kind === "drainShot" ? "drainShot" : "enemy_bullet"; }
 function bossCollisionHits(bullet, boss) {
-  const origin = { x: boss.x, y: boss.y - ((boss.recoil || 0) * 0.35) };
   return manifestCollision(
     { key: playerBulletSpriteKey(), x: bullet.x, y: bullet.y, fallbackRadius: bullet.r || 3 },
-    { key: bossSpriteKey(boss.mode), x: origin.x, y: origin.y, fallbackRadius: Math.max(18, (boss.w || 80) * 0.32) }
+    bossCollisionBody(boss)
   );
 }
 function updateCollisions() {
@@ -541,7 +610,7 @@ function updateCollisions() {
       }
       if (manifestCollision(
         { key: playerBulletSpriteKey(), x: b.x, y: b.y, fallbackRadius: b.r || 3 },
-        { key: e.type, x: e.x, y: e.y, fallbackRadius: e.r || 12, scale: e.collisionScale == null ? 1 : e.collisionScale }
+        enemyCollisionBody(e)
       )) {
         b.hitIds = b.hitIds || [];
         b.hitIds.push(e.id);
@@ -598,7 +667,7 @@ function updateCollisions() {
     if (b.kind === "drainShot") {
       if (manifestCollision(
         { key: "drainShot", x: b.x, y: b.y, fallbackRadius: b.r || 5 },
-        { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+        playerCollisionBody(p)
       )) {
         state.enemyBullets.splice(i, 1);
         if (typeof drainPlayerEnergy === "function") drainPlayerEnergy(b.drain || 22, "drainShot");
@@ -609,7 +678,7 @@ function updateCollisions() {
     if (state.boss && state.boss.mode === "wraith" && (b.kind === "wraithPhysical" || b.kind === "wraithGhost")) {
       if (manifestCollision(
         { key: enemyBulletSpriteKey(b.kind), x: b.x, y: b.y, fallbackRadius: b.r || 4 },
-        { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+        playerCollisionBody(p)
       ) && p.inv <= 0) {
         state.enemyBullets.splice(i, 1);
         damagePlayer(b.damage || 1);
@@ -618,7 +687,7 @@ function updateCollisions() {
     }
     if (manifestCollision(
       { key: enemyBulletSpriteKey(b.kind), x: b.x, y: b.y, fallbackRadius: b.r || 4 },
-      { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+      playerCollisionBody(p)
     ) && p.inv <= 0) {
       state.enemyBullets.splice(i, 1);
       damagePlayer(1);
@@ -633,7 +702,7 @@ function updateCollisions() {
       for (let w = state.wingmen.length - 1; w >= 0; w--) {
         const wm = state.wingmen[w];
         if (manifestCollision(
-          { key: e.type, x: e.x, y: e.y, fallbackRadius: e.r || 12, scale: e.collisionScale == null ? 1 : e.collisionScale },
+          enemyCollisionBody(e),
           { key: "wingman", x: wm.x, y: wm.y, fallbackRadius: 12 }
         )) {
           if (wm.phase === "departing") continue;
@@ -665,8 +734,8 @@ function updateCollisions() {
     if (e.type === "leech") continue;
 
     if (manifestCollision(
-      { key: e.type, x: e.x, y: e.y, fallbackRadius: e.r || 12, scale: e.collisionScale == null ? 1 : e.collisionScale },
-      { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+      enemyCollisionBody(e),
+      playerCollisionBody(p)
     ) && p.inv <= 0) {
       state.enemies.splice(i, 1);
       damagePlayer(1);
@@ -678,7 +747,7 @@ function updateCollisions() {
     if (pu.tutorialCollectibleFrame != null && state.frame < pu.tutorialCollectibleFrame) continue;
     if (manifestCollision(
       { key: `powerup_${pu.type}`, x: pu.x, y: pu.y, fallbackRadius: pu.size || 16 },
-      { key: "player", x: p.x, y: p.y, fallbackRadius: 15 }
+      playerCollisionBody(p)
     )) {
       collectPowerup(pu);
       state.powerups.splice(i, 1);
