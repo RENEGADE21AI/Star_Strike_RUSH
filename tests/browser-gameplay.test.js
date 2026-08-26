@@ -209,6 +209,10 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
     const healthBeforePause = (await debugSnapshot(page)).player.hp;
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "pause");
+    await page.waitForFunction(() => {
+      const focused = gameAccessibilitySnapshot().actions.filter((action) => action.focused);
+      return focused.length === 1 && focused[0].label === "Resume flight";
+    });
     let modalState = await page.evaluate(() => ({
       gameState: state.gameState,
       uiMode: onboardingUiMode,
