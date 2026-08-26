@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited: 2026-08-20
+Last audited: 2026-08-25
 
 This file distinguishes repository state, staged state, and production state.
 The live source of truth is always Hosting `/version.json` plus the matching
@@ -8,18 +8,20 @@ backend release marker.
 
 ## Release truth
 
-The production baseline at the start of this pass is
-`a24de81e9572eb828fb4ad1a37860fb06d994552`. The progression/records/account
-work described below is repository work until a protected PR merges and the
-guarded production workflow proves matching Hosting and backend SHAs.
+The production baseline verified at the end of this pass is
+`a7156cffdbc20b301bb8488ff9751e9994e8f17d`. Production still reports the prior
+`explicit_account_or_device` authority. The automatic strongest-save resolver
+and collision polish described below remain repository work until a protected
+PR merges and the guarded release workflow proves matching Hosting and backend
+SHAs.
 
 Current release configuration:
 
 | Concept | Repository state |
 | --- | --- |
-| Progression authority | `explicit_account_or_device` |
+| Progression authority | `automatic_best_account_or_device` |
 | Signed-out progression | Device save |
-| Signed-in conflict | Player selects account or device; replacement only, never addition |
+| Signed-in comparison | Server keeps the strongest eligible whole save automatically; never addition or field merging |
 | World Records | Existing server record archive remains readable; new writes are paused |
 | Weekly Leagues | Server-owned implementation remains fail-closed |
 | Legacy records | Preserved in `leaderboard_scores`; never treated as verified |
@@ -62,8 +64,8 @@ Current release configuration:
   purge removes Auth, identity, progression, records, achievement data, run
   receipts, handle registry ownership, league membership, device bindings, and
   related server metadata.
-- Account/device progression conflicts require an explicit replacement choice.
-  A device-save binding prevents copying the same save into multiple accounts;
+- Account/device progression comparison automatically keeps the strongest
+  eligible whole save. A device-save binding prevents copying the same save into multiple accounts;
   sign-out clears local gameplay progression while retaining global settings,
   onboarding, and the local identity seed.
 

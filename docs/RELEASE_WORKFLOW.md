@@ -1,8 +1,8 @@
 # Firebase Release Workflow
 
 Star Strike RUSH uses Node.js 22 and the locked repository Firebase CLI. The
-release model is `explicit_account_or_device`. Account progression replacement
-is enabled. World Record publication, Weekly Leagues, and run-progression
+release model is `automatic_best_account_or_device`. Whole-save automatic
+account/device replacement is enabled. World Record publication, Weekly Leagues, and run-progression
 writes are fail-closed pending an authoritative verifier. App Check enforcement
 remains disabled and must not be claimed live.
 

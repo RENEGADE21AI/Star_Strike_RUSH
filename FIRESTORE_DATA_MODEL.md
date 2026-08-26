@@ -11,11 +11,12 @@ public game identity, a server record archive, dormant Weekly League data, and
 historical archives. Cloud Functions own every mutation. Browser writes are
 denied. New public record, league, and run-progression writes are fail-closed.
 
-The active authority is `explicit_account_or_device`: when both account and
-device contain different meaningful progression, the player selects exactly one
-snapshot. Replacement is never additive. A one-way device binding prevents the
-same device save from being assigned to several accounts, and sign-out clears
-the device's gameplay progression.
+The active authority is `automatic_best_account_or_device`: trusted server
+logic compares complete account and device snapshots and automatically keeps
+the stronger eligible save. Replacement is never additive or field-merged;
+exact ties retain the account copy. A one-way device binding prevents the same
+device save from being assigned to several accounts, and sign-out clears the
+device's gameplay progression.
 
 Firebase browser configuration is loaded from Hosting's reserved
 `/__/firebase/init.json`; ignored local configuration is supported for
@@ -138,7 +139,7 @@ to clients.
 
 Firestore Rules provide owner reads only where required, bounded authenticated
 public reads, and a deny-all fallback. Registries, record writes, league
-internals, progression choice, run sessions, and deletion requests are
+internals, progression resolution, run sessions, and deletion requests are
 callable/Admin only.
 
 App Check support remains configured behind

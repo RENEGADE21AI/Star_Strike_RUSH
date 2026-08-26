@@ -422,7 +422,7 @@ async function runCase(browser, baseUrl, item) {
           profileHandle: "renegade21",
           identityService: "available",
           accountArchive: "loaded",
-          progressionMode: "explicit_account_or_device",
+          progressionMode: "automatic_best_account_or_device",
           competitionMode: "paused",
           lastStatus: "PILOT IDENTITY ACTIVE",
           lastError: "",
@@ -648,7 +648,27 @@ async function runCase(browser, baseUrl, item) {
       if (await button.isVisible()) await button.click();
       await page.waitForTimeout(180);
     }
+    if (item.step === "auto_weapons") {
+      evidence.arrivalState = await page.evaluate(() => {
+        state.bullets = [];
+        tutorialRuntime.weaponsLocked = true;
+        for (const enemy of state.enemies) {
+          if (!enemy.tutorialTarget || !enemy.tutorialArrival) continue;
+          enemy.tutorialArrivalComplete = false;
+          enemy.tutorialArrival.duration = 1000000;
+          enemy.tutorialArrival.elapsed = 450000;
+        }
+        updateDebugSnapshot();
+        return state.enemies.map((enemy) => ({
+          tutorialTarget: enemy.tutorialTarget === true,
+          arrivalComplete: enemy.tutorialArrivalComplete === true
+        }));
+      });
+      await page.waitForTimeout(180);
+    }
     if (item.realmOverride != null) {
+      await waitForRequiredVisualAssets(page, [item.realmOverride === 0 ? "boss_wraith_physical" : "boss_wraith_ghost"], errors);
+      await page.waitForFunction(() => state.boss && state.boss.mode === "wraith" && state.boss.y > 42);
       await page.evaluate((realm) => {
         if (state.boss && state.boss.mode === "wraith") state.boss.realm = realm;
       }, item.realmOverride);
@@ -705,6 +725,9 @@ async function runCase(browser, baseUrl, item) {
     }
     if (item.step === "auto_weapons") {
       if (tutorial.counts.enemies !== 3) errors.push("training targets did not enter as a complete formation");
+      if (!evidence.arrivalState?.every((enemy) => enemy.tutorialTarget && !enemy.arrivalComplete)) {
+        errors.push("training targets were not held in a deterministic arrival state");
+      }
       if (!tutorial.tutorial?.runtime?.weaponsLocked) errors.push("weapons unlocked before training targets completed arrival");
       if (tutorial.counts.bullets !== 0) errors.push("weapons fired during target arrival");
     }
@@ -715,6 +738,7 @@ async function runCase(browser, baseUrl, item) {
     }
     if (item.step === "realm_practice" && (!tutorial.encounter.boss || tutorial.encounter.boss.realm == null)) errors.push("realm practice lacks a realm target");
     if (item.realmOverride != null && tutorial.encounter.boss?.realm !== item.realmOverride) errors.push("Wraith realm art case did not hold the requested realm");
+    if (item.realmOverride != null && tutorial.encounter.boss?.y <= 42) errors.push("Wraith realm art remained outside the visible playfield");
     if (item.ghostVisual && tutorial.player.ghostTimer <= 0) errors.push("Ghost visual case was not active");
   } else if (item.kind === "tutorial-retry") {
     const button = page.getByRole("button", { name: "Continue" });
@@ -937,7 +961,11 @@ async function runCase(browser, baseUrl, item) {
   const browser = await chromium.launch({ headless: true });
   const report = [];
   try {
-    for (const item of selectedCases) report.push(await runCase(browser, baseUrl, item));
+    for (let index = 0; index < selectedCases.length; index++) {
+      const item = selectedCases[index];
+      console.log(`Visual QA ${index + 1}/${selectedCases.length}: ${item.name}`);
+      report.push(await runCase(browser, baseUrl, item));
+    }
   } finally {
     await browser.close();
     if (staticServer) await new Promise((resolve) => staticServer.close(resolve));
