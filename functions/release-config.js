@@ -3,7 +3,7 @@
 // Generated from shared/release-integrity.json. Run `npm run generate:shared`.
 const RELEASE_INTEGRITY_CONFIG = Object.freeze({
   schemaVersion: 1,
-  progressionAuthority: "explicit_account_or_device",
+  progressionAuthority: "automatic_best_account_or_device",
   competitionMode: "paused_pending_authoritative_verifier",
   clientCompetitionWritesEnabled: false,
   serverCompetitionWritesEnabled: false,

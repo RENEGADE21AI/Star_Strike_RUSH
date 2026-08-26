@@ -137,10 +137,9 @@ function enemyHeadingRotation(dx, dy, fallbackY = 1) {
 }
 function drawEnemies() {
   for (const e of state.enemies) {
-    const arrivalScale = Number.isFinite(e.tutorialVisualScale) ? e.tutorialVisualScale : 1;
-    const scale = (1 + Math.min(0.12, (e.hitPulse || 0) * 0.08)) * arrivalScale;
+    const transform = enemyVisualTransform(e);
+    const scale = transform.scale;
     const hitMix = clamp((e.hitFlash || 0) / 12, 0, 1);
-    const typeScale = e.type === "red" ? 1.05 : 1;
     let entityAlpha = 1;
     if (e.type === "phantom") {
       entityAlpha = e.telegraphTimer > 0
@@ -149,14 +148,9 @@ function drawEnemies() {
     }
     entityAlpha *= Number.isFinite(e.tutorialVisualAlpha) ? e.tutorialVisualAlpha : 1;
     ctx.save();
-    ctx.translate(e.x, e.y);
-    ctx.scale(scale * typeScale, scale * typeScale);
-    const dx = e.x - (e.prevX || e.x);
-    const dy = e.y - (e.prevY || e.y);
-    const heading = Number.isFinite(e.visualHeading)
-      ? e.visualHeading
-      : enemyHeadingRotation(dx, dy, e.escape ? -1 : 1);
-    ctx.rotate(heading);
+    ctx.translate(transform.x, transform.y);
+    ctx.scale(scale, scale);
+    ctx.rotate(transform.rotation);
     drawEnemyGeometry(e.type, {
       hitMix,
       alpha: entityAlpha,
@@ -207,8 +201,9 @@ function drawBoss() {
       : 0.84 + (1 - hpPct) * 0.10;
     const flicker = b.shiftTelegraph > 0 ? (0.35 + Math.sin(state.frame * 0.8) * 0.25) : 1;
     const visibleAlpha = alphaBase * flicker;
-    const wobble = Math.sin(state.frame * 0.045 + b.movePhase) * 2.2;
-    const tilt = Math.sin(state.frame * 0.02 + b.movePhase) * 0.04;
+    const transform = bossVisualTransform(b);
+    const wobble = transform.y - b.y;
+    const tilt = transform.rotation;
     ctx.save();
     ctx.translate(b.x, b.y + wobble);
     ctx.rotate(tilt);
@@ -247,8 +242,9 @@ function drawBoss() {
     return;
   }
   const hpPct = b.hp / b.maxHp;
-  const bob = Math.sin(state.frame * 0.05 + b.step) * 1.4;
-  const tilt = Math.sin(state.frame * 0.03) * 0.02;
+  const transform = bossVisualTransform(b);
+  const bob = transform.y - b.y;
+  const tilt = transform.rotation;
   ctx.save();
   ctx.translate(b.x, b.y + bob);
   ctx.rotate(tilt);

@@ -84,8 +84,8 @@ after the files they depend on, because the current code intentionally shares gl
   and developer stat controls are not part of the runtime.
 - `19-game-achievements.js`: per-run and lifetime achievement ladders, progress
   metrics, run stat payloads, and account-identity hooks called by the game loop.
-- `20-firebase-online.js`: Firebase Auth, unique mutable handles, explicit
-  account-or-device progression selection, 72-hour deletion controls,
+- `20-firebase-online.js`: Firebase Auth, unique mutable handles, automatic
+  strongest whole-save account/device resolution, 72-hour deletion controls,
   server-issued run sessions, World Records, Weekly Leagues, and graceful
   backend-unavailable state. It intentionally does not commit Firebase API keys;
   it loads config from Firebase Hosting

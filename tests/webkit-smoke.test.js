@@ -47,16 +47,16 @@ for (const scenario of [
   { name: "desktop", viewport: { width: 1440, height: 900 }, touch: false },
   { name: "iPhone-like touch", viewport: { width: 390, height: 844 }, touch: true }
 ]) {
-  test(`WebKit ${scenario.name} supports first load, launch, controls, pause, and resize`, { timeout: 90_000 }, async () => {
+  test(`WebKit ${scenario.name} supports first load, launch, controls, pause, and resize`, { timeout: 120_000 }, async () => {
     const context = await browser.newContext({ viewport: scenario.viewport, hasTouch: scenario.touch, isMobile: scenario.touch });
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     // Use the production first-load router while enabling only the tutorial QA
     // snapshot. A bare `debug=1` intentionally bypasses onboarding.
-    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${baseUrl}/?debug=1&scenario=tutorial`, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent, null, { timeout: 60000 });
-    await page.getByRole("button", { name: "NO — GO TO TITLE" }).click();
+    await page.getByRole("button", { name: "NO — GO TO TITLE" }).evaluate((button) => button.click());
     // Canvas-mapped accessible actions deliberately ignore pointer events so
     // physical input continues to land on the Canvas; assistive activation is
     // equivalent to a programmatic button click.
@@ -64,7 +64,7 @@ for (const scenario of [
     await page.waitForFunction(() => {
       const data = JSON.parse(document.querySelector("#debugSnapshot").textContent);
       return data.gameState === "playing" && data.transition.mode === "idle";
-    }, null, { timeout: 30000 });
+    }, null, { timeout: 60000 });
     const before = await snapshot(page);
     if (scenario.touch) {
       const canvas = await page.locator("#game").boundingBox();

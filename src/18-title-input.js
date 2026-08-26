@@ -316,14 +316,6 @@ function handleTitlePointerDown(x, y, pointerId = null) {
     }
     return true;
   }
-  const online = accountIdentitySnapshot();
-  if (online.progressionChoice && online.progressionChoice.required) {
-    const r = getProgressionChoiceRects();
-    if (online.progressionChoice.status === "saving") return true;
-    if (hitRect(r.account, x, y)) { window.starStrikeOnline.chooseProgression("account").catch(() => {}); return true; }
-    if (hitRect(r.device, x, y)) { window.starStrikeOnline.chooseProgression("device").catch(() => {}); return true; }
-    return true;
-  }
   if (resetProgressConfirm) return handleResetProgressConfirmDown(x, y);
   if (titlePanelAnim > 0.02) return handleOpenTitlePanelPointerDown(x, y, pointerId);
 

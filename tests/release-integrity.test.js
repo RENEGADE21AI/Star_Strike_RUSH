@@ -24,9 +24,9 @@ function memoryStorage() {
   };
 }
 
-test("account or device progression selection stays active while public competition fails closed", () => {
+test("automatic best-save progression stays active while public competition fails closed", () => {
   const release = require("../shared/release-integrity.json");
-  assert.equal(release.progressionAuthority, "explicit_account_or_device");
+  assert.equal(release.progressionAuthority, "automatic_best_account_or_device");
   assert.equal(release.clientCompetitionWritesEnabled, false);
   assert.equal(release.serverCompetitionWritesEnabled, false);
   assert.equal(release.serverProgressionWritesEnabled, false);

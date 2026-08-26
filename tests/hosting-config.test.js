@@ -62,7 +62,7 @@ test("production build pins every runtime entry to one commit and describes its 
   const version = JSON.parse(fs.readFileSync(path.join(repoRoot, "dist", "version.json"), "utf8"));
   assert.equal(version.commitSha, expectedCommit);
   assert.equal(version.packageVersion, "1.1.0");
-  assert.equal(version.progressionMode, "explicit_account_or_device");
+  assert.equal(version.progressionMode, "automatic_best_account_or_device");
   assert.equal(version.competitionMode, "paused_pending_authoritative_verifier");
   assert.equal(Number.isNaN(Date.parse(version.buildTimestamp)), false);
 

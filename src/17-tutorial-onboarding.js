@@ -1465,7 +1465,7 @@ function getTutorialObjectiveRect() {
   const hint = tutorialInputPrompt(state.inputMode, tutorialDirector.objectiveKind);
   const width = Math.min(W - 64, Math.max(ctx.measureText(text).width, ctx.measureText(hint).width) + 26);
   ctx.restore();
-  return { x: W / 2 - width / 2, y: 112, w: width, h: 38 };
+  return { x: W / 2 - width / 2, y: state.boss ? 126 : 112, w: width, h: 38 };
 }
 
 function getTutorialControlRects() {

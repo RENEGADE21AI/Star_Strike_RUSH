@@ -681,7 +681,10 @@ test("touch ability reaches the real Ghost lesson action control", { timeout: 12
       if (before.tutorial?.director?.dialogueVisible) await pressContinue(page);
       if (before.tutorial?.director?.stepId !== "ghost_shift") break;
       await touchGhostCross(page, cdp, before.layout);
-      await page.waitForTimeout(100);
+      await page.waitForFunction(() => {
+        const current = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+        return current.tutorial?.director?.stepId !== "ghost_shift" || current.tutorial?.director?.dialogueVisible === true;
+      }, null, { timeout: 3000 }).catch(() => {});
       const after = await snapshot(page);
       if (after.tutorial?.director?.stepId === "powerup") break;
       if (after.tutorial?.director?.dialogueVisible) await pressContinue(page);

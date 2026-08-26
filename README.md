@@ -28,8 +28,8 @@ Play: https://star-strike-rush.web.app
 Release truth as of 2026-08-20: the production baseline for this pass is
 `a24de81e9572eb828fb4ad1a37860fb06d994552`.
 The authoritative live identity is the matching Hosting `/version.json` and
-backend release marker, not a source commit alone. This pass introduces an
-explicit account-or-device progression choice. A security review kept public
+backend release marker, not a source commit alone. Account hydration uses a
+server-owned automatic strongest-save comparison. A security review kept public
 World Record and Weekly League writes fail-closed pending an authoritative run
 verifier; it is not live until both release identities match the new merge.
 
@@ -161,7 +161,7 @@ Important runtime guarantees include:
 - boss vulnerability only after staging and the first attack begin;
 - one-Health standard-run pause on manual or lifecycle pause, coalesced per interruption;
 - graceful local play when Firebase is unavailable.
-- explicit account-or-device progression replacement with no additive merge;
+- automatic strongest whole-save account/device replacement with no additive merge;
 - exact browser/test Firebase SDK parity at `12.16.0`;
 - one canonical 79-entry achievement catalog generated for browser and server.
 - no player-facing developer shortcuts or phase skips in the shipped build.
@@ -174,11 +174,13 @@ in `docs/SECURITY_REVIEW_2026-08-20.md`.
 
 ## Progression authority and Firebase boundary
 
-`PROGRESSION_AUTHORITY = "explicit_account_or_device"` is the active model:
+`PROGRESSION_AUTHORITY = "automatic_best_account_or_device"` is the active model:
 
-- Signed-out play uses the device save. When a signed-in account and device
-  contain different meaningful progress, the player must keep exactly one;
-  the selected snapshot replaces the other and the two are never added.
+- Signed-out play uses the device save. At sign-in, trusted server logic keeps
+  the stronger eligible account or device snapshot automatically. The priority
+  is cumulative Glory, best score, achievements, best phase, lifetime totals,
+  and Codex breadth; exact ties keep the established account snapshot. The two
+  saves are never added or field-merged.
 - Assigning a device save to an account also binds that device-save identity to
   the account, preventing one accumulated save from being copied across
   multiple accounts. Signing out clears gameplay progression from the device.

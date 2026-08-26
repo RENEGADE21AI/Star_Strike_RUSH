@@ -280,7 +280,7 @@ function updateExpansionHazards() {
     }
     if ((d.kind === "mine" || d.kind === "energy_mine") && d.armed && manifestCollision(
       { key: d.kind, x: d.x, y: d.y, fallbackRadius: d.r || 12, scale: d.collisionScale == null ? 1 : d.collisionScale },
-      { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+      playerCollisionBody(p)
     )) {
       explodeHazard(d);
       state.debris.splice(i, 1);
@@ -288,7 +288,7 @@ function updateExpansionHazards() {
     }
     if (d.kind !== "mine" && d.kind !== "energy_mine" && manifestCollision(
       { key: d.kind, x: d.x, y: d.y, fallbackRadius: d.r || 12, scale: d.collisionScale == null ? 1 : d.collisionScale },
-      { key: "player", x: p.x, y: p.y, fallbackRadius: 14 }
+      playerCollisionBody(p)
     ) && p.inv <= 0) {
       damagePlayer(d.damage || 1);
       if (!d.wall) d.hp -= 2;
@@ -298,7 +298,7 @@ function updateExpansionHazards() {
         const e = state.enemies[j];
         if (manifestCollision(
           { key: d.kind, x: d.x, y: d.y, fallbackRadius: d.r || 12, scale: d.collisionScale == null ? 1 : d.collisionScale },
-          { key: e.type, x: e.x, y: e.y, fallbackRadius: e.r || 12, scale: e.collisionScale == null ? 1 : e.collisionScale }
+          enemyCollisionBody(e)
         )) {
           e.hp -= d.wall ? 2 : 1.5;
           if (!d.wall) d.hp -= 1;

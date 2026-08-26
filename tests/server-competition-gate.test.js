@@ -18,7 +18,7 @@ test("competition callables reject before authentication while the retired rewar
         error &&
         error.code === "failed-precondition" &&
         /authoritative run verifier/i.test(error.message) &&
-        error.details?.release?.progressionAuthority === "explicit_account_or_device"
+        error.details?.release?.progressionAuthority === "automatic_best_account_or_device"
       )
     );
   }

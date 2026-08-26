@@ -38,8 +38,9 @@ Persistence:
 - Firebase Auth supports Google sign-in.
 - Cloud Firestore stores private account progression, public game identity,
   a server record archive, dormant Weekly League data, and a legacy archive.
-- When account and device saves differ, the pilot selects exactly one; it
-  replaces the other and no additive merge exists. A device binding prevents
+- When account and device saves differ, trusted server logic automatically
+  keeps the strongest eligible whole save; it replaces the other and no
+  additive or field-level merge exists. A device binding prevents
   copying one accumulated local save into multiple accounts. Sign-out clears
   local gameplay progression.
 - Cloud Functions retain a fail-closed run-challenge design for future trusted
@@ -209,9 +210,10 @@ normalized schema without reversing rewards already reflected in balances and
 without replaying historical milestone ceremonies.
 
 Firebase stores account progression separately from a signed-out device save.
-Sign-in with conflicting meaningful saves pauses at an explicit replacement
-choice; it never merges Glory or Prestige. Verified run sessions update the
-selected signed-in account, World Records, and Weekly League standings through
+Sign-in compares complete account and device snapshots and automatically keeps
+the stronger eligible one; exact ties keep the account copy. It never merges
+Glory or Prestige. Verified run sessions update the retained signed-in account,
+World Records, and Weekly League standings through
 server-owned transactions. The server ignores a caller score and calculates the
 accepted result from validated event evidence.
 `claimSeasonReward()` exists only as a retired compatibility callable that

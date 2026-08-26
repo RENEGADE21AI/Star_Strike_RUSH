@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
-  accountProgressionChoiceState,
+  bestProgressionSource,
   replacementProfileForChoice
 } = require("../functions/account-progression-choice");
 
@@ -41,11 +41,26 @@ test("progression choice replaces one save with the other and never combines bal
   assert.notEqual(replacementProfileForChoice("device", device, account).totalGlory, 10500);
 });
 
-test("a conflict is required only for two distinct meaningful saves", () => {
-  assert.equal(accountProgressionChoiceState({}, {}).kind, "empty");
-  assert.equal(accountProgressionChoiceState(device, {}).kind, "device_only");
-  assert.equal(accountProgressionChoiceState({}, account).kind, "account_only");
-  assert.equal(accountProgressionChoiceState(device, account).kind, "conflict");
-  assert.equal(accountProgressionChoiceState(device, { ...device }).kind, "same");
+test("server automatically chooses one complete save using stable priority fields", () => {
+  assert.equal(bestProgressionSource(device, account), "account");
+  assert.equal(bestProgressionSource(account, device), "device");
+  assert.equal(bestProgressionSource(account, { ...account }), "account", "account wins exact ties");
+
+  const sameCoreAccount = { ...device };
+  assert.equal(
+    bestProgressionSource(device, sameCoreAccount, { deviceAchievementCount: 12, accountAchievementCount: 4 }),
+    "device"
+  );
+  assert.equal(
+    bestProgressionSource(device, sameCoreAccount, { deviceAchievementCount: 4, accountAchievementCount: 4, deviceCodexCount: 2, accountCodexCount: 8 }),
+    "account"
+  );
+});
+
+test("automatic replacement returns the selected save unchanged rather than combining fields", () => {
+  const selected = replacementProfileForChoice(bestProgressionSource(device, account), device, account);
+  assert.equal(selected.totalGlory, account.totalGlory);
+  assert.equal(selected.bestScore, account.bestScore);
+  assert.notEqual(selected.totalGlory, device.totalGlory + account.totalGlory);
 });
 

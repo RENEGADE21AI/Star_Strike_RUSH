@@ -3,7 +3,7 @@ const FIREBASE_CONFIG_CANDIDATES = [
   "/__/firebase/init.json",
   "src/firebase-config.local.json"
 ];
-const PROGRESSION_MODE = window.PROGRESSION_AUTHORITY || "explicit_account_or_device";
+const PROGRESSION_MODE = window.PROGRESSION_AUTHORITY || "automatic_best_account_or_device";
 const competitiveModeEnabled = window.CLIENT_COMPETITION_WRITES_ENABLED === true;
 const competitionMode = competitiveModeEnabled && window.PUBLIC_COMPETITION_MODE === "verified_world_records"
   ? "verified_world_records"
@@ -45,7 +45,7 @@ const online = {
   profileHandle: "",
   profileMeta: null,
   onlineArchiveMeta: null,
-  progressionChoice: null,
+  progressionResolution: null,
   accountDeletion: null,
   legacyRecord: null,
   weeklyLeague: null,
@@ -69,6 +69,7 @@ const online = {
     achievementAggregateLoads: 0,
     archiveListenerSubscriptions: 0,
     weeklyCallableCalls: 0,
+    progressionResolutions: 0,
     redirectResults: 0,
     signInStarts: 0
   }
@@ -92,7 +93,7 @@ function getState() {
     profileHandle: online.profileHandle,
     profileMeta: cloneMeta(online.profileMeta),
     onlineArchiveMeta: cloneMeta(online.onlineArchiveMeta),
-    progressionChoice: cloneMeta(online.progressionChoice),
+    progressionResolution: cloneMeta(online.progressionResolution),
     accountDeletion: cloneMeta(online.accountDeletion),
     legacyRecord: online.legacyRecord ? { ...online.legacyRecord } : null,
     weeklyLeague: online.weeklyLeague ? JSON.parse(JSON.stringify(online.weeklyLeague)) : null,
@@ -120,7 +121,6 @@ function getAccessibilityKey() {
 
 function getOverlayState() {
   return {
-    progressionChoice: cloneMeta(online.progressionChoice),
     accountDeletion: cloneMeta(online.accountDeletion)
   };
 }
@@ -295,8 +295,8 @@ function normalizeBackendRelease(release) {
       ? String(release.commitSha).toLowerCase()
       : "development",
     packageVersion: safeText(release.packageVersion, "development", 30),
-    progressionAuthority: release.progressionAuthority === "explicit_account_or_device"
-      ? "explicit_account_or_device"
+    progressionAuthority: release.progressionAuthority === "automatic_best_account_or_device"
+      ? "automatic_best_account_or_device"
       : "unknown",
     competitionMode: release.competitionMode === "verified_world_records" ? "verified_world_records" : "paused",
     competitionWritesEnabled: release.competitionWritesEnabled === true,
@@ -398,33 +398,6 @@ function selectWeeklyLeague(leagueId) {
   return true;
 }
 
-function updateProgressionChoiceState() {
-  const deviceProgress = typeof window.currentMetaSnapshot === "function" ? window.currentMetaSnapshot() : {};
-  const accountProgression = online.onlineArchiveMeta || {};
-  const kind = typeof window.progressionSelectionKind === "function"
-    ? window.progressionSelectionKind(deviceProgress, accountProgression)
-    : "same";
-  if (kind === "account_only") {
-    if (typeof window.replaceDeviceProgression === "function") {
-      window.replaceDeviceProgression(accountProgression, online.achievements, accountProgression.codexDiscoveries || []);
-    }
-    online.progressionChoice = null;
-    return kind;
-  }
-  if (kind === "conflict" || kind === "device_only") {
-    online.progressionChoice = {
-      required: true,
-      kind,
-      status: "waiting",
-      device: cloneMeta(deviceProgress),
-      account: cloneMeta(accountProgression)
-    };
-    return kind;
-  }
-  online.progressionChoice = null;
-  return kind;
-}
-
 function subscribeWorldRecords(uid) {
   if (!db || !auth || !auth.currentUser || auth.currentUser.uid !== uid) return;
   if (archiveUnsubscribe && archiveListenerUid === uid) return;
@@ -477,7 +450,6 @@ async function syncProfile(explicitCallSign = "", generation = authGeneration) {
     requestedAtMs: boundedNumber(result.accountDeletion.requestedAtMs, 9999999999999),
     deletesAfterMs: boundedNumber(result.accountDeletion.deletesAfterMs, 9999999999999)
   } : null;
-  updateProgressionChoiceState();
   online.backendRelease = normalizeBackendRelease(result.release);
   online.developmentCounters.achievementAggregateLoads++;
   online.accountArchive = "loaded";
@@ -515,6 +487,8 @@ async function hydrateAccount(user, options = {}) {
     }
     const result = await syncProfile(pending.pending ? pending.desiredCallSign : "", generation);
     if (!result || result.stale || !isHydrationCurrent(uid, generation)) return { stale: true };
+    await resolveBestProgression(generation);
+    if (!isHydrationCurrent(uid, generation)) return { stale: true };
     subscribeWorldRecords(uid);
     if (competitiveModeEnabled) {
       try {
@@ -603,14 +577,15 @@ async function refresh() {
   return result;
 }
 
-async function chooseProgression(choice) {
+async function resolveBestProgression(generation = authGeneration) {
   if (!online.ready || !auth || !auth.currentUser || !functionsApi) throw new Error("Account progression service is unavailable.");
-  if (choice !== "device" && choice !== "account") throw new Error("Choose device or account progression.");
-  if (online.progressionChoice) online.progressionChoice.status = "saving";
+  const uid = auth.currentUser.uid;
+  online.progressionResolution = { status: "resolving", selectedSource: "" };
+  online.developmentCounters.progressionResolutions++;
   const callable = window.starStrikeFirebaseApi.httpsCallable(functionsApi, "chooseProgressionSource");
   const deviceProgress = typeof window.currentMetaSnapshot === "function" ? window.currentMetaSnapshot() : {};
   const payload = {
-    choice,
+    choice: "best",
     deviceBindingId: typeof window.getLocalPilotSeed === "function" ? window.getLocalPilotSeed() : "",
     deviceProgress,
     achievementIds: typeof window.getLocalAchievementIds === "function" ? window.getLocalAchievementIds() : [],
@@ -619,20 +594,25 @@ async function chooseProgression(choice) {
   try {
     const response = await callable(payload);
     const result = response && response.data ? response.data : {};
+    if (!isHydrationCurrent(uid, generation)) return { stale: true };
     const selected = normalizeArchiveMeta(result.accountProgression || {});
     online.onlineArchiveMeta = selected;
     online.profileMeta = selected;
-    if (choice === "account" && typeof window.replaceDeviceProgression === "function") {
-      window.replaceDeviceProgression(selected, online.achievements, selected.codexDiscoveries || []);
+    const selectedSource = result.selectedSource === "device" ? "device" : "account";
+    const selectedAchievementIds = normalizeAchievementArchive({ ids: result.achievementIds });
+    if (selectedAchievementIds.length || selectedSource === "device") online.achievements = selectedAchievementIds;
+    if (selectedSource === "account" && typeof window.replaceDeviceProgression === "function") {
+      window.replaceDeviceProgression(selected, selectedAchievementIds, result.codexDiscoveries || selected.codexDiscoveries || []);
     }
-    online.progressionChoice = null;
-    setStatus(choice === "account" ? "ACCOUNT PROGRESSION LOADED" : "DEVICE PROGRESSION ASSIGNED TO ACCOUNT");
-    notify("PROGRESSION CHOICE SAVED");
-    return { ok: true, choice, accountProgression: selected };
+    online.progressionResolution = null;
+    setStatus(selectedSource === "account" ? "BEST ACCOUNT PROGRESSION LOADED" : "BEST DEVICE PROGRESSION SECURED TO ACCOUNT");
+    notify("STRONGEST PROGRESSION KEPT");
+    return { ok: true, selectedSource, accountProgression: selected };
   } catch (error) {
-    if (online.progressionChoice) online.progressionChoice.status = "error";
-    setError(error, "Progression choice could not be saved.");
-    throw error;
+    online.progressionResolution = { status: "pending_retry", selectedSource: "" };
+    online.networkState = navigator.onLine === false ? "offline" : "degraded";
+    setError(error, "Account progression comparison is pending. Device progress remains active.");
+    return { ok: false, pending: true, error };
   }
 }
 
@@ -829,7 +809,6 @@ window.starStrikeOnline = {
   signIn,
   signOut: signOutOnline,
   refresh,
-  chooseProgression,
   requestAccountDeletion,
   cancelAccountDeletion,
   updateCallSign,

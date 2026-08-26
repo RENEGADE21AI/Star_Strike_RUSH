@@ -40,8 +40,8 @@ and release evidence.
 
 - Defined separate configuration for client competition writes, server
   competition writes, server progression writes, and progression authority.
-- Account and device progression remain distinct. When both are meaningful the
-  player selects exactly one replacement snapshot; they are never merged.
+- Account and device progression remain distinct. Trusted server logic keeps
+  the strongest eligible whole snapshot automatically; they are never merged.
 - The later permanent-progression pass retired Season XP, tiers, reward lanes,
   and claims in favor of one cumulative Glory Road. Prestige is derived from
   full 300,000-Glory blocks and never consumes Glory.

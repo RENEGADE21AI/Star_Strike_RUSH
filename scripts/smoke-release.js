@@ -86,7 +86,7 @@ async function requireCallableError(name, expectedStatus, data = {}) {
   const release = body?.error?.details?.release;
   assert.ok(release && typeof release === "object", `${name} must return backend release metadata`);
   assert.equal(release.commitSha, expectedCommit, `${name} backend commit SHA differs`);
-  assert.equal(release.progressionAuthority, "explicit_account_or_device", `${name} progression authority differs`);
+  assert.equal(release.progressionAuthority, "automatic_best_account_or_device", `${name} progression authority differs`);
   assert.equal(release.competitionMode, "paused_pending_authoritative_verifier", `${name} competition label differs`);
   assert.equal(release.competitionWritesEnabled, false, `${name} public competition writes must remain fail-closed`);
   assert.equal(release.serverProgressionWritesEnabled, false, `${name} run progression writes must remain fail-closed`);
@@ -142,7 +142,7 @@ async function requireGoogleAuthOrigin() {
   assert.equal(version.status, 200, "version.json must return 200");
   const release = await version.json();
   assert.equal(release.commitSha, expectedCommit, "deployed version.json commit differs");
-  assert.equal(release.progressionMode, "explicit_account_or_device");
+  assert.equal(release.progressionMode, "automatic_best_account_or_device");
   assert.equal(release.competitionMode, "paused_pending_authoritative_verifier");
   assert.match(root.headers.get("cache-control") || "", /no-store/i, "HTML must be no-store");
   assert.match(version.headers.get("cache-control") || "", /no-store/i, "version.json must be no-store");

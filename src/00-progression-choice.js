@@ -14,6 +14,8 @@ function progressionComparable(raw = {}) {
   };
   return {
     totalGlory: number(raw.totalGlory),
+    achievementCount: number(raw.achievementCount != null ? raw.achievementCount : Array.isArray(raw.achievementIds) ? raw.achievementIds.length : 0),
+    codexCount: number(raw.codexCount != null ? raw.codexCount : Array.isArray(raw.codexDiscoveries) ? raw.codexDiscoveries.length : 0),
     lifetime: {
       runs: number(lifetime.runs),
       score: number(lifetime.score),
@@ -29,22 +31,29 @@ function progressionComparable(raw = {}) {
   };
 }
 
-function progressionIsMeaningful(raw) {
+function progressionPriority(raw = {}) {
   const profile = progressionComparable(raw);
-  return profile.totalGlory > 0 || profile.lifetime.runs > 0 || profile.lifetime.score > 0 ||
-    profile.lifetime.kills > 0 || profile.lifetime.powerups > 0 || profile.lifetime.ghostUses > 0 ||
-    profile.lifetime.bosses > 0 || profile.lifetime.bestScore > 0 || profile.lifetime.bestPhase > 1;
+  return [
+    profile.totalGlory,
+    profile.lifetime.bestScore,
+    profile.achievementCount,
+    profile.lifetime.bestPhase,
+    profile.lifetime.score,
+    profile.lifetime.bosses,
+    profile.lifetime.kills,
+    profile.lifetime.runs,
+    profile.codexCount
+  ];
 }
 
-function progressionSelectionKind(deviceProgress, accountProgression) {
-  const deviceMeaningful = progressionIsMeaningful(deviceProgress);
-  const accountMeaningful = progressionIsMeaningful(accountProgression);
-  if (!deviceMeaningful && !accountMeaningful) return "empty";
-  if (deviceMeaningful && !accountMeaningful) return "device_only";
-  if (!deviceMeaningful && accountMeaningful) return "account_only";
-  return JSON.stringify(progressionComparable(deviceProgress)) === JSON.stringify(progressionComparable(accountProgression))
-    ? "same"
-    : "conflict";
+function bestProgressionSource(deviceProgress, accountProgression) {
+  const devicePriority = progressionPriority(deviceProgress);
+  const accountPriority = progressionPriority(accountProgression);
+  for (let index = 0; index < devicePriority.length; index++) {
+    if (devicePriority[index] > accountPriority[index]) return "device";
+    if (accountPriority[index] > devicePriority[index]) return "account";
+  }
+  return "account";
 }
 
 function clearDeviceProgressionStorage(storage) {
@@ -58,7 +67,7 @@ function clearDeviceProgressionStorage(storage) {
 
 globalThis.DEVICE_PROGRESSION_STORAGE_KEYS = DEVICE_PROGRESSION_STORAGE_KEYS;
 globalThis.progressionComparable = progressionComparable;
-globalThis.progressionIsMeaningful = progressionIsMeaningful;
-globalThis.progressionSelectionKind = progressionSelectionKind;
+globalThis.progressionPriority = progressionPriority;
+globalThis.bestProgressionSource = bestProgressionSource;
 globalThis.clearDeviceProgressionStorage = clearDeviceProgressionStorage;
 

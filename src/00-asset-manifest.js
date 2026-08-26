@@ -2,7 +2,13 @@ const RAW_SPRITE_MANIFEST = {
   player: {
     source: "assets/sprites/player.png",
     render: { width: 40, height: 48, anchorX: 0.5, anchorY: 0.5, rotationOriginX: 0.5, rotationOriginY: 0.5, glow: "#78f6ff" },
-    collision: [{ offsetX: 0, offsetY: -8, radius: 4.5 }, { offsetX: 0, offsetY: 1, radius: 6.5 }, { offsetX: 0, offsetY: 10, radius: 4.5 }],
+    collision: [
+      { offsetX: 0, offsetY: -9, radius: 5 },
+      { offsetX: 0, offsetY: 1, radius: 7 },
+      { offsetX: -9, offsetY: 5, radius: 4.5 },
+      { offsetX: 9, offsetY: 5, radius: 4.5 },
+      { offsetX: 0, offsetY: 11, radius: 5 }
+    ],
     projectileOrigin: { offsetX: 0, offsetY: -20 },
     spreadProjectileOrigins: [{ offsetX: -10, offsetY: -13 }, { offsetX: 0, offsetY: -20 }, { offsetX: 10, offsetY: -13 }]
   },
@@ -28,33 +34,33 @@ const RAW_SPRITE_MANIFEST = {
   boss_standard: {
     source: "assets/sprites/boss-standard.png",
     render: { width: 154, height: 69, anchorX: 0.5, anchorY: 0.5, glow: "#ff3d55" },
-    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -34, offsetY: 1, radius: 16 }, { offsetX: 34, offsetY: 1, radius: 16 }, { offsetX: 0, offsetY: 15, radius: 17 }],
+    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -34, offsetY: 1, radius: 18 }, { offsetX: 34, offsetY: 1, radius: 18 }, { offsetX: -57, offsetY: 0, radius: 7 }, { offsetX: 57, offsetY: 0, radius: 7 }, { offsetX: 0, offsetY: 15, radius: 17 }],
     healthBarOffset: { offsetY: -62 }
   },
   boss_wraith: {
     source: "assets/sprites/boss-wraith.png",
     render: { width: 158, height: 70, anchorX: 0.5, anchorY: 0.5, glow: "#5cf6ff" },
-    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 16 }, { offsetX: 36, offsetY: 2, radius: 16 }, { offsetX: 0, offsetY: -18, radius: 14 }],
+    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 18 }, { offsetX: 36, offsetY: 2, radius: 18 }, { offsetX: -59, offsetY: 1, radius: 9 }, { offsetX: 59, offsetY: 1, radius: 9 }, { offsetX: 0, offsetY: -20, radius: 13 }, { offsetX: 0, offsetY: 21, radius: 10 }],
     healthBarOffset: { offsetY: -64 }
   },
   boss_wraith_physical: {
     source: "assets/sprites/boss-wraith-physical.png",
     render: { width: 158, height: 70, anchorX: 0.5, anchorY: 0.5, glow: "#e8f8ff" },
-    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 16 }, { offsetX: 36, offsetY: 2, radius: 16 }, { offsetX: 0, offsetY: -18, radius: 14 }],
+    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 18 }, { offsetX: 36, offsetY: 2, radius: 18 }, { offsetX: -59, offsetY: 1, radius: 9 }, { offsetX: 59, offsetY: 1, radius: 9 }, { offsetX: 0, offsetY: -20, radius: 13 }, { offsetX: 0, offsetY: 21, radius: 10 }],
     healthBarOffset: { offsetY: -64 }
   },
   boss_wraith_ghost: {
     source: "assets/sprites/boss-wraith-ghost.png",
     render: { width: 158, height: 70, anchorX: 0.5, anchorY: 0.5, glow: "#d25cff" },
-    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 16 }, { offsetX: 36, offsetY: 2, radius: 16 }, { offsetX: 0, offsetY: -18, radius: 14 }],
+    collision: [{ offsetX: 0, offsetY: 0, radius: 27 }, { offsetX: -36, offsetY: 2, radius: 18 }, { offsetX: 36, offsetY: 2, radius: 18 }, { offsetX: -59, offsetY: 1, radius: 9 }, { offsetX: 59, offsetY: 1, radius: 9 }, { offsetX: 0, offsetY: -20, radius: 13 }, { offsetX: 0, offsetY: 21, radius: 10 }],
     healthBarOffset: { offsetY: -64 }
   },
-  boss_debris_warden: { source: "assets/sprites/boss-debris-warden.png", render: { width: 158, height: 96, anchorX: 0.5, anchorY: 0.5, glow: "#f2a33b" }, collision: [{ offsetX: 0, offsetY: 0, radius: 28 }, { offsetX: -45, offsetY: 3, radius: 19 }, { offsetX: 45, offsetY: 3, radius: 19 }] },
-  boss_mothership: { source: "assets/sprites/boss-mothership.png", render: { width: 174, height: 116, anchorX: 0.5, anchorY: 0.5, glow: "#4cf5ff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 30 }, { offsetX: -52, offsetY: 1, radius: 20 }, { offsetX: 52, offsetY: 1, radius: 20 }] },
-  boss_siphon_core: { source: "assets/sprites/boss-siphon-core.png", render: { width: 144, height: 91, anchorX: 0.5, anchorY: 0.5, glow: "#61ff72" }, collision: [{ offsetX: 0, offsetY: -2, radius: 33 }, { offsetX: -39, offsetY: -2, radius: 18 }, { offsetX: 39, offsetY: -2, radius: 18 }] },
-  boss_hive_breaker: { source: "assets/sprites/boss-hive-breaker.png", render: { width: 148, height: 90, anchorX: 0.5, anchorY: 0.5, glow: "#77ff65" }, collision: [{ offsetX: 0, offsetY: 0, radius: 29 }, { offsetX: -37, offsetY: 3, radius: 18 }, { offsetX: 37, offsetY: 3, radius: 18 }] },
-  boss_rail_tyrant: { source: "assets/sprites/boss-rail-tyrant.png", render: { width: 158, height: 86, anchorX: 0.5, anchorY: 0.5, glow: "#ff3046" }, collision: [{ offsetX: 0, offsetY: 0, radius: 29 }, { offsetX: -30, offsetY: 5, radius: 17 }, { offsetX: 30, offsetY: 5, radius: 17 }] },
-  boss_gravity_well: { source: "assets/sprites/boss-gravity-well.png", render: { width: 150, height: 81, anchorX: 0.5, anchorY: 0.5, glow: "#a45cff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 32 }, { offsetX: -41, offsetY: 0, radius: 17 }, { offsetX: 41, offsetY: 0, radius: 17 }] },
+  boss_debris_warden: { source: "assets/sprites/boss-debris-warden.png", render: { width: 158, height: 96, anchorX: 0.5, anchorY: 0.5, glow: "#f2a33b" }, collision: [{ offsetX: 0, offsetY: 0, radius: 29 }, { offsetX: -43, offsetY: 2, radius: 21 }, { offsetX: 43, offsetY: 2, radius: 21 }, { offsetX: -66, offsetY: 0, radius: 11 }, { offsetX: 66, offsetY: 0, radius: 11 }, { offsetX: 0, offsetY: -28, radius: 17 }, { offsetX: 0, offsetY: 29, radius: 17 }] },
+  boss_mothership: { source: "assets/sprites/boss-mothership.png", render: { width: 174, height: 116, anchorX: 0.5, anchorY: 0.5, glow: "#4cf5ff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 31 }, { offsetX: -48, offsetY: 3, radius: 23 }, { offsetX: 48, offsetY: 3, radius: 23 }, { offsetX: -74, offsetY: 5, radius: 11 }, { offsetX: 74, offsetY: 5, radius: 11 }, { offsetX: 0, offsetY: -34, radius: 16 }, { offsetX: 0, offsetY: 38, radius: 15 }] },
+  boss_siphon_core: { source: "assets/sprites/boss-siphon-core.png", render: { width: 144, height: 91, anchorX: 0.5, anchorY: 0.5, glow: "#61ff72" }, collision: [{ offsetX: 0, offsetY: -2, radius: 31 }, { offsetX: -38, offsetY: -1, radius: 19 }, { offsetX: 38, offsetY: -1, radius: 19 }, { offsetX: -61, offsetY: 2, radius: 9 }, { offsetX: 61, offsetY: 2, radius: 9 }, { offsetX: 0, offsetY: -27, radius: 14 }, { offsetX: 0, offsetY: 29, radius: 13 }] },
+  boss_hive_breaker: { source: "assets/sprites/boss-hive-breaker.png", render: { width: 148, height: 90, anchorX: 0.5, anchorY: 0.5, glow: "#77ff65" }, collision: [{ offsetX: 0, offsetY: 0, radius: 29 }, { offsetX: -38, offsetY: 2, radius: 20 }, { offsetX: 38, offsetY: 2, radius: 20 }, { offsetX: -63, offsetY: 2, radius: 9 }, { offsetX: 63, offsetY: 2, radius: 9 }, { offsetX: -24, offsetY: -24, radius: 12 }, { offsetX: 24, offsetY: -24, radius: 12 }, { offsetX: 0, offsetY: 29, radius: 13 }] },
+  boss_rail_tyrant: { source: "assets/sprites/boss-rail-tyrant.png", render: { width: 158, height: 86, anchorX: 0.5, anchorY: 0.5, glow: "#ff3046" }, collision: [{ offsetX: 0, offsetY: 0, radius: 29 }, { offsetX: -35, offsetY: 2, radius: 20 }, { offsetX: 35, offsetY: 2, radius: 20 }, { offsetX: -62, offsetY: 1, radius: 13 }, { offsetX: 62, offsetY: 1, radius: 13 }, { offsetX: 0, offsetY: -24, radius: 13 }, { offsetX: 0, offsetY: 26, radius: 13 }] },
+  boss_gravity_well: { source: "assets/sprites/boss-gravity-well.png", render: { width: 150, height: 81, anchorX: 0.5, anchorY: 0.5, glow: "#a45cff" }, collision: [{ offsetX: 0, offsetY: 0, radius: 31 }, { offsetX: -39, offsetY: 1, radius: 19 }, { offsetX: 39, offsetY: 1, radius: 19 }, { offsetX: -63, offsetY: 2, radius: 10 }, { offsetX: 63, offsetY: 2, radius: 10 }, { offsetX: 0, offsetY: -25, radius: 13 }, { offsetX: 0, offsetY: 26, radius: 12 }] },
   small_debris: { source: "assets/sprites/asteroid-rock-3.png", render: { width: 25, height: 25, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 9.5 }] },
   rock_asteroid: { source: "assets/sprites/asteroid-rock-1.png", render: { width: 40, height: 40, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 15.5 }] },
   iron_asteroid: { source: "assets/sprites/asteroid-rock-2.png", render: { width: 53, height: 53, anchorX: 0.5, anchorY: 0.5 }, collision: [{ offsetX: 0, offsetY: 0, radius: 20.5 }] },
@@ -170,7 +176,8 @@ function normalizeCollisionBody(body) {
     x,
     y,
     scale: Number.isFinite(Number(body.scale)) ? Math.max(0, Number(body.scale)) : 1,
-    fallbackRadius: Number.isFinite(Number(body.fallbackRadius)) ? Math.max(0, Number(body.fallbackRadius)) : 0
+    fallbackRadius: Number.isFinite(Number(body.fallbackRadius)) ? Math.max(0, Number(body.fallbackRadius)) : 0,
+    rotation: Number.isFinite(Number(body.rotation)) ? Number(body.rotation) : 0
   };
 }
 
@@ -185,11 +192,17 @@ function collisionCirclesFor(body) {
   const circles = meta && Array.isArray(meta.collision) && meta.collision.length
     ? meta.collision
     : [{ offsetX: 0, offsetY: 0, radius: normalized.fallbackRadius }];
-  return circles.map((circle) => ({
-    x: normalized.x + Number(circle.offsetX || 0) * normalized.scale,
-    y: normalized.y + Number(circle.offsetY || 0) * normalized.scale,
-    r: Math.max(0, Number(circle.radius || normalized.fallbackRadius || 0) * normalized.scale)
-  }));
+  const cosine = Math.cos(normalized.rotation);
+  const sine = Math.sin(normalized.rotation);
+  return circles.map((circle) => {
+    const offsetX = Number(circle.offsetX || 0) * normalized.scale;
+    const offsetY = Number(circle.offsetY || 0) * normalized.scale;
+    return {
+      x: normalized.x + offsetX * cosine - offsetY * sine,
+      y: normalized.y + offsetX * sine + offsetY * cosine,
+      r: Math.max(0, Number(circle.radius || normalized.fallbackRadius || 0) * normalized.scale)
+    };
+  });
 }
 
 function collisionCircleFor(body) {

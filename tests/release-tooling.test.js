@@ -43,7 +43,7 @@ test("release tooling separates backend staging from approval-gated production H
 test("release smoke verifies SHA, authority, cache, headers, private 404s, and callable modes", () => {
   assert.match(smokeScript, /release\.commitSha, expectedCommit/);
   assert.match(smokeScript, /backend commit SHA differs/);
-  assert.match(smokeScript, /explicit_account_or_device/);
+  assert.match(smokeScript, /automatic_best_account_or_device/);
   assert.match(smokeScript, /competitionMode, "paused_pending_authoritative_verifier"/);
   assert.match(smokeScript, /cache-control/);
   assert.match(smokeScript, /content-security-policy/);

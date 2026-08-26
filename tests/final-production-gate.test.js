@@ -273,7 +273,7 @@ test("backend release identity is generated from the exact release SHA and expos
     assert.deepEqual(generated, {
       commitSha: releaseSha,
       packageVersion: "1.1.0",
-      progressionAuthority: "explicit_account_or_device",
+      progressionAuthority: "automatic_best_account_or_device",
       competitionMode: "paused_pending_authoritative_verifier",
       competitionWritesEnabled: false,
       serverProgressionWritesEnabled: false,
@@ -298,7 +298,7 @@ test("CI release report proves build/marker parity without claiming deployment",
     const outputPath = path.join(fixture, "staged-release-report.json");
     fs.writeFileSync(versionPath, JSON.stringify({
       commitSha: releaseSha,
-      progressionMode: "explicit_account_or_device",
+      progressionMode: "automatic_best_account_or_device",
       competitionMode: "paused_pending_authoritative_verifier"
     }));
     let result = spawnSync(process.execPath, [
@@ -347,7 +347,7 @@ test("release smoke fails a stale backend SHA even when paused callables return 
       response.writeHead(200, { ...securityHeaders, "content-type": "application/json" });
       response.end(JSON.stringify({
         commitSha: releaseSha,
-        progressionMode: "explicit_account_or_device",
+        progressionMode: "automatic_best_account_or_device",
         competitionMode: "paused_pending_authoritative_verifier"
       }));
       return;
@@ -384,7 +384,7 @@ test("release smoke fails a stale backend SHA even when paused callables return 
             release: {
               commitSha: backendSha,
               packageVersion: "1.1.0",
-              progressionAuthority: "explicit_account_or_device",
+              progressionAuthority: "automatic_best_account_or_device",
               competitionMode: "paused_pending_authoritative_verifier",
               competitionWritesEnabled: false,
               serverProgressionWritesEnabled: false,
@@ -447,7 +447,7 @@ test("release smoke waits for a newly deployed preview to become ready", async (
       response.writeHead(200, { ...securityHeaders, "content-type": "application/json" });
       response.end(JSON.stringify({
         commitSha: releaseSha,
-        progressionMode: "explicit_account_or_device",
+        progressionMode: "automatic_best_account_or_device",
         competitionMode: "paused_pending_authoritative_verifier"
       }));
       return;
@@ -522,7 +522,7 @@ test("release smoke waits for the staged origin to become authorized for Google 
       response.writeHead(200, { ...securityHeaders, "content-type": "application/json" });
       response.end(JSON.stringify({
         commitSha: releaseSha,
-        progressionMode: "explicit_account_or_device",
+        progressionMode: "automatic_best_account_or_device",
         competitionMode: "paused_pending_authoritative_verifier"
       }));
       return;
