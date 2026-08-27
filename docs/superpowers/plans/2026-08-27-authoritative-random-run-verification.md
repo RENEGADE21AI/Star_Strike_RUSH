@@ -73,10 +73,13 @@ artwork-aligned collision geometry, common enemy/boss stats, auto-fire,
 projectile motion, basic enemy contact, kills, score, result derivation,
 fixed phase clocks, seeded browser-matching early wave pools (`breather`,
 `redV`, `redWall`, `orangePair`, and `mixedChevron`), exact queued formation
-geometry, and named-stream integer red-enemy drift. The ordered browser runtime
-now consumes the same phase-duration source.
-Full later-phase formations, enemy behaviors, hazards, boss procedures, adaptive
-pacing, drops, powerups, and browser-state ownership remain intentionally
+geometry, named-stream integer Red drift, Orange snap/zigzag motion, Purple
+drift/warnings/aimed fire, hostile-projectile movement and damage, and Phantom
+realm cycles/telegraphs/physical fire. Phantom telegraphs are now canonically
+intangible, and hostile projectiles can cause terminal death only in the matching
+realm. The ordered browser runtime now consumes the same phase-duration source.
+Full later-phase formations, expansion-enemy behaviors, hazards, boss procedures,
+adaptive pacing, drops, powerups, and browser-state ownership remain intentionally
 unchecked below until parity is implemented.
 
 **Files:**

@@ -231,6 +231,532 @@ test("red drift consumes only deterministic enemy behavior randomness and stays 
   assert.doesNotThrow(() => serializeCanonicalState(state));
 });
 
+test("orange snap turns consume only enemy behavior randomness and stay integer exact", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.phase = 2;
+  state.player.fireCooldown = 10_000;
+  const values = [5, 0xffffffff, 1, 3, 50, 25, 0xffffffff];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const enemy = spawnCanonicalEnemy(state, "orange", 100_000, -20_000, {
+    vx: 3_277,
+    vy: 2_600,
+    motion: "snap",
+    loopAngle: 0,
+    turnTimer: 0,
+    turnDir: -1,
+    snapTimer: 0
+  }, streams);
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.deepEqual({
+    x: enemy.x,
+    y: enemy.y,
+    vx: enemy.vx,
+    vy: enemy.vy,
+    motionTick: enemy.motionTick,
+    turnTimer: enemy.turnTimer,
+    turnDir: enemy.turnDir,
+    snapTimer: enemy.snapTimer
+  }, {
+    x: 101_880,
+    y: -17_041,
+    vx: 4_700,
+    vy: 2_959,
+    motionTick: 1,
+    turnTimer: 16,
+    turnDir: 1,
+    snapTimer: 10
+  });
+  assert.equal(values.length, 0);
+  assert.doesNotThrow(() => serializeCanonicalState(state));
+});
+
+test("orange zigzag weave advances from canonical angle state", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.phase = 2;
+  state.player.fireCooldown = 10_000;
+  const values = [0xffffffff];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const enemy = spawnCanonicalEnemy(state, "orange", 100_000, -20_000, {
+    vx: 3_000,
+    vy: 2_500,
+    motion: "zigzag",
+    loopAngle: 0,
+    turnTimer: 2,
+    turnDir: 1,
+    snapTimer: 0
+  }, streams);
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.deepEqual({
+    x: enemy.x,
+    y: enemy.y,
+    vx: enemy.vx,
+    vy: enemy.vy,
+    motionTick: enemy.motionTick,
+    turnTimer: enemy.turnTimer
+  }, {
+    x: 101_202,
+    y: -17_500,
+    vx: 3_004,
+    vy: 2_500,
+    motionTick: 1,
+    turnTimer: 1
+  });
+  assert.equal(values.length, 0);
+});
+
+test("orange zigzag turns choose canonical direction and velocity", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.phase = 2;
+  state.player.fireCooldown = 10_000;
+  const values = [5, 0, 1, 0, 50, 25, 0xffffffff];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const enemy = spawnCanonicalEnemy(state, "orange", 100_000, -20_000, {
+    vx: 3_000,
+    vy: 2_500,
+    motion: "zigzag",
+    loopAngle: 0,
+    turnTimer: 0,
+    turnDir: -1,
+    snapTimer: 0
+  }, streams);
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.deepEqual({
+    x: enemy.x,
+    y: enemy.y,
+    vx: enemy.vx,
+    vy: enemy.vy,
+    motionTick: enemy.motionTick,
+    turnTimer: enemy.turnTimer,
+    turnDir: enemy.turnDir,
+    snapTimer: enemy.snapTimer
+  }, {
+    x: 98_552,
+    y: -17_092,
+    vx: -3_621,
+    vy: 2_908,
+    motionTick: 1,
+    turnTimer: 16,
+    turnDir: 1,
+    snapTimer: 0
+  });
+  assert.equal(values.length, 0);
+});
+
+test("queued orange enemies initialize canonical motion from the named behavior stream", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.phase = 2;
+  const values = [1_024, 5, 1];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+
+  const enemy = spawnCanonicalEnemy(state, "orange", 100_000, -20_000, {
+    vy: 2_600,
+    motion: "zigzag"
+  }, streams);
+  assert.deepEqual({
+    vx: enemy.vx,
+    loopAngle: enemy.loopAngle,
+    turnTimer: enemy.turnTimer,
+    turnDir: enemy.turnDir,
+    snapTimer: enemy.snapTimer
+  }, {
+    vx: 3_379,
+    loopAngle: 1_024,
+    turnTimer: 19,
+    turnDir: 1,
+    snapTimer: 0
+  });
+  assert.equal(values.length, 0);
+});
+
+test("purple warning emits an authoritative aimed projectile on its canonical tick", () => {
+  const state = createSimulationState(ticket({ maxTicks: 40 }));
+  state.phase = 2;
+  state.player.fireCooldown = 10_000;
+  const values = [5];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const enemy = spawnCanonicalEnemy(
+    state,
+    "purple",
+    state.player.x,
+    state.player.y - 100 * POSITION_UNITS_PER_PIXEL,
+    {
+      vx: 0,
+      vy: 0,
+      driftPower: 0,
+      shootTimer: 1,
+      warnTimer: 0,
+      volleySeed: 0
+    }
+  );
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.equal(enemy.warnTimer, 16);
+  assert.equal(state.enemyProjectiles.length, 0);
+  for (let tick = 0; tick < 16; tick++) {
+    stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  }
+
+  assert.deepEqual(state.enemyProjectiles, [{
+    id: 2,
+    kind: "purple",
+    x: state.player.x,
+    y: state.player.y - 88 * POSITION_UNITS_PER_PIXEL,
+    vx: 0,
+    vy: 3_604,
+    angle: 0,
+    life: 180,
+    damage: 1,
+    realm: 0
+  }]);
+  assert.equal(enemy.warnTimer, 0);
+  assert.equal(enemy.shootTimer, 103);
+  assert.equal(values.length, 0);
+  assert.doesNotThrow(() => serializeCanonicalState(state));
+});
+
+test("enemy projectiles advance, damage the matching realm, and become terminal authority", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.player.hp = 1;
+  state.player.fireCooldown = 10_000;
+  state.enemyProjectiles.push({
+    id: state.nextEntityId++,
+    kind: "purple",
+    x: state.player.x,
+    y: state.player.y - 12 * POSITION_UNITS_PER_PIXEL,
+    vx: 0,
+    vy: 3 * POSITION_UNITS_PER_PIXEL,
+    angle: 0,
+    life: 2,
+    damage: 1,
+    realm: 0
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(state.player.hp, 0);
+  assert.equal(state.stats.damageTaken, 1);
+  assert.equal(state.terminal, true);
+  assert.equal(state.terminalReason, "player_destroyed");
+  assert.equal(state.enemyProjectiles.length, 0);
+});
+
+test("queued purple enemies initialize drift and fire cadence from the behavior stream", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  const values = [1_024, 1, 39, 5, 2];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+
+  const enemy = spawnCanonicalEnemy(state, "purple", 100_000, -20_000, {
+    vy: 1_100,
+    motion: "drift"
+  }, streams);
+  assert.deepEqual({
+    driftAngle: enemy.driftAngle,
+    driftDir: enemy.driftDir,
+    driftPower: enemy.driftPower,
+    shootTimer: enemy.shootTimer,
+    warnTimer: enemy.warnTimer,
+    volleySeed: enemy.volleySeed
+  }, {
+    driftAngle: 1_024,
+    driftDir: 1,
+    driftPower: 100,
+    shootTimer: 67,
+    warnTimer: 0,
+    volleySeed: 2
+  });
+  assert.equal(values.length, 0);
+});
+
+test("purple drift and player tracking remain deterministic integer motion", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.player.fireCooldown = 10_000;
+  const values = [0xffffffff];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const enemy = spawnCanonicalEnemy(state, "purple", 100_000, -20_000, {
+    vx: 0,
+    vy: 1_100,
+    driftAngle: 1_024,
+    driftDir: 1,
+    driftPower: 100,
+    shootTimer: 100,
+    warnTimer: 0,
+    volleySeed: 0
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.deepEqual({
+    x: enemy.x,
+    y: enemy.y,
+    driftAngle: enemy.driftAngle,
+    driftDir: enemy.driftDir,
+    shootTimer: enemy.shootTimer,
+    warnTimer: enemy.warnTimer
+  }, {
+    x: 100_428,
+    y: -18_900,
+    driftAngle: 1_047,
+    driftDir: 1,
+    shootTimer: 99,
+    warnTimer: 0
+  });
+  assert.equal(values.length, 0);
+});
+
+test("phantom telegraph deterministically transitions into the ghost realm", () => {
+  const state = createSimulationState(ticket({ maxTicks: 40 }));
+  state.player.fireCooldown = 10_000;
+  const values = [0xffffffff, 0, 0];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const enemy = spawnCanonicalEnemy(state, "phantom", 100_000, -20_000, {
+    vx: 0,
+    vy: 1_600,
+    driftPower: 0,
+    phaseOffset: 0,
+    stateMode: "physical",
+    cycleTimer: 1,
+    telegraphTimer: 0,
+    fireTimer: 100
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.deepEqual({
+    stateMode: enemy.stateMode,
+    realm: enemy.realm,
+    cycleTimer: enemy.cycleTimer,
+    telegraphTimer: enemy.telegraphTimer,
+    fireTimer: enemy.fireTimer,
+    y: enemy.y
+  }, {
+    stateMode: "physical",
+    realm: 0,
+    cycleTimer: 0,
+    telegraphTimer: 20,
+    fireTimer: 99,
+    y: -18_400
+  });
+
+  for (let tick = 0; tick < 20; tick++) {
+    stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  }
+  assert.deepEqual({
+    stateMode: enemy.stateMode,
+    realm: enemy.realm,
+    cycleTimer: enemy.cycleTimer,
+    telegraphTimer: enemy.telegraphTimer,
+    fireTimer: enemy.fireTimer,
+    motionTick: enemy.motionTick,
+    y: enemy.y
+  }, {
+    stateMode: "ghost",
+    realm: 1,
+    cycleTimer: 66,
+    telegraphTimer: 0,
+    fireTimer: 67,
+    motionTick: 21,
+    y: -800
+  });
+  assert.equal(values.length, 0);
+  assert.doesNotThrow(() => serializeCanonicalState(state));
+});
+
+test("queued phantoms initialize cycle and fire state from the behavior stream", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  const values = [1_024, 1, 39, 5, 7];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+
+  const enemy = spawnCanonicalEnemy(state, "phantom", 100_000, -20_000, {
+    vy: 1_600,
+    motion: "phantom"
+  }, streams);
+  assert.deepEqual({
+    stateMode: enemy.stateMode,
+    realm: enemy.realm,
+    phaseOffset: enemy.phaseOffset,
+    driftDir: enemy.driftDir,
+    driftPower: enemy.driftPower,
+    cycleTimer: enemy.cycleTimer,
+    telegraphTimer: enemy.telegraphTimer,
+    fireTimer: enemy.fireTimer
+  }, {
+    stateMode: "physical",
+    realm: 0,
+    phaseOffset: 1_024,
+    driftDir: 1,
+    driftPower: 100,
+    cycleTimer: 5,
+    telegraphTimer: 0,
+    fireTimer: 31
+  });
+  assert.equal(values.length, 0);
+});
+
+test("physical phantoms fire realm-bound canonical projectiles", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.phase = 2;
+  state.player.fireCooldown = 10_000;
+  const values = [0xffffffff, 0];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const enemy = spawnCanonicalEnemy(
+    state,
+    "phantom",
+    state.player.x,
+    state.player.y - 100 * POSITION_UNITS_PER_PIXEL,
+    {
+      vx: 0,
+      vy: 0,
+      driftPower: 0,
+      phaseOffset: 0,
+      stateMode: "physical",
+      cycleTimer: 100,
+      telegraphTimer: 0,
+      fireTimer: 1
+    }
+  );
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.deepEqual(state.enemyProjectiles, [{
+    id: 2,
+    kind: "phantomShot",
+    x: state.player.x,
+    y: state.player.y - 90 * POSITION_UNITS_PER_PIXEL,
+    vx: 0,
+    vy: 2_724,
+    angle: 0,
+    life: 180,
+    damage: 1,
+    realm: 0
+  }]);
+  assert.equal(enemy.fireTimer, 100);
+  assert.equal(enemy.cycleTimer, 99);
+  assert.equal(values.length, 0);
+});
+
+test("phantom telegraphs are intangible to player projectiles", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.player.fireCooldown = 10_000;
+  const enemy = spawnCanonicalEnemy(state, "phantom", state.player.x, state.player.y - 50 * POSITION_UNITS_PER_PIXEL, {
+    vx: 0,
+    vy: 0,
+    driftPower: 0,
+    phaseOffset: 0,
+    stateMode: "physical",
+    cycleTimer: 0,
+    telegraphTimer: 10,
+    fireTimer: 100
+  });
+  state.playerProjectiles.push({
+    id: state.nextEntityId++,
+    x: enemy.x,
+    y: enemy.y,
+    vx: 0,
+    vy: -9 * POSITION_UNITS_PER_PIXEL,
+    angle: 0,
+    life: 10,
+    damage: 3,
+    realm: 0
+  });
+  const streams = {
+    nextUint32() {
+      throw new Error("telegraph tick must not draw randomness");
+    }
+  };
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.equal(enemy.telegraphTimer, 9);
+  assert.equal(enemy.hp, 3);
+  assert.equal(state.enemies.length, 1);
+  assert.equal(state.playerProjectiles.length, 1);
+  assert.equal(state.stats.kills, 0);
+});
+
+test("phantom telegraphs cannot damage the player by contact", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.player.fireCooldown = 10_000;
+  const enemy = spawnCanonicalEnemy(state, "phantom", state.player.x, state.player.y, {
+    vx: 0,
+    vy: 0,
+    driftPower: 0,
+    phaseOffset: 0,
+    stateMode: "physical",
+    cycleTimer: 0,
+    telegraphTimer: 10,
+    fireTimer: 100
+  });
+  const streams = {
+    nextUint32() {
+      throw new Error("telegraph tick must not draw randomness");
+    }
+  };
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.equal(enemy.telegraphTimer, 9);
+  assert.equal(state.player.hp, 5);
+  assert.equal(state.stats.damageTaken, 0);
+  assert.equal(state.terminal, false);
+});
+
 test("entity creation rejects unknown content and all combat state stays integer-only", () => {
   const state = createSimulationState(ticket({ maxTicks: 30 }));
   assert.throws(() => spawnCanonicalEnemy(state, "invented", 0, 0), /enemy type/);
