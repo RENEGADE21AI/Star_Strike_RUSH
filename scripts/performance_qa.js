@@ -115,6 +115,9 @@ async function stageLateGamePressure(page) {
       spawnEnemy(enemyTypes[index % enemyTypes.length], 54 + column * ((W - 108) / 6), 100 + row * 78, {
         forceSpawn: true,
         noCodex: true,
+        hp: 999999,
+        maxHp: 999999,
+        reward: 0,
         entryFrames: 0,
         recover: 1_000_000,
         shoot: 1_000_000,
@@ -208,6 +211,20 @@ async function capturePerformance(page) {
   return page.evaluate(async ({ durationMs }) => {
     const samples = [];
     const longTasks = [];
+    while (state.enemies.length < 12) {
+      const index = state.enemies.length;
+      spawnEnemy("red", 54 + (index % 6) * ((W - 108) / 5), 110 + Math.floor(index / 6) * 76, {
+        forceSpawn: true,
+        noCodex: true,
+        hp: 999999,
+        maxHp: 999999,
+        reward: 0,
+        entryFrames: 0,
+        recover: 1_000_000,
+        shoot: 1_000_000,
+        noPowerup: true
+      });
+    }
     let observer = null;
     if (typeof PerformanceObserver === "function" && PerformanceObserver.supportedEntryTypes?.includes("longtask")) {
       observer = new PerformanceObserver((list) => {
@@ -216,18 +233,22 @@ async function capturePerformance(page) {
       observer.observe({ entryTypes: ["longtask"] });
     }
     const start = performance.now();
+    const takeSample = (timestamp) => {
+      state.player.hp = state.player.maxHp;
+      state.player.inv = Math.max(state.player.inv, 1_000_000);
+      const debug = getDebugSnapshot();
+      samples.push({
+        timestampMs: timestamp,
+        simulationFrame: state.frame,
+        simulationBacklogMs: Number(simulationClock.accumulator || 0),
+        heapUsedBytes: Number(performance.memory && performance.memory.usedJSHeapSize),
+        counts: debug.counts
+      });
+    };
+    takeSample(start);
     await new Promise((resolve) => {
       const sample = (timestamp) => {
-        state.player.hp = state.player.maxHp;
-        state.player.inv = Math.max(state.player.inv, 1_000_000);
-        const debug = getDebugSnapshot();
-        samples.push({
-          timestampMs: timestamp,
-          simulationFrame: state.frame,
-          simulationBacklogMs: Number(simulationClock.accumulator || 0),
-          heapUsedBytes: Number(performance.memory && performance.memory.usedJSHeapSize),
-          counts: debug.counts
-        });
+        takeSample(timestamp);
         if (timestamp - start >= durationMs) resolve();
         else requestAnimationFrame(sample);
       };
@@ -257,6 +278,9 @@ async function runCase(browser, baseUrl, item) {
     await page.waitForFunction(() => document.querySelector("#debugSnapshot")?.textContent, null, { timeout: 90_000 });
     await stageLateGamePressure(page);
     await page.waitForTimeout(warmupMs);
+    // Warm the renderer and image paths, then reset the exact pressure profile so
+    // faster runners cannot simulate entities offscreen before sampling begins.
+    await stageLateGamePressure(page);
     const capture = await capturePerformance(page);
     const summary = summarizePerformance(capture.samples, { expectedFrameMs, longTasks: capture.longTasks });
     const budget = { ...item.budget, minSamples: Math.max(3, Math.floor(durationMs / 2500)) };
