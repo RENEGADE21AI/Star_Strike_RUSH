@@ -66,6 +66,12 @@
 
 ### Task 3: Canonical gameplay state and headless transition
 
+Progress checkpoint: the shared browser/Node core now owns revision-bound integer
+state, canonical player motion, pause and Ghost Shift tick semantics, terminal
+enforcement, stable serialization, checkpoint digests, and result derivation.
+Enemy, projectile, hazard, boss, collision, pacing, scoring, and browser-state
+ownership remain intentionally unchecked below until parity is implemented.
+
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`
 - Create: `shared/verified-run/simulation-step.js`
