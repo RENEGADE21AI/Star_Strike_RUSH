@@ -68,6 +68,7 @@ function createSimulationState(ticket) {
     multiplier: 1,
     comboKills: 0,
     playerRealm: 0,
+    nextEntityId: 1,
     player: {
       x: Math.round(GAME_WIDTH_UNITS / 2),
       y: Math.round(GAME_HEIGHT_UNITS * 8 / 10),
@@ -133,6 +134,7 @@ function canonicalStateView(state) {
     multiplier: state.multiplier,
     comboKills: state.comboKills,
     playerRealm: state.playerRealm,
+    nextEntityId: state.nextEntityId,
     player: state.player,
     stats: state.stats,
     enemies: state.enemies,

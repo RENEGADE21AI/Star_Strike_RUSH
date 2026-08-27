@@ -16,7 +16,10 @@ const {
   digestCanonicalState,
   serializeCanonicalState
 } = require("../shared/verified-run/simulation-state");
-const { stepSimulation } = require("../shared/verified-run/simulation-step");
+const {
+  spawnCanonicalEnemy,
+  stepSimulation
+} = require("../shared/verified-run/simulation-step");
 const { deriveVerifiedRunResult } = require("../shared/verified-run/result");
 
 function ticket(overrides = {}) {
@@ -174,4 +177,45 @@ test("canonical stepping rejects malformed input before mutating state", () => {
     assert.throws(() => stepSimulation(state, input), /input/);
     assert.equal(state.tick, 0);
   }
+});
+
+test("auto-fire, projectile motion, collision, kills, and score are authoritative", () => {
+  const state = createSimulationState(ticket({ maxTicks: 120 }));
+  spawnCanonicalEnemy(state, "orange", state.player.x, state.player.y - 45 * POSITION_UNITS_PER_PIXEL, {
+    vx: 0,
+    vy: 0
+  });
+  for (let tick = 0; tick < 8 && state.stats.kills === 0; tick++) {
+    stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  }
+  assert.equal(state.stats.kills, 1);
+  assert.equal(state.score, 20);
+  assert.equal(state.comboKills, 1);
+  assert.equal(state.multiplier, 1);
+  assert.equal(state.enemies.length, 0);
+  assert.equal(state.playerProjectiles.length, 0, "the hitting projectile must be consumed");
+});
+
+test("enemy contact uses artwork-aligned bodies and terminal health authority", () => {
+  const state = createSimulationState(ticket());
+  state.player.hp = 1;
+  spawnCanonicalEnemy(state, "carrier", state.player.x, state.player.y, { vx: 0, vy: 0 });
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(state.player.hp, 0);
+  assert.equal(state.terminal, true);
+  assert.equal(state.terminalReason, "player_destroyed");
+  assert.equal(state.stats.damageTaken, 1);
+});
+
+test("entity creation rejects unknown content and all combat state stays integer-only", () => {
+  const state = createSimulationState(ticket({ maxTicks: 30 }));
+  assert.throws(() => spawnCanonicalEnemy(state, "invented", 0, 0), /enemy type/);
+  for (const type of ["red", "purple", "phantom", "splitter", "siphon", "railgunner"]) {
+    spawnCanonicalEnemy(state, type, 30 * POSITION_UNITS_PER_PIXEL + state.enemies.length * 40 * POSITION_UNITS_PER_PIXEL, 80 * POSITION_UNITS_PER_PIXEL, {
+      vx: 0,
+      vy: POSITION_UNITS_PER_PIXEL
+    });
+  }
+  while (!state.terminal) stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.doesNotThrow(() => serializeCanonicalState(state));
 });

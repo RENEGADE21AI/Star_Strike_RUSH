@@ -7,9 +7,11 @@
   },
   "scripts": {
     "generate:achievements": "node scripts/generate-achievements.js",
+    "generate:verified-trig": "node scripts/generate-verified-trig.js",
+    "check:verified-trig": "node scripts/generate-verified-trig.js --check",
     "check:achievements": "node scripts/generate-achievements.js --check",
-    "build": "npm run check:achievements && node scripts/build_static.js",
-    "test": "npm run check:achievements && node --test --test-concurrency=1 tests/*.test.js",
+    "build": "npm run check:achievements && npm run check:verified-trig && node scripts/build_static.js",
+    "test": "npm run check:achievements && npm run check:verified-trig && node --test --test-concurrency=1 tests/*.test.js",
     "test:browser": "node --test tests/browser-gameplay.test.js",
     "test:webkit": "node --test tests/webkit-smoke.test.js",
     "test:rules": "npx firebase emulators:exec --only firestore \"node --test tests/firestore-rules.emulator.mjs\"",

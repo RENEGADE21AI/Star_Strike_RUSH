@@ -68,9 +68,12 @@
 
 Progress checkpoint: the shared browser/Node core now owns revision-bound integer
 state, canonical player motion, pause and Ghost Shift tick semantics, terminal
-enforcement, stable serialization, checkpoint digests, and result derivation.
-Enemy, projectile, hazard, boss, collision, pacing, scoring, and browser-state
-ownership remain intentionally unchecked below until parity is implemented.
+enforcement, stable serialization, checkpoint digests, versioned trigonometry,
+artwork-aligned collision geometry, common enemy/boss stats, auto-fire,
+projectile motion, basic enemy contact, kills, score, and result derivation.
+Full enemy behaviors, hazards, boss procedures, pacing, drops, powerups, and
+browser-state ownership remain intentionally unchecked below until parity is
+implemented.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`

@@ -69,7 +69,8 @@ async function dismissCurrentTutorialDialogue(page) {
 async function pressAccessibleGameActionUntil(page, label, completion) {
   const action = page.getByRole("button", { name: label, exact: true });
   for (let attempt = 0; attempt < 4; attempt++) {
-    await action.press("Enter");
+    const pressed = await action.press("Enter", { timeout: 3_000 }).then(() => true, () => false);
+    if (!pressed) continue;
     const completed = await page.waitForFunction((expected) => {
       if (expected === "checkpoint-dialogue") {
         return tutorialDirector?.dialogueVisible === true && state.gameState === "playing";
@@ -81,7 +82,14 @@ async function pressAccessibleGameActionUntil(page, label, completion) {
     }, completion, { timeout: 3_000 }).then(() => true, () => false);
     if (completed) return;
   }
-  throw new Error(`Accessible action did not reach ${completion}: ${label}`);
+  const diagnostic = await page.evaluate(() => ({
+    gameState: state.gameState,
+    runMode: state.runMode,
+    onboardingUiMode,
+    onboardingStatus: onboardingState?.status || "",
+    surface: gameAccessibilitySnapshot()
+  }));
+  throw new Error(`Accessible action did not reach ${completion}: ${label}; ${JSON.stringify(diagnostic)}`);
 }
 
 before(async () => {
@@ -318,7 +326,10 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
     });
 
     await page.keyboard.press("Escape");
-    await page.waitForFunction(() => onboardingUiMode === "none" && gameAccessibilitySnapshot().mode === "pause");
+    await page.waitForFunction(() => {
+      const surface = gameAccessibilitySnapshot();
+      return onboardingUiMode === "none" && surface.mode === "pause" && surface.hidden === false;
+    });
     await pressAccessibleGameActionUntil(page, "Restart tutorial checkpoint", "checkpoint-dialogue");
     let transferred = await page.evaluate(() => ({
       modalCount: document.querySelectorAll('[aria-modal="true"]').length,
@@ -331,7 +342,10 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
 
     await dismissCurrentTutorialDialogue(page);
     await page.keyboard.press("Escape");
-    await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "pause");
+    await page.waitForFunction(() => {
+      const surface = gameAccessibilitySnapshot();
+      return onboardingUiMode === "none" && surface.mode === "pause" && surface.hidden === false;
+    });
     await pressAccessibleGameActionUntil(page, "Return to title", "training-offer");
     transferred = await page.evaluate(() => ({
       modalCount: document.querySelectorAll('[aria-modal="true"]').length,

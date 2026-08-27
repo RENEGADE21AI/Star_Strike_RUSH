@@ -53,7 +53,7 @@ test("verified run primitives and adapter are browser-safe and load before the g
   };
   browserContext.globalThis = browserContext;
   vm.createContext(browserContext);
-  for (const file of ["constants.js", "random.js", "input-tape.js", "simulation-state.js", "simulation-step.js", "result.js"]) {
+  for (const file of ["constants.js", "random.js", "input-tape.js", "trig-table.js", "content.js", "geometry.js", "simulation-state.js", "simulation-step.js", "result.js"]) {
     vm.runInContext(
       fs.readFileSync(path.join(repoRoot, "shared", "verified-run", file), "utf8"),
       browserContext
@@ -67,6 +67,7 @@ test("verified run primitives and adapter are browser-safe and load before the g
   assert.equal(typeof browserContext.createRunRandomStreams, "function");
   assert.equal(typeof browserContext.encodeInputTape, "function");
   assert.equal(typeof browserContext.createSimulationState, "function");
+  assert.equal(typeof browserContext.bodiesOverlap, "function");
   assert.equal(typeof browserContext.stepSimulation, "function");
   assert.equal(typeof browserContext.deriveVerifiedRunResult, "function");
   assert.equal(typeof browserContext.runRandom, "function");
@@ -126,15 +127,25 @@ test("verified run primitives and adapter are browser-safe and load before the g
   const constantsAt = html.indexOf("shared/verified-run/constants.js");
   const randomAt = html.indexOf("shared/verified-run/random.js");
   const inputAt = html.indexOf("shared/verified-run/input-tape.js");
+  const trigAt = html.indexOf("shared/verified-run/trig-table.js");
+  const contentAt = html.indexOf("shared/verified-run/content.js");
+  const geometryAt = html.indexOf("shared/verified-run/geometry.js");
   const stateAt = html.indexOf("shared/verified-run/simulation-state.js");
   const stepAt = html.indexOf("shared/verified-run/simulation-step.js");
   const resultAt = html.indexOf("shared/verified-run/result.js");
   const adapterAt = html.indexOf("src/00-verified-run-runtime.js");
   const coreAt = html.indexOf("src/01-core.js");
   assert.ok(
-    constantsAt >= 0 && constantsAt < randomAt && randomAt < inputAt && inputAt < stateAt &&
+    constantsAt >= 0 && constantsAt < randomAt && randomAt < inputAt && inputAt < trigAt &&
+    trigAt < contentAt && contentAt < geometryAt && geometryAt < stateAt &&
     stateAt < stepAt && stepAt < resultAt && resultAt < adapterAt && adapterAt < coreAt
   );
+
+  const assetManifest = fs.readFileSync(path.join(repoRoot, "src", "00-asset-manifest.js"), "utf8");
+  assert.match(assetManifest, /AUTHORITATIVE_COLLISION_CIRCLES_PIXELS\[key\]/);
+  const coreSource = fs.readFileSync(path.join(repoRoot, "src", "01-core.js"), "utf8");
+  assert.match(coreSource, /Object\.entries\(AUTHORITATIVE_ENEMY_ARCHETYPES\)/);
+  assert.match(coreSource, /Object\.entries\(AUTHORITATIVE_BOSS_ARCHETYPES\)/);
 
   const build = fs.readFileSync(path.join(repoRoot, "scripts", "build_static.js"), "utf8");
   assert.match(build, /path\.join\("shared", "verified-run"\)/);

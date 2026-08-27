@@ -7,12 +7,14 @@
   const inputTape = typeof module === "object" && module.exports
     ? require("./input-tape")
     : root;
-  const api = factory(constants, inputTape);
+  const content = typeof module === "object" && module.exports ? require("./content") : root;
+  const geometry = typeof module === "object" && module.exports ? require("./geometry") : root;
+  const api = factory(constants, inputTape, content, geometry);
   if (typeof module === "object" && module.exports) module.exports = api;
   Object.assign(root, api);
-})(globalThis, function buildVerifiedRunSimulationStep(constants, inputTape) {
+})(globalThis, function buildVerifiedRunSimulationStep(constants, inputTape, content, geometry) {
 
-if (!constants || !inputTape) throw new Error("Verified run primitives must load before simulation step.");
+if (!constants || !inputTape || !content || !geometry) throw new Error("Verified run primitives must load before simulation step.");
 
 const {
   ENERGY_UNITS_PER_POINT,
@@ -21,6 +23,8 @@ const {
   POSITION_UNITS_PER_PIXEL
 } = constants;
 const { BUTTON_GHOST_SHIFT, BUTTON_PAUSE } = inputTape;
+const { AUTHORITATIVE_ENEMY_ARCHETYPES } = content;
+const { bodiesOverlap, collisionBodyFor } = geometry;
 const ALLOWED_BUTTONS = BUTTON_GHOST_SHIFT | BUTTON_PAUSE;
 const GHOST_BURST = Math.round(4.6 * POSITION_UNITS_PER_PIXEL);
 const GHOST_COST = 35 * ENERGY_UNITS_PER_POINT;
@@ -109,6 +113,116 @@ function updateCanonicalPlayer(state, input) {
   player.energy = Math.min(player.maxEnergy, player.energy + 50);
 }
 
+function spawnCanonicalEnemy(state, type, x, y, options = {}) {
+  if (!state || state.schema !== "SSR_SIM_STATE_V1" || state.terminal) {
+    throw new TypeError("Canonical enemy creation requires an active simulation state.");
+  }
+  const archetype = AUTHORITATIVE_ENEMY_ARCHETYPES[String(type || "")];
+  if (!archetype) throw new RangeError(`Unknown authoritative enemy type: ${type}`);
+  const enemy = {
+    id: state.nextEntityId++,
+    type: String(type),
+    x: canonicalEntityInteger(x, "Enemy X"),
+    y: canonicalEntityInteger(y, "Enemy Y"),
+    vx: canonicalEntityInteger(options.vx || 0, "Enemy velocity X"),
+    vy: canonicalEntityInteger(options.vy || 0, "Enemy velocity Y"),
+    angle: canonicalEntityInteger(options.angle || 0, "Enemy angle"),
+    hp: archetype.hp,
+    maxHp: archetype.hp,
+    score: archetype.score,
+    realm: canonicalEntityInteger(options.realm || 0, "Enemy realm")
+  };
+  state.enemies.push(enemy);
+  return enemy;
+}
+
+function canonicalEntityInteger(value, label) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number)) throw new TypeError(`${label} must be a safe integer.`);
+  return number;
+}
+
+function fireCanonicalPlayer(state) {
+  const player = state.player;
+  if (player.fireCooldown > 0) return;
+  state.playerProjectiles.push({
+    id: state.nextEntityId++,
+    x: player.x,
+    y: player.y - 20 * POSITION_UNITS_PER_PIXEL,
+    vx: 0,
+    vy: -9 * POSITION_UNITS_PER_PIXEL,
+    angle: 0,
+    life: 90,
+    damage: 1,
+    realm: state.playerRealm
+  });
+  player.fireCooldown = 14;
+}
+
+function updateCanonicalEntities(state) {
+  for (const enemy of state.enemies) {
+    enemy.x += enemy.vx;
+    enemy.y += enemy.vy;
+  }
+  for (const projectile of state.playerProjectiles) {
+    projectile.x += projectile.vx;
+    projectile.y += projectile.vy;
+    projectile.life--;
+  }
+  state.playerProjectiles = state.playerProjectiles.filter((projectile) => (
+    projectile.life > 0 && projectile.y > -40 * POSITION_UNITS_PER_PIXEL
+  ));
+}
+
+function noteCanonicalKill(state, enemy) {
+  state.comboKills++;
+  state.multiplier = Math.max(1, Math.min(4, 1 + Math.floor(state.comboKills / 7)));
+  state.score += enemy.score * state.multiplier;
+  state.stats.kills++;
+  state.stats.highestCombo = Math.max(state.stats.highestCombo, state.comboKills);
+}
+
+function resolveCanonicalProjectileHits(state) {
+  const deadProjectiles = new Set();
+  const deadEnemies = new Set();
+  for (const projectile of state.playerProjectiles) {
+    if (deadProjectiles.has(projectile.id)) continue;
+    const projectileBody = collisionBodyFor("player_bullet", projectile.x, projectile.y, projectile.angle);
+    for (const enemy of state.enemies) {
+      if (deadEnemies.has(enemy.id) || enemy.realm !== projectile.realm) continue;
+      const enemyBody = collisionBodyFor(enemy.type, enemy.x, enemy.y, enemy.angle);
+      if (!bodiesOverlap(projectileBody, enemyBody)) continue;
+      enemy.hp -= projectile.damage;
+      deadProjectiles.add(projectile.id);
+      if (enemy.hp <= 0) {
+        deadEnemies.add(enemy.id);
+        noteCanonicalKill(state, enemy);
+      }
+      break;
+    }
+  }
+  state.playerProjectiles = state.playerProjectiles.filter((projectile) => !deadProjectiles.has(projectile.id));
+  state.enemies = state.enemies.filter((enemy) => !deadEnemies.has(enemy.id));
+}
+
+function resolveCanonicalPlayerContact(state) {
+  const player = state.player;
+  if (player.invulnerability > 0 || player.ghostTimer > 0) return;
+  const playerBody = collisionBodyFor("player", player.x, player.y, player.heading);
+  for (const enemy of state.enemies) {
+    if (enemy.realm !== state.playerRealm) continue;
+    if (!bodiesOverlap(playerBody, collisionBodyFor(enemy.type, enemy.x, enemy.y, enemy.angle))) continue;
+    player.hp = Math.max(0, player.hp - 1);
+    state.stats.damageTaken++;
+    player.invulnerability = 90;
+    if (player.hp === 0) {
+      state.terminal = true;
+      state.terminalReason = "player_destroyed";
+    }
+    break;
+  }
+}
+
 function stepSimulation(state, rawInput) {
   if (!state || state.schema !== "SSR_SIM_STATE_V1") throw new TypeError("Canonical simulation state is invalid.");
   if (state.terminal) throw new Error("Canonical simulation is already terminal.");
@@ -118,6 +232,10 @@ function stepSimulation(state, rawInput) {
   if (!state.terminal) {
     applyGhostShift(state, input);
     updateCanonicalPlayer(state, input);
+    fireCanonicalPlayer(state);
+    updateCanonicalEntities(state);
+    resolveCanonicalProjectileHits(state);
+    resolveCanonicalPlayerContact(state);
   }
   if (!state.terminal && state.tick >= state.maxTicks) {
     state.terminal = true;
@@ -128,6 +246,7 @@ function stepSimulation(state, rawInput) {
 
 return Object.freeze({
   roundDivide,
+  spawnCanonicalEnemy,
   stepSimulation,
   validateCanonicalInput
 });
