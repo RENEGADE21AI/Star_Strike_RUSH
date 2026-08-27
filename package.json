@@ -15,6 +15,7 @@
     "test:rules": "npx firebase emulators:exec --only firestore \"node --test tests/firestore-rules.emulator.mjs\"",
     "test:firebase-client": "node scripts/run-firebase-client-emulator.js",
     "test:visual": "node scripts/visual_qa.js",
+    "test:performance": "node scripts/performance_qa.js",
     "test:secret": "node scripts/secret_scan.js",
     "release:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -CheckOnly -ExpectedBranch \"*\"",
     "deploy:preview": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -StageBackendPreview -ExpectedBranch main",

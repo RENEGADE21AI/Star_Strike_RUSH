@@ -25,13 +25,13 @@ appears only after graduation.
 
 Play: https://star-strike-rush.web.app
 
-Release truth as of 2026-08-20: the production baseline for this pass is
-`a24de81e9572eb828fb4ad1a37860fb06d994552`.
+Release truth verified on 2026-08-26: production is
+`e81eea5cd37bbc44c6baecaed3edc75ea83442d3`.
 The authoritative live identity is the matching Hosting `/version.json` and
 backend release marker, not a source commit alone. Account hydration uses a
 server-owned automatic strongest-save comparison. A security review kept public
 World Record and Weekly League writes fail-closed pending an authoritative run
-verifier; it is not live until both release identities match the new merge.
+verifier.
 
 ## Controls
 
@@ -97,6 +97,7 @@ npm test
 npm run test:rules
 npm run test:firebase-client
 npm run test:visual
+npm run test:performance
 npm run build
 ```
 
@@ -114,6 +115,12 @@ own local server, drives layout-derived controls in Chromium, asserts touch
 scrolling, HUD clearance, terminal states, panel navigation, and motion
 behavior, and writes screenshots plus a JSON report under
 `test-artifacts/visual-qa/` (with traces on failure).
+`npm run test:performance` runs a deterministic synthetic late-game pressure
+profile at desktop and mobile-sized viewports, records frame percentiles,
+long tasks, entity pressure, heap trend, fixed-step backlog/discarded time, and
+dropped-render estimates, and writes JSON plus screenshot evidence under
+`test-artifacts/performance-qa/`. Its broad software-rendering ceilings are a CI
+regression envelope, not a claim about physical-device frame rate.
 `npm run build` creates a deployment-only `dist/` directory containing the
 runtime, optimized assets, manifest, styles, and `version.json`. HTML, scripts,
 styles, manifest assets, and runtime assets receive one commit-version tag;

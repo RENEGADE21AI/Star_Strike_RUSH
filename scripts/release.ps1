@@ -44,6 +44,7 @@ function Invoke-ReleaseChecks {
   Invoke-Checked -Label "Run Firestore Rules emulator tests" -Command { npm run test:rules }
   Invoke-Checked -Label "Run real Firebase client emulator tests" -Command { npm run test:firebase-client }
   Invoke-Checked -Label "Run asserted visual QA" -Command { npm run test:visual }
+  Invoke-Checked -Label "Run late-game performance soak" -Command { npm run test:performance }
   Invoke-Checked -Label "Audit root production dependencies" -Command { npm audit --omit=dev --audit-level=high }
   Invoke-Checked -Label "Audit Functions production dependencies" -Command {
     npm audit --prefix functions --omit=dev --audit-level=high
