@@ -53,7 +53,7 @@ test("verified run primitives and adapter are browser-safe and load before the g
   };
   browserContext.globalThis = browserContext;
   vm.createContext(browserContext);
-  for (const file of ["constants.js", "random.js", "input-tape.js", "trig-table.js", "content.js", "geometry.js", "simulation-state.js", "simulation-step.js", "result.js"]) {
+  for (const file of ["constants.js", "random.js", "input-tape.js", "trig-table.js", "content.js", "director.js", "geometry.js", "simulation-state.js", "simulation-step.js", "result.js"]) {
     vm.runInContext(
       fs.readFileSync(path.join(repoRoot, "shared", "verified-run", file), "utf8"),
       browserContext
@@ -67,6 +67,7 @@ test("verified run primitives and adapter are browser-safe and load before the g
   assert.equal(typeof browserContext.createRunRandomStreams, "function");
   assert.equal(typeof browserContext.encodeInputTape, "function");
   assert.equal(typeof browserContext.createSimulationState, "function");
+  assert.equal(typeof browserContext.tickCanonicalDirector, "function");
   assert.equal(typeof browserContext.bodiesOverlap, "function");
   assert.equal(typeof browserContext.stepSimulation, "function");
   assert.equal(typeof browserContext.deriveVerifiedRunResult, "function");
@@ -129,6 +130,7 @@ test("verified run primitives and adapter are browser-safe and load before the g
   const inputAt = html.indexOf("shared/verified-run/input-tape.js");
   const trigAt = html.indexOf("shared/verified-run/trig-table.js");
   const contentAt = html.indexOf("shared/verified-run/content.js");
+  const directorAt = html.indexOf("shared/verified-run/director.js");
   const geometryAt = html.indexOf("shared/verified-run/geometry.js");
   const stateAt = html.indexOf("shared/verified-run/simulation-state.js");
   const stepAt = html.indexOf("shared/verified-run/simulation-step.js");
@@ -137,7 +139,7 @@ test("verified run primitives and adapter are browser-safe and load before the g
   const coreAt = html.indexOf("src/01-core.js");
   assert.ok(
     constantsAt >= 0 && constantsAt < randomAt && randomAt < inputAt && inputAt < trigAt &&
-    trigAt < contentAt && contentAt < geometryAt && geometryAt < stateAt &&
+    trigAt < contentAt && contentAt < directorAt && directorAt < geometryAt && geometryAt < stateAt &&
     stateAt < stepAt && stepAt < resultAt && resultAt < adapterAt && adapterAt < coreAt
   );
 
@@ -146,6 +148,10 @@ test("verified run primitives and adapter are browser-safe and load before the g
   const coreSource = fs.readFileSync(path.join(repoRoot, "src", "01-core.js"), "utf8");
   assert.match(coreSource, /Object\.entries\(AUTHORITATIVE_ENEMY_ARCHETYPES\)/);
   assert.match(coreSource, /Object\.entries\(AUTHORITATIVE_BOSS_ARCHETYPES\)/);
+
+  browserContext.canonicalPhaseDuration = (phase) => 4000 + phase;
+  vm.runInContext(fs.readFileSync(path.join(repoRoot, "src", "03-pacing.js"), "utf8"), browserContext);
+  assert.equal(browserContext.phaseDuration(3), 4003, "the ordered browser director must consume shared phase pacing");
 
   const build = fs.readFileSync(path.join(repoRoot, "scripts", "build_static.js"), "utf8");
   assert.match(build, /path\.join\("shared", "verified-run"\)/);

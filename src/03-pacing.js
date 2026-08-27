@@ -1,8 +1,5 @@
 function phaseDuration(phase) {
-  if (phase === 1) return 3000;
-  if (phase === 2) return 3300;
-  if (phase === 3) return 3000;
-  return Math.max(580, 940 - (phase - 4) * 20);
+  return canonicalPhaseDuration(phase);
 }
 function openingRamp() {
   return clamp(state.frame / 7200, 0, 1);

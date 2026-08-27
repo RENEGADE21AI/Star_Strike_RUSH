@@ -8,13 +8,14 @@
     ? require("./input-tape")
     : root;
   const content = typeof module === "object" && module.exports ? require("./content") : root;
+  const director = typeof module === "object" && module.exports ? require("./director") : root;
   const geometry = typeof module === "object" && module.exports ? require("./geometry") : root;
-  const api = factory(constants, inputTape, content, geometry);
+  const api = factory(constants, inputTape, content, director, geometry);
   if (typeof module === "object" && module.exports) module.exports = api;
   Object.assign(root, api);
-})(globalThis, function buildVerifiedRunSimulationStep(constants, inputTape, content, geometry) {
+})(globalThis, function buildVerifiedRunSimulationStep(constants, inputTape, content, director, geometry) {
 
-if (!constants || !inputTape || !content || !geometry) throw new Error("Verified run primitives must load before simulation step.");
+if (!constants || !inputTape || !content || !director || !geometry) throw new Error("Verified run primitives must load before simulation step.");
 
 const {
   ENERGY_UNITS_PER_POINT,
@@ -24,6 +25,7 @@ const {
 } = constants;
 const { BUTTON_GHOST_SHIFT, BUTTON_PAUSE } = inputTape;
 const { AUTHORITATIVE_ENEMY_ARCHETYPES } = content;
+const { tickCanonicalDirector } = director;
 const { bodiesOverlap, collisionBodyFor } = geometry;
 const ALLOWED_BUTTONS = BUTTON_GHOST_SHIFT | BUTTON_PAUSE;
 const GHOST_BURST = Math.round(4.6 * POSITION_UNITS_PER_PIXEL);
@@ -124,13 +126,16 @@ function spawnCanonicalEnemy(state, type, x, y, options = {}) {
     type: String(type),
     x: canonicalEntityInteger(x, "Enemy X"),
     y: canonicalEntityInteger(y, "Enemy Y"),
-    vx: canonicalEntityInteger(options.vx || 0, "Enemy velocity X"),
-    vy: canonicalEntityInteger(options.vy || 0, "Enemy velocity Y"),
-    angle: canonicalEntityInteger(options.angle || 0, "Enemy angle"),
+    vx: canonicalEntityInteger(options.vx ?? 0, "Enemy velocity X"),
+    vy: canonicalEntityInteger(options.vy ?? 0, "Enemy velocity Y"),
+    angle: canonicalEntityInteger(options.angle ?? 0, "Enemy angle"),
     hp: archetype.hp,
     maxHp: archetype.hp,
     score: archetype.score,
-    realm: canonicalEntityInteger(options.realm || 0, "Enemy realm")
+    realm: canonicalEntityInteger(options.realm ?? 0, "Enemy realm"),
+    motion: String(options.motion || "linear"),
+    motionTick: canonicalEntityInteger(options.motionTick ?? 0, "Enemy motion tick"),
+    lane: canonicalEntityInteger(options.lane ?? -1, "Enemy lane")
   };
   state.enemies.push(enemy);
   return enemy;
@@ -159,10 +164,30 @@ function fireCanonicalPlayer(state) {
   player.fireCooldown = 14;
 }
 
+function canonicalEnemyVelocityY(type, phase) {
+  const phaseBoostHundredths = Math.min(phase * 8, 135);
+  if (type === "red") return roundDivide((180 + phaseBoostHundredths) * POSITION_UNITS_PER_PIXEL, 100);
+  if (type === "orange") return roundDivide((25500 + phaseBoostHundredths * 22) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "purple") return roundDivide((10500 + phaseBoostHundredths * 18) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "phantom") return roundDivide((15500 + phaseBoostHundredths * 14) * POSITION_UNITS_PER_PIXEL, 10000);
+  return 2 * POSITION_UNITS_PER_PIXEL;
+}
+
+function materializeCanonicalSpawns(state, descriptors) {
+  for (const descriptor of descriptors) {
+    spawnCanonicalEnemy(state, descriptor.type, descriptor.x, descriptor.y, {
+      vy: canonicalEnemyVelocityY(descriptor.type, state.phase),
+      motion: descriptor.motion,
+      lane: descriptor.lane
+    });
+  }
+}
+
 function updateCanonicalEntities(state) {
   for (const enemy of state.enemies) {
     enemy.x += enemy.vx;
     enemy.y += enemy.vy;
+    enemy.motionTick++;
   }
   for (const projectile of state.playerProjectiles) {
     projectile.x += projectile.vx;
@@ -223,7 +248,7 @@ function resolveCanonicalPlayerContact(state) {
   }
 }
 
-function stepSimulation(state, rawInput) {
+function stepSimulation(state, rawInput, streams) {
   if (!state || state.schema !== "SSR_SIM_STATE_V1") throw new TypeError("Canonical simulation state is invalid.");
   if (state.terminal) throw new Error("Canonical simulation is already terminal.");
   const input = validateCanonicalInput(rawInput);
@@ -236,6 +261,7 @@ function stepSimulation(state, rawInput) {
     updateCanonicalEntities(state);
     resolveCanonicalProjectileHits(state);
     resolveCanonicalPlayerContact(state);
+    if (!state.terminal && streams) materializeCanonicalSpawns(state, tickCanonicalDirector(state, streams));
   }
   if (!state.terminal && state.tick >= state.maxTicks) {
     state.terminal = true;

@@ -38,6 +38,7 @@ function loadGameContext() {
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "shared/verified-run/constants.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "shared/verified-run/content.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(repoRoot, "shared/verified-run/director.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/01-core.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(repoRoot, "src/03-pacing.js"), "utf8"), context);
   return context;
