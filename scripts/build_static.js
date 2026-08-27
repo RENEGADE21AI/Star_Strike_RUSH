@@ -5,7 +5,7 @@ const { execFileSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const out = path.join(root, "dist");
 const files = ["index.html", "styles.css", "site.webmanifest"];
-const directories = ["assets", "src"];
+const directories = ["assets", "src", path.join("shared", "verified-run")];
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
@@ -38,7 +38,7 @@ const withVersion = (url) => {
 
 const htmlPath = path.join(out, "index.html");
 let html = fs.readFileSync(htmlPath, "utf8");
-html = html.replace(/\b(src|href)="((?:src\/|assets\/|styles\.css|site\.webmanifest)[^"]*)"/g, (_, attribute, url) => (
+html = html.replace(/\b(src|href)="((?:src\/|shared\/verified-run\/|assets\/|styles\.css|site\.webmanifest)[^"]*)"/g, (_, attribute, url) => (
   `${attribute}="${withVersion(url)}"`
 ));
 fs.writeFileSync(htmlPath, html, "utf8");

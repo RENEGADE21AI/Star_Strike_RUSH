@@ -21,6 +21,7 @@ const {
   decodeInputTape,
   encodeInputTape
 } = require("../shared/verified-run/input-tape");
+require("../src/00-verified-run-runtime.js");
 
 test("xoshiro128** matches the repository fixed vector", () => {
   const random = createXoshiro128StarStar([1, 2, 3, 4]);
@@ -50,6 +51,33 @@ test("stream derivation rejects malformed roots and unknown names", async () => 
   await assert.rejects(() => createRunRandomStreams("abcd", "sim-v1"), /128-bit hexadecimal/);
   const streams = await createRunRandomStreams("00112233445566778899aabbccddeeff", "sim-v1");
   assert.throws(() => streams.nextUint32("cosmetic"), /Unknown run random stream/);
+});
+
+test("a seeded standard run binds random streams and canonical input to one ticket", async () => {
+  clearRunRandomStreams();
+  await beginSeededStandardRun({
+    runId: "run_001",
+    rootSeed: "00112233445566778899aabbccddeeff",
+    simRevision: "sim-v1"
+  });
+  assert.equal(currentVerifiedRunContext().seeded, true);
+  assert.equal(currentVerifiedRunContext().recording, true);
+  assert.equal(currentVerifiedRunContext().ticket.runId, "run_001");
+
+  queueVerifiedRunInputEdge("ghost");
+  const first = beginCanonicalRunTick({
+    keyboard: { right: true },
+    joystick: { active: false }
+  });
+  assert.deepEqual(first, { x: 1, y: 0, ghostPressed: true, pausePressed: false });
+  assert.deepEqual(currentCanonicalRunVector(), { x: 1, y: 0 });
+  endCanonicalRunTick();
+
+  const tape = finalizeRecordedInputTape();
+  assert.deepEqual(decodeInputTape(tape).segments, [
+    { duration: 1, x: 127, y: 0, buttons: BUTTON_GHOST_SHIFT }
+  ]);
+  clearRunRandomStreams();
 });
 
 test("canonical input clamps axes and records pressed edges", () => {

@@ -129,23 +129,23 @@ function updateIntensityCycle() {
   state.intensityTimer--;
   if (state.intensityTimer <= 0) {
     if (state.intensityPhase === "normal") {
-      state.intensityPhase = strong ? "surge" : (fragile ? "cooldown" : (Math.random() < 0.6 ? "surge" : "cooldown"));
-      state.intensityTimer = state.intensityPhase === "surge" ? 300 + Math.floor(rand(0, 120)) : 170 + Math.floor(rand(0, 90));
+      state.intensityPhase = strong ? "surge" : (fragile ? "cooldown" : (pacingRandom() < 0.6 ? "surge" : "cooldown"));
+      state.intensityTimer = state.intensityPhase === "surge" ? 300 + Math.floor(pacingRand(0, 120)) : 170 + Math.floor(pacingRand(0, 90));
     } else if (state.intensityPhase === "surge") {
       state.intensityPhase = "cooldown";
-      state.intensityTimer = 180 + Math.floor(rand(0, 100));
+      state.intensityTimer = 180 + Math.floor(pacingRand(0, 100));
     } else {
       state.intensityPhase = "normal";
-      state.intensityTimer = 170 + Math.floor(rand(0, 120));
+      state.intensityTimer = 170 + Math.floor(pacingRand(0, 120));
     }
   }
   if (state.intensityPhase === "normal") {
-    if (strong && Math.random() < 0.01) {
+    if (strong && pacingRandom() < 0.01) {
       state.intensityPhase = "surge";
-      state.intensityTimer = 260 + Math.floor(rand(0, 100));
-    } else if (fragile && Math.random() < 0.008) {
+      state.intensityTimer = 260 + Math.floor(pacingRand(0, 100));
+    } else if (fragile && pacingRandom() < 0.008) {
       state.intensityPhase = "cooldown";
-      state.intensityTimer = 180 + Math.floor(rand(0, 80));
+      state.intensityTimer = 180 + Math.floor(pacingRand(0, 80));
     }
   }
 }
@@ -188,25 +188,25 @@ function updateWaveMood() {
   let next;
   if (state.phase === 1) {
     if (recoveryNeed || arc < -0.15) next = "open";
-    else next = Math.random() < 0.55 ? "open" : "recovery";
+    else next = pacingRandom() < 0.55 ? "open" : "recovery";
   } else if (early) {
     if (recoveryNeed || arc < -0.20) next = "open";
-    else if (state.phase >= 2 && state.phaseTimer > 900 && arc > 0.52 && openingRamp() > 0.35) next = Math.random() < 0.40 ? "spike" : "open";
-    else next = Math.random() < 0.70 ? "open" : "recovery";
+    else if (state.phase >= 2 && state.phaseTimer > 900 && arc > 0.52 && openingRamp() > 0.35) next = pacingRandom() < 0.40 ? "spike" : "open";
+    else next = pacingRandom() < 0.70 ? "open" : "recovery";
   } else {
-    if (recoveryNeed) next = Math.random() < 0.72 ? "recovery" : "open";
-    else if (arc > 0.48 || state.intensityPhase === "surge") next = Math.random() < 0.66 ? "spike" : (state.phase >= 5 && Math.random() < 0.4 ? "rule" : "open");
-    else if (arc < -0.38) next = Math.random() < 0.66 ? "open" : "recovery";
-    else if (sinceHit > 840 && p.hp === p.maxHp && state.pressure < 48) next = Math.random() < 0.55 ? "spike" : "rule";
-    else if (d.pacingMemory > 0.35) next = Math.random() < 0.60 ? "spike" : "rule";
-    else if (d.pacingMemory < -0.25) next = Math.random() < 0.58 ? "recovery" : "open";
+    if (recoveryNeed) next = pacingRandom() < 0.72 ? "recovery" : "open";
+    else if (arc > 0.48 || state.intensityPhase === "surge") next = pacingRandom() < 0.66 ? "spike" : (state.phase >= 5 && pacingRandom() < 0.4 ? "rule" : "open");
+    else if (arc < -0.38) next = pacingRandom() < 0.66 ? "open" : "recovery";
+    else if (sinceHit > 840 && p.hp === p.maxHp && state.pressure < 48) next = pacingRandom() < 0.55 ? "spike" : "rule";
+    else if (d.pacingMemory > 0.35) next = pacingRandom() < 0.60 ? "spike" : "rule";
+    else if (d.pacingMemory < -0.25) next = pacingRandom() < 0.58 ? "recovery" : "open";
     else {
-      const roll = Math.random();
+      const roll = pacingRandom();
       next = roll < 0.40 ? "open" : roll < 0.68 ? "spike" : roll < 0.86 ? "recovery" : "rule";
     }
   }
   state.waveMood = next;
-  state.waveMoodTimer = next === "spike" ? 84 + Math.floor(rand(0, 42)) : next === "recovery" ? 116 + Math.floor(rand(0, 60)) : next === "rule" ? 92 + Math.floor(rand(0, 54)) : 100 + Math.floor(rand(0, 50));
+  state.waveMoodTimer = next === "spike" ? 84 + Math.floor(pacingRand(0, 42)) : next === "recovery" ? 116 + Math.floor(pacingRand(0, 60)) : next === "rule" ? 92 + Math.floor(pacingRand(0, 54)) : 100 + Math.floor(pacingRand(0, 50));
 }
 function updateDifficulty() {
   const d = state.difficulty, p = state.player, sinceHit = state.frame - d.lastHitFrame;
@@ -286,3 +286,5 @@ function phantomFrontArcOK(e, tx, ty) {
   const forward = Math.atan2(e.vy || 0.001, e.vx || 0.001);
   return Math.abs(wrapAngle(aim - forward)) <= Math.PI / 2;
 }
+const pacingRandom = () => runRandom("pacing");
+const pacingRand = (minimum, maximum) => runRandomRange("pacing", minimum, maximum);

@@ -1,5 +1,11 @@
 "use strict";
 
+(function initializeVerifiedRunRandom(root, factory) {
+  const api = factory(root);
+  if (typeof module === "object" && module.exports) module.exports = api;
+  Object.assign(root, api);
+})(globalThis, function buildVerifiedRunRandom(root) {
+
 const DEFAULT_RUN_RANDOM_STREAMS = Object.freeze([
   "waves",
   "pacing",
@@ -50,8 +56,9 @@ function createXoshiro128StarStar(seedWords) {
 }
 
 function webCrypto() {
-  if (globalThis.crypto && globalThis.crypto.subtle) return globalThis.crypto;
-  return require("node:crypto").webcrypto;
+  if (root.crypto && root.crypto.subtle) return root.crypto;
+  if (typeof require === "function") return require("node:crypto").webcrypto;
+  throw new Error("Web Crypto is required for run stream derivation.");
 }
 
 function validateRootSeed(rootSeedHex) {
@@ -130,8 +137,9 @@ async function createRunRandomStreams(rootSeedHex, simRevision, streamNames = DE
   });
 }
 
-module.exports = {
+return Object.freeze({
   DEFAULT_RUN_RANDOM_STREAMS,
   createRunRandomStreams,
   createXoshiro128StarStar
-};
+});
+});

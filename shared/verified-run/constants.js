@@ -1,5 +1,11 @@
 "use strict";
 
+(function initializeVerifiedRunConstants(root, factory) {
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  root.StarStrikeVerifiedRunConstants = api;
+})(globalThis, function buildVerifiedRunConstants() {
+
 const SIMULATION_HZ = 60;
 const MAX_RUN_DURATION_SECONDS = 6 * 60 * 60;
 const MAX_RUN_TICKS = SIMULATION_HZ * MAX_RUN_DURATION_SECONDS;
@@ -14,7 +20,7 @@ const INPUT_HEADER_BYTES = 32;
 const INPUT_SEGMENT_BYTES = 8;
 const INPUT_CHECKPOINT_BYTES = 20;
 
-module.exports = Object.freeze({
+return Object.freeze({
   CHECKPOINT_INTERVAL_TICKS,
   INPUT_CHECKPOINT_BYTES,
   INPUT_HEADER_BYTES,
@@ -28,4 +34,5 @@ module.exports = Object.freeze({
   MAX_RUN_DURATION_SECONDS,
   MAX_RUN_TICKS,
   SIMULATION_HZ
+});
 });

@@ -5,15 +5,15 @@ function spawnBossAdds() {
   const mouthX = b.x, mouthY = b.y + b.h / 2 + 6;
   const lane = laneIndexFromX(b.x);
   const patterns = state.phase < 3 ? ["red"] : state.phase < 5 ? ["red", "orange"] : ["red", "orange", "purple"];
-  const type1 = patterns[Math.floor(Math.random() * patterns.length)];
+  const type1 = patterns[Math.floor(bossRandom() * patterns.length)];
   const lane1 = chooseLane([lane]);
   spawnEnemy(type1, mouthX, mouthY, {
     bossSpawn: true, spawnMode: "boss", spawnPhase: "emerge", spawnTimer: 18, launchTimer: 12,
     spawnOriginX: mouthX, spawnOriginY: mouthY, spawnTargetX: laneX(lane1), spawnTargetY: mouthY + 72, recover: 28
   });
-  if (state.phase >= 4 && Math.random() < 0.55) {
+  if (state.phase >= 4 && bossRandom() < 0.55) {
     const lane2 = chooseLane([lane, lane1]);
-    const type2 = patterns[Math.floor(Math.random() * patterns.length)];
+    const type2 = patterns[Math.floor(bossRandom() * patterns.length)];
     spawnEnemy(type2, mouthX, mouthY, {
       bossSpawn: true, spawnMode: "boss", spawnPhase: "emerge", spawnTimer: 18, launchTimer: 12,
       spawnOriginX: mouthX, spawnOriginY: mouthY, spawnTargetX: laneX(lane2), spawnTargetY: mouthY + 82, recover: 28
@@ -34,7 +34,7 @@ function fireWraithBullet(fromX, fromY, angle, speed, realm, driftSeed = 0) {
     kind, realm,
     life: realm === 0 ? 220 : 200,
     r: realm === 0 ? 4 : 5, damage: 1, age: 0,
-    seed: driftSeed || Math.random() * 9999, trail: [],
+    seed: driftSeed || bossRandom() * 9999, trail: [],
     maxSpeed: realm === 0 ? 6.0 : 5.4
   });
 }
@@ -94,20 +94,20 @@ function fireWraithCharge(boss) {
   kickShake(5);
 }
 function spawnWraithPhantomBurst(boss) {
-  const count = 3 + Math.floor(rand(0, 3));
-  const base = rand(0, TAU);
+  const count = 3 + Math.floor(bossRand(0, 3));
+  const base = bossRand(0, TAU);
   const spread = 0.95;
   for (let i = 0; i < count; i++) {
     const t = count === 1 ? 0 : (i / (count - 1)) * 2 - 1;
     const ang = base + t * spread;
-    const sp = 1.4 + rand(0.2, 0.8);
+    const sp = 1.4 + bossRand(0.2, 0.8);
     spawnEnemy("phantom", boss.x + Math.cos(ang) * 8, boss.y + 10 + Math.sin(ang) * 6, {
       launchFrames: 14,
       launchVX: Math.cos(ang) * sp,
       launchVY: Math.sin(ang) * sp + 0.4,
-      cycleTimer: rand(0, phantomCycleDuration("physical")),
-      fireTimer: rand(24, 72),
-      stateMode: Math.random() < 0.5 ? "physical" : "ghost",
+      cycleTimer: bossRand(0, phantomCycleDuration("physical")),
+      fireTimer: bossRand(24, 72),
+      stateMode: bossRandom() < 0.5 ? "physical" : "ghost",
       bossSpawn: true
     });
   }
@@ -131,7 +131,7 @@ function finishWraithShift(boss) {
   boss.shiftReason = "";
   boss.nextRealm = null;
   boss.hitsSinceShift = 0;
-  boss.nextShiftHits = boss.tutorialOverride ? 4 : 6 + Math.floor(rand(0, 3));
+  boss.nextShiftHits = boss.tutorialOverride ? 4 : 6 + Math.floor(bossRand(0, 3));
   boss.passiveTimer = 0;
   boss.attackTimer = Math.min(boss.attackTimer, 38);
   boss.realmPulse = 16;
@@ -147,11 +147,11 @@ function spawnWraithBoss() {
     mode: "wraith",
     x: W / 2, y: -120, w: 152, h: 96,
     hp, maxHp: hp, entered: false, combatActive: false, realm: 0, nextRealm: 1,
-    shiftTelegraph: 0, shiftReason: "", hitsSinceShift: 0, nextShiftHits: 6 + Math.floor(rand(0, 3)),
+    shiftTelegraph: 0, shiftReason: "", hitsSinceShift: 0, nextShiftHits: 6 + Math.floor(bossRand(0, 3)),
     passiveTimer: 0, shift60Triggered: false, shift30Triggered: false,
     attackTimer: 54, chargeTelegraph: 0, chargeStartRealm: 0, chargeDodged: false,
-    chargeRecovery: 0, movePhase: rand(0, TAU), flicker: 0, corePulse: 0, realmPulse: 0,
-    phantomSpewTimer: state.phase >= 4 ? 300 + Math.floor(rand(0, 120)) : 9999
+    chargeRecovery: 0, movePhase: bossRand(0, TAU), flicker: 0, corePulse: 0, realmPulse: 0,
+    phantomSpewTimer: state.phase >= 4 ? 300 + Math.floor(bossRand(0, 120)) : 9999
   };
   state.playerRealm = 0;
   state.player.ghostTimer = 0;
@@ -211,9 +211,9 @@ function spawnBossDeath(boss) {
     const py = boss.y - boss.h / 2 + r * ph + ph / 2;
     state.bossDeath.pieces.push({
       x: px, y: py, w: pw - 2, h: ph - 2,
-      vx: rand(-2.5, 2.5) + (c - 2) * 0.15,
-      vy: rand(-2.8, 1.2) + (r - 1) * 0.2,
-      rot: rand(-0.1, 0.1), vr: rand(-0.03, 0.03), alpha: 1
+      vx: bossRand(-2.5, 2.5) + (c - 2) * 0.15,
+      vy: bossRand(-2.8, 1.2) + (r - 1) * 0.2,
+      rot: bossRand(-0.1, 0.1), vr: bossRand(-0.03, 0.03), alpha: 1
     });
   }
   state.bossRecovery = 120;
@@ -263,7 +263,7 @@ function updateBossStandard() {
         for (let i = -spread; i <= spread; i++) fireAngle(b.x, b.y + 24, base + i * (7 * Math.PI / 180), speedBase + Math.abs(i) * 0.1, "boss");
       } else if (attack === "spawn") {
         spawnBossAdds();
-        if (hpPct < 0.35 && Math.random() < 0.65) spawnBossAdds();
+        if (hpPct < 0.35 && bossRandom() < 0.65) spawnBossAdds();
       }
       b.step = (b.step + 1) % 4;
       b.pending = null;
@@ -321,7 +321,7 @@ function updateBossWraith() {
     b.phantomSpewTimer--;
     if (b.phantomSpewTimer <= 0) {
       spawnWraithPhantomBurst(b);
-      b.phantomSpewTimer = 300 + Math.floor(rand(0, 180));
+      b.phantomSpewTimer = 300 + Math.floor(bossRand(0, 180));
     }
   }
   const moveAmp = 0.9 + (1 - hpPct) * 3.0;
@@ -342,7 +342,7 @@ function updateBossWraith() {
     b.combatActive = true;
     const chargeChance = hpPct < 0.2 ? 0.60 : (hpPct < 0.4 ? 0.45 : hpPct < 0.7 ? 0.28 : 0.18);
     const tutorialCharge = b.tutorialOverride && ((b.tutorialAttackCursor || 0) % 3 === 2);
-    if ((tutorialCharge || (!b.tutorialOverride && Math.random() < chargeChance)) && b.chargeRecovery <= 0) {
+    if ((tutorialCharge || (!b.tutorialOverride && bossRandom() < chargeChance)) && b.chargeRecovery <= 0) {
       b.chargeTelegraph = b.tutorialOverride ? 72 : (hpPct < 0.4 ? 48 : 42);
       b.chargeStartRealm = state.playerRealm;
       b.chargeDodged = false;
@@ -380,3 +380,5 @@ function updateBossDeathIfNeeded() {
   }
   if (d.timer >= d.life) state.bossDeath = null;
 }
+const bossRandom = () => runRandom("boss_behavior");
+const bossRand = (minimum, maximum) => runRandomRange("boss_behavior", minimum, maximum);

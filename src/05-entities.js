@@ -2,8 +2,8 @@ function spawnEnemy(type, x, y, extra = {}) {
   if (type === "orange" && state.phase === 1) type = "red";
   if (type === "red" && !extra.forceSpawn) {
     const nearbyReds = state.enemies.filter(e => e.type === "red" && Math.abs(e.x - x) < 90 && Math.abs(e.y - y) < 110).length;
-    if (nearbyReds >= 2 && Math.random() < 0.55) return;
-    if (Math.random() < 0.05) return;
+    if (nearbyReds >= 2 && enemyRandom() < 0.55) return;
+    if (enemyRandom() < 0.05) return;
   }
   if (type === "purple" && !extra.forceSpawn && activePurpleCount() >= (state.phase >= 8 ? 2 : 3)) return;
   if (type === "phantom" && !extra.forceSpawn && activePhantomCount() >= phantomCapForPhase()) return;
@@ -14,12 +14,12 @@ function spawnEnemy(type, x, y, extra = {}) {
     id: enemyIdCounter++,
     x, y, type,
     hp: data.hp, maxHp: data.hp, r: data.radius, reward: data.score,
-    vx: 0, vy: 2, dir: Math.random() < 0.5 ? -1 : 1,
+    vx: 0, vy: 2, dir: enemyRandom() < 0.5 ? -1 : 1,
     shoot: 0, warn: 0, recover: 0, escape: false, escapeEdge: "left",
-    launchFrames: 0, launchVX: 0, launchVY: 0, loopPhase: rand(0, TAU),
-    motion: "zigzag", t: rand(0, 60), prevX: x, prevY: y, turnTimer: 0,
-    turnDir: Math.random() < 0.5 ? -1 : 1, snapTimer: 0, driftPhase: rand(0, TAU),
-    driftDir: Math.random() < 0.5 ? -1 : 1, driftPower: rand(0.06, 0.22),
+    launchFrames: 0, launchVX: 0, launchVY: 0, loopPhase: enemyRand(0, TAU),
+    motion: "zigzag", t: enemyRand(0, 60), prevX: x, prevY: y, turnTimer: 0,
+    turnDir: enemyRandom() < 0.5 ? -1 : 1, snapTimer: 0, driftPhase: enemyRand(0, TAU),
+    driftDir: enemyRandom() < 0.5 ? -1 : 1, driftPower: enemyRand(0.06, 0.22),
     hitFlash: 0, hitPulse: 0, entryFrames: 0
   };
   if (type === "red") {
@@ -29,27 +29,27 @@ function spawnEnemy(type, x, y, extra = {}) {
     base.vy = 2.55 + phaseBoost * 0.22;
     base.vx = 3.2 + state.phase * 0.05;
     base.hp = 1; base.maxHp = 1; base.r = 10;
-    base.motion = ["zigzag", "burst", "snap", "chain", "sweep"][Math.floor(Math.random() * 5)];
-    base.turnTimer = rand(14, 38);
-    base.turnDir = Math.random() < 0.5 ? -1 : 1;
+    base.motion = ["zigzag", "burst", "snap", "chain", "sweep"][Math.floor(enemyRandom() * 5)];
+    base.turnTimer = enemyRand(14, 38);
+    base.turnDir = enemyRandom() < 0.5 ? -1 : 1;
     base.entryFrames = extra.bossSpawn ? 0 : 8;
   } else if (type === "purple") {
     base.vy = 1.05 + phaseBoost * 0.18;
     base.hp = 5; base.maxHp = 5; base.r = 17;
-    base.shoot = 62 + Math.floor(rand(0, 22));
-    base.volleySeed = Math.floor(rand(0, 4));
+    base.shoot = 62 + Math.floor(enemyRand(0, 22));
+    base.volleySeed = Math.floor(enemyRand(0, 4));
     base.motion = "drift"; base.entryFrames = extra.bossSpawn ? 0 : 6;
   } else if (type === "phantom") {
-    base.x = clamp(W / 2 + (x - W / 2) * 0.75 + rand(-10, 10), 20, W - 20);
+    base.x = clamp(W / 2 + (x - W / 2) * 0.75 + enemyRand(-10, 10), 20, W - 20);
     base.y = y; base.vy = 1.55 + phaseBoost * 0.14;
     base.hp = 3; base.maxHp = 3; base.r = 14; base.reward = 100;
     base.motion = "phantom";
     base.stateMode = extra.stateMode || "physical";
-    base.cycleTimer = (extra.cycleTimer != null) ? extra.cycleTimer : rand(0, phantomCycleDuration(base.stateMode));
+    base.cycleTimer = (extra.cycleTimer != null) ? extra.cycleTimer : enemyRand(0, phantomCycleDuration(base.stateMode));
     base.telegraphTimer = extra.telegraphTimer || 0;
-    base.fireTimer = (extra.fireTimer != null) ? extra.fireTimer : rand(24, 72);
-    base.phaseOffset = rand(0, TAU);
-    base.flickerSeed = rand(0, 9999);
+    base.fireTimer = (extra.fireTimer != null) ? extra.fireTimer : enemyRand(24, 72);
+    base.phaseOffset = enemyRand(0, TAU);
+    base.flickerSeed = enemyRand(0, 9999);
     base.entryFrames = extra.bossSpawn ? 0 : 6;
   }
   const enemy = Object.assign(base, extra);
@@ -81,7 +81,7 @@ function fireAimedBurst(fromX, fromY, targetX, targetY, count, spreadDeg, speed,
 
 function updatePlayer() {
   const p = state.player;
-  const input = currentInputVector();
+  const input = currentCanonicalRunVector(state);
   const desiredVX = input.x * p.maxSpeed;
   const desiredVY = input.y * p.maxSpeed;
   const moving = Math.abs(input.x) + Math.abs(input.y) > 0.02;
@@ -262,3 +262,5 @@ function updateBullets() {
   state.bullets = state.bullets.filter(b => b.life > 0 && b.y > -40);
   state.enemyBullets = state.enemyBullets.filter(b => b.life > 0);
 }
+const enemyRandom = () => runRandom("enemy_behavior");
+const enemyRand = (minimum, maximum) => runRandomRange("enemy_behavior", minimum, maximum);

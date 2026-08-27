@@ -57,12 +57,12 @@
 - Consumes: Task 1 random and input contracts.
 - Produces: `beginSeededStandardRun(ticket)`, `runRandom(streamName)`, `captureCanonicalRunInput(state)`, and `finalizeRecordedInputTape()` on the ordered runtime boundary.
 
-- [ ] Add static and browser tests proving standard runs use ticket seed streams, cosmetic randomness cannot shift authoritative streams, and the exact canonical input drives and records each tick.
-- [ ] Run the targeted tests and confirm they fail against the legacy runtime.
-- [ ] Add the ordered runtime adapter and build allowlist entry; route gameplay randomness through named streams while leaving title traffic, stars, and particles cosmetic.
-- [ ] Record movement, Ghost Shift edge, and pause edge before each simulation update; keep tutorial runs and nonstandard QA runs outside verification.
-- [ ] Run browser gameplay, runtime contracts, WebKit smoke, and the full Node suite.
-- [ ] Commit with `git commit -m "feat: make standard runs seed and input deterministic"`.
+- [x] Add static and browser tests proving standard runs use ticket seed streams, cosmetic randomness cannot shift authoritative streams, and the exact canonical input drives and records each tick.
+- [x] Run the targeted tests and confirm they fail against the legacy runtime.
+- [x] Add the ordered runtime adapter and build allowlist entry; route gameplay randomness through named streams while leaving title traffic, stars, and particles cosmetic.
+- [x] Record movement, Ghost Shift edge, and pause edge before each simulation update; keep tutorial runs and nonstandard QA runs outside verification.
+- [x] Run browser gameplay, runtime contracts, WebKit smoke, and the full Node suite.
+- [x] Commit with `git commit -m "feat: make standard runs seed and input deterministic"`.
 
 ### Task 3: Canonical gameplay state and headless transition
 

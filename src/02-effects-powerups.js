@@ -96,7 +96,7 @@ function safePowerupType() {
     const expansionType = pickExpansionPowerupType(lowHp);
     if (expansionType) return expansionType;
   }
-  const r = Math.random();
+  const r = runRandom("loot");
   if (lowHp) {
     if (r < 0.34) return "repair";
     if (r < 0.58) return "wingman";
@@ -114,7 +114,7 @@ function safePowerupType() {
 function registerPowerupDrop(cooldownMin = 240, cooldownMax = 360) {
   state.killsSinceLastDrop = 0;
   state.framesSinceLastDrop = 0;
-  state.powerupDropCooldown = cooldownMin + Math.floor(rand(0, Math.max(1, cooldownMax - cooldownMin)));
+  state.powerupDropCooldown = cooldownMin + Math.floor(runRandomRange("loot", 0, Math.max(1, cooldownMax - cooldownMin)));
 }
 function shouldDropPowerupNow() {
   if (state.powerupDropCooldown > 0) return false;
@@ -127,15 +127,15 @@ function shouldDropPowerupNow() {
   if (state.phase >= 10) chance += 0.01;
   if (state.intensityPhase === "cooldown") chance += 0.05;
   if (state.intensityPhase === "surge") chance -= 0.02;
-  return Math.random() < chance;
+  return runRandom("loot") < chance;
 }
 function dropPowerup(x, y) { spawnPowerupAt(x, y, safePowerupType()); }
 function bossRewardDrops(x, y) {
-  const primary = Math.random() < 0.5 ? "spread" : "rapid";
+  const primary = runRandom("loot") < 0.5 ? "spread" : "rapid";
   spawnPowerupAt(x - 18, y - 2, primary);
-  if (Math.random() < 0.5) {
+  if (runRandom("loot") < 0.5) {
     const pool = ["spread", "rapid", "repair", "wingman", "dual", "energy_cell", "phase_shield", "overcharge", "piercing"];
-    spawnPowerupAt(x + 18, y + 2, pool[Math.floor(Math.random() * pool.length)]);
+    spawnPowerupAt(x + 18, y + 2, pool[Math.floor(runRandom("loot") * pool.length)]);
   }
 }
 function chooseLane(exclude = []) {
@@ -151,7 +151,7 @@ function chooseLane(exclude = []) {
     else if (counts[i] === min) best.push(i);
   }
   if (!best.length) return 1;
-  return best[Math.floor(Math.random() * best.length)];
+  return best[Math.floor(runRandom("loot") * best.length)];
 }
 function laneX(lane) { return laneCenters()[lane]; }
 const WINGMAN_FORMATION_OFFSET_X = 42;
@@ -225,19 +225,12 @@ function fireWingman(w) {
   w.fire = 18;
 }
 function currentInputVector() {
-  let x = 0, y = 0;
-  if (state.keyboard.left) x -= 1;
-  if (state.keyboard.right) x += 1;
-  if (state.keyboard.up) y -= 1;
-  if (state.keyboard.down) y += 1;
-  if (state.joystick.active) { x += state.joystick.ax; y += state.joystick.ay; }
-  const mag = Math.hypot(x, y);
-  if (mag > 1) { x /= mag; y /= mag; }
-  return { x, y };
+  return currentCanonicalRunVector(state);
 }
 
 function attemptGhost() {
   if (state.gameState !== "playing") return;
+  queueVerifiedRunInputEdge("ghost");
   const p = state.player;
   const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST", cost: 35, cooldown: 20, burst: 4.6, phaseThroughDebris: true };
   if (isWraithActive()) {

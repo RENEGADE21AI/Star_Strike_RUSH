@@ -33,6 +33,151 @@ function test(name, fn) {
 
 const context = loadPureScripts("00-asset-manifest.js", "00-competition.js", "00-identity.js", "00-gameplay-rules.js", "00-input-actions.js", "00-pause-policy.js");
 
+test("verified run primitives and adapter are browser-safe and load before the gameplay core", () => {
+  const browserContext = {
+    Array,
+    ArrayBuffer,
+    DataView,
+    Map,
+    Math,
+    Number,
+    Object,
+    Promise,
+    RangeError,
+    RegExp,
+    Set,
+    String,
+    TextEncoder,
+    TypeError,
+    Uint8Array
+  };
+  browserContext.globalThis = browserContext;
+  vm.createContext(browserContext);
+  for (const file of ["constants.js", "random.js", "input-tape.js"]) {
+    vm.runInContext(
+      fs.readFileSync(path.join(repoRoot, "shared", "verified-run", file), "utf8"),
+      browserContext
+    );
+  }
+  vm.runInContext(
+    fs.readFileSync(path.join(repoRoot, "src", "00-verified-run-runtime.js"), "utf8"),
+    browserContext
+  );
+  assert.equal(typeof browserContext.StarStrikeVerifiedRunConstants.MAX_RUN_TICKS, "number");
+  assert.equal(typeof browserContext.createRunRandomStreams, "function");
+  assert.equal(typeof browserContext.encodeInputTape, "function");
+  assert.equal(typeof browserContext.runRandom, "function");
+  assert.equal(typeof browserContext.beginSeededStandardRun, "function");
+  assert.equal(typeof browserContext.captureCanonicalRunInput, "function");
+  assert.equal(typeof browserContext.beginCanonicalRunTick, "function");
+  assert.equal(typeof browserContext.finalizeRecordedInputTape, "function");
+
+  const calls = [];
+  browserContext.installRunRandomStreams({
+    names: ["waves", "loot"],
+    nextFloat(name) {
+      calls.push(name);
+      return name === "waves" ? 0.25 : 0.75;
+    }
+  }, { runId: "run_1", simRevision: "sim-v1" });
+  assert.equal(browserContext.runRandom("waves"), 0.25);
+  assert.equal(browserContext.runRandomRange("loot", 10, 20), 17.5);
+  assert.deepEqual(calls, ["waves", "loot"]);
+
+  browserContext.beginRunInputRecording();
+  browserContext.recordCanonicalRunInput({ moveX: 1, moveY: 0, ghostPressed: true });
+  browserContext.recordCanonicalRunInput({ moveX: 1, moveY: 0 });
+  const tape = browserContext.finalizeRunInputRecording();
+  const decoded = browserContext.decodeInputTape(tape);
+  assert.equal(decoded.tickCount, 2);
+  assert.equal(decoded.segments.length, 2);
+
+  const gameplayInput = {
+    keyboard: { left: false, right: true, up: true, down: false },
+    joystick: { active: true, ax: 0.25, ay: 0.5 }
+  };
+  const canonical = browserContext.captureCanonicalRunInput(gameplayInput);
+  assert.deepEqual(
+    { x: canonical.x, y: canonical.y, buttons: canonical.buttons },
+    { x: 118, y: -47, buttons: 0 },
+    "keyboard and stick must be normalized and quantized once at the run boundary"
+  );
+  browserContext.beginRunInputRecording();
+  browserContext.queueVerifiedRunInputEdge("ghost");
+  const driven = browserContext.beginCanonicalRunTick(gameplayInput);
+  assert.equal(driven.x, 118 / 127);
+  assert.equal(driven.y, -47 / 127);
+  assert.equal(driven.ghostPressed, true);
+  assert.equal(browserContext.currentCanonicalRunVector().x, 118 / 127);
+  assert.equal(browserContext.currentCanonicalRunVector().y, -47 / 127);
+  browserContext.endCanonicalRunTick();
+  const drivenAgain = browserContext.beginCanonicalRunTick(gameplayInput);
+  assert.equal(drivenAgain.ghostPressed, false, "pressed edges must be consumed by one tick");
+  browserContext.endCanonicalRunTick();
+  const recorded = browserContext.decodeInputTape(browserContext.finalizeRecordedInputTape());
+  assert.equal(recorded.tickCount, 2);
+  assert.equal(recorded.segments[0].buttons, browserContext.BUTTON_GHOST_SHIFT);
+  assert.equal(recorded.segments[1].buttons, 0);
+
+  const html = fs.readFileSync(path.join(repoRoot, "index.html"), "utf8");
+  const constantsAt = html.indexOf("shared/verified-run/constants.js");
+  const randomAt = html.indexOf("shared/verified-run/random.js");
+  const inputAt = html.indexOf("shared/verified-run/input-tape.js");
+  const adapterAt = html.indexOf("src/00-verified-run-runtime.js");
+  const coreAt = html.indexOf("src/01-core.js");
+  assert.ok(constantsAt >= 0 && constantsAt < randomAt && randomAt < inputAt && inputAt < adapterAt && adapterAt < coreAt);
+
+  const build = fs.readFileSync(path.join(repoRoot, "scripts", "build_static.js"), "utf8");
+  assert.match(build, /path\.join\("shared", "verified-run"\)/);
+});
+
+test("the fixed-step loop records canonical controls before authoritative updates", () => {
+  const loop = fs.readFileSync(path.join(repoRoot, "src", "18-session-input-loop.js"), "utf8");
+  const gameplayStep = loop.slice(
+    loop.indexOf("function update()"),
+    loop.indexOf("/* DEVELOPMENT_QA_START */")
+  );
+  assert.match(gameplayStep, /beginCanonicalRunTick\(state\)/);
+  assert.ok(gameplayStep.indexOf("beginCanonicalRunTick(state)") < gameplayStep.indexOf("updateWavesAndPhaseAndPressure()"));
+  assert.ok(gameplayStep.indexOf("beginCanonicalRunTick(state)") < gameplayStep.indexOf("updatePlayer()"));
+  assert.match(gameplayStep, /endCanonicalRunTick\(\)/);
+  assert.match(loop, /queueVerifiedRunInputEdge\("pause"\)/);
+
+  const player = fs.readFileSync(path.join(repoRoot, "src", "05-entities.js"), "utf8");
+  const updatePlayerSource = player.slice(player.indexOf("function updatePlayer"), player.indexOf("function firePlayer"));
+  assert.match(updatePlayerSource, /currentCanonicalRunVector\(state\)/);
+
+  const powerups = fs.readFileSync(path.join(repoRoot, "src", "02-effects-powerups.js"), "utf8");
+  const ghost = powerups.slice(powerups.indexOf("function attemptGhost"), powerups.indexOf("function updateStars"));
+  assert.match(ghost, /queueVerifiedRunInputEdge\("ghost"\)/);
+});
+
+test("gameplay randomness uses named run streams while cosmetics remain local", () => {
+  const streamByFile = new Map([
+    ["00-gameplay-rules.js", "hazards"],
+    ["03-pacing.js", "pacing"],
+    ["04-waves.js", "waves"],
+    ["05-entities.js", "enemy_behavior"],
+    ["06-bosses.js", "boss_behavior"],
+    ["07-gameplay-systems.js", "enemy_behavior"],
+    ["18-expansion-data.js", "enemy_behavior"],
+    ["18-expansion-enemies-powerups.js", "enemy_behavior"],
+    ["18-expansion-hazards-bosses.js", "hazards"],
+    ["18-expansion-rendering-waves.js", "waves"]
+  ]);
+  for (const [file, stream] of streamByFile) {
+    const source = fs.readFileSync(path.join(repoRoot, "src", file), "utf8");
+    assert.doesNotMatch(source, /Math\.random\(\)/, `${file} bypasses the seeded run streams`);
+    assert.match(source, new RegExp(`runRandom(?:Range)?\\(\\"${stream}\\"`), `${file} does not use ${stream}`);
+  }
+
+  const powerups = fs.readFileSync(path.join(repoRoot, "src", "02-effects-powerups.js"), "utf8");
+  const authoritativeDrops = powerups.slice(powerups.indexOf("function safePowerupType"), powerups.indexOf("const WINGMAN_FORMATION_OFFSET_X"));
+  assert.doesNotMatch(authoritativeDrops, /Math\.random\(\)|\brand\(/);
+  assert.match(authoritativeDrops, /runRandom\("loot"\)/);
+  assert.match(powerups.slice(0, powerups.indexOf("function powerupFeedbackColor")), /Math\.random\(\)|\brand\(/);
+});
+
 test("sprite manifest has render and collision metadata for every registered entity", () => {
   const result = context.validateSpriteManifest();
   assert.equal(result.ok, true, result.errors.join("\n"));

@@ -75,6 +75,7 @@ function currentGameplayControlEnabled() {
 }
 function pauseGame(reason = "manual") {
   if (state.gameState !== "playing" && state.gameState !== "resuming") return false;
+  if (reason === "manual") queueVerifiedRunInputEdge("pause");
   const decision = typeof pauseHealthDecision === "function"
     ? pauseHealthDecision(state.player, reason, state.runMode)
     : { allowed: true, cost: 0, remainingHp: state.player.hp, message: "" };
@@ -98,6 +99,10 @@ function pauseGame(reason = "manual") {
       state.gameState = "paused";
       if (typeof showTutorialPauseAccessibility === "function") showTutorialPauseAccessibility();
     } else {
+      if (currentVerifiedRunContext().recording) {
+        beginCanonicalRunTick(state);
+        endCanonicalRunTick();
+      }
       enterGameOver();
       state.pauseNotice = decision.message;
     }
@@ -138,6 +143,7 @@ function handlePauseEscape() {
   return false;
 }
 function setupSession(mode = "start", options = {}) {
+  clearRunRandomStreams();
   const preserveStars = options.preserveStars === true && Array.isArray(state.stars) && state.stars.length > 0;
   if (typeof resetGloryCelebrations === "function") resetGloryCelebrations();
   state.player = makePlayer();
@@ -158,6 +164,7 @@ function setupSession(mode = "start", options = {}) {
   state.verifiedRunLedger = typeof createTrustedRunLedger === "function" ? createTrustedRunLedger() : null;
   state.verifiedRunSession = null;
   state.verifiedRunPromise = null;
+  state.verifiedInputTape = null;
   state.runStartingHighScore = highScore;
   state.newHighScore = false;
   state.multiplier = 1;
@@ -319,6 +326,14 @@ function enterGameOver() {
   state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
   if (typeof recordDifficultySample === "function") recordDifficultySample(true);
   if (progressionAllowed) finalizeLocalRunAchievements();
+  if (progressionAllowed && currentVerifiedRunContext().recording) {
+    try {
+      state.verifiedInputTape = finalizeRecordedInputTape();
+    } catch {
+      cancelRunInputRecording();
+      state.verifiedInputTape = null;
+    }
+  }
   if (progressionAllowed && typeof publishVerifiedRunIfEligible === "function") publishVerifiedRunIfEligible();
   if (typeof startGloryCelebrations === "function") {
     startGloryCelebrations(progressionResult && progressionResult.presentationEvents);
@@ -794,6 +809,7 @@ function update() {
     return;
   }
 
+  beginCanonicalRunTick(state);
   state.runStats.activeFrames = Math.max(0, Math.floor(state.runStats.activeFrames || 0)) + 1;
   state.framesSinceLastDrop++;
   if (!state.inputHintAcknowledged) state.inputHintTimer = Math.min(600, Math.max(0, state.inputHintTimer || 0) + 1);
@@ -828,6 +844,8 @@ function update() {
   } else if (state.messageQueue.length > 0 && !state.message) {
     showNextMessage();
   }
+
+  endCanonicalRunTick();
 
 }
 

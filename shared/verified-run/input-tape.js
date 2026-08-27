@@ -1,5 +1,16 @@
 "use strict";
 
+(function initializeVerifiedRunInputTape(root, factory) {
+  const constants = typeof module === "object" && module.exports
+    ? require("./constants")
+    : root.StarStrikeVerifiedRunConstants;
+  const api = factory(constants);
+  if (typeof module === "object" && module.exports) module.exports = api;
+  Object.assign(root, api);
+})(globalThis, function buildVerifiedRunInputTape(constants) {
+
+if (!constants) throw new Error("Verified run constants must load before the input tape codec.");
+
 const {
   CHECKPOINT_INTERVAL_TICKS,
   INPUT_CHECKPOINT_BYTES,
@@ -12,7 +23,7 @@ const {
   MAX_INPUT_BYTES,
   MAX_INPUT_SEGMENTS,
   MAX_RUN_TICKS
-} = require("./constants");
+} = constants;
 
 const BUTTON_GHOST_SHIFT = 1;
 const BUTTON_PAUSE = 2;
@@ -194,10 +205,11 @@ function decodeInputTape(value) {
   });
 }
 
-module.exports = {
+return Object.freeze({
   BUTTON_GHOST_SHIFT,
   BUTTON_PAUSE,
   canonicalRunInput,
   decodeInputTape,
   encodeInputTape
-};
+});
+});

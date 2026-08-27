@@ -170,9 +170,9 @@ function updateEnemies() {
           e.recover = 18;
           e.vx = 0;
           e.vy = (e.type === "orange" ? 2.9 : (e.type === "purple" ? 1.2 : 2.0)) + state.phase * 0.04;
-          e.turnTimer = rand(10, 28);
-          e.driftPhase = rand(0, TAU);
-          e.driftDir = Math.random() < 0.5 ? -1 : 1;
+          e.turnTimer = enemyMotionRand(10, 28);
+          e.driftPhase = enemyMotionRand(0, TAU);
+          e.driftDir = enemyMotionRandom() < 0.5 ? -1 : 1;
         }
         continue;
       }
@@ -189,44 +189,44 @@ function updateEnemies() {
         // Expansion enemies handle their own readable movement and attack timers.
       } else if (e.type === "red") {
         e.t += 1;
-        if (Math.random() < 0.012) e.driftDir *= -1;
+        if (enemyMotionRandom() < 0.012) e.driftDir *= -1;
         e.x += Math.sin(e.t * 0.03 + e.driftPhase) * e.driftPower * e.driftDir;
         e.y += e.vy * moveScale;
       } else if (e.type === "orange") {
         e.t += 1;
         const t = e.t;
         if (e.turnTimer <= 0) {
-          e.turnTimer = rand(12, 34);
+          e.turnTimer = enemyMotionRand(12, 34);
           const edgeBiasLeft = e.x > W * 0.5;
-          const r = Math.random();
+          const r = enemyMotionRandom();
           if (e.motion === "snap" || r > 0.83) {
-            e.turnDir = Math.random() < 0.5 ? -1 : 1;
+            e.turnDir = enemyMotionRandom() < 0.5 ? -1 : 1;
             if (e.x < margin + 48) e.turnDir = 1;
             if (e.x > W - margin - 48) e.turnDir = -1;
-            e.snapTimer = rand(8, 16);
+            e.snapTimer = enemyMotionRand(8, 16);
           } else {
             e.snapTimer = 0;
-            if (r < 0.50) e.turnDir = Math.random() < 0.5 ? -1 : 1;
+            if (r < 0.50) e.turnDir = enemyMotionRandom() < 0.5 ? -1 : 1;
             else if (r < 0.72) e.turnDir = edgeBiasLeft ? -1 : 1;
             else e.turnDir = edgeBiasLeft ? 1 : -1;
           }
           const vyBase = 2.25 + state.phase * 0.12;
           const vxBase = 2.4 + state.phase * 0.22;
           if (e.motion === "zigzag") {
-            e.vx = (Math.random() < 0.5 ? -1 : 1) * (vxBase + rand(0.2, 2.0));
-            e.vy = vyBase + rand(0.1, 0.8);
+            e.vx = (enemyMotionRandom() < 0.5 ? -1 : 1) * (vxBase + enemyMotionRand(0.2, 2.0));
+            e.vy = vyBase + enemyMotionRand(0.1, 0.8);
           } else if (e.motion === "burst") {
-            e.vx = (e.turnDir || 1) * (vxBase + rand(1.2, 2.7));
-            e.vy = vyBase + rand(0.2, 0.9);
+            e.vx = (e.turnDir || 1) * (vxBase + enemyMotionRand(1.2, 2.7));
+            e.vy = vyBase + enemyMotionRand(0.2, 0.9);
           } else if (e.motion === "chain") {
-            e.vx = (Math.random() < 0.5 ? -1 : 1) * (vxBase + rand(0.4, 1.8));
-            e.vy = vyBase + rand(0.15, 0.7);
+            e.vx = (enemyMotionRandom() < 0.5 ? -1 : 1) * (vxBase + enemyMotionRand(0.4, 1.8));
+            e.vy = vyBase + enemyMotionRand(0.15, 0.7);
           } else if (e.motion === "sweep") {
-            e.vx = (e.turnDir || 1) * (vxBase + rand(1.0, 2.4));
-            e.vy = vyBase + rand(0.25, 0.95);
+            e.vx = (e.turnDir || 1) * (vxBase + enemyMotionRand(1.0, 2.4));
+            e.vy = vyBase + enemyMotionRand(0.25, 0.95);
           } else {
-            e.vx = (e.turnDir || 1) * (vxBase + rand(0.8, 2.2));
-            e.vy = vyBase + rand(0.15, 0.8);
+            e.vx = (e.turnDir || 1) * (vxBase + enemyMotionRand(0.8, 2.2));
+            e.vy = vyBase + enemyMotionRand(0.15, 0.8);
           }
         }
         e.turnTimer--;
@@ -236,17 +236,17 @@ function updateEnemies() {
           const wave = Math.sin(t * 0.09 + e.loopPhase) * 0.9;
           const weave = Math.sin(t * 0.04 + e.loopPhase * 1.2) * 1.2;
           e.vx += wave + weave * 0.35;
-          if (Math.random() < 0.008 + state.phase * 0.0005) e.turnDir *= -1;
+          if (enemyMotionRandom() < 0.008 + state.phase * 0.0005) e.turnDir *= -1;
         }
-        if (e.motion === "sweep") { if (Math.random() < 0.02) e.vx += (Math.random() < 0.5 ? -1 : 1) * rand(0.8, 2.0); }
+        if (e.motion === "sweep") { if (enemyMotionRandom() < 0.02) e.vx += (enemyMotionRandom() < 0.5 ? -1 : 1) * enemyMotionRand(0.8, 2.0); }
         if (e.x <= margin) { e.x = margin; e.turnDir = 1; e.turnTimer = Math.min(e.turnTimer, 10); }
         if (e.x >= W - margin) { e.x = W - margin; e.turnDir = -1; e.turnTimer = Math.min(e.turnTimer, 10); }
         e.x += e.vx * 0.40;
         e.y += e.vy * moveScale;
-        if (Math.random() < 0.006 + state.phase * 0.0006) e.vx += (Math.random() < 0.5 ? -1 : 1) * rand(1.0, 2.0);
+        if (enemyMotionRandom() < 0.006 + state.phase * 0.0006) e.vx += (enemyMotionRandom() < 0.5 ? -1 : 1) * enemyMotionRand(1.0, 2.0);
       } else if (e.type === "purple") {
         e.t += 1;
-        if (Math.random() < 0.01) e.driftDir *= -1;
+        if (enemyMotionRandom() < 0.01) e.driftDir *= -1;
         e.x += Math.sin(e.t * 0.035 + e.driftPhase) * e.driftPower * 0.8 * e.driftDir;
         e.x += Math.sign(p.x - e.x) * 0.34;
         e.y += e.vy * moveScale;
@@ -264,7 +264,7 @@ function updateEnemies() {
                 const d = Math.max(1, Math.hypot(dx, dy));
                 const speed = 3.4 + state.phase * 0.06;
                 const extraDelay = Math.floor((purpleCrowd - 1) * 10) + (e.volleySeed || 0) * 6;
-                e.shoot = Math.max(76, 102 - state.phase * 2 - Math.floor(threat * 7) + extraDelay + Math.floor(rand(0, 10)));
+                e.shoot = Math.max(76, 102 - state.phase * 2 - Math.floor(threat * 7) + extraDelay + Math.floor(enemyMotionRand(0, 10)));
                 fireEnemyBullet(e.x, e.y + 12, (dx / d) * speed, (dy / d) * speed, "purple");
               } else {
                 e.warn = 20;
@@ -283,8 +283,8 @@ function updateEnemies() {
           e.x += Math.sin(e.t * 0.03 + e.phaseOffset) * 0.08;
           if (e.telegraphTimer === 0) {
             e.stateMode = (e.stateMode === "physical") ? "ghost" : "physical";
-            e.cycleTimer = phantomCycleDuration(e.stateMode) + Math.floor(rand(-12, 12));
-            e.fireTimer = Math.max(18, e.fireTimer + Math.floor(rand(-12, 18)));
+            e.cycleTimer = phantomCycleDuration(e.stateMode) + Math.floor(enemyMotionRand(-12, 12));
+            e.fireTimer = Math.max(18, e.fireTimer + Math.floor(enemyMotionRand(-12, 18)));
           }
         } else {
           e.cycleTimer--;
@@ -292,7 +292,7 @@ function updateEnemies() {
           e.y += e.vy * moveScale;
           e.x += Math.sin(e.t * 0.028 + e.phaseOffset) * e.driftPower * 0.75;
           e.x += Math.sign(p.x - e.x) * (e.stateMode === "physical" ? 0.14 : 0.09);
-          if (Math.random() < 0.012) e.driftDir *= -1;
+          if (enemyMotionRandom() < 0.012) e.driftDir *= -1;
         }
         e.x = clamp(e.x, margin, W - margin);
         e.fireTimer--;
@@ -303,7 +303,7 @@ function updateEnemies() {
               const speed = 2.6 + state.phase * 0.03;
               if (phantomFrontArcOK(e, p.x, p.y)) {
                 fireEnemyBullet(e.x, e.y + 10, (dx / d) * speed, (dy / d) * speed, "phantomShot", {});
-                e.fireTimer = Math.floor(120 + rand(-20, 20));
+                e.fireTimer = Math.floor(120 + enemyMotionRand(-20, 20));
               } else e.fireTimer = 20;
             }
           } else if (isWraithActive()) {
@@ -312,7 +312,7 @@ function updateEnemies() {
               const speed = 2.4 + state.phase * 0.025;
               if (phantomFrontArcOK(e, p.x, p.y)) {
                 fireEnemyBullet(e.x, e.y + 10, (dx / d) * speed, (dy / d) * speed, "wraithGhost", { realm: 1 });
-                e.fireTimer = Math.floor(185 + rand(-25, 25));
+                e.fireTimer = Math.floor(185 + enemyMotionRand(-25, 25));
               } else e.fireTimer = 20;
             }
           }
@@ -331,11 +331,11 @@ function updateEnemies() {
       if (e.y < -34) {
         e.escape = false;
         e.y = -28;
-        e.x = rand(margin, W - margin);
+        e.x = enemyMotionRand(margin, W - margin);
         e.recover = 24;
         e.warn = 0;
-        if (e.type === "orange") e.turnDir = Math.random() < 0.5 ? -1 : 1;
-        if (e.type === "purple") e.shoot = 72 + Math.floor(rand(0, 22));
+        if (e.type === "orange") e.turnDir = enemyMotionRandom() < 0.5 ? -1 : 1;
+        if (e.type === "purple") e.shoot = 72 + Math.floor(enemyMotionRand(0, 22));
       }
     }
   }
@@ -857,3 +857,5 @@ function updateWavesAndPhaseAndPressure() {
   if (typeof updateDebrisEvent === "function") updateDebrisEvent();
   updatePendingSpawns();
 }
+const enemyMotionRandom = () => runRandom("enemy_behavior");
+const enemyMotionRand = (minimum, maximum) => runRandomRange("enemy_behavior", minimum, maximum);

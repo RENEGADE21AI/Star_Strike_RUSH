@@ -309,7 +309,7 @@ function registerExpansionWaveTemplates() {
   };
   waveTemplates.leechPressure = function waveTemplateLeechPressure() {
     const [a, b, c] = laneCenters();
-    return [waveItem("leech", b + rand(-22, 22), -58, 0), waveItem("red", a, -32, 20), waveItem("orange", c, -38, 34, { motion: "zigzag" })];
+    return [waveItem("leech", b + expansionWaveRand(-22, 22), -58, 0), waveItem("red", a, -32, 20), waveItem("orange", c, -38, 34, { motion: "zigzag" })];
   };
   waveTemplates.railWarning = function waveTemplateRailWarning() {
     const [a, b, c] = laneCenters();
@@ -322,3 +322,4 @@ function registerExpansionWaveTemplates() {
 }
 
 registerExpansionWaveTemplates();
+const expansionWaveRand = (minimum, maximum) => runRandomRange("waves", minimum, maximum);

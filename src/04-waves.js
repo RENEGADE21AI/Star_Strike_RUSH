@@ -9,15 +9,15 @@ function waveTemplatePurpleGuard() { const [a, b, c] = laneCenters(); return [wa
 function waveTemplateSplitAmbush() { const [a, b, c] = laneCenters(); return [waveItem("orange", a - 100, -30, 0, { motion: "snap" }), waveItem("red", b, -44, 8), waveItem("purple", b, -66, 16), waveItem("red", b + 56, -44, 24), waveItem("orange", c + 100, -30, 32, { motion: "burst" })]; }
 function waveTemplateOrangeChain() { const [a, b, c] = laneCenters(); return [waveItem("orange", a - 110, -32, 0, { motion: "chain" }), waveItem("orange", a - 56, -42, 8, { motion: "chain" }), waveItem("orange", b, -52, 16, { motion: "chain" }), waveItem("orange", c + 56, -42, 24, { motion: "chain" }), waveItem("orange", c + 110, -32, 32, { motion: "chain" })]; }
 function waveTemplateOrangeSlash() { const [a, b, c] = laneCenters(); return [waveItem("orange", a - 40, -28, 0, { motion: "sweep" }), waveItem("orange", b + 16, -44, 10, { motion: "sweep" }), waveItem("orange", c - 20, -58, 20, { motion: "sweep" }), waveItem("orange", c + 76, -36, 30, { motion: "sweep" })]; }
-function waveTemplatePhantomProbe() { const [a, b, c] = laneCenters(); return [waveItem("phantom", b + rand(-16, 16), -46, 0), waveItem("phantom", a + rand(-12, 12), -62, 12), waveItem("phantom", c + rand(-12, 12), -62, 24)]; }
-function waveTemplatePhantomPair() { const [a, b, c] = laneCenters(); return [waveItem("phantom", a + rand(-8, 8), -48, 0), waveItem("phantom", c + rand(-8, 8), -48, 18), waveItem("phantom", b + rand(-8, 8), -70, 30)]; }
+function waveTemplatePhantomProbe() { const [a, b, c] = laneCenters(); return [waveItem("phantom", b + waveRand(-16, 16), -46, 0), waveItem("phantom", a + waveRand(-12, 12), -62, 12), waveItem("phantom", c + waveRand(-12, 12), -62, 24)]; }
+function waveTemplatePhantomPair() { const [a, b, c] = laneCenters(); return [waveItem("phantom", a + waveRand(-8, 8), -48, 0), waveItem("phantom", c + waveRand(-8, 8), -48, 18), waveItem("phantom", b + waveRand(-8, 8), -70, 30)]; }
 function waveTemplatePhantomFan() { const [a, b, c] = laneCenters(); return [waveItem("phantom", b, -54, 0), waveItem("phantom", a - 24, -58, 12), waveItem("phantom", c + 24, -58, 24)]; }
 const waveTemplates = { breather: waveTemplateBreather, redV: waveTemplateRedV, redWall: waveTemplateRedWall, staggerMix: waveTemplateStaggerMix, orangePair: waveTemplateOrangePair, mixedChevron: waveTemplateMixedChevron, orangeRibbon: waveTemplateOrangeRibbon, purpleGuard: waveTemplatePurpleGuard, splitAmbush: waveTemplateSplitAmbush, orangeChain: waveTemplateOrangeChain, orangeSlash: waveTemplateOrangeSlash, phantomProbe: waveTemplatePhantomProbe, phantomPair: waveTemplatePhantomPair, phantomFan: waveTemplatePhantomFan };
 function pickWeightedTemplate(pool, avoidName = null) {
   const filtered = avoidName ? pool.filter(([name]) => name !== avoidName) : pool.slice();
   const list = filtered.length > 0 ? filtered : pool.slice();
   const total = list.reduce((sum, item) => sum + item[1], 0);
-  let roll = Math.random() * total;
+  let roll = waveRandom() * total;
   for (const [name, weight] of list) {
     roll -= weight;
     if (roll <= 0) return name;
@@ -104,29 +104,31 @@ function spawnWave() {
   state.pendingSpawns.push(...events);
   const density = templateDensity(events);
   if (state.phase >= 3 && state.waveMood === "spike" && density < 4.8) {
-    const followName = Math.random() < 0.6 ? "mixedChevron" : "redWall";
+    const followName = waveRandom() < 0.6 ? "mixedChevron" : "redWall";
     const follow = waveTemplates[followName] ? waveTemplates[followName]() : [];
-    for (const ev of follow) ev.delay += 28 + Math.floor(rand(0, 18));
+    for (const ev of follow) ev.delay += 28 + Math.floor(waveRand(0, 18));
     state.pendingSpawns.push(...follow);
   }
   if (state.waveMood === "rule" && state.phase >= 5 && density < 4.8) {
-    const followName = Math.random() < 0.5 ? "phantomPair" : "phantomFan";
+    const followName = waveRandom() < 0.5 ? "phantomPair" : "phantomFan";
     const follow = waveTemplates[followName] ? waveTemplates[followName]() : [];
-    for (const ev of follow) ev.delay += 36 + Math.floor(rand(0, 20));
+    for (const ev of follow) ev.delay += 36 + Math.floor(waveRand(0, 20));
     state.pendingSpawns.push(...follow);
   }
   if (state.phase >= 3 && density >= 5.5) {
-    const followName = Math.random() < 0.5 ? "breather" : "orangePair";
+    const followName = waveRandom() < 0.5 ? "breather" : "orangePair";
     const follow = waveTemplates[followName] ? waveTemplates[followName]() : [];
-    for (const ev of follow) ev.delay += 34 + Math.floor(rand(0, 20));
+    for (const ev of follow) ev.delay += 34 + Math.floor(waveRand(0, 20));
     state.pendingSpawns.push(...follow);
-    state.waveRest = Math.max(state.waveRest, 18 + Math.floor(rand(0, 12)));
+    state.waveRest = Math.max(state.waveRest, 18 + Math.floor(waveRand(0, 12)));
   } else if (density >= 4.0) {
-    state.waveRest = Math.max(state.waveRest, 12 + Math.floor(rand(0, 8)));
+    state.waveRest = Math.max(state.waveRest, 12 + Math.floor(waveRand(0, 8)));
   }
-  if (state.waveMood === "recovery") state.waveRest = Math.max(state.waveRest, 18 + Math.floor(rand(0, 12)));
-  else if (state.waveMood === "spike") state.waveRest = Math.max(state.waveRest, 8 + Math.floor(rand(0, 8)));
-  else if (state.waveMood === "rule") state.waveRest = Math.max(state.waveRest, 12 + Math.floor(rand(0, 8)));
+  if (state.waveMood === "recovery") state.waveRest = Math.max(state.waveRest, 18 + Math.floor(waveRand(0, 12)));
+  else if (state.waveMood === "spike") state.waveRest = Math.max(state.waveRest, 8 + Math.floor(waveRand(0, 8)));
+  else if (state.waveMood === "rule") state.waveRest = Math.max(state.waveRest, 12 + Math.floor(waveRand(0, 8)));
   state.waveIndex++;
 }
 
+const waveRandom = () => runRandom("waves");
+const waveRand = (minimum, maximum) => runRandomRange("waves", minimum, maximum);

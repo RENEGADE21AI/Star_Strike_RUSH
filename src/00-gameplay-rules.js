@@ -30,7 +30,7 @@ function debrisSafeGap(slot, options = {}) {
 }
 
 function createDoubleDebrisPlan(options = {}) {
-  const rng = typeof options.rng === "function" ? options.rng : Math.random;
+  const rng = typeof options.rng === "function" ? options.rng : () => runRandom("hazards");
   const slots = options.slots || 6;
   const width = options.width || 375;
   const rowDistance = options.rowDistance == null ? 92 : options.rowDistance;

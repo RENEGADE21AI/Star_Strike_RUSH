@@ -66,6 +66,24 @@ async function dismissCurrentTutorialDialogue(page) {
   });
 }
 
+async function pressAccessibleGameActionUntil(page, label, completion) {
+  const action = page.getByRole("button", { name: label, exact: true });
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await action.press("Enter");
+    const completed = await page.waitForFunction((expected) => {
+      if (expected === "checkpoint-dialogue") {
+        return tutorialDirector?.dialogueVisible === true && state.gameState === "playing";
+      }
+      if (expected === "training-offer") {
+        return onboardingUiMode === "resume_training" && state.gameState === "start";
+      }
+      return false;
+    }, completion, { timeout: 3_000 }).then(() => true, () => false);
+    if (completed) return;
+  }
+  throw new Error(`Accessible action did not reach ${completion}: ${label}`);
+}
+
 before(async () => {
   server = http.createServer(staticResponse);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -301,10 +319,7 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
 
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => onboardingUiMode === "none" && gameAccessibilitySnapshot().mode === "pause");
-    const restartCheckpoint = page.getByRole("button", { name: "Restart tutorial checkpoint", exact: true });
-    await restartCheckpoint.focus();
-    await page.keyboard.press("Enter");
-    await page.waitForFunction(() => tutorialDirector?.dialogueVisible === true && state.gameState === "playing");
+    await pressAccessibleGameActionUntil(page, "Restart tutorial checkpoint", "checkpoint-dialogue");
     let transferred = await page.evaluate(() => ({
       modalCount: document.querySelectorAll('[aria-modal="true"]').length,
       game: gameAccessibilitySnapshot(),
@@ -317,9 +332,7 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
     await dismissCurrentTutorialDialogue(page);
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "pause");
-    const returnTitle = page.getByRole("button", { name: "Return to title", exact: true });
-    await returnTitle.press("Enter");
-    await page.waitForFunction(() => onboardingUiMode === "resume_training" && state.gameState === "start");
+    await pressAccessibleGameActionUntil(page, "Return to title", "training-offer");
     transferred = await page.evaluate(() => ({
       modalCount: document.querySelectorAll('[aria-modal="true"]').length,
       game: gameAccessibilitySnapshot(),

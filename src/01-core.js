@@ -734,6 +734,7 @@ const state = {
   verifiedRunLedger: null,
   verifiedRunSession: null,
   verifiedRunPromise: null,
+  verifiedInputTape: null,
   runMode: "standard",
   pausedReason: "",
   pauseNotice: "",
