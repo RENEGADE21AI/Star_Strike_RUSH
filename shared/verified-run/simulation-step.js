@@ -9,23 +9,27 @@
     : root;
   const content = typeof module === "object" && module.exports ? require("./content") : root;
   const director = typeof module === "object" && module.exports ? require("./director") : root;
+  const trig = typeof module === "object" && module.exports ? require("./trig-table") : root;
   const geometry = typeof module === "object" && module.exports ? require("./geometry") : root;
-  const api = factory(constants, inputTape, content, director, geometry);
+  const api = factory(constants, inputTape, content, director, trig, geometry);
   if (typeof module === "object" && module.exports) module.exports = api;
   Object.assign(root, api);
-})(globalThis, function buildVerifiedRunSimulationStep(constants, inputTape, content, director, geometry) {
+})(globalThis, function buildVerifiedRunSimulationStep(constants, inputTape, content, director, trig, geometry) {
 
-if (!constants || !inputTape || !content || !director || !geometry) throw new Error("Verified run primitives must load before simulation step.");
+if (!constants || !inputTape || !content || !director || !trig || !geometry) throw new Error("Verified run primitives must load before simulation step.");
 
 const {
+  ANGLE_UNITS,
   ENERGY_UNITS_PER_POINT,
   GAME_HEIGHT_UNITS,
   GAME_WIDTH_UNITS,
-  POSITION_UNITS_PER_PIXEL
+  POSITION_UNITS_PER_PIXEL,
+  TRIG_UNITS
 } = constants;
 const { BUTTON_GHOST_SHIFT, BUTTON_PAUSE } = inputTape;
 const { AUTHORITATIVE_ENEMY_ARCHETYPES } = content;
 const { tickCanonicalDirector } = director;
+const { sinForAngle } = trig;
 const { bodiesOverlap, collisionBodyFor } = geometry;
 const ALLOWED_BUTTONS = BUTTON_GHOST_SHIFT | BUTTON_PAUSE;
 const GHOST_BURST = Math.round(4.6 * POSITION_UNITS_PER_PIXEL);
@@ -115,7 +119,14 @@ function updateCanonicalPlayer(state, input) {
   player.energy = Math.min(player.maxEnergy, player.energy + 50);
 }
 
-function spawnCanonicalEnemy(state, type, x, y, options = {}) {
+function canonicalRandomUint32(streams, name) {
+  if (!streams || typeof streams.nextUint32 !== "function") throw new TypeError("Canonical enemy behavior requires named random streams.");
+  const value = Number(streams.nextUint32(name));
+  if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff) throw new TypeError("Canonical random streams must return unsigned 32-bit integers.");
+  return value;
+}
+
+function spawnCanonicalEnemy(state, type, x, y, options = {}, streams) {
   if (!state || state.schema !== "SSR_SIM_STATE_V1" || state.terminal) {
     throw new TypeError("Canonical enemy creation requires an active simulation state.");
   }
@@ -135,8 +146,16 @@ function spawnCanonicalEnemy(state, type, x, y, options = {}) {
     realm: canonicalEntityInteger(options.realm ?? 0, "Enemy realm"),
     motion: String(options.motion || "linear"),
     motionTick: canonicalEntityInteger(options.motionTick ?? 0, "Enemy motion tick"),
-    lane: canonicalEntityInteger(options.lane ?? -1, "Enemy lane")
+    lane: canonicalEntityInteger(options.lane ?? -1, "Enemy lane"),
+    driftAngle: canonicalEntityInteger(options.driftAngle ?? 0, "Enemy drift angle"),
+    driftDir: canonicalEntityInteger(options.driftDir ?? 1, "Enemy drift direction"),
+    driftPower: canonicalEntityInteger(options.driftPower ?? 0, "Enemy drift power")
   };
+  if (enemy.type === "red" && streams) {
+    enemy.driftAngle = canonicalRandomUint32(streams, "enemy_behavior") % ANGLE_UNITS;
+    enemy.driftDir = (canonicalRandomUint32(streams, "enemy_behavior") & 1) === 1 ? 1 : -1;
+    enemy.driftPower = 61 + canonicalRandomUint32(streams, "enemy_behavior") % 165;
+  }
   state.enemies.push(enemy);
   return enemy;
 }
@@ -173,18 +192,23 @@ function canonicalEnemyVelocityY(type, phase) {
   return 2 * POSITION_UNITS_PER_PIXEL;
 }
 
-function materializeCanonicalSpawns(state, descriptors) {
+function materializeCanonicalSpawns(state, descriptors, streams) {
   for (const descriptor of descriptors) {
     spawnCanonicalEnemy(state, descriptor.type, descriptor.x, descriptor.y, {
       vy: canonicalEnemyVelocityY(descriptor.type, state.phase),
       motion: descriptor.motion,
       lane: descriptor.lane
-    });
+    }, streams);
   }
 }
 
-function updateCanonicalEntities(state) {
+function updateCanonicalEntities(state, streams) {
   for (const enemy of state.enemies) {
+    if (enemy.type === "red" && enemy.driftPower > 0 && streams) {
+      if (canonicalRandomUint32(streams, "enemy_behavior") < 51_539_608) enemy.driftDir *= -1;
+      enemy.x += roundDivide(sinForAngle(enemy.driftAngle) * enemy.driftPower * enemy.driftDir, TRIG_UNITS);
+      enemy.driftAngle = (enemy.driftAngle + 20) % ANGLE_UNITS;
+    }
     enemy.x += enemy.vx;
     enemy.y += enemy.vy;
     enemy.motionTick++;
@@ -258,10 +282,10 @@ function stepSimulation(state, rawInput, streams) {
     applyGhostShift(state, input);
     updateCanonicalPlayer(state, input);
     fireCanonicalPlayer(state);
-    updateCanonicalEntities(state);
+    updateCanonicalEntities(state, streams);
     resolveCanonicalProjectileHits(state);
     resolveCanonicalPlayerContact(state);
-    if (!state.terminal && streams) materializeCanonicalSpawns(state, tickCanonicalDirector(state, streams));
+    if (!state.terminal && streams) materializeCanonicalSpawns(state, tickCanonicalDirector(state, streams), streams);
   }
   if (!state.terminal && state.tick >= state.maxTicks) {
     state.terminal = true;

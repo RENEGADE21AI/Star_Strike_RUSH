@@ -52,6 +52,64 @@ test("opening pacing schedules a red-only first wave at tick 180", async () => {
   assert.equal(state.pendingSpawns.every((spawn) => spawn.type === "red"), true);
 });
 
+test("the server seed can select the live five-ship red V as the first formation", async () => {
+  const { state, streams } = await directorFixture({ rootSeed: "00000000000000000000000000000002" });
+  let due = [];
+  for (let tick = 1; tick <= 180; tick++) due = due.concat(tickCanonicalDirector(state, streams));
+
+  assert.equal(state.director.lastTemplate, "redV");
+  assert.deepEqual(
+    due.concat(state.pendingSpawns).map(({ type, x, y, delay, motion }) => ({ type, x, y, delay, motion })),
+    [
+      { type: "red", x: 72_192, y: -26_624, delay: 0, motion: "drift" },
+      { type: "red", x: 137_728, y: -40_960, delay: 8, motion: "drift" },
+      { type: "red", x: 192_000, y: -53_248, delay: 16, motion: "drift" },
+      { type: "red", x: 246_272, y: -40_960, delay: 24, motion: "drift" },
+      { type: "red", x: 311_808, y: -26_624, delay: 32, motion: "drift" }
+    ]
+  );
+});
+
+test("late phase one unlocks the live red wall and avoids repeating the prior template", async () => {
+  const { state, streams } = await directorFixture({ rootSeed: "00000000000000000000000000000002" });
+  state.director.phaseTick = 1700;
+  state.director.waveTick = 155;
+  state.director.waveIndex = 3;
+  state.director.lastTemplate = "breather";
+
+  const due = tickCanonicalDirector(state, streams);
+  assert.equal(state.director.lastTemplate, "redWall");
+  assert.deepEqual(
+    due.concat(state.pendingSpawns).map(({ type, x, y, delay }) => ({ type, x, y, delay })),
+    [
+      { type: "red", x: 55_808, y: -30_720, delay: 0 },
+      { type: "red", x: 107_008, y: -30_720, delay: 8 },
+      { type: "red", x: 192_000, y: -43_008, delay: 16 },
+      { type: "red", x: 237_056, y: -30_720, delay: 24 },
+      { type: "red", x: 276_992, y: -30_720, delay: 32 },
+      { type: "red", x: 328_192, y: -30_720, delay: 40 }
+    ]
+  );
+});
+
+test("phase two can seed the live orange pair with its exact motion contract", async () => {
+  const { state, streams } = await directorFixture({ rootSeed: "00000000000000000000000000000002" });
+  state.phase = 2;
+  state.director.waveTick = 155;
+
+  const due = tickCanonicalDirector(state, streams);
+  assert.equal(state.director.lastTemplate, "orangePair");
+  assert.deepEqual(
+    due.concat(state.pendingSpawns).map(({ type, x, y, delay, motion }) => ({ type, x, y, delay, motion })),
+    [
+      { type: "orange", x: 70_144, y: -32_768, delay: 0, motion: "zigzag" },
+      { type: "red", x: 192_000, y: -45_056, delay: 10, motion: "drift" },
+      { type: "red", x: 138_752, y: -28_672, delay: 20, motion: "drift" },
+      { type: "orange", x: 313_856, y: -32_768, delay: 30, motion: "snap" }
+    ]
+  );
+});
+
 test("phase one advances only after its complete 3000-tick contract", async () => {
   const { state, streams } = await directorFixture();
   for (let tick = 1; tick < 3000; tick++) tickCanonicalDirector(state, streams);
@@ -82,7 +140,7 @@ test("seeded waves reproduce and loot consumption cannot shift their geometry", 
   assert.ok(firstDue.length >= 6, "two opening formations should have entered by tick 420");
 });
 
-test("simulation stepping materializes queued enemies with exact formation timing and motion", async () => {
+test("simulation stepping materializes queued enemies with exact formation timing and seeded drift", async () => {
   const { state, streams } = await directorFixture({ maxTicks: 500 });
   state.player.fireCooldown = 10_000;
   const idle = { x: 0, y: 0, buttons: 0 };
@@ -100,8 +158,8 @@ test("simulation stepping materializes queued enemies with exact formation timin
   assert.deepEqual(
     state.enemies.map(({ x, y, motionTick }) => ({ x, y, motionTick })),
     [
-      { x: 84_480, y: -28 * POSITION_UNITS_PER_PIXEL + 24 * redVelocity, motionTick: 24 },
-      { x: 192_000, y: -38 * POSITION_UNITS_PER_PIXEL + 12 * redVelocity, motionTick: 12 },
+      { x: 86_094, y: -28 * POSITION_UNITS_PER_PIXEL + 24 * redVelocity, motionTick: 24 },
+      { x: 192_908, y: -38 * POSITION_UNITS_PER_PIXEL + 12 * redVelocity, motionTick: 12 },
       { x: 299_520, y: -28 * POSITION_UNITS_PER_PIXEL, motionTick: 0 }
     ]
   );

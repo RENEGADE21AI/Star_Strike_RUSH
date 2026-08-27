@@ -207,6 +207,30 @@ test("enemy contact uses artwork-aligned bodies and terminal health authority", 
   assert.equal(state.stats.damageTaken, 1);
 });
 
+test("red drift consumes only deterministic enemy behavior randomness and stays integer exact", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.player.fireCooldown = 10_000;
+  const values = [1024, 1, 39, 0xffffffff];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const enemy = spawnCanonicalEnemy(state, "red", 100_000, -20_000, {
+    vy: 1_925,
+    motion: "drift"
+  }, streams);
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.equal(enemy.x, 100_100);
+  assert.equal(enemy.y, -18_075);
+  assert.equal(enemy.motionTick, 1);
+  assert.equal(values.length, 0);
+  assert.doesNotThrow(() => serializeCanonicalState(state));
+});
+
 test("entity creation rejects unknown content and all combat state stays integer-only", () => {
   const state = createSimulationState(ticket({ maxTicks: 30 }));
   assert.throws(() => spawnCanonicalEnemy(state, "invented", 0, 0), /enemy type/);

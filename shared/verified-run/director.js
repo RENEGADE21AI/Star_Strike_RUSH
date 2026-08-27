@@ -37,10 +37,10 @@ function laneX(lane) {
   return Math.round(GAME_WIDTH_UNITS * numerators[lane] / 100);
 }
 
-function spawnDescriptor(type, lane, yPixels, delay, motion) {
+function spawnDescriptor(type, lane, yPixels, delay, motion, offsetPixels = 0) {
   return {
     type,
-    x: laneX(lane),
+    x: laneX(lane) + offsetPixels * POSITION_UNITS_PER_PIXEL,
     y: yPixels * POSITION_UNITS_PER_PIXEL,
     delay,
     motion,
@@ -56,20 +56,79 @@ function openingBreather() {
   ];
 }
 
-function openingChevron() {
+function redV() {
   return [
-    spawnDescriptor("red", 0, -26, 0, "drift"),
-    spawnDescriptor("red", 1, -52, 12, "drift"),
-    spawnDescriptor("red", 2, -26, 24, "drift")
+    spawnDescriptor("red", 0, -26, 0, "drift", -12),
+    spawnDescriptor("red", 0, -40, 8, "drift", 52),
+    spawnDescriptor("red", 1, -52, 16, "drift"),
+    spawnDescriptor("red", 2, -40, 24, "drift", -52),
+    spawnDescriptor("red", 2, -26, 32, "drift", 12)
   ];
+}
+
+function redWall() {
+  return [
+    spawnDescriptor("red", 0, -30, 0, "drift", -28),
+    spawnDescriptor("red", 0, -30, 8, "drift", 22),
+    spawnDescriptor("red", 1, -42, 16, "drift"),
+    spawnDescriptor("red", 1, -30, 24, "drift", 44),
+    spawnDescriptor("red", 2, -30, 32, "drift", -22),
+    spawnDescriptor("red", 2, -30, 40, "drift", 28)
+  ];
+}
+
+function orangePair() {
+  return [
+    spawnDescriptor("orange", 0, -32, 0, "zigzag", -14),
+    spawnDescriptor("red", 1, -44, 10, "drift"),
+    spawnDescriptor("red", 1, -28, 20, "drift", -52),
+    spawnDescriptor("orange", 2, -32, 30, "snap", 14)
+  ];
+}
+
+function mixedChevron() {
+  return [
+    spawnDescriptor("red", 0, -30, 0, "drift"),
+    spawnDescriptor("orange", 0, -44, 8, "zigzag", 58),
+    spawnDescriptor("red", 1, -54, 16, "drift"),
+    spawnDescriptor("orange", 2, -44, 24, "burst", -58),
+    spawnDescriptor("red", 2, -30, 32, "drift")
+  ];
+}
+
+const CANONICAL_WAVE_TEMPLATES = Object.freeze({
+  breather: openingBreather,
+  mixedChevron,
+  orangePair,
+  redV,
+  redWall
+});
+
+function canonicalWavePool(state) {
+  if (state.phase === 1) {
+    return state.director.phaseTick > canonicalPhaseDuration(1) * 55 / 100
+      ? [["breather", 7], ["redV", 4], ["redWall", 1]]
+      : [["breather", 8], ["redV", 2]];
+  }
+  return [["breather", 5], ["redV", 4], ["orangePair", 4], ["mixedChevron", 2]];
+}
+
+function selectWeightedTemplate(pool, avoidName, streams) {
+  const filtered = avoidName ? pool.filter(([name]) => name !== avoidName) : pool.slice();
+  const choices = filtered.length > 0 ? filtered : pool.slice();
+  const total = choices.reduce((sum, entry) => sum + entry[1], 0);
+  let roll = streams.nextUint32("waves") / 0x100000000 * total;
+  for (const [name, weight] of choices) {
+    roll -= weight;
+    if (roll <= 0) return name;
+  }
+  return choices[choices.length - 1][0];
 }
 
 function queueCanonicalWave(state, streams) {
   const director = state.director;
-  const firstWave = director.waveIndex === 0;
-  const chooseChevron = !firstWave && (streams.nextUint32("waves") & 1) === 1;
-  const template = chooseChevron ? "red_chevron" : "opening_breather";
-  const entries = chooseChevron ? openingChevron() : openingBreather();
+  const template = selectWeightedTemplate(canonicalWavePool(state), director.lastTemplate, streams);
+  const entries = CANONICAL_WAVE_TEMPLATES[template]();
   state.pendingSpawns.push(...entries);
   director.waveIndex++;
   director.lastTemplate = template;
