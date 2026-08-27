@@ -35,11 +35,11 @@
 - Produces: `createRunRandomStreams(rootSeedHex, simRevision)`, `canonicalRunInput(raw)`, `encodeInputTape(frames, metadata)`, and `decodeInputTape(bytes)`.
 - Produces: immutable limits and revision constants consumed by client, Functions, and worker code.
 
-- [ ] Write Node tests that assert fixed random vectors, named-stream isolation, input quantization, RLE round trips, malformed/trailing-byte rejection, and all hard limits.
-- [ ] Run `node --test tests/verified-run-primitives.test.js` and confirm missing-module failure.
-- [ ] Implement xoshiro128**, SHA-256 stream derivation, canonical input normalization, and the `SSR_INPUT_V1` binary codec with strict bounded parsing.
-- [ ] Run the targeted test and `npm test`.
-- [ ] Commit with `git commit -m "feat: add deterministic run verification primitives"`.
+- [x] Write Node tests that assert fixed random vectors, named-stream isolation, input quantization, RLE round trips, malformed/trailing-byte rejection, and all hard limits.
+- [x] Run `node --test tests/verified-run-primitives.test.js` and confirm missing-module failure.
+- [x] Implement xoshiro128**, SHA-256 stream derivation, canonical input normalization, and the `SSR_INPUT_V1` binary codec with strict bounded parsing.
+- [x] Run the targeted test and `npm test`.
+- [x] Commit with `git commit -m "feat: add deterministic run verification primitives"`.
 
 ### Task 2: Browser random and input boundary
 
