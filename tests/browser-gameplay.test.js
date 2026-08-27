@@ -233,6 +233,7 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
     await skipTraining.focus();
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => onboardingUiMode === "skip_confirm");
+    await page.waitForFunction(() => document.activeElement?.dataset?.onboardingAction === "cancel-skip");
     modalState = await page.evaluate(() => ({
       gameState: state.gameState,
       uiMode: onboardingUiMode,
@@ -264,6 +265,7 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
     await page.getByRole("button", { name: "Skip training", exact: true }).focus();
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => onboardingUiMode === "skip_confirm");
+    await page.waitForFunction(() => document.activeElement?.dataset?.onboardingAction === "cancel-skip");
     const resumeCenter = await page.evaluate(() => {
       const rect = getPauseOverlayRects().resume;
       return {

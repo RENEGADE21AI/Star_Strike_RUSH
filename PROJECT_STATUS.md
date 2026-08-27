@@ -1,6 +1,6 @@
 # Project Status
 
-Last audited: 2026-08-25
+Last audited: 2026-08-26
 
 This file distinguishes repository state, staged state, and production state.
 The live source of truth is always Hosting `/version.json` plus the matching
@@ -8,12 +8,12 @@ backend release marker.
 
 ## Release truth
 
-The production baseline verified at the end of this pass is
-`a7156cffdbc20b301bb8488ff9751e9994e8f17d`. Production still reports the prior
-`explicit_account_or_device` authority. The automatic strongest-save resolver
-and collision polish described below remain repository work until a protected
-PR merges and the guarded release workflow proves matching Hosting and backend
-SHAs.
+The production baseline verified before this pass is
+`e81eea5cd37bbc44c6baecaed3edc75ea83442d3`. Production reports
+`automatic_best_account_or_device` authority and
+`paused_pending_authoritative_verifier` competition mode. The deterministic
+performance-soak gate described below remains repository work until a protected
+PR merges and the guarded release workflow proves the next exact Hosting SHA.
 
 Current release configuration:
 
@@ -120,8 +120,9 @@ MP3 files. No artist, source URL, or formal license name is inferred.
 
 The protected workflow runs Node 22 syntax/contracts, real Chromium gameplay,
 representative WebKit desktop/mobile smoke, Firestore Rules emulation, real
-Firebase client emulation, asserted visual QA, dependency audits, production
-build, release-marker validation, and tracked-file secret scanning. Final
+Firebase client emulation, asserted visual QA, a deterministic late-game
+performance soak at desktop and mobile-sized viewports, dependency audits,
+production build, release-marker validation, and tracked-file secret scanning. Final
 counts and artifact URLs belong in the PR and release report rather than being
 duplicated here before the run completes.
 
@@ -135,6 +136,7 @@ npm run test:webkit
 npm run test:rules
 npm run test:firebase-client
 npm run test:visual
+npm run test:performance
 npm run build
 npm run test:secret
 npm audit --omit=dev --audit-level=high

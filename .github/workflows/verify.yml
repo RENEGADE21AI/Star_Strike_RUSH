@@ -48,6 +48,16 @@ jobs:
           path: test-artifacts/visual-qa/
           if-no-files-found: error
           retention-days: 14
+      - name: Run late-game performance soak
+        run: npm run test:performance
+      - name: Upload performance QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-qa-${{ github.run_id }}
+          path: test-artifacts/performance-qa/
+          if-no-files-found: error
+          retention-days: 14
       - name: Dependency audit
         run: |
           npm audit --omit=dev --audit-level=high
