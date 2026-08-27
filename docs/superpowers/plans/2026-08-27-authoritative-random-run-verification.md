@@ -77,10 +77,15 @@ geometry, named-stream integer Red drift, Orange snap/zigzag motion, Purple
 drift/warnings/aimed fire, hostile-projectile movement and damage, and Phantom
 realm cycles/telegraphs/physical fire. Phantom telegraphs are now canonically
 intangible, and hostile projectiles can cause terminal death only in the matching
-realm. The ordered browser runtime now consumes the same phase-duration source.
-Full later-phase formations, expansion-enemy behaviors, hazards, boss procedures,
-adaptive pacing, drops, powerups, and browser-state ownership remain intentionally
-unchecked below until parity is implemented.
+realm. The canonical director now owns every classic and expansion formation plus
+the phase/mood pool contract. Splitters, shards, carriers, siphons, leeches,
+minecasters, shieldbearers, railgunners, and repair drones now produce their
+movement and gameplay consequences in integer-only replay state, including seeded
+launches, energy drain, tethers, mines, shield interception, beams, and repairs.
+The ordered browser runtime now consumes the same phase-duration source. Remaining
+hazard events, boss procedures, adaptive pacing transitions, drops, powerups, and
+browser-state ownership remain intentionally unchecked below until parity is
+implemented.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`

@@ -161,7 +161,25 @@ function spawnCanonicalEnemy(state, type, x, y, options = {}, streams) {
     cycleTimer: canonicalEntityInteger(options.cycleTimer ?? 0, "Enemy cycle timer"),
     telegraphTimer: canonicalEntityInteger(options.telegraphTimer ?? 0, "Enemy telegraph timer"),
     fireTimer: canonicalEntityInteger(options.fireTimer ?? 0, "Enemy fire timer"),
-    phaseOffset: canonicalEntityInteger(options.phaseOffset ?? 0, "Enemy phase offset")
+    phaseOffset: canonicalEntityInteger(options.phaseOffset ?? 0, "Enemy phase offset"),
+    launchTimer: canonicalEntityInteger(options.launchTimer ?? 0, "Enemy launch timer"),
+    launchCount: canonicalEntityInteger(options.launchCount ?? 0, "Enemy launch count"),
+    bayOpen: canonicalEntityInteger(options.bayOpen ?? 0, "Enemy bay timer"),
+    fireWarn: canonicalEntityInteger(options.fireWarn ?? 0, "Enemy fire warning"),
+    lockTimer: canonicalEntityInteger(options.lockTimer ?? 0, "Enemy lock timer"),
+    tetherActive: Boolean(options.tetherActive),
+    tetherDrainTick: canonicalEntityInteger(options.tetherDrainTick ?? 0, "Enemy tether drain tick"),
+    mineTimer: canonicalEntityInteger(options.mineTimer ?? 0, "Enemy mine timer"),
+    minesDropped: canonicalEntityInteger(options.minesDropped ?? 0, "Enemy mines dropped"),
+    shieldPulse: canonicalEntityInteger(options.shieldPulse ?? 0, "Enemy shield pulse"),
+    shieldedBy: canonicalEntityInteger(options.shieldedBy ?? 0, "Enemy shield source"),
+    shieldCooldown: canonicalEntityInteger(options.shieldCooldown ?? 0, "Enemy shield cooldown"),
+    railCooldown: canonicalEntityInteger(options.railCooldown ?? 0, "Enemy rail cooldown"),
+    railWarn: canonicalEntityInteger(options.railWarn ?? 0, "Enemy rail warning"),
+    railAngle: canonicalEntityInteger(options.railAngle ?? 1_024, "Enemy rail angle"),
+    repairTimer: canonicalEntityInteger(options.repairTimer ?? 0, "Enemy repair timer"),
+    repairTargetId: canonicalEntityInteger(options.repairTargetId ?? 0, "Enemy repair target"),
+    noPowerup: Boolean(options.noPowerup)
   };
   if (enemy.type === "red" && streams) {
     enemy.driftAngle = canonicalRandomUint32(streams, "enemy_behavior") % ANGLE_UNITS;
@@ -204,6 +222,18 @@ function spawnCanonicalEnemy(state, type, x, y, options = {}, streams) {
       if (options.fireTimer == null) enemy.fireTimer = canonicalRandomRange(streams, 24, 71);
     }
   }
+  if (streams && ["splitter", "splitter_shard", "carrier", "siphon", "leech", "minecaster", "shieldbearer", "railgunner", "repair_drone"].includes(enemy.type)) {
+    if (options.loopAngle == null) enemy.loopAngle = canonicalRandomUint32(streams, "enemy_behavior") % ANGLE_UNITS;
+    if (enemy.type === "carrier" && options.launchTimer == null) enemy.launchTimer = canonicalRandomRange(streams, 86, 123);
+    if (enemy.type === "siphon" && options.fireTimer == null) enemy.fireTimer = canonicalRandomRange(streams, 58, 97);
+    if (enemy.type === "leech" && options.lockTimer == null) enemy.lockTimer = 78;
+    if (enemy.type === "minecaster" && options.mineTimer == null) enemy.mineTimer = canonicalRandomRange(streams, 70, 109);
+    if (enemy.type === "shieldbearer" && options.shieldPulse == null) {
+      enemy.shieldPulse = canonicalRandomUint32(streams, "enemy_behavior") % ANGLE_UNITS;
+    }
+    if (enemy.type === "railgunner" && options.railCooldown == null) enemy.railCooldown = canonicalRandomRange(streams, 85, 129);
+    if (enemy.type === "repair_drone" && options.repairTimer == null) enemy.repairTimer = 38;
+  }
   state.enemies.push(enemy);
   return enemy;
 }
@@ -244,6 +274,15 @@ function canonicalEnemyVelocityY(type, phase) {
   if (type === "orange") return roundDivide((25500 + phaseBoostHundredths * 22) * POSITION_UNITS_PER_PIXEL, 10000);
   if (type === "purple") return roundDivide((10500 + phaseBoostHundredths * 18) * POSITION_UNITS_PER_PIXEL, 10000);
   if (type === "phantom") return roundDivide((15500 + phaseBoostHundredths * 14) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "splitter") return roundDivide((11500 + phaseBoostHundredths * 16) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "splitter_shard") return roundDivide((27500 + phase * 350) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "carrier") return roundDivide((5500 + phaseBoostHundredths * 5) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "siphon") return roundDivide((10500 + phaseBoostHundredths * 12) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "leech") return roundDivide((7000 + phaseBoostHundredths * 5) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "minecaster") return roundDivide((8200 + phaseBoostHundredths * 5) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "shieldbearer") return roundDivide((7500 + phaseBoostHundredths * 4) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "railgunner") return roundDivide((7200 + phaseBoostHundredths * 4) * POSITION_UNITS_PER_PIXEL, 10000);
+  if (type === "repair_drone") return roundDivide((10500 + phaseBoostHundredths * 6) * POSITION_UNITS_PER_PIXEL, 10000);
   return 2 * POSITION_UNITS_PER_PIXEL;
 }
 
@@ -307,12 +346,12 @@ function updateCanonicalOrange(state, enemy, streams) {
   enemy.x += roundDivide(enemy.vx * 40, 100);
 }
 
-function fireCanonicalEnemyProjectile(state, enemy, kind, speed, originOffsetPixels = 12) {
+function fireCanonicalEnemyProjectile(state, enemy, kind, speed, originOffsetPixels = 12, extra = {}) {
   const originY = enemy.y + originOffsetPixels * POSITION_UNITS_PER_PIXEL;
   const dx = state.player.x - enemy.x;
   const dy = state.player.y - originY;
   const distance = Math.max(1, Math.trunc(Math.sqrt(dx * dx + dy * dy)));
-  state.enemyProjectiles.push({
+  const projectile = {
     id: state.nextEntityId++,
     kind,
     x: enemy.x,
@@ -320,10 +359,12 @@ function fireCanonicalEnemyProjectile(state, enemy, kind, speed, originOffsetPix
     vx: roundDivide(dx * speed, distance),
     vy: roundDivide(dy * speed, distance),
     angle: 0,
-    life: 180,
-    damage: 1,
+    life: canonicalEntityInteger(extra.life ?? 180, "Enemy projectile life"),
+    damage: canonicalEntityInteger(extra.damage ?? 1, "Enemy projectile damage"),
     realm: enemy.realm
-  });
+  };
+  if (extra.drain != null) projectile.drain = canonicalEntityInteger(extra.drain, "Enemy projectile drain");
+  state.enemyProjectiles.push(projectile);
 }
 
 function updateCanonicalPurple(state, enemy, streams) {
@@ -386,9 +427,274 @@ function updateCanonicalPhantom(state, enemy, streams) {
   }
 }
 
-function updateCanonicalEntities(state, streams) {
-  const existingEnemyProjectileCount = state.enemyProjectiles.length;
+function canonicalDistance(x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  return Math.trunc(Math.sqrt(dx * dx + dy * dy));
+}
+
+function canonicalCosForAngle(angle) {
+  return sinForAngle(angle + ANGLE_UNITS / 4);
+}
+
+function spawnCanonicalMine(state, enemy, streams) {
+  const offset = canonicalRandomRange(streams, -10, 10) * POSITION_UNITS_PER_PIXEL;
+  state.hazards.push({
+    id: state.nextEntityId++,
+    kind: "mine",
+    x: enemy.x + offset,
+    y: enemy.y + 16 * POSITION_UNITS_PER_PIXEL,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    life: 600,
+    armTimer: 48,
+    damage: 1,
+    realm: 0
+  });
+}
+
+function launchCanonicalCarrierEnemy(state, enemy, streams) {
+  const earlyPool = ["red", "orange"];
+  const latePool = state.phase >= 9 ? ["red", "orange", "splitter", "siphon"] : ["red", "orange", "red"];
+  const pool = enemy.launchCount < 2 ? earlyPool : latePool;
+  const type = pool[canonicalRandomUint32(streams, "enemy_behavior") % pool.length];
+  const lane = canonicalRandomUint32(streams, "enemy_behavior") % 3;
+  const side = enemy.launchCount % 2 === 0 ? -1 : 1;
+  spawnCanonicalEnemy(state, type, enemy.x + side * 11 * POSITION_UNITS_PER_PIXEL, enemy.y + 16 * POSITION_UNITS_PER_PIXEL, {
+    vy: canonicalEnemyVelocityY(type, state.phase),
+    motion: type === "phantom" ? "phantom" : type === "orange" ? "zigzag" : "drift",
+    lane
+  }, streams);
+  enemy.launchCount++;
+  enemy.bayOpen = 26;
+  enemy.launchTimer = Math.max(
+    60,
+    108 - roundDivide(state.phase * 12, 10) + canonicalRandomRange(streams, 0, 44)
+  );
+}
+
+function findCanonicalRepairTarget(state, drone) {
+  let best = null;
+  let bestDistance = Number.MAX_SAFE_INTEGER;
   for (const enemy of state.enemies) {
+    if (enemy === drone || enemy.type === "repair_drone" || enemy.type === "splitter_shard") continue;
+    if (enemy.hp >= enemy.maxHp || enemy.maxHp <= 1) continue;
+    const distance = canonicalDistance(drone.x, drone.y, enemy.x, enemy.y);
+    if (distance < bestDistance) {
+      best = enemy;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function updateCanonicalExpansionEnemy(state, enemy, streams) {
+  if (!["splitter", "splitter_shard", "carrier", "siphon", "leech", "minecaster", "shieldbearer", "railgunner", "repair_drone"].includes(enemy.type)) {
+    return false;
+  }
+  if (enemy.type === "splitter") {
+    enemy.loopAngle = (enemy.loopAngle + 23) % ANGLE_UNITS;
+    enemy.x += roundDivide(sinForAngle(enemy.loopAngle) * 461, TRIG_UNITS);
+    enemy.y += enemy.vy;
+  } else if (enemy.type === "splitter_shard") {
+    enemy.x += enemy.vx;
+    enemy.y += enemy.vy;
+    enemy.loopAngle = (enemy.loopAngle + 52) % ANGLE_UNITS;
+    enemy.vx += roundDivide(sinForAngle(enemy.loopAngle) * 15, TRIG_UNITS);
+  } else if (enemy.type === "carrier") {
+    enemy.loopAngle = (enemy.loopAngle + 12) % ANGLE_UNITS;
+    enemy.x += roundDivide(sinForAngle(enemy.loopAngle) * 328, TRIG_UNITS);
+    enemy.y += enemy.vy;
+    enemy.bayOpen = Math.max(0, enemy.bayOpen - 1);
+    enemy.launchTimer--;
+    if (enemy.launchTimer <= 22) enemy.bayOpen = Math.max(enemy.bayOpen, enemy.launchTimer);
+    if (enemy.launchTimer <= 0 && streams) launchCanonicalCarrierEnemy(state, enemy, streams);
+  } else if (enemy.type === "siphon") {
+    enemy.loopAngle = (enemy.loopAngle + 23) % ANGLE_UNITS;
+    enemy.x += Math.sign(state.player.x - enemy.x) * 225;
+    enemy.x += roundDivide(sinForAngle(enemy.loopAngle) * 184, TRIG_UNITS);
+    enemy.y += enemy.vy;
+    enemy.fireTimer--;
+    enemy.fireWarn = enemy.fireTimer > 0 && enemy.fireTimer <= 22 ? enemy.fireTimer : 0;
+    if (enemy.fireTimer <= 0 && streams) {
+      const speed = roundDivide((305 + state.phase * 3) * POSITION_UNITS_PER_PIXEL, 100);
+      fireCanonicalEnemyProjectile(state, enemy, "drainShot", speed, 11, {
+        damage: 0,
+        drain: 22 * ENERGY_UNITS_PER_POINT,
+        life: 240
+      });
+      enemy.fireTimer = Math.max(54, 112 - roundDivide(state.phase * 15, 10) + canonicalRandomRange(streams, -20, 27));
+      enemy.fireWarn = 0;
+    }
+  } else if (enemy.type === "leech") {
+    enemy.loopAngle = (enemy.loopAngle + 16) % ANGLE_UNITS;
+    const targetY = Math.round(GAME_HEIGHT_UNITS * 30 / 100)
+      + roundDivide(sinForAngle(enemy.loopAngle) * 28 * POSITION_UNITS_PER_PIXEL, TRIG_UNITS);
+    enemy.x += Math.sign(state.player.x - enemy.x) * (307 + state.phase * 8);
+    enemy.y += roundDivide((targetY - enemy.y) * 18, 1000) + roundDivide(enemy.vy * 18, 100);
+    const distance = canonicalDistance(enemy.x, enemy.y, state.player.x, state.player.y);
+    if (enemy.tetherActive) {
+      if (distance > 225 * POSITION_UNITS_PER_PIXEL || state.player.ghostTimer > 0) {
+        enemy.tetherActive = false;
+        enemy.lockTimer = 74;
+      } else {
+        enemy.tetherDrainTick++;
+        if (enemy.tetherDrainTick % 8 === 0) {
+          state.player.energy = Math.max(0, state.player.energy - Math.round(2.6 * ENERGY_UNITS_PER_POINT));
+        }
+      }
+    } else {
+      enemy.lockTimer--;
+      if (enemy.lockTimer <= 0 && distance < 188 * POSITION_UNITS_PER_PIXEL) {
+        enemy.tetherActive = true;
+        enemy.tetherDrainTick = 0;
+      } else if (enemy.lockTimer <= 0) {
+        enemy.lockTimer = 24;
+      }
+    }
+  } else if (enemy.type === "minecaster") {
+    enemy.loopAngle = (enemy.loopAngle + 18) % ANGLE_UNITS;
+    enemy.x += roundDivide(sinForAngle(enemy.loopAngle) * 287, TRIG_UNITS);
+    enemy.y += enemy.vy;
+    if (state.hazards.filter((hazard) => hazard.kind === "mine").length < 4) {
+      enemy.mineTimer--;
+      if (enemy.mineTimer <= 0 && enemy.minesDropped < 2 && streams) {
+        spawnCanonicalMine(state, enemy, streams);
+        enemy.minesDropped++;
+        enemy.mineTimer = canonicalRandomRange(streams, 86, 128);
+      }
+    }
+  } else if (enemy.type === "shieldbearer") {
+    enemy.loopAngle = (enemy.loopAngle + 16) % ANGLE_UNITS;
+    enemy.x += roundDivide(sinForAngle(enemy.loopAngle) * 184, TRIG_UNITS);
+    enemy.y += enemy.vy;
+    enemy.shieldPulse = (enemy.shieldPulse + 39) % ANGLE_UNITS;
+  } else if (enemy.type === "railgunner") {
+    enemy.loopAngle = (enemy.loopAngle + 13) % ANGLE_UNITS;
+    enemy.x += roundDivide(sinForAngle(enemy.loopAngle) * (enemy.railWarn > 0 ? 51 : 225), TRIG_UNITS);
+    enemy.y += enemy.railWarn > 0 ? roundDivide(enemy.vy * 28, 100) : enemy.vy;
+    if (enemy.railWarn > 0) {
+      enemy.railWarn--;
+      if (enemy.railWarn <= 0 && streams) {
+        state.hazards.push({
+          id: state.nextEntityId++,
+          kind: "enemy_beam",
+          x: enemy.x,
+          y: enemy.y + 13 * POSITION_UNITS_PER_PIXEL,
+          angle: enemy.railAngle,
+          active: 14,
+          width: 7 * POSITION_UNITS_PER_PIXEL,
+          damage: 1,
+          realm: 0
+        });
+        enemy.railCooldown = 132 + canonicalRandomRange(streams, -18, 34);
+      }
+    } else {
+      enemy.railCooldown--;
+      if (enemy.railCooldown <= 0) {
+        const dx = state.player.x - enemy.x;
+        const dy = state.player.y - (enemy.y + 13 * POSITION_UNITS_PER_PIXEL);
+        const angle = Math.atan2(dy, dx);
+        enemy.railAngle = ((Math.round(angle * ANGLE_UNITS / (Math.PI * 2)) % ANGLE_UNITS) + ANGLE_UNITS) % ANGLE_UNITS;
+        enemy.railWarn = streams ? canonicalRandomRange(streams, 38, 45) : 38;
+      }
+    }
+  } else if (enemy.type === "repair_drone") {
+    const target = findCanonicalRepairTarget(state, enemy);
+    if (target) {
+      enemy.repairTargetId = target.id;
+      enemy.x += Math.sign(target.x - enemy.x) * 369;
+      enemy.y += Math.sign(target.y - enemy.y) * 246 + roundDivide(enemy.vy * 24, 100);
+      enemy.repairTimer--;
+      if (canonicalDistance(enemy.x, enemy.y, target.x, target.y) < 88 * POSITION_UNITS_PER_PIXEL && enemy.repairTimer <= 0) {
+        target.hp = Math.min(target.maxHp, target.hp + 1);
+        enemy.repairTimer = 42;
+      }
+    } else {
+      enemy.repairTargetId = 0;
+      enemy.loopAngle = (enemy.loopAngle + 33) % ANGLE_UNITS;
+      enemy.x += roundDivide(sinForAngle(enemy.loopAngle) * 246, TRIG_UNITS);
+      enemy.y += enemy.vy;
+    }
+  }
+  enemy.x = clampInteger(enemy.x, 20 * POSITION_UNITS_PER_PIXEL, GAME_WIDTH_UNITS - 20 * POSITION_UNITS_PER_PIXEL);
+  return true;
+}
+
+function refreshCanonicalSupportEffects(state) {
+  for (const enemy of state.enemies) {
+    enemy.shieldedBy = 0;
+    enemy.shieldCooldown = Math.max(0, enemy.shieldCooldown - 1);
+  }
+  for (const shield of state.enemies) {
+    if (shield.type !== "shieldbearer" || shield.hp <= 0) continue;
+    for (const enemy of state.enemies) {
+      if (enemy === shield || enemy.hp <= 0 || enemy.shieldedBy) continue;
+      if (enemy.type === "phantom" && enemy.stateMode === "ghost") continue;
+      if (canonicalDistance(shield.x, shield.y, enemy.x, enemy.y) <= 94 * POSITION_UNITS_PER_PIXEL) {
+        enemy.shieldedBy = shield.id;
+      }
+    }
+  }
+}
+
+function damageCanonicalPlayer(state, amount) {
+  if (state.player.invulnerability > 0 || state.player.ghostTimer > 0) return false;
+  state.player.hp = Math.max(0, state.player.hp - amount);
+  state.stats.damageTaken += amount;
+  state.player.invulnerability = 90;
+  if (state.player.hp === 0) {
+    state.terminal = true;
+    state.terminalReason = "player_destroyed";
+  }
+  return true;
+}
+
+function updateCanonicalHazards(state) {
+  const playerBody = collisionBodyFor("player", state.player.x, state.player.y, state.player.heading);
+  const survivors = [];
+  for (const hazard of state.hazards) {
+    if (hazard.kind === "mine") {
+      hazard.x += hazard.vx;
+      hazard.y += hazard.vy;
+      hazard.life--;
+      if (hazard.armTimer > 0) hazard.armTimer--;
+      if (hazard.armTimer <= 0 && hazard.realm === state.playerRealm
+        && bodiesOverlap(playerBody, collisionBodyFor("mine", hazard.x, hazard.y, hazard.angle))) {
+        damageCanonicalPlayer(state, hazard.damage);
+        continue;
+      }
+      if (hazard.life > 0) survivors.push(hazard);
+      continue;
+    }
+    if (hazard.kind === "enemy_beam") {
+      hazard.active--;
+      if (hazard.realm === state.playerRealm && hazard.active >= 0) {
+        const dx = state.player.x - hazard.x;
+        const dy = state.player.y - hazard.y;
+        const directionX = canonicalCosForAngle(hazard.angle);
+        const directionY = sinForAngle(hazard.angle);
+        const projection = roundDivide(dx * directionX + dy * directionY, TRIG_UNITS);
+        const perpendicular = Math.abs(roundDivide(dx * directionY - dy * directionX, TRIG_UNITS));
+        if (projection >= 0 && projection <= GAME_HEIGHT_UNITS
+          && perpendicular <= hazard.width + 7 * POSITION_UNITS_PER_PIXEL) {
+          damageCanonicalPlayer(state, hazard.damage);
+        }
+      }
+      if (hazard.active > 0) survivors.push(hazard);
+      continue;
+    }
+    survivors.push(hazard);
+  }
+  state.hazards = survivors;
+}
+
+function updateCanonicalEntities(state, streams) {
+  const existingEnemyCount = state.enemies.length;
+  const existingEnemyProjectileCount = state.enemyProjectiles.length;
+  for (let enemyIndex = 0; enemyIndex < existingEnemyCount; enemyIndex++) {
+    const enemy = state.enemies[enemyIndex];
     if (enemy.type === "red" && enemy.driftPower > 0 && streams) {
       if (canonicalRandomUint32(streams, "enemy_behavior") < 51_539_608) enemy.driftDir *= -1;
       enemy.x += roundDivide(sinForAngle(enemy.driftAngle) * enemy.driftPower * enemy.driftDir, TRIG_UNITS);
@@ -397,6 +703,8 @@ function updateCanonicalEntities(state, streams) {
     let verticalMovementHandled = false;
     if (enemy.type === "orange" && streams) {
       updateCanonicalOrange(state, enemy, streams);
+    } else if (updateCanonicalExpansionEnemy(state, enemy, streams)) {
+      verticalMovementHandled = true;
     } else {
       enemy.x += enemy.vx;
     }
@@ -408,6 +716,7 @@ function updateCanonicalEntities(state, streams) {
     if (!verticalMovementHandled) enemy.y += enemy.vy;
     enemy.motionTick++;
   }
+  refreshCanonicalSupportEffects(state);
   for (const projectile of state.playerProjectiles) {
     projectile.x += projectile.vx;
     projectile.y += projectile.vy;
@@ -428,6 +737,7 @@ function updateCanonicalEntities(state, streams) {
       && projectile.x < GAME_WIDTH_UNITS + 40 * POSITION_UNITS_PER_PIXEL
       && projectile.y < GAME_HEIGHT_UNITS + 40 * POSITION_UNITS_PER_PIXEL
   ));
+  updateCanonicalHazards(state);
 }
 
 function noteCanonicalKill(state, enemy) {
@@ -441,6 +751,7 @@ function noteCanonicalKill(state, enemy) {
 function resolveCanonicalProjectileHits(state) {
   const deadProjectiles = new Set();
   const deadEnemies = new Set();
+  const destroyedEnemies = [];
   for (const projectile of state.playerProjectiles) {
     if (deadProjectiles.has(projectile.id)) continue;
     const projectileBody = collisionBodyFor("player_bullet", projectile.x, projectile.y, projectile.angle);
@@ -449,10 +760,15 @@ function resolveCanonicalProjectileHits(state) {
       if (enemy.type === "phantom" && enemy.telegraphTimer > 0) continue;
       const enemyBody = collisionBodyFor(enemy.type, enemy.x, enemy.y, enemy.angle);
       if (!bodiesOverlap(projectileBody, enemyBody)) continue;
-      enemy.hp -= projectile.damage;
       deadProjectiles.add(projectile.id);
+      if (enemy.shieldedBy && enemy.type !== "shieldbearer" && enemy.shieldCooldown <= 0) {
+        enemy.shieldCooldown = 62;
+        break;
+      }
+      enemy.hp -= projectile.damage;
       if (enemy.hp <= 0) {
         deadEnemies.add(enemy.id);
+        destroyedEnemies.push(enemy);
         noteCanonicalKill(state, enemy);
       }
       break;
@@ -460,6 +776,23 @@ function resolveCanonicalProjectileHits(state) {
   }
   state.playerProjectiles = state.playerProjectiles.filter((projectile) => !deadProjectiles.has(projectile.id));
   state.enemies = state.enemies.filter((enemy) => !deadEnemies.has(enemy.id));
+  for (const enemy of destroyedEnemies) {
+    if (enemy.type !== "splitter") continue;
+    const shardCount = state.enemies.filter((candidate) => candidate.type === "splitter_shard").length;
+    if (shardCount >= 8) continue;
+    spawnCanonicalEnemy(state, "splitter_shard", enemy.x - 4 * POSITION_UNITS_PER_PIXEL, enemy.y + 3 * POSITION_UNITS_PER_PIXEL, {
+      vx: -Math.round(1.85 * POSITION_UNITS_PER_PIXEL),
+      vy: Math.round(2.9 * POSITION_UNITS_PER_PIXEL),
+      motion: "splitter_shard",
+      noPowerup: true
+    });
+    spawnCanonicalEnemy(state, "splitter_shard", enemy.x + 4 * POSITION_UNITS_PER_PIXEL, enemy.y + 3 * POSITION_UNITS_PER_PIXEL, {
+      vx: Math.round(1.85 * POSITION_UNITS_PER_PIXEL),
+      vy: Math.round(2.9 * POSITION_UNITS_PER_PIXEL),
+      motion: "splitter_shard",
+      noPowerup: true
+    });
+  }
 }
 
 function resolveCanonicalPlayerContact(state) {
@@ -483,20 +816,19 @@ function resolveCanonicalPlayerContact(state) {
 
 function resolveCanonicalEnemyProjectileHits(state) {
   const player = state.player;
-  if (player.invulnerability > 0 || player.ghostTimer > 0) return;
   const playerBody = collisionBodyFor("player", player.x, player.y, player.heading);
   const consumed = new Set();
   for (const projectile of state.enemyProjectiles) {
     if (projectile.realm !== state.playerRealm) continue;
-    if (!bodiesOverlap(playerBody, collisionBodyFor("enemy_bullet", projectile.x, projectile.y, projectile.angle))) continue;
-    consumed.add(projectile.id);
-    player.hp = Math.max(0, player.hp - projectile.damage);
-    state.stats.damageTaken += projectile.damage;
-    player.invulnerability = 90;
-    if (player.hp === 0) {
-      state.terminal = true;
-      state.terminalReason = "player_destroyed";
-    }
+    const collisionKey = projectile.kind === "drainShot" ? "drainShot" : "enemy_bullet";
+    if (!bodiesOverlap(playerBody, collisionBodyFor(collisionKey, projectile.x, projectile.y, projectile.angle))) continue;
+    if (projectile.kind === "drainShot") {
+      consumed.add(projectile.id);
+      player.energy = Math.max(0, player.energy - projectile.drain);
+    } else if (player.invulnerability <= 0 && player.ghostTimer <= 0) {
+      consumed.add(projectile.id);
+      damageCanonicalPlayer(state, projectile.damage);
+    } else continue;
     break;
   }
   state.enemyProjectiles = state.enemyProjectiles.filter((projectile) => !consumed.has(projectile.id));

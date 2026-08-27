@@ -74,6 +74,8 @@ function createSimulationState(ticket) {
       waveTick: 0,
       waveIndex: 0,
       waveRest: 0,
+      mood: "open",
+      moodTimer: 120,
       lastTemplate: ""
     },
     player: {

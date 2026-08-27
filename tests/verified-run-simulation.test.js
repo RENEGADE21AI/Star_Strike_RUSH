@@ -757,6 +757,242 @@ test("phantom telegraphs cannot damage the player by contact", () => {
   assert.equal(state.terminal, false);
 });
 
+test("destroyed splitters canonically become two diagonal shard threats", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.player.fireCooldown = 10_000;
+  const splitter = spawnCanonicalEnemy(state, "splitter", 100_000, 100_000, {
+    vx: 0,
+    vy: 0,
+    loopAngle: 0
+  });
+  state.playerProjectiles.push({
+    id: state.nextEntityId++,
+    x: splitter.x,
+    y: splitter.y + 9 * POSITION_UNITS_PER_PIXEL,
+    vx: 0,
+    vy: -9 * POSITION_UNITS_PER_PIXEL,
+    angle: 0,
+    life: 10,
+    damage: 3,
+    realm: 0
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(state.stats.kills, 1);
+  assert.equal(state.score, 120);
+  assert.deepEqual(
+    state.enemies.map(({ type, x, y, vx, vy, noPowerup }) => ({ type, x, y, vx, vy, noPowerup })),
+    [
+      { type: "splitter_shard", x: 95_920, y: 103_072, vx: -1_894, vy: 2_970, noPowerup: true },
+      { type: "splitter_shard", x: 104_112, y: 103_072, vx: 1_894, vy: 2_970, noPowerup: true }
+    ]
+  );
+  assert.doesNotThrow(() => serializeCanonicalState(state));
+});
+
+test("carriers launch seeded canonical enemies instead of trusting a client event", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.phase = 6;
+  state.player.fireCooldown = 10_000;
+  const values = [0, 0, 0, 1, 39, 0];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const carrier = spawnCanonicalEnemy(state, "carrier", 192_000, -20_000, {
+    vx: 0,
+    vy: 0,
+    loopAngle: 0,
+    launchTimer: 1,
+    launchCount: 0
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.equal(carrier.launchCount, 1);
+  assert.equal(carrier.launchTimer, 101);
+  assert.deepEqual(
+    state.enemies.map(({ type, x, y }) => ({ type, x, y })),
+    [
+      { type: "carrier", x: 192_006, y: -20_000 },
+      { type: "red", x: 180_742, y: -3_616 }
+    ]
+  );
+  assert.equal(values.length, 0);
+});
+
+test("siphon drain shots authoritatively remove energy without fabricating health damage", () => {
+  const state = createSimulationState(ticket({ maxTicks: 30 }));
+  state.phase = 5;
+  state.player.fireCooldown = 10_000;
+  const values = [0];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  spawnCanonicalEnemy(state, "siphon", state.player.x, state.player.y - 100 * POSITION_UNITS_PER_PIXEL, {
+    vx: 0,
+    vy: 0,
+    loopAngle: 0,
+    fireTimer: 1,
+    fireWarn: 0
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.equal(state.enemyProjectiles.length, 1);
+  assert.equal(state.enemyProjectiles[0].kind, "drainShot");
+  assert.equal(state.enemyProjectiles[0].damage, 0);
+  assert.equal(state.enemyProjectiles[0].drain, 22 * ENERGY_UNITS_PER_POINT);
+  state.enemyProjectiles[0].x = state.player.x;
+  state.enemyProjectiles[0].y = state.player.y;
+  state.enemyProjectiles[0].vx = 0;
+  state.enemyProjectiles[0].vy = 0;
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(state.player.energy, 78 * ENERGY_UNITS_PER_POINT);
+  assert.equal(state.player.hp, 5);
+  assert.equal(state.stats.damageTaken, 0);
+  assert.equal(state.enemyProjectiles.length, 0);
+});
+
+test("leeches acquire in range and drain canonical energy every eight tether ticks", () => {
+  const state = createSimulationState(ticket({ maxTicks: 30 }));
+  state.phase = 6;
+  state.player.fireCooldown = 10_000;
+  const leech = spawnCanonicalEnemy(state, "leech", state.player.x, state.player.y - 40 * POSITION_UNITS_PER_PIXEL, {
+    vx: 0,
+    vy: 0,
+    loopAngle: 0,
+    lockTimer: 1,
+    tetherActive: false,
+    tetherDrainTick: 0
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(leech.tetherActive, true);
+  for (let tick = 0; tick < 8; tick++) stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(leech.tetherDrainTick, 8);
+  assert.equal(state.player.energy, 97 * ENERGY_UNITS_PER_POINT + 240);
+});
+
+test("minecasters create bounded canonical mine hazards", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.phase = 4;
+  state.player.fireCooldown = 10_000;
+  const values = [1, 5];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  const minecaster = spawnCanonicalEnemy(state, "minecaster", 100_000, -20_000, {
+    vx: 0,
+    vy: 0,
+    loopAngle: 0,
+    mineTimer: 1,
+    minesDropped: 0
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.equal(minecaster.minesDropped, 1);
+  assert.equal(minecaster.mineTimer, 91);
+  assert.deepEqual(state.hazards, [{
+    id: 2,
+    kind: "mine",
+    x: 90_792,
+    y: -3_616,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    life: 599,
+    armTimer: 47,
+    damage: 1,
+    realm: 0
+  }]);
+  assert.equal(values.length, 0);
+});
+
+test("shieldbearers authoritatively consume one nearby hit before cooldown", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.player.fireCooldown = 10_000;
+  spawnCanonicalEnemy(state, "shieldbearer", 100_000, 100_000, { vx: 0, vy: 0, loopAngle: 0 });
+  const target = spawnCanonicalEnemy(state, "red", 120_000, 100_000, { vx: 0, vy: 0, driftPower: 0 });
+  state.playerProjectiles.push({
+    id: state.nextEntityId++, x: target.x, y: target.y + 9 * POSITION_UNITS_PER_PIXEL,
+    vx: 0, vy: -9 * POSITION_UNITS_PER_PIXEL, angle: 0, life: 10, damage: 2, realm: 0
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(target.hp, 2);
+  assert.equal(target.shieldCooldown, 62);
+  assert.equal(state.playerProjectiles.length, 0);
+
+  state.enemies = state.enemies.filter((enemy) => enemy.type !== "shieldbearer");
+  state.playerProjectiles.push({
+    id: state.nextEntityId++, x: target.x, y: target.y + 9 * POSITION_UNITS_PER_PIXEL,
+    vx: 0, vy: -9 * POSITION_UNITS_PER_PIXEL, angle: 0, life: 10, damage: 2, realm: 0
+  });
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(state.enemies.some((enemy) => enemy.id === target.id), false);
+  assert.equal(state.stats.kills, 1);
+});
+
+test("railgunner warnings create canonical damaging beam hazards", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.player.hp = 1;
+  state.player.fireCooldown = 10_000;
+  const values = [0];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "enemy_behavior");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+  spawnCanonicalEnemy(state, "railgunner", state.player.x, state.player.y - 100 * POSITION_UNITS_PER_PIXEL, {
+    vx: 0,
+    vy: 0,
+    loopAngle: 0,
+    railCooldown: 100,
+    railWarn: 1,
+    railAngle: 1_024
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, streams);
+  assert.equal(state.hazards.length, 1);
+  assert.equal(state.hazards[0].kind, "enemy_beam");
+  assert.equal(state.player.hp, 0);
+  assert.equal(state.terminal, true);
+  assert.equal(state.terminalReason, "player_destroyed");
+  assert.equal(values.length, 0);
+});
+
+test("repair drones select and heal damaged canonical allies", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.player.fireCooldown = 10_000;
+  const target = spawnCanonicalEnemy(state, "red", 100_000, 100_000, { vx: 0, vy: 0, driftPower: 0 });
+  target.hp = 1;
+  const drone = spawnCanonicalEnemy(state, "repair_drone", 110_000, 100_000, {
+    vx: 0,
+    vy: 0,
+    loopAngle: 0,
+    repairTimer: 1,
+    repairTargetId: 0
+  });
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(drone.repairTargetId, target.id);
+  assert.equal(drone.repairTimer, 42);
+  assert.equal(target.hp, 2);
+});
+
 test("entity creation rejects unknown content and all combat state stays integer-only", () => {
   const state = createSimulationState(ticket({ maxTicks: 30 }));
   assert.throws(() => spawnCanonicalEnemy(state, "invented", 0, 0), /enemy type/);

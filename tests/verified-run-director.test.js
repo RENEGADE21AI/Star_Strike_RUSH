@@ -6,7 +6,11 @@ const assert = require("node:assert/strict");
 const { POSITION_UNITS_PER_PIXEL, SIMULATION_REVISION } = require("../shared/verified-run/constants");
 const { createRunRandomStreams } = require("../shared/verified-run/random");
 const { createSimulationState } = require("../shared/verified-run/simulation-state");
-const { tickCanonicalDirector } = require("../shared/verified-run/director");
+const {
+  canonicalWavePool,
+  canonicalWaveTemplate,
+  tickCanonicalDirector
+} = require("../shared/verified-run/director");
 const { stepSimulation } = require("../shared/verified-run/simulation-step");
 
 function ticket(overrides = {}) {
@@ -108,6 +112,132 @@ test("phase two can seed the live orange pair with its exact motion contract", a
       { type: "orange", x: 313_856, y: -32_768, delay: 30, motion: "snap" }
     ]
   );
+});
+
+test("later classic formations preserve the live geometry and alternating ribbon direction", async () => {
+  const { state, streams } = await directorFixture();
+  state.phase = 9;
+  state.director.waveIndex = 2;
+
+  assert.deepEqual(
+    canonicalWaveTemplate("orangeRibbon", state, streams).map(({ type, x, y, delay, motion }) => ({ type, x, y, delay, motion })),
+    [
+      { type: "orange", x: 79_360, y: -28_672, delay: 0, motion: "zigzag" },
+      { type: "orange", x: 104_960, y: -45_056, delay: 8, motion: "snap" },
+      { type: "orange", x: 192_000, y: -59_392, delay: 16, motion: "burst" },
+      { type: "orange", x: 281_088, y: -45_056, delay: 24, motion: "zigzag" },
+      { type: "orange", x: 314_880, y: -30_720, delay: 32, motion: "snap" }
+    ]
+  );
+
+  state.director.waveIndex = 3;
+  assert.deepEqual(
+    canonicalWaveTemplate("orangeRibbon", state, streams).map(({ x }) => x),
+    [304_640, 64_000, 192_000, 317_952, 69_120]
+  );
+
+  assert.deepEqual(
+    canonicalWaveTemplate("purpleGuard", state, streams).map(({ type, x, y, delay, motion }) => ({ type, x, y, delay, motion })),
+    [
+      { type: "purple", x: 16_896, y: -30_720, delay: 0, motion: "drift" },
+      { type: "red", x: 88_576, y: -49_152, delay: 8, motion: "drift" },
+      { type: "orange", x: 169_472, y: -59_392, delay: 16, motion: "burst" },
+      { type: "red", x: 295_424, y: -49_152, delay: 24, motion: "drift" },
+      { type: "purple", x: 367_104, y: -30_720, delay: 32, motion: "drift" },
+      { type: "red", x: 192_000, y: -73_728, delay: 40, motion: "drift" }
+    ]
+  );
+});
+
+test("seeded phantom formations consume only the waves stream", () => {
+  const state = createSimulationState(ticket());
+  const values = [0, 0xffffffff, 0x80000000];
+  const streams = {
+    nextUint32(name) {
+      assert.equal(name, "waves");
+      if (values.length === 0) throw new Error("unexpected random draw");
+      return values.shift();
+    }
+  };
+
+  assert.deepEqual(
+    canonicalWaveTemplate("phantomProbe", state, streams).map(({ type, x, y, delay, motion }) => ({ type, x, y, delay, motion })),
+    [
+      { type: "phantom", x: 175_616, y: -47_104, delay: 0, motion: "phantom" },
+      { type: "phantom", x: 96_768, y: -63_488, delay: 12, motion: "phantom" },
+      { type: "phantom", x: 299_520, y: -63_488, delay: 24, motion: "phantom" }
+    ]
+  );
+  assert.equal(values.length, 0);
+});
+
+test("all expansion formations are canonical server-owned wave content", () => {
+  const state = createSimulationState(ticket());
+  state.phase = 9;
+  const streams = { nextUint32(name) { assert.equal(name, "waves"); return 0x80000000; } };
+  const summary = (name) => canonicalWaveTemplate(name, state, streams)
+    .map(({ type, lane, y, delay, motion }) => ({ type, lane, y, delay, motion }));
+
+  assert.deepEqual(summary("splitterPair"), [
+    { type: "red", lane: 0, y: -28_672, delay: 0, motion: "drift" },
+    { type: "splitter", lane: 1, y: -53_248, delay: 16, motion: "drift" },
+    { type: "red", lane: 2, y: -28_672, delay: 32, motion: "drift" }
+  ]);
+  assert.deepEqual(summary("mineLane"), [
+    { type: "minecaster", lane: 0, y: -40_960, delay: 0, motion: "drift" },
+    { type: "orange", lane: 1, y: -55_296, delay: 18, motion: "sweep" },
+    { type: "red", lane: 2, y: -30_720, delay: 34, motion: "drift" }
+  ]);
+  assert.deepEqual(summary("siphonEscort"), [
+    { type: "red", lane: 0, y: -28_672, delay: 0, motion: "drift" },
+    { type: "siphon", lane: 1, y: -55_296, delay: 14, motion: "drift" },
+    { type: "orange", lane: 2, y: -34_816, delay: 30, motion: "burst" }
+  ]);
+  assert.deepEqual(summary("supportCell"), [
+    { type: "shieldbearer", lane: 1, y: -59_392, delay: 0, motion: "drift" },
+    { type: "red", lane: 0, y: -34_816, delay: 12, motion: "drift" },
+    { type: "purple", lane: 2, y: -38_912, delay: 24, motion: "drift" }
+  ]);
+  assert.deepEqual(summary("carrierPriority"), [
+    { type: "carrier", lane: 1, y: -63_488, delay: 0, motion: "drift" },
+    { type: "orange", lane: 0, y: -28_672, delay: 22, motion: "snap" },
+    { type: "red", lane: 2, y: -26_624, delay: 34, motion: "drift" }
+  ]);
+  assert.deepEqual(summary("leechPressure"), [
+    { type: "leech", lane: 1, y: -59_392, delay: 0, motion: "drift" },
+    { type: "red", lane: 0, y: -32_768, delay: 20, motion: "drift" },
+    { type: "orange", lane: 2, y: -38_912, delay: 34, motion: "zigzag" }
+  ]);
+  assert.deepEqual(summary("railWarning"), [
+    { type: "railgunner", lane: 1, y: -59_392, delay: 0, motion: "drift" },
+    { type: "red", lane: 0, y: -30_720, delay: 18, motion: "drift" },
+    { type: "red", lane: 2, y: -30_720, delay: 30, motion: "drift" }
+  ]);
+  assert.deepEqual(summary("repairGuard"), [
+    { type: "purple", lane: 1, y: -53_248, delay: 0, motion: "drift" },
+    { type: "repair_drone", lane: 0, y: -36_864, delay: 16, motion: "drift" },
+    { type: "red", lane: 2, y: -28_672, delay: 30, motion: "drift" }
+  ]);
+});
+
+test("canonical phase and mood pools match the live later-run director", () => {
+  const state = createSimulationState(ticket());
+  state.phase = 9;
+  state.director.mood = "spike";
+  assert.deepEqual(canonicalWavePool(state), [
+    ["redWall", 3], ["orangeRibbon", 3], ["purpleGuard", 4], ["splitAmbush", 4],
+    ["orangeChain", 2], ["orangeSlash", 3], ["splitterPair", 3], ["mineLane", 1],
+    ["siphonEscort", 1], ["supportCell", 1], ["carrierPriority", 2], ["railWarning", 1],
+    ["repairGuard", 1]
+  ]);
+
+  state.phase = 6;
+  state.director.mood = "rule";
+  assert.deepEqual(canonicalWavePool(state), [
+    ["phantomProbe", 4], ["phantomPair", 4], ["phantomFan", 3], ["mixedChevron", 2],
+    ["purpleGuard", 2], ["splitterPair", 1], ["mineLane", 2], ["siphonEscort", 3],
+    ["supportCell", 1], ["leechPressure", 2], ["repairGuard", 1]
+  ]);
 });
 
 test("phase one advances only after its complete 3000-tick contract", async () => {
