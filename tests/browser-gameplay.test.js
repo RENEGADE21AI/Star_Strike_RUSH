@@ -99,6 +99,34 @@ before(async () => {
   browser = await chromium.launch({ headless: true });
 });
 
+test("modal autofocus never steals an explicitly selected accessible action", async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.setContent("<!doctype html><html><body><main id=game tabindex=0></main></body></html>");
+    await page.addScriptTag({ url: `${baseUrl}/src/00-accessible-surface.js` });
+    await page.evaluate(() => {
+      const rect = { x: 0, y: 0, w: 40, h: 20 };
+      setGameAccessibleSurface({
+        mode: "focus-race-regression",
+        modal: true,
+        actions: [
+          { id: "safe-first", label: "Safe first action", rect, handler() {} },
+          { id: "explicit-choice", label: "Explicit choice", rect, handler() {} }
+        ]
+      });
+      document.querySelector('[data-game-action="explicit-choice"]').focus();
+    });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.dataset?.gameAction || ""),
+      "explicit-choice"
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 test("a fresh player explicitly chooses First Flight before the separate call-sign briefing", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
