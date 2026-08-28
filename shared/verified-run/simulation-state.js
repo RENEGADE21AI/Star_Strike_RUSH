@@ -83,7 +83,20 @@ function createSimulationState(ticket) {
       killsSinceDrop: 0,
       ticksSinceDrop: 0,
       dropCooldown: 0,
-      intensity: "normal"
+      intensity: "normal",
+      intensityTimer: 180,
+      pressureHundredths: 800,
+      threatThousandths: 580,
+      threatTargetThousandths: 580,
+      pacingMemoryThousandths: 0,
+      grace: 0,
+      ghostGrace: 0,
+      heatStreak: false,
+      lastHitTick: -999,
+      killStreak: 0,
+      burstHundredths: 0,
+      shotsFired: 0,
+      shotsHit: 0
     },
     player: {
       x: Math.round(GAME_WIDTH_UNITS / 2),

@@ -28,7 +28,7 @@ const {
 } = constants;
 const { BUTTON_GHOST_SHIFT, BUTTON_PAUSE } = inputTape;
 const { AUTHORITATIVE_BOSS_ARCHETYPES, AUTHORITATIVE_ENEMY_ARCHETYPES } = content;
-const { tickCanonicalDirector } = director;
+const { tickCanonicalDirector, tickCanonicalPacing } = director;
 const { cosForAngle, sinForAngle } = trig;
 const { bodiesOverlap, collisionBodyFor } = geometry;
 const ALLOWED_BUTTONS = BUTTON_GHOST_SHIFT | BUTTON_PAUSE;
@@ -80,6 +80,7 @@ function applyGhostShift(state, input) {
   player.ghostCooldown = 20;
   player.energy -= GHOST_COST;
   state.stats.ghostUses++;
+  state.director.ghostGrace = Math.max(state.director.ghostGrace, 60);
 }
 
 function applyPauseEdge(state, input) {
@@ -123,7 +124,8 @@ function updateCanonicalPlayer(state, input) {
   if (player.piercing > 0) player.piercing--;
   if (player.stabilizer > 0) player.stabilizer--;
   if (player.scoreSurge > 0) player.scoreSurge--;
-  player.energy = Math.min(player.maxEnergy, player.energy + (player.overcharge > 0 ? 120 : 50));
+  const baseRegen = state.director.intensity === "cooldown" ? 72 : state.director.intensity === "surge" ? 42 : 50;
+  player.energy = Math.min(player.maxEnergy, player.energy + baseRegen + (player.overcharge > 0 ? 70 : 0));
 }
 
 function canonicalRandomUint32(streams, name) {
@@ -727,6 +729,7 @@ function fireCanonicalPlayer(state) {
         angle: 0, life: 90, damage: 1, pierce: entry.pierce, realm: state.playerRealm
       });
     }
+    state.director.shotsFired += 3;
   } else {
     state.playerProjectiles.push({
       id: state.nextEntityId++,
@@ -741,6 +744,7 @@ function fireCanonicalPlayer(state) {
       pierce: player.piercing > 0 ? 1 : 0,
       realm: state.playerRealm
     });
+    state.director.shotsFired++;
   }
   player.fireCooldown = player.rapid > 0 ? 10 : 14;
 }
@@ -842,6 +846,7 @@ function fireCanonicalEnemyProjectile(state, enemy, kind, speed, originOffsetPix
   };
   if (extra.drain != null) projectile.drain = canonicalEntityInteger(extra.drain, "Enemy projectile drain");
   state.enemyProjectiles.push(projectile);
+  state.director.burstHundredths = Math.min(300, state.director.burstHundredths + 12);
 }
 
 function updateCanonicalPurple(state, enemy, streams) {
@@ -1126,9 +1131,31 @@ function damageCanonicalPlayer(state, amount) {
     state.player.invulnerability = 42;
     return false;
   }
+  const pacing = state.director;
+  if (state.tick - pacing.lastHitTick <= 180) pacing.heatStreak = true;
+  pacing.lastHitTick = state.tick;
   state.player.hp = Math.max(0, state.player.hp - amount);
   state.stats.damageTaken += amount;
   state.player.invulnerability = 90;
+  state.player.energy = Math.min(state.player.maxEnergy, state.player.energy + 12 * ENERGY_UNITS_PER_POINT);
+  pacing.grace = 120;
+  pacing.ghostGrace = 0;
+  pacing.killStreak = 0;
+  state.comboKills = 0;
+  state.multiplier = 1;
+  if (state.player.hp <= 2) {
+    pacing.mood = "recovery";
+    pacing.moodTimer = Math.max(pacing.moodTimer, state.player.hp <= 1 ? 170 : 140);
+    pacing.waveRest = Math.max(pacing.waveRest, state.player.hp <= 1 ? 72 : 48);
+    if (!state.boss) {
+      if (state.player.hp <= 1) state.pendingSpawns = [];
+      else if (state.pendingSpawns.length > 2) state.pendingSpawns.splice(0, Math.floor(state.pendingSpawns.length / 2));
+      const keepProjectiles = state.player.hp <= 1 ? 2 : 4;
+      if (state.enemyProjectiles.length > keepProjectiles) {
+        state.enemyProjectiles.splice(0, state.enemyProjectiles.length - keepProjectiles);
+      }
+    }
+  }
   if (state.player.hp === 0) {
     state.terminal = true;
     state.terminalReason = "player_destroyed";
@@ -1264,6 +1291,7 @@ function fireCanonicalBossProjectile(state, boss, angle, speed, realm = 0, kind 
     drain: 0,
     realm
   });
+  state.director.burstHundredths = Math.min(300, state.director.burstHundredths + 12);
 }
 
 function fireCanonicalBossSpread(state, boss, count, spreadAngle, speed, realm = 0, kind = "boss") {
@@ -1749,6 +1777,7 @@ function noteCanonicalKill(state, enemy, streams, allowDrop = true) {
   const score = enemy.score * state.multiplier;
   state.score += state.player.scoreSurge > 0 ? Math.round(score * 3 / 2) : score;
   state.stats.kills++;
+  state.director.killStreak++;
   state.stats.highestCombo = Math.max(state.stats.highestCombo, state.comboKills);
   if (!allowDrop || enemy.noPowerup || enemy.type === "splitter_shard") return;
   if (streams && shouldDropCanonicalPowerup(state, streams)) {
@@ -1771,6 +1800,7 @@ function resolveCanonicalProjectileHits(state, streams) {
       if (enemy.type === "phantom" && enemy.telegraphTimer > 0) continue;
       const enemyBody = collisionBodyFor(enemy.type, enemy.x, enemy.y, enemy.angle);
       if (!bodiesOverlap(projectileBody, enemyBody)) continue;
+      state.director.shotsHit++;
       if (enemy.shieldedBy && enemy.type !== "shieldbearer" && enemy.shieldCooldown <= 0) {
         enemy.shieldCooldown = 62;
         deadProjectiles.add(projectile.id);
@@ -1905,6 +1935,7 @@ function resolveCanonicalBossProjectileHits(state, streams) {
     const bossKey = boss.mode === "standard" ? "boss_standard" : `boss_${boss.mode}`;
     if (!bodiesOverlap(projectileBody, collisionBodyFor(bossKey, boss.x, boss.y, boss.angle))) continue;
     consumed.add(projectile.id);
+    state.director.shotsHit++;
     boss.hp -= projectile.damage;
     if (boss.mode === "wraith") {
       boss.hitsSinceShift++;
@@ -1978,6 +2009,7 @@ function stepSimulation(state, rawInput, streams) {
     if (!state.terminal) resolveCanonicalEnemyProjectileHits(state);
     if (!state.terminal) resolveCanonicalWingmanContact(state);
     resolveCanonicalPlayerContact(state);
+    if (!state.terminal && streams) tickCanonicalPacing(state, streams);
     if (!state.terminal && streams && !state.boss && !bossDefeated) {
       if (state.director.bossRecovery > 0) {
         state.director.bossRecovery--;

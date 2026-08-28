@@ -32,6 +32,286 @@ function canonicalBaseWaveInterval(phase, phaseTick) {
   return Math.max(38, Math.round(88 - phase * 3.5));
 }
 
+function clampInteger(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function roundIntegerRatio(numerator, denominator) {
+  if (!Number.isSafeInteger(numerator) || !Number.isSafeInteger(denominator) || denominator <= 0) {
+    throw new TypeError("Canonical pacing division requires safe integers.");
+  }
+  return numerator < 0
+    ? -Math.floor((-numerator + Math.floor(denominator / 2)) / denominator)
+    : Math.floor((numerator + Math.floor(denominator / 2)) / denominator);
+}
+
+function canonicalPacingUint32(streams) {
+  if (!streams || typeof streams.nextUint32 !== "function") {
+    throw new TypeError("Canonical adaptive pacing requires named random streams.");
+  }
+  const value = Number(streams.nextUint32("pacing"));
+  if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff) {
+    throw new TypeError("Canonical pacing randomness must be unsigned 32-bit data.");
+  }
+  return value;
+}
+
+function canonicalPacingRange(streams, minimum, maximumExclusive) {
+  const width = maximumExclusive - minimum;
+  if (!Number.isSafeInteger(minimum) || !Number.isSafeInteger(maximumExclusive) || width <= 0) {
+    throw new TypeError("Canonical pacing range is invalid.");
+  }
+  return minimum + Math.floor(canonicalPacingUint32(streams) * width / 0x100000000);
+}
+
+function canonicalPacingChance(streams, chanceMillionths) {
+  const chance = clampInteger(chanceMillionths, 0, 1_000_000);
+  const threshold = Math.floor(chance * 0x100000000 / 1_000_000);
+  return canonicalPacingUint32(streams) < threshold;
+}
+
+function canonicalOpeningRampThousandths(state) {
+  return clampInteger(Math.floor(state.tick * 1000 / 7200), 0, 1000);
+}
+
+function canonicalPhaseArcThousandths(state) {
+  const duration = canonicalPhaseDuration(state.phase);
+  const position = clampInteger(Math.floor(state.director.phaseTick * 4000 / duration), 0, 4000);
+  if (position < 1000) return -1000 + position;
+  if (position < 2000) return position - 1000;
+  if (position < 3000) return 3000 - position;
+  return -(position - 3000);
+}
+
+function canonicalRhythmProfile(state) {
+  const beat = state.director.waveTick % 240;
+  const calm = 1000 - canonicalOpeningRampThousandths(state);
+  if (beat < 45) return { pressureHundredths: -700, interval: 18 };
+  if (beat < 135) return {
+    pressureHundredths: 1000 - roundIntegerRatio(calm * 800, 1000),
+    interval: -12 + roundIntegerRatio(calm * 20, 1000)
+  };
+  if (beat < 170) return { pressureHundredths: -400, interval: 10 };
+  return {
+    pressureHundredths: 1200 - roundIntegerRatio(calm * 900, 1000),
+    interval: -16 + roundIntegerRatio(calm * 22, 1000)
+  };
+}
+
+function updateCanonicalIntensity(state, streams) {
+  const pacing = state.director;
+  if (state.boss) {
+    pacing.intensity = "normal";
+    pacing.intensityTimer = Math.max(pacing.intensityTimer, 120);
+    return;
+  }
+  if (state.tick < 5400 || state.phase <= 2) {
+    pacing.intensity = "cooldown";
+    pacing.intensityTimer = Math.max(pacing.intensityTimer, 120);
+    return;
+  }
+  const sinceHit = state.tick - pacing.lastHitTick;
+  const strong = sinceHit > 720 && pacing.killStreak >= 5 && state.phase >= 3;
+  const fragile = state.player.hp <= 2 || pacing.pressureHundredths > 7400;
+  pacing.intensityTimer--;
+  if (pacing.intensityTimer <= 0) {
+    if (pacing.intensity === "normal") {
+      pacing.intensity = strong
+        ? "surge"
+        : fragile
+          ? "cooldown"
+          : canonicalPacingChance(streams, 600_000) ? "surge" : "cooldown";
+      pacing.intensityTimer = pacing.intensity === "surge"
+        ? canonicalPacingRange(streams, 300, 420)
+        : canonicalPacingRange(streams, 170, 260);
+    } else if (pacing.intensity === "surge") {
+      pacing.intensity = "cooldown";
+      pacing.intensityTimer = canonicalPacingRange(streams, 180, 280);
+    } else {
+      pacing.intensity = "normal";
+      pacing.intensityTimer = canonicalPacingRange(streams, 170, 290);
+    }
+  }
+  if (pacing.intensity === "normal") {
+    if (strong && canonicalPacingChance(streams, 10_000)) {
+      pacing.intensity = "surge";
+      pacing.intensityTimer = canonicalPacingRange(streams, 260, 360);
+    } else if (fragile && canonicalPacingChance(streams, 8_000)) {
+      pacing.intensity = "cooldown";
+      pacing.intensityTimer = canonicalPacingRange(streams, 180, 260);
+    }
+  }
+}
+
+function updateCanonicalPressure(state) {
+  const pacing = state.director;
+  const rhythm = canonicalRhythmProfile(state);
+  const enemyLoad = state.enemies.length * 350;
+  const bulletLoad = state.enemyProjectiles.length * 210;
+  const queueLoad = state.pendingSpawns.length * 120;
+  const comboLoad = clampInteger(Math.max(0, state.comboKills - 5) * 16, 0, 800);
+  const bossLoad = state.boss ? 1200 : 0;
+  const relief = (5 - state.player.hp) * 800 + (pacing.grace > 0 ? 1000 : 0) + (pacing.ghostGrace > 0 ? 400 : 0);
+  const intensityBias = pacing.intensity === "surge" ? 900 : pacing.intensity === "cooldown" ? -800 : 0;
+  const base = 1000 + roundIntegerRatio(canonicalOpeningRampThousandths(state) * 800, 1000) + state.phase * 340;
+  const target = clampInteger(base + enemyLoad + bulletLoad + queueLoad + comboLoad + bossLoad - relief + rhythm.pressureHundredths + intensityBias, 0, 10_000);
+  pacing.pressureHundredths += roundIntegerRatio((target - pacing.pressureHundredths) * 4, 100);
+}
+
+function updateCanonicalPacingMemory(state) {
+  const pacing = state.director;
+  const sinceHit = state.tick - pacing.lastHitTick;
+  if (state.boss) {
+    pacing.pacingMemoryThousandths = roundIntegerRatio(pacing.pacingMemoryThousandths * 994, 1000);
+  } else {
+    const comfortable = sinceHit > 840 && state.player.hp === state.player.maxHp && pacing.pressureHundredths < 4800;
+    const stressed = state.player.hp <= 2 || pacing.pressureHundredths > 7200 || pacing.grace > 0 || pacing.ghostGrace > 0;
+    if (comfortable) pacing.pacingMemoryThousandths = clampInteger(pacing.pacingMemoryThousandths + 6, -1000, 1000);
+    else if (stressed) pacing.pacingMemoryThousandths = clampInteger(pacing.pacingMemoryThousandths - 8, -1000, 1000);
+    else pacing.pacingMemoryThousandths = roundIntegerRatio(pacing.pacingMemoryThousandths * 996, 1000);
+  }
+  if (state.tick > 0 && state.tick % 240 === 0) {
+    pacing.shotsFired = Math.floor(pacing.shotsFired * 72 / 100);
+    pacing.shotsHit = Math.floor(pacing.shotsHit * 72 / 100);
+  }
+}
+
+function updateCanonicalMood(state, streams) {
+  const pacing = state.director;
+  if (state.boss) {
+    pacing.mood = "boss";
+    pacing.moodTimer = 0;
+    return;
+  }
+  if (pacing.moodTimer > 0) {
+    pacing.moodTimer--;
+    if (pacing.moodTimer > 24) return;
+  }
+  const sinceHit = state.tick - pacing.lastHitTick;
+  const arc = canonicalPhaseArcThousandths(state);
+  const early = state.phase <= 2;
+  const recoveryNeed = state.player.hp <= 2 || pacing.pressureHundredths > 7200
+    || pacing.grace > 0 || pacing.ghostGrace > 0 || pacing.pacingMemoryThousandths < -350;
+  let next;
+  if (state.phase === 1) {
+    next = recoveryNeed || arc < -150 || canonicalPacingChance(streams, 550_000) ? "open" : "recovery";
+  } else if (early) {
+    if (recoveryNeed || arc < -200) next = "open";
+    else if (state.director.phaseTick > 900 && arc > 520 && canonicalOpeningRampThousandths(state) > 350) {
+      next = canonicalPacingChance(streams, 400_000) ? "spike" : "open";
+    } else next = canonicalPacingChance(streams, 700_000) ? "open" : "recovery";
+  } else if (recoveryNeed) {
+    next = canonicalPacingChance(streams, 720_000) ? "recovery" : "open";
+  } else if (arc > 480 || pacing.intensity === "surge") {
+    if (canonicalPacingChance(streams, 660_000)) next = "spike";
+    else next = state.phase >= 5 && canonicalPacingChance(streams, 400_000) ? "rule" : "open";
+  } else if (arc < -380) {
+    next = canonicalPacingChance(streams, 660_000) ? "open" : "recovery";
+  } else if (sinceHit > 840 && state.player.hp === state.player.maxHp && pacing.pressureHundredths < 4800) {
+    next = canonicalPacingChance(streams, 550_000) ? "spike" : "rule";
+  } else if (pacing.pacingMemoryThousandths > 350) {
+    next = canonicalPacingChance(streams, 600_000) ? "spike" : "rule";
+  } else if (pacing.pacingMemoryThousandths < -250) {
+    next = canonicalPacingChance(streams, 580_000) ? "recovery" : "open";
+  } else {
+    const roll = canonicalPacingRange(streams, 0, 100);
+    next = roll < 40 ? "open" : roll < 68 ? "spike" : roll < 86 ? "recovery" : "rule";
+  }
+  pacing.mood = next;
+  pacing.moodTimer = next === "spike"
+    ? canonicalPacingRange(streams, 84, 126)
+    : next === "recovery"
+      ? canonicalPacingRange(streams, 116, 176)
+      : next === "rule"
+        ? canonicalPacingRange(streams, 92, 146)
+        : canonicalPacingRange(streams, 100, 150);
+}
+
+function updateCanonicalThreat(state) {
+  const pacing = state.director;
+  const sinceHit = state.tick - pacing.lastHitTick;
+  if (sinceHit > 600) pacing.heatStreak = false;
+  if (state.boss) {
+    const lerp = state.player.hp === 1 ? 60 : state.player.hp === state.player.maxHp && pacing.killStreak > 0 ? 30 : 25;
+    pacing.threatThousandths += roundIntegerRatio((pacing.threatTargetThousandths - pacing.threatThousandths) * lerp, 1000);
+  } else {
+    let target;
+    if (state.phase <= 3) {
+      target = 520 + roundIntegerRatio(canonicalOpeningRampThousandths(state) * 170, 1000) + (state.phase - 1) * 45;
+      const phaseProgress = clampInteger(Math.floor(state.director.phaseTick * 1000 / canonicalPhaseDuration(state.phase)), 0, 1000);
+      target += roundIntegerRatio(phaseProgress * 50, 1000);
+    } else {
+      target = 780 + (state.phase - 4) * 75;
+      target += clampInteger(roundIntegerRatio((state.director.phaseTick - 180) * 1000, 2400), 0, 140);
+    }
+    target -= (state.player.maxHp - state.player.hp) * 50;
+    if (state.player.hp === 1) target -= 40;
+    if (pacing.grace > 0) target -= 100;
+    if (pacing.ghostGrace > 0) target -= 70;
+    if (pacing.heatStreak) target -= 120;
+    const accuracy = pacing.shotsFired > 0 ? Math.floor(pacing.shotsHit * 1000 / pacing.shotsFired) : 500;
+    target += clampInteger(roundIntegerRatio((accuracy - 380) * 160, 1000), 0, 100);
+    target += sinceHit > 900 ? 100 : clampInteger(roundIntegerRatio(pacing.killStreak * 5, 2), 0, 80);
+    if (pacing.pacingMemoryThousandths > 450) target += 80;
+    else if (pacing.pacingMemoryThousandths < -450) target -= 60;
+    target += roundIntegerRatio(canonicalPhaseArcThousandths(state) * 50, 1000);
+    target -= roundIntegerRatio(clampInteger(pacing.burstHundredths, 0, 300) * 3, 10);
+    target += roundIntegerRatio(pacing.pressureHundredths - 5000, 20);
+    if (state.enemies.some((enemy) => enemy.type === "phantom")) target -= 60;
+    if (pacing.mood === "open") target -= 20;
+    else if (pacing.mood === "recovery") target -= 80;
+    else if (pacing.mood === "spike") target += 30;
+    else if (pacing.mood === "rule") target += 10;
+    if (pacing.intensity === "surge") target += 60;
+    else if (pacing.intensity === "cooldown") target -= 50;
+    pacing.threatTargetThousandths = clampInteger(target, 500, 1450);
+    let lerp = 25;
+    if (state.player.hp === 1) lerp = 60;
+    else if (state.player.hp === state.player.maxHp && (pacing.killStreak > 0 || pacing.pacingMemoryThousandths > 250 || accuracy > 600)) lerp = 30;
+    else if (pacing.pressureHundredths > 7000 || pacing.pacingMemoryThousandths < -350) lerp = 40;
+    pacing.threatThousandths += roundIntegerRatio((pacing.threatTargetThousandths - pacing.threatThousandths) * lerp, 1000);
+    pacing.threatThousandths = clampInteger(pacing.threatThousandths, 500, 1450);
+  }
+  if (pacing.grace > 0) pacing.grace--;
+  if (pacing.ghostGrace > 0) pacing.ghostGrace--;
+  pacing.burstHundredths = Math.max(0, pacing.burstHundredths - 3);
+  if (state.tick % 180 === 0) pacing.killStreak = Math.max(0, pacing.killStreak - 1);
+}
+
+function tickCanonicalPacing(state, streams) {
+  validateDirectorState(state);
+  updateCanonicalIntensity(state, streams);
+  updateCanonicalPressure(state);
+  updateCanonicalPacingMemory(state);
+  updateCanonicalMood(state, streams);
+  updateCanonicalThreat(state);
+  return state.director;
+}
+
+function canonicalAdaptiveWaveInterval(state) {
+  validateDirectorState(state);
+  const pacing = state.director;
+  const base = canonicalBaseWaveInterval(state.phase, pacing.phaseTick);
+  if (state.phase <= 2) return base;
+  let factorMillionths = 1_000_000;
+  if (pacing.mood === "spike") factorMillionths = Math.floor(factorMillionths * 82 / 100);
+  else if (pacing.mood === "recovery") factorMillionths = Math.floor(factorMillionths * 122 / 100);
+  else if (pacing.mood === "rule") factorMillionths = Math.floor(factorMillionths * 92 / 100);
+  if (pacing.pacingMemoryThousandths > 450) factorMillionths = Math.floor(factorMillionths * 90 / 100);
+  else if (pacing.pacingMemoryThousandths < -350) factorMillionths = Math.floor(factorMillionths * 108 / 100);
+  if (pacing.intensity === "surge") factorMillionths = Math.floor(factorMillionths * 78 / 100);
+  else if (pacing.intensity === "cooldown") factorMillionths = Math.floor(factorMillionths * 118 / 100);
+  let interval = roundIntegerRatio((base + canonicalRhythmProfile(state).interval) * factorMillionths, 1_000_000);
+  if (pacing.grace > 0) interval += 10;
+  if (pacing.ghostGrace > 0) interval += 8;
+  if (state.player.hp <= 2) interval += 16;
+  if (state.player.hp === 1) interval += 18;
+  if (pacing.waveRest > 0) interval += Math.floor(pacing.waveRest / 2);
+  interval += roundIntegerRatio((pacing.pressureHundredths - 5000) * 8, 10_000);
+  interval = roundIntegerRatio(interval * 1000, clampInteger(pacing.threatThousandths, 550, 1250));
+  return Math.max(24, interval);
+}
+
 function laneX(lane) {
   const numerators = [22, 50, 78];
   return Math.round(GAME_WIDTH_UNITS * numerators[lane] / 100);
@@ -370,7 +650,7 @@ function tickCanonicalDirector(state, streams) {
     director.lastTemplate = "";
   }
 
-  const interval = canonicalBaseWaveInterval(state.phase, director.phaseTick);
+  const interval = canonicalAdaptiveWaveInterval(state);
   if (state.pendingSpawns.length === 0 && director.waveTick >= interval) {
     queueCanonicalWave(state, streams);
     director.waveTick = 0;
@@ -385,10 +665,12 @@ function tickCanonicalDirector(state, streams) {
 }
 
 return Object.freeze({
+  canonicalAdaptiveWaveInterval,
   canonicalBaseWaveInterval,
   canonicalPhaseDuration,
   canonicalWavePool,
   canonicalWaveTemplate,
-  tickCanonicalDirector
+  tickCanonicalDirector,
+  tickCanonicalPacing
 });
 });

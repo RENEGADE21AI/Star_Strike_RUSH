@@ -258,6 +258,7 @@ test("phase four starts a boss, freezes the wave clock, and boss death grants on
   assert.equal(state.boss, null);
   assert.equal(state.stats.bosses, 1);
   assert.equal(state.score, 1_000);
+  assert.equal(state.director.shotsHit, 1);
   assert.equal(state.director.bossRecovery, 120);
   assert.equal(state.director.phaseTick, frozenPhaseTick);
   assert.equal(state.enemies.length, 0);

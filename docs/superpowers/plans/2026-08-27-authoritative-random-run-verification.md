@@ -92,8 +92,12 @@ phase-duration source. Canonical loot now owns drought protection, cooldowns,
 seeded normal and boss drops, pickup motion and collision, all thirteen powerup
 effects, wingman arrival/fire/interception/departure, and powerup-derived scoring,
 damage, energy, and projectile consequences. Remaining adaptive pacing transitions
-and browser-state ownership remain intentionally unchecked below until parity is
-implemented.
+are now canonical integer state as well: pressure, threat, pacing memory, accuracy,
+hit grace, low-health relief, seeded intensity/mood transitions, adaptive wave
+intervals, and intensity-aware energy recovery all replay from the ticket's isolated
+`pacing` stream. Boss hits participate in the same authoritative accuracy signal.
+Browser-state ownership remains intentionally unchecked below until the ordered
+runtime renders and presents this canonical state directly.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`
