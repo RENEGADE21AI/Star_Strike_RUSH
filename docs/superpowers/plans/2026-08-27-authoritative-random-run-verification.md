@@ -88,8 +88,11 @@ boss rotation; phase-scaled boss health; entry, telegraph, realm, signature-atta
 and recovery procedures for all eight bosses; and flat server-derived boss rewards.
 Boss projectiles preserve the live birth-tick ordering while boss hazards update on
 their live creation tick. The ordered browser runtime now consumes the same
-phase-duration source. Remaining adaptive pacing transitions, drops, powerups, and
-browser-state ownership remain intentionally unchecked below until parity is
+phase-duration source. Canonical loot now owns drought protection, cooldowns,
+seeded normal and boss drops, pickup motion and collision, all thirteen powerup
+effects, wingman arrival/fire/interception/departure, and powerup-derived scoring,
+damage, energy, and projectile consequences. Remaining adaptive pacing transitions
+and browser-state ownership remain intentionally unchecked below until parity is
 implemented.
 
 **Files:**

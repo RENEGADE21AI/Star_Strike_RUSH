@@ -79,7 +79,11 @@ function createSimulationState(ticket) {
       lastTemplate: "",
       hazardEventTimer: 1200,
       hazardWarningTimer: 0,
-      bossRecovery: 0
+      bossRecovery: 0,
+      killsSinceDrop: 0,
+      ticksSinceDrop: 0,
+      dropCooldown: 0,
+      intensity: "normal"
     },
     player: {
       x: Math.round(GAME_WIDTH_UNITS / 2),
@@ -96,6 +100,14 @@ function createSimulationState(ticket) {
       ghostTimer: 0,
       dashTimer: 0,
       ghostCooldown: 0,
+      spread: 0,
+      rapid: 0,
+      overcharge: 0,
+      phaseShield: 0,
+      magnet: 0,
+      piercing: 0,
+      stabilizer: 0,
+      scoreSurge: 0,
       maxSpeed: Math.round(5.5 * POSITION_UNITS_PER_PIXEL)
     },
     stats: {
@@ -115,6 +127,7 @@ function createSimulationState(ticket) {
     enemyProjectiles: [],
     hazards: [],
     powerups: [],
+    wingmen: [],
     boss: null
   };
 }
@@ -157,6 +170,7 @@ function canonicalStateView(state) {
     enemyProjectiles: state.enemyProjectiles,
     hazards: state.hazards,
     powerups: state.powerups,
+    wingmen: state.wingmen,
     boss: state.boss
   };
 }

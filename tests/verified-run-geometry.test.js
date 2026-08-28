@@ -40,7 +40,7 @@ test("canonical offsets rotate using only versioned integer tables", () => {
 
 test("every gameplay ship and hazard has authoritative collision content", () => {
   const required = [
-    "player", "red", "orange", "purple", "phantom", "splitter", "splitter_shard",
+    "player", "wingman", "red", "orange", "purple", "phantom", "splitter", "splitter_shard",
     "carrier", "siphon", "leech", "minecaster", "shieldbearer", "railgunner", "repair_drone",
     "boss_standard", "boss_wraith", "boss_debris_warden", "boss_mothership", "boss_siphon_core",
     "boss_hive_breaker", "boss_rail_tyrant", "boss_gravity_well", "small_debris", "rock_asteroid",

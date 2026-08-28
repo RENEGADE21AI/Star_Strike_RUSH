@@ -45,6 +45,7 @@ function circles(...entries) {
 
 const AUTHORITATIVE_COLLISION_CIRCLES_PIXELS = Object.freeze({
   player: circles([0, -9, 5], [0, 1, 7], [-9, 5, 4.5], [9, 5, 4.5], [0, 11, 5]),
+  wingman: circles([0, 1, 8.5]),
   red: circles([0, 1, 10]),
   orange: circles([0, 1, 8.5]),
   purple: circles([0, 1, 14]),
