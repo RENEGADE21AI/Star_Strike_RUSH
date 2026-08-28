@@ -175,6 +175,96 @@ test("browser parity reports concrete live-state differences from canonical auth
   clearRunRandomStreams();
 });
 
+test("a canonical tick projects authoritative outcomes into the ticketed browser state", async () => {
+  clearRunRandomStreams();
+  await beginSeededStandardRun(seededTicket({ runId: "run_authority_projection" }));
+  const browserState = {
+    runStats: {
+      activeFrames: 99,
+      kills: 99,
+      bosses: 99,
+      powerups: 99,
+      abilityUses: 99,
+      ghostUses: 99,
+      dashUses: 99,
+      realmHops: 99,
+      damageTaken: 99,
+      highestCombo: 99
+    },
+    score: 99,
+    phase: 9,
+    multiplier: 4,
+    comboKills: 99,
+    playerRealm: 1,
+    player: {
+      x: -1,
+      y: -1,
+      vx: -1,
+      vy: -1,
+      hp: 1,
+      maxHp: 1,
+      energy: 1,
+      maxEnergy: 1,
+      inv: 1,
+      fire: 1,
+      spread: 1,
+      rapid: 1,
+      ghostTimer: 1,
+      dashTimer: 1,
+      ghostCooldown: 1,
+      overcharge: 1,
+      phaseShield: 1,
+      magnet: 1,
+      piercing: 1,
+      stabilizer: 1,
+      scoreSurge: 1,
+      maxSpeed: 1
+    },
+    particles: [{ cosmetic: true }]
+  };
+
+  beginCanonicalRunTick({ keyboard: { right: true }, joystick: { active: false } });
+  const outcome = globalThis.endCanonicalRunTick?.(browserState);
+  const canonical = currentCanonicalRunState();
+
+  assert.deepEqual(outcome, { advanced: true, terminal: false, canonicalTick: 1 });
+  assert.equal(browserState.runStats.activeFrames, canonical.tick);
+  assert.equal(browserState.score, canonical.score);
+  assert.equal(browserState.phase, canonical.phase);
+  assert.equal(browserState.multiplier, canonical.multiplier);
+  assert.equal(browserState.comboKills, canonical.comboKills);
+  assert.equal(browserState.playerRealm, canonical.playerRealm);
+  assert.equal(browserState.player.x, canonical.player.x / POSITION_UNITS_PER_PIXEL);
+  assert.equal(browserState.player.y, canonical.player.y / POSITION_UNITS_PER_PIXEL);
+  assert.equal(browserState.player.vx, canonical.player.vx / POSITION_UNITS_PER_PIXEL);
+  assert.equal(browserState.player.vy, canonical.player.vy / POSITION_UNITS_PER_PIXEL);
+  assert.equal(browserState.player.hp, canonical.player.hp);
+  assert.equal(browserState.player.energy, canonical.player.energy / ENERGY_UNITS_PER_POINT);
+  assert.equal(browserState.runStats.kills, canonical.stats.kills);
+  assert.equal(browserState.runStats.bosses, canonical.stats.bosses);
+  assert.equal(browserState.runStats.powerups, canonical.stats.powerups);
+  assert.deepEqual(browserState.particles, [{ cosmetic: true }], "presentation-only state stays browser-owned");
+  clearRunRandomStreams();
+});
+
+test("canonical pause damage returns the terminal outcome that must end a ticketed run", async () => {
+  clearRunRandomStreams();
+  await beginSeededStandardRun(seededTicket({ runId: "run_authority_terminal" }));
+  const canonical = currentCanonicalRunState();
+  canonical.player.hp = 1;
+  const browserState = { runStats: {}, player: {} };
+
+  queueVerifiedRunInputEdge("pause");
+  beginCanonicalRunTick({ keyboard: {}, joystick: { active: false } });
+  const outcome = globalThis.endCanonicalRunTick?.(browserState);
+
+  assert.deepEqual(outcome, { advanced: true, terminal: true, canonicalTick: 1 });
+  assert.equal(browserState.player.hp, 0);
+  assert.equal(browserState.runStats.activeFrames, 1);
+  assert.equal(canonical.stats.pauseUses, 1);
+  clearRunRandomStreams();
+});
+
 test("canonical input clamps axes and records pressed edges", () => {
   assert.deepEqual(
     canonicalRunInput({ moveX: 2, moveY: -0.5, ghostPressed: true, pausePressed: true }),

@@ -102,8 +102,13 @@ every active fixed tick. Legacy rendering draws cannot perturb that shadow state
 and overlapping ticket starts cannot replace it. Development QA now exposes exact
 live-versus-canonical differences for run ticks, outcome fields, player state, and
 entity counts so parity gaps can be eliminated before authority is switched over.
-Browser-state ownership remains intentionally unchecked below until Canvas, DOM,
-and audio render this canonical state directly instead of the parallel legacy state.
+Ticketed browser ticks now project canonical score, phase, combo, player state, and
+run statistics back into the ordered runtime before presentation, and canonical
+pause damage and terminal state own the game-over decision. Legacy collision death
+cannot preempt that terminal decision. Entity arrays, collision feedback, and their
+audio/visual presentation still run in parallel, so browser-state ownership remains
+intentionally unchecked below until those consumers render canonical entities
+directly instead of the legacy arrays.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`

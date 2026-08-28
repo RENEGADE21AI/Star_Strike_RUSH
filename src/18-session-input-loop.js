@@ -75,7 +75,6 @@ function currentGameplayControlEnabled() {
 }
 function pauseGame(reason = "manual") {
   if (state.gameState !== "playing" && state.gameState !== "resuming") return false;
-  if (reason === "manual") queueVerifiedRunInputEdge("pause");
   const decision = typeof pauseHealthDecision === "function"
     ? pauseHealthDecision(state.player, reason, state.runMode)
     : { allowed: true, cost: 0, remainingHp: state.player.hp, message: "" };
@@ -90,6 +89,17 @@ function pauseGame(reason = "manual") {
   clearGameplayInput();
   state.pausedReason = reason;
   state.pauseNotice = decision.message;
+  let canonicalPauseOutcome = null;
+  if (state.runMode === "standard" && currentVerifiedRunContext().recording) {
+    queueVerifiedRunInputEdge("pause");
+    beginCanonicalRunTick(state);
+    canonicalPauseOutcome = endCanonicalRunTick(state);
+  }
+  if (canonicalPauseOutcome && canonicalPauseOutcome.terminal) {
+    enterGameOver();
+    state.pauseNotice = decision.message;
+    return true;
+  }
   if (decision.cost > 0 && state.player.hp <= 0) {
     if (state.runMode === "tutorial" && typeof recoverTutorialCheckpoint === "function") {
       recoverTutorialCheckpoint();
@@ -99,10 +109,6 @@ function pauseGame(reason = "manual") {
       state.gameState = "paused";
       if (typeof showTutorialPauseAccessibility === "function") showTutorialPauseAccessibility();
     } else {
-      if (currentVerifiedRunContext().recording) {
-        beginCanonicalRunTick(state);
-        endCanonicalRunTick();
-      }
       enterGameOver();
       state.pauseNotice = decision.message;
     }
@@ -845,7 +851,8 @@ function update() {
     showNextMessage();
   }
 
-  endCanonicalRunTick();
+  const canonicalOutcome = endCanonicalRunTick(state);
+  if (canonicalOutcome.terminal && state.gameState !== "gameover") enterGameOver();
 
 }
 

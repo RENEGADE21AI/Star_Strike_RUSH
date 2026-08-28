@@ -90,6 +90,64 @@ function currentCanonicalRunState() {
   return activeCanonicalRunState;
 }
 
+function canonicalRunOwnsGameplayOutcome() {
+  return activeCanonicalRunState !== null;
+}
+
+function applyCanonicalRunAuthority(browserState) {
+  const canonical = activeCanonicalRunState;
+  if (!canonical || !browserState || typeof browserState !== "object") return false;
+  const player = browserState.player;
+  const stats = browserState.runStats;
+  if (!player || typeof player !== "object" || !stats || typeof stats !== "object") {
+    throw new TypeError("Ticketed browser state requires player and run statistics objects.");
+  }
+  const positionUnits = StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL;
+  const energyUnits = StarStrikeVerifiedRunConstants.ENERGY_UNITS_PER_POINT;
+
+  browserState.score = canonical.score;
+  browserState.phase = canonical.phase;
+  browserState.multiplier = canonical.multiplier;
+  browserState.comboKills = canonical.comboKills;
+  browserState.playerRealm = canonical.playerRealm;
+
+  player.x = canonical.player.x / positionUnits;
+  player.y = canonical.player.y / positionUnits;
+  player.vx = canonical.player.vx / positionUnits;
+  player.vy = canonical.player.vy / positionUnits;
+  player.hp = canonical.player.hp;
+  player.maxHp = canonical.player.maxHp;
+  player.energy = canonical.player.energy / energyUnits;
+  player.maxEnergy = canonical.player.maxEnergy / energyUnits;
+  player.inv = canonical.player.invulnerability;
+  player.fire = canonical.player.fireCooldown;
+  player.spread = canonical.player.spread;
+  player.rapid = canonical.player.rapid;
+  player.ghostTimer = canonical.player.ghostTimer;
+  player.dashTimer = canonical.player.dashTimer;
+  player.ghostCooldown = canonical.player.ghostCooldown;
+  player.overcharge = canonical.player.overcharge;
+  player.phaseShield = canonical.player.phaseShield;
+  player.magnet = canonical.player.magnet;
+  player.piercing = canonical.player.piercing;
+  player.stabilizer = canonical.player.stabilizer;
+  player.scoreSurge = canonical.player.scoreSurge;
+  player.maxSpeed = canonical.player.maxSpeed / positionUnits;
+
+  stats.activeFrames = canonical.tick;
+  stats.kills = canonical.stats.kills;
+  stats.bosses = canonical.stats.bosses;
+  stats.powerups = canonical.stats.powerups;
+  stats.ghostUses = canonical.stats.ghostUses;
+  stats.dashUses = canonical.stats.dashUses;
+  stats.realmHops = canonical.stats.realmHops;
+  stats.pauseUses = canonical.stats.pauseUses;
+  stats.abilityUses = canonical.stats.ghostUses + canonical.stats.dashUses + canonical.stats.realmHops;
+  stats.damageTaken = canonical.stats.damageTaken;
+  stats.highestCombo = canonical.stats.highestCombo;
+  return true;
+}
+
 function currentCanonicalRunParity(browserState = {}) {
   const canonical = activeCanonicalRunState;
   if (!canonical) {
@@ -189,12 +247,23 @@ function currentCanonicalRunVector(inputState = {}) {
   return Object.freeze({ x: canonical.x / 127, y: canonical.y / 127 });
 }
 
-function endCanonicalRunTick() {
+function endCanonicalRunTick(browserState = null) {
   const canonical = activeCanonicalRunInput;
   activeCanonicalRunInput = null;
   if (activeCanonicalRunState && canonical) {
     stepSimulation(activeCanonicalRunState, canonical, activeCanonicalRunRandomStreams);
+    if (browserState) applyCanonicalRunAuthority(browserState);
+    return Object.freeze({
+      advanced: true,
+      terminal: activeCanonicalRunState.terminal === true,
+      canonicalTick: activeCanonicalRunState.tick
+    });
   }
+  return Object.freeze({
+    advanced: false,
+    terminal: activeCanonicalRunState?.terminal === true,
+    canonicalTick: activeCanonicalRunState ? activeCanonicalRunState.tick : 0
+  });
 }
 
 function recordCanonicalRunInput(rawInput = {}) {
@@ -241,6 +310,8 @@ globalThis.runRandomRange = runRandomRange;
 globalThis.beginRunInputRecording = beginRunInputRecording;
 globalThis.beginSeededStandardRun = beginSeededStandardRun;
 globalThis.currentCanonicalRunState = currentCanonicalRunState;
+globalThis.canonicalRunOwnsGameplayOutcome = canonicalRunOwnsGameplayOutcome;
+globalThis.applyCanonicalRunAuthority = applyCanonicalRunAuthority;
 globalThis.currentCanonicalRunParity = currentCanonicalRunParity;
 globalThis.captureCanonicalRunInput = captureCanonicalRunInput;
 globalThis.queueVerifiedRunInputEdge = queueVerifiedRunInputEdge;

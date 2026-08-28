@@ -166,7 +166,8 @@ test("the fixed-step loop records canonical controls before authoritative update
   assert.match(gameplayStep, /beginCanonicalRunTick\(state\)/);
   assert.ok(gameplayStep.indexOf("beginCanonicalRunTick(state)") < gameplayStep.indexOf("updateWavesAndPhaseAndPressure()"));
   assert.ok(gameplayStep.indexOf("beginCanonicalRunTick(state)") < gameplayStep.indexOf("updatePlayer()"));
-  assert.match(gameplayStep, /endCanonicalRunTick\(\)/);
+  assert.match(gameplayStep, /const canonicalOutcome = endCanonicalRunTick\(state\)/);
+  assert.match(gameplayStep, /canonicalOutcome\.terminal[^\n]+enterGameOver\(\)/);
   assert.match(loop, /queueVerifiedRunInputEdge\("pause"\)/);
 
   const player = fs.readFileSync(path.join(repoRoot, "src", "05-entities.js"), "utf8");

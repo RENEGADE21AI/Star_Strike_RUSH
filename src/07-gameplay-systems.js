@@ -429,6 +429,7 @@ function damagePlayer(amount = 1) {
   spawnParticles(p.x, p.y, amount >= 2 ? 18 : 12, "#ff8a8a", 1.05);
   if (typeof playGameSound === "function") playGameSound("player_hit", amount >= 2 ? 1.15 : 0.9);
   if (p.hp <= 0) {
+    if (typeof canonicalRunOwnsGameplayOutcome === "function" && canonicalRunOwnsGameplayOutcome()) return;
     if (state.runMode === "tutorial" && typeof recoverTutorialCheckpoint === "function") recoverTutorialCheckpoint();
     else enterGameOver();
   }

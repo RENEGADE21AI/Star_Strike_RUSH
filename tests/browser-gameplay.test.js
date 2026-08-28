@@ -1081,6 +1081,68 @@ test("debug QA exposes live versus canonical parity for a ticketed browser run",
     assert.equal(parity.active, true);
     assert.equal(typeof parity.matched, "boolean");
     assert.ok(Array.isArray(parity.differences));
+    const outcomeFields = new Set([
+      "activeTicks",
+      "score",
+      "phase",
+      "multiplier",
+      "comboKills",
+      "playerRealm",
+      "player.x",
+      "player.y",
+      "player.hp",
+      "player.energy"
+    ]);
+    assert.deepEqual(
+      parity.differences.filter((difference) => outcomeFields.has(difference.field)),
+      [],
+      "ticketed browser outcome fields must be projected from canonical state"
+    );
+    const pause = await page.evaluate(() => {
+      const accepted = pauseGame("focus");
+      const canonical = currentCanonicalRunState();
+      return {
+        accepted,
+        gameState: state.gameState,
+        browserHp: state.player.hp,
+        canonicalHp: canonical.player.hp,
+        pauseUses: canonical.stats.pauseUses
+      };
+    });
+    assert.deepEqual(pause, {
+      accepted: true,
+      gameState: "paused",
+      browserHp: 4,
+      canonicalHp: 4,
+      pauseUses: 1
+    });
+    const terminal = await page.evaluate(() => {
+      state.gameState = "playing";
+      state.player.hp = 1;
+      currentCanonicalRunState().player.hp = 1;
+      const accepted = pauseGame("manual");
+      const canonical = currentCanonicalRunState();
+      return {
+        accepted,
+        gameState: state.gameState,
+        browserHp: state.player.hp,
+        canonicalHp: canonical.player.hp,
+        terminal: canonical.terminal,
+        pauseUses: canonical.stats.pauseUses,
+        recording: currentVerifiedRunContext().recording,
+        tapeBytes: state.verifiedInputTape?.byteLength || 0
+      };
+    });
+    assert.deepEqual({ ...terminal, tapeBytes: terminal.tapeBytes > 0 }, {
+      accepted: true,
+      gameState: "gameover",
+      browserHp: 0,
+      canonicalHp: 0,
+      terminal: true,
+      pauseUses: 2,
+      recording: false,
+      tapeBytes: true
+    });
     assert.deepEqual(errors, []);
   } finally {
     await context.close();
