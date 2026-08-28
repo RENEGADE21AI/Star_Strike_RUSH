@@ -96,8 +96,12 @@ are now canonical integer state as well: pressure, threat, pacing memory, accura
 hit grace, low-health relief, seeded intensity/mood transitions, adaptive wave
 intervals, and intensity-aware energy recovery all replay from the ticket's isolated
 `pacing` stream. Boss hits participate in the same authoritative accuracy signal.
-Browser-state ownership remains intentionally unchecked below until the ordered
-runtime renders and presents this canonical state directly.
+The ordered browser adapter now creates a second, independently seeded canonical
+stream set and advances the complete replay state from the exact recorded input on
+every active fixed tick. Legacy rendering draws cannot perturb that shadow state,
+and overlapping ticket starts cannot replace it. Browser-state ownership remains
+intentionally unchecked below until Canvas, DOM, and audio render this canonical
+state directly instead of the parallel legacy state.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`

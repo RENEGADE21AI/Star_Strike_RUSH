@@ -2,6 +2,9 @@
 
 let activeRunRandomStreams = null;
 let activeVerifiedRunTicket = null;
+let activeCanonicalRunRandomStreams = null;
+let activeCanonicalRunState = null;
+let seededRunStarting = false;
 let recordedRunInputs = null;
 let pendingRunInputButtons = 0;
 let activeCanonicalRunInput = null;
@@ -18,6 +21,8 @@ function installRunRandomStreams(streams, ticket = null) {
 function clearRunRandomStreams() {
   activeRunRandomStreams = null;
   activeVerifiedRunTicket = null;
+  activeCanonicalRunRandomStreams = null;
+  activeCanonicalRunState = null;
   recordedRunInputs = null;
   pendingRunInputButtons = 0;
   activeCanonicalRunInput = null;
@@ -27,6 +32,8 @@ function currentVerifiedRunContext() {
   return Object.freeze({
     seeded: activeRunRandomStreams !== null,
     ticket: activeVerifiedRunTicket,
+    authoritativeState: activeCanonicalRunState !== null,
+    canonicalTick: activeCanonicalRunState ? activeCanonicalRunState.tick : 0,
     recording: Array.isArray(recordedRunInputs),
     recordedTicks: Array.isArray(recordedRunInputs) ? recordedRunInputs.length : 0
   });
@@ -55,17 +62,32 @@ function beginRunInputRecording() {
 }
 
 async function beginSeededStandardRun(ticket) {
-  if (activeRunRandomStreams || Array.isArray(recordedRunInputs)) {
+  if (seededRunStarting || activeRunRandomStreams || Array.isArray(recordedRunInputs)) {
     throw new Error("A seeded standard run is already active.");
   }
   const runTicket = ticket && typeof ticket === "object" ? ticket : {};
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(runTicket.runId || ""))) {
     throw new TypeError("Verified run ticket ID is invalid.");
   }
-  const streams = await createRunRandomStreams(runTicket.rootSeed, runTicket.simRevision);
-  installRunRandomStreams(streams, runTicket);
-  beginRunInputRecording();
-  return currentVerifiedRunContext();
+  seededRunStarting = true;
+  try {
+    const [streams, canonicalStreams] = await Promise.all([
+      createRunRandomStreams(runTicket.rootSeed, runTicket.simRevision),
+      createRunRandomStreams(runTicket.rootSeed, runTicket.simRevision)
+    ]);
+    const canonicalState = createSimulationState(runTicket);
+    installRunRandomStreams(streams, runTicket);
+    activeCanonicalRunRandomStreams = canonicalStreams;
+    activeCanonicalRunState = canonicalState;
+    beginRunInputRecording();
+    return currentVerifiedRunContext();
+  } finally {
+    seededRunStarting = false;
+  }
+}
+
+function currentCanonicalRunState() {
+  return activeCanonicalRunState;
 }
 
 function captureCanonicalRunInput(inputState = {}, edgeButtons = 0) {
@@ -126,7 +148,11 @@ function currentCanonicalRunVector(inputState = {}) {
 }
 
 function endCanonicalRunTick() {
+  const canonical = activeCanonicalRunInput;
   activeCanonicalRunInput = null;
+  if (activeCanonicalRunState && canonical) {
+    stepSimulation(activeCanonicalRunState, canonical, activeCanonicalRunRandomStreams);
+  }
 }
 
 function recordCanonicalRunInput(rawInput = {}) {
@@ -172,6 +198,7 @@ globalThis.runRandom = runRandom;
 globalThis.runRandomRange = runRandomRange;
 globalThis.beginRunInputRecording = beginRunInputRecording;
 globalThis.beginSeededStandardRun = beginSeededStandardRun;
+globalThis.currentCanonicalRunState = currentCanonicalRunState;
 globalThis.captureCanonicalRunInput = captureCanonicalRunInput;
 globalThis.queueVerifiedRunInputEdge = queueVerifiedRunInputEdge;
 globalThis.beginCanonicalRunTick = beginCanonicalRunTick;

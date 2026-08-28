@@ -8,7 +8,8 @@ const {
   INPUT_HEADER_BYTES,
   MAX_INPUT_BYTES,
   MAX_INPUT_SEGMENTS,
-  MAX_RUN_TICKS
+  MAX_RUN_TICKS,
+  SIMULATION_REVISION
 } = require("../shared/verified-run/constants");
 const {
   createRunRandomStreams,
@@ -21,7 +22,22 @@ const {
   decodeInputTape,
   encodeInputTape
 } = require("../shared/verified-run/input-tape");
+const { serializeCanonicalState } = require("../shared/verified-run/simulation-state");
+require("../shared/verified-run/simulation-step");
 require("../src/00-verified-run-runtime.js");
+
+function seededTicket(overrides = {}) {
+  return {
+    runId: "run_001",
+    rootSeed: "00112233445566778899aabbccddeeff",
+    simRevision: SIMULATION_REVISION,
+    rulesRevision: "rules-v1",
+    contentRevision: "content-v1",
+    buildSha: "a".repeat(40),
+    maxTicks: 20_000,
+    ...overrides
+  };
+}
 
 test("xoshiro128** matches the repository fixed vector", () => {
   const random = createXoshiro128StarStar([1, 2, 3, 4]);
@@ -55,11 +71,7 @@ test("stream derivation rejects malformed roots and unknown names", async () => 
 
 test("a seeded standard run binds random streams and canonical input to one ticket", async () => {
   clearRunRandomStreams();
-  await beginSeededStandardRun({
-    runId: "run_001",
-    rootSeed: "00112233445566778899aabbccddeeff",
-    simRevision: "sim-v1"
-  });
+  await beginSeededStandardRun(seededTicket());
   assert.equal(currentVerifiedRunContext().seeded, true);
   assert.equal(currentVerifiedRunContext().recording, true);
   assert.equal(currentVerifiedRunContext().ticket.runId, "run_001");
@@ -77,6 +89,43 @@ test("a seeded standard run binds random streams and canonical input to one tick
   assert.deepEqual(decodeInputTape(tape).segments, [
     { duration: 1, x: 127, y: 0, buttons: BUTTON_GHOST_SHIFT }
   ]);
+  clearRunRandomStreams();
+});
+
+test("the browser canonical shadow advances independently of legacy random draws", async () => {
+  async function replay({ consumeLegacyRandomness }) {
+    clearRunRandomStreams();
+    await beginSeededStandardRun(seededTicket({ runId: "run_shadow" }));
+    if (consumeLegacyRandomness) {
+      for (let index = 0; index < 80; index++) {
+        runRandom("waves");
+        runRandom("enemy_behavior");
+      }
+    }
+    for (let tick = 0; tick < 220; tick++) {
+      beginCanonicalRunTick({ keyboard: { right: tick < 40 }, joystick: { active: false } });
+      endCanonicalRunTick();
+    }
+    assert.equal(currentVerifiedRunContext().canonicalTick, 220);
+    const serialized = serializeCanonicalState(currentCanonicalRunState());
+    clearRunRandomStreams();
+    return serialized;
+  }
+
+  const burned = await replay({ consumeLegacyRandomness: true });
+  const clean = await replay({ consumeLegacyRandomness: false });
+  assert.deepEqual(burned, clean);
+});
+
+test("concurrent seeded run starts cannot replace the active authoritative state", async () => {
+  clearRunRandomStreams();
+  const first = beginSeededStandardRun(seededTicket({ runId: "run_first" }));
+  const second = beginSeededStandardRun(seededTicket({ runId: "run_second" }));
+
+  await assert.rejects(second, /already active/);
+  await first;
+  assert.equal(currentVerifiedRunContext().ticket.runId, "run_first");
+  assert.equal(currentCanonicalRunState().ticket.runId, "run_first");
   clearRunRandomStreams();
 });
 
