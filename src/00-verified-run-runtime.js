@@ -90,6 +90,48 @@ function currentCanonicalRunState() {
   return activeCanonicalRunState;
 }
 
+function currentCanonicalRunParity(browserState = {}) {
+  const canonical = activeCanonicalRunState;
+  if (!canonical) {
+    return { active: false, matched: false, canonicalTick: 0, differences: [] };
+  }
+  const source = browserState && typeof browserState === "object" ? browserState : {};
+  const player = source.player && typeof source.player === "object" ? source.player : {};
+  const differences = [];
+  const arrayLength = (value) => Array.isArray(value) ? value.length : null;
+  const compare = (field, browser, authority) => {
+    if (browser !== authority) differences.push({ field, browser, canonical: authority });
+  };
+
+  compare("activeTicks", Number(source.runStats?.activeFrames), canonical.tick);
+  compare("score", Number(source.score), canonical.score);
+  compare("phase", Number(source.phase), canonical.phase);
+  compare("multiplier", Number(source.multiplier), canonical.multiplier);
+  compare("comboKills", Number(source.comboKills), canonical.comboKills);
+  compare("playerRealm", Number(source.playerRealm), canonical.playerRealm);
+  compare("player.x", Number(player.x), canonical.player.x / StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL);
+  compare("player.y", Number(player.y), canonical.player.y / StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL);
+  compare("player.hp", Number(player.hp), canonical.player.hp);
+  compare("player.energy", Number(player.energy), canonical.player.energy / StarStrikeVerifiedRunConstants.ENERGY_UNITS_PER_POINT);
+  compare("counts.playerProjectiles", arrayLength(source.bullets), canonical.playerProjectiles.length);
+  compare("counts.enemyProjectiles", arrayLength(source.enemyBullets), canonical.enemyProjectiles.length);
+  compare("counts.enemies", arrayLength(source.enemies), canonical.enemies.length);
+  const browserHazards = [source.debris, source.enemyBeams, source.gravityWells]
+    .reduce((total, value) => total + (Array.isArray(value) ? value.length : 0), 0);
+  compare("counts.hazards", browserHazards, canonical.hazards.length);
+  compare("counts.powerups", arrayLength(source.powerups), canonical.powerups.length);
+  compare("counts.wingmen", arrayLength(source.wingmen), canonical.wingmen.length);
+  compare("counts.pendingSpawns", arrayLength(source.pendingSpawns), canonical.pendingSpawns.length);
+  compare("boss.active", Boolean(source.boss), Boolean(canonical.boss));
+
+  return {
+    active: true,
+    matched: differences.length === 0,
+    canonicalTick: canonical.tick,
+    differences
+  };
+}
+
 function captureCanonicalRunInput(inputState = {}, edgeButtons = 0) {
   const keyboard = inputState.keyboard && typeof inputState.keyboard === "object" ? inputState.keyboard : {};
   const joystick = inputState.joystick && typeof inputState.joystick === "object" ? inputState.joystick : {};
@@ -199,6 +241,7 @@ globalThis.runRandomRange = runRandomRange;
 globalThis.beginRunInputRecording = beginRunInputRecording;
 globalThis.beginSeededStandardRun = beginSeededStandardRun;
 globalThis.currentCanonicalRunState = currentCanonicalRunState;
+globalThis.currentCanonicalRunParity = currentCanonicalRunParity;
 globalThis.captureCanonicalRunInput = captureCanonicalRunInput;
 globalThis.queueVerifiedRunInputEdge = queueVerifiedRunInputEdge;
 globalThis.beginCanonicalRunTick = beginCanonicalRunTick;

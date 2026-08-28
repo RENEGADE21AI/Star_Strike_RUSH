@@ -5,10 +5,12 @@ const assert = require("node:assert/strict");
 
 const {
   CHECKPOINT_INTERVAL_TICKS,
+  ENERGY_UNITS_PER_POINT,
   INPUT_HEADER_BYTES,
   MAX_INPUT_BYTES,
   MAX_INPUT_SEGMENTS,
   MAX_RUN_TICKS,
+  POSITION_UNITS_PER_PIXEL,
   SIMULATION_REVISION
 } = require("../shared/verified-run/constants");
 const {
@@ -126,6 +128,50 @@ test("concurrent seeded run starts cannot replace the active authoritative state
   await first;
   assert.equal(currentVerifiedRunContext().ticket.runId, "run_first");
   assert.equal(currentCanonicalRunState().ticket.runId, "run_first");
+  clearRunRandomStreams();
+});
+
+test("browser parity reports concrete live-state differences from canonical authority", async () => {
+  clearRunRandomStreams();
+  await beginSeededStandardRun(seededTicket({ runId: "run_parity" }));
+  beginCanonicalRunTick({ keyboard: {}, joystick: { active: false } });
+  endCanonicalRunTick();
+  const canonical = currentCanonicalRunState();
+  const browserState = {
+    runStats: { activeFrames: canonical.tick },
+    score: canonical.score,
+    phase: canonical.phase,
+    multiplier: canonical.multiplier,
+    comboKills: canonical.comboKills,
+    playerRealm: canonical.playerRealm,
+    player: {
+      x: canonical.player.x / POSITION_UNITS_PER_PIXEL,
+      y: canonical.player.y / POSITION_UNITS_PER_PIXEL,
+      hp: canonical.player.hp,
+      energy: canonical.player.energy / ENERGY_UNITS_PER_POINT
+    },
+    bullets: new Array(canonical.playerProjectiles.length),
+    enemyBullets: new Array(canonical.enemyProjectiles.length),
+    enemies: new Array(canonical.enemies.length),
+    debris: new Array(canonical.hazards.length),
+    enemyBeams: [],
+    gravityWells: [],
+    powerups: new Array(canonical.powerups.length),
+    wingmen: new Array(canonical.wingmen.length),
+    pendingSpawns: new Array(canonical.pendingSpawns.length),
+    boss: canonical.boss
+  };
+
+  assert.deepEqual(globalThis.currentCanonicalRunParity?.(browserState), {
+    active: true,
+    matched: true,
+    canonicalTick: 1,
+    differences: []
+  });
+  browserState.score++;
+  assert.deepEqual(globalThis.currentCanonicalRunParity?.(browserState).differences, [
+    { field: "score", browser: 1, canonical: 0 }
+  ]);
   clearRunRandomStreams();
 });
 

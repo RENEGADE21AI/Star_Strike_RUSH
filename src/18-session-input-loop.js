@@ -915,6 +915,9 @@ function getDebugSnapshot() {
     score: state.score,
     highScore,
     phase: state.phase,
+    canonicalParity: typeof currentCanonicalRunParity === "function"
+      ? currentCanonicalRunParity(state)
+      : null,
     deviceProgress: typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null,
     gloryCelebration: typeof gloryCelebrationActive === "function" && gloryCelebrationActive() ? {
       active: true,

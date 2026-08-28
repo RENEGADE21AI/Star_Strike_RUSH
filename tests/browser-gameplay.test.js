@@ -1056,6 +1056,37 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
   }
 });
 
+test("debug QA exposes live versus canonical parity for a ticketed browser run", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1");
+  try {
+    await page.evaluate(async () => {
+      setupSession("playing");
+      state.sceneTransition = { mode: "idle", frame: 0, duration: 1 };
+      await beginSeededStandardRun({
+        runId: "run_browser_parity",
+        rootSeed: "00112233445566778899aabbccddeeff",
+        simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+        rulesRevision: "rules-v1",
+        contentRevision: "content-v1",
+        buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        maxTicks: 20_000
+      });
+    });
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "null");
+      return snapshot?.canonicalParity?.canonicalTick >= 2;
+    });
+    const parity = (await debugSnapshot(page)).canonicalParity;
+    assert.equal(parity.active, true);
+    assert.equal(typeof parity.matched, "boolean");
+    assert.ok(Array.isArray(parity.differences));
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("resume countdown can be cancelled without hidden actions or an additional health charge", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
   const { page, errors } = await openGame(context);

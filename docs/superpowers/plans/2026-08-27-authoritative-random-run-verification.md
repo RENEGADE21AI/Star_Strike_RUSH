@@ -99,9 +99,11 @@ intervals, and intensity-aware energy recovery all replay from the ticket's isol
 The ordered browser adapter now creates a second, independently seeded canonical
 stream set and advances the complete replay state from the exact recorded input on
 every active fixed tick. Legacy rendering draws cannot perturb that shadow state,
-and overlapping ticket starts cannot replace it. Browser-state ownership remains
-intentionally unchecked below until Canvas, DOM, and audio render this canonical
-state directly instead of the parallel legacy state.
+and overlapping ticket starts cannot replace it. Development QA now exposes exact
+live-versus-canonical differences for run ticks, outcome fields, player state, and
+entity counts so parity gaps can be eliminated before authority is switched over.
+Browser-state ownership remains intentionally unchecked below until Canvas, DOM,
+and audio render this canonical state directly instead of the parallel legacy state.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`
