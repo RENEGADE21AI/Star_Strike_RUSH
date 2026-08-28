@@ -76,7 +76,10 @@ function createSimulationState(ticket) {
       waveRest: 0,
       mood: "open",
       moodTimer: 120,
-      lastTemplate: ""
+      lastTemplate: "",
+      hazardEventTimer: 1200,
+      hazardWarningTimer: 0,
+      bossRecovery: 0
     },
     player: {
       x: Math.round(GAME_WIDTH_UNITS / 2),

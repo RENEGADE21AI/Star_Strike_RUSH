@@ -82,8 +82,13 @@ the phase/mood pool contract. Splitters, shards, carriers, siphons, leeches,
 minecasters, shieldbearers, railgunners, and repair drones now produce their
 movement and gameplay consequences in integer-only replay state, including seeded
 launches, energy drain, tethers, mines, shield interception, beams, and repairs.
-The ordered browser runtime now consumes the same phase-duration source. Remaining
-hazard events, boss procedures, adaptive pacing transitions, drops, powerups, and
+The shared core now also owns phase-gated debris events; destructible asteroid,
+mine, energy-mine, beam, and gravity-well consequences; the complete phase-based
+boss rotation; phase-scaled boss health; entry, telegraph, realm, signature-attack,
+and recovery procedures for all eight bosses; and flat server-derived boss rewards.
+Boss projectiles preserve the live birth-tick ordering while boss hazards update on
+their live creation tick. The ordered browser runtime now consumes the same
+phase-duration source. Remaining adaptive pacing transitions, drops, powerups, and
 browser-state ownership remain intentionally unchecked below until parity is
 implemented.
 

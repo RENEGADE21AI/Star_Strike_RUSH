@@ -27,7 +27,7 @@ const {
   TRIG_UNITS
 } = constants;
 const { BUTTON_GHOST_SHIFT, BUTTON_PAUSE } = inputTape;
-const { AUTHORITATIVE_ENEMY_ARCHETYPES } = content;
+const { AUTHORITATIVE_BOSS_ARCHETYPES, AUTHORITATIVE_ENEMY_ARCHETYPES } = content;
 const { tickCanonicalDirector } = director;
 const { sinForAngle } = trig;
 const { bodiesOverlap, collisionBodyFor } = geometry;
@@ -249,6 +249,189 @@ function canonicalRandomRange(streams, minimum, maximum) {
     throw new TypeError("Canonical random range requires ordered safe integers.");
   }
   return minimum + canonicalRandomUint32(streams, "enemy_behavior") % (maximum - minimum + 1);
+}
+
+function canonicalStreamRange(streams, streamName, minimum, maximum) {
+  if (!Number.isSafeInteger(minimum) || !Number.isSafeInteger(maximum) || maximum < minimum) {
+    throw new TypeError("Canonical random range requires ordered safe integers.");
+  }
+  return minimum + canonicalRandomUint32(streams, streamName) % (maximum - minimum + 1);
+}
+
+const CANONICAL_ASTEROIDS = Object.freeze({
+  small_debris: Object.freeze({ hp: 12, vy: 3_277, vxMin: -358, vxMax: 358, damage: 1 }),
+  rock_asteroid: Object.freeze({ hp: 12, vy: 2_253, vxMin: -246, vxMax: 246, damage: 1 }),
+  iron_asteroid: Object.freeze({ hp: 12, vy: 1_485, vxMin: -123, vxMax: 123, damage: 1 }),
+  comet_shard: Object.freeze({ hp: 12, vy: 3_789, vxMin: -563, vxMax: 563, damage: 1 }),
+  boss_wall: Object.freeze({ hp: 999, vy: 2_048, vxMin: 0, vxMax: 0, damage: 1 })
+});
+const CANONICAL_HAZARD_KINDS = new Set([
+  ...Object.keys(CANONICAL_ASTEROIDS),
+  "mine",
+  "energy_mine",
+  "meteor_warning",
+  "enemy_beam",
+  "gravity_well"
+]);
+
+function spawnCanonicalHazard(state, kind, x, y, options = {}, streams) {
+  if (!state || state.schema !== "SSR_SIM_STATE_V1" || state.terminal) {
+    throw new TypeError("Canonical hazard creation requires an active simulation state.");
+  }
+  const canonicalKind = String(kind || "");
+  if (!CANONICAL_HAZARD_KINDS.has(canonicalKind)) {
+    throw new RangeError(`Unknown authoritative hazard kind: ${kind}`);
+  }
+  const hazardX = canonicalEntityInteger(x, "Hazard X");
+  const hazardY = canonicalEntityInteger(y, "Hazard Y");
+  let hazard;
+  const asteroid = CANONICAL_ASTEROIDS[canonicalKind];
+  if (asteroid) {
+    const defaultVX = streams
+      ? canonicalStreamRange(streams, "hazards", asteroid.vxMin, asteroid.vxMax)
+      : 0;
+    hazard = {
+      id: state.nextEntityId++,
+      kind: canonicalKind,
+      x: hazardX,
+      y: hazardY,
+      vx: canonicalEntityInteger(options.vx ?? defaultVX, "Hazard velocity X"),
+      vy: canonicalEntityInteger(options.vy ?? asteroid.vy, "Hazard velocity Y"),
+      angle: canonicalEntityInteger(options.angle ?? (streams ? canonicalStreamRange(streams, "hazards", 0, ANGLE_UNITS - 1) : 0), "Hazard angle"),
+      angularVelocity: canonicalEntityInteger(options.angularVelocity ?? (streams ? canonicalStreamRange(streams, "hazards", -36, 36) : 0), "Hazard angular velocity"),
+      hp: canonicalEntityInteger(options.hp ?? asteroid.hp, "Hazard health"),
+      maxHp: canonicalEntityInteger(options.maxHp ?? options.hp ?? asteroid.hp, "Hazard maximum health"),
+      life: canonicalEntityInteger(options.life ?? 780, "Hazard life"),
+      damage: canonicalEntityInteger(options.damage ?? asteroid.damage, "Hazard damage"),
+      realm: canonicalEntityInteger(options.realm ?? 0, "Hazard realm"),
+      rareEvent: Boolean(options.rareEvent),
+      wall: canonicalKind === "boss_wall" || Boolean(options.wall),
+      noScore: canonicalKind === "boss_wall" || Boolean(options.noScore)
+    };
+  } else if (canonicalKind === "mine" || canonicalKind === "energy_mine") {
+    hazard = {
+      id: state.nextEntityId++,
+      kind: canonicalKind,
+      x: hazardX,
+      y: hazardY,
+      vx: canonicalEntityInteger(options.vx ?? (streams ? canonicalStreamRange(streams, "hazards", -184, 184) : 0), "Hazard velocity X"),
+      vy: canonicalEntityInteger(options.vy ?? (canonicalKind === "mine" ? 799 : 737), "Hazard velocity Y"),
+      angle: canonicalEntityInteger(options.angle ?? 0, "Hazard angle"),
+      hp: canonicalEntityInteger(options.hp ?? 2, "Hazard health"),
+      maxHp: canonicalEntityInteger(options.maxHp ?? options.hp ?? 2, "Hazard maximum health"),
+      life: canonicalEntityInteger(options.life ?? 720, "Hazard life"),
+      armTimer: canonicalEntityInteger(options.armTimer ?? (canonicalKind === "mine" ? 54 : 44), "Hazard arm timer"),
+      damage: canonicalEntityInteger(options.damage ?? 1, "Hazard damage"),
+      drain: canonicalEntityInteger(options.drain ?? (canonicalKind === "energy_mine" ? 24 * ENERGY_UNITS_PER_POINT : 0), "Hazard drain"),
+      realm: canonicalEntityInteger(options.realm ?? 0, "Hazard realm")
+    };
+  } else if (canonicalKind === "meteor_warning") {
+    const targetKind = String(options.targetKind || "rock_asteroid");
+    if (!CANONICAL_ASTEROIDS[targetKind] || targetKind === "boss_wall") {
+      throw new RangeError(`Unknown meteor target kind: ${targetKind}`);
+    }
+    hazard = {
+      id: state.nextEntityId++,
+      kind: canonicalKind,
+      x: hazardX,
+      y: hazardY,
+      vx: 0,
+      vy: 0,
+      angle: 0,
+      warn: canonicalEntityInteger(options.warn ?? 48, "Meteor warning timer"),
+      life: canonicalEntityInteger(options.life ?? (options.warn ?? 48) + 4, "Meteor warning life"),
+      targetKind,
+      spawnVX: canonicalEntityInteger(options.spawnVX ?? 0, "Meteor spawn velocity X"),
+      spawnVY: canonicalEntityInteger(options.spawnVY ?? (targetKind === "comet_shard" ? 3_891 : 2_765), "Meteor spawn velocity Y"),
+      rareEvent: Boolean(options.rareEvent)
+    };
+  } else if (canonicalKind === "enemy_beam") {
+    hazard = {
+      id: state.nextEntityId++,
+      kind: canonicalKind,
+      x: hazardX,
+      y: hazardY,
+      angle: canonicalEntityInteger(options.angle ?? 1_024, "Beam angle"),
+      length: canonicalEntityInteger(options.length ?? Math.round(GAME_HEIGHT_UNITS * 14 / 10), "Beam length"),
+      width: canonicalEntityInteger(options.width ?? 8 * POSITION_UNITS_PER_PIXEL, "Beam width"),
+      warn: canonicalEntityInteger(options.warn ?? 0, "Beam warning"),
+      active: canonicalEntityInteger(options.active ?? 16, "Beam active timer"),
+      damage: canonicalEntityInteger(options.damage ?? 0, "Beam damage"),
+      drain: canonicalEntityInteger(options.drain ?? 0, "Beam drain"),
+      sweepVx: canonicalEntityInteger(options.sweepVx ?? 0, "Beam sweep velocity X"),
+      sweepVy: canonicalEntityInteger(options.sweepVy ?? 0, "Beam sweep velocity Y"),
+      realm: canonicalEntityInteger(options.realm ?? 0, "Beam realm")
+    };
+  } else {
+    hazard = {
+      id: state.nextEntityId++,
+      kind: canonicalKind,
+      x: hazardX,
+      y: hazardY,
+      radius: canonicalEntityInteger(options.radius ?? 76 * POSITION_UNITS_PER_PIXEL, "Gravity-well radius"),
+      warn: canonicalEntityInteger(options.warn ?? 46, "Gravity-well warning"),
+      life: canonicalEntityInteger(options.life ?? 190, "Gravity-well life"),
+      strength: canonicalEntityInteger(options.strength ?? 102, "Gravity-well strength"),
+      drain: canonicalEntityInteger(options.drain ?? 0, "Gravity-well drain"),
+      pulseAngle: canonicalEntityInteger(options.pulseAngle ?? (streams ? canonicalStreamRange(streams, "hazards", 0, ANGLE_UNITS - 1) : 0), "Gravity-well pulse"),
+      expanding: Boolean(options.expanding),
+      shrink: Boolean(options.shrink),
+      realm: canonicalEntityInteger(options.realm ?? 0, "Gravity-well realm")
+    };
+  }
+  state.hazards.push(hazard);
+  return hazard;
+}
+
+function laneXForHazard(lane) {
+  return Math.round(GAME_WIDTH_UNITS * [22, 50, 78][lane] / 100);
+}
+
+function spawnCanonicalDebrisField(state, streams) {
+  const count = 5 + canonicalStreamRange(streams, "hazards", 0, state.phase >= 8 ? 2 : 1);
+  for (let index = 0; index < count; index++) {
+    const roll = canonicalRandomUint32(streams, "hazards");
+    const kind = state.phase >= 8 && roll > Math.floor(0xffffffff * 0.86)
+      ? "comet_shard"
+      : roll > Math.floor(0xffffffff * 0.68)
+        ? "small_debris"
+        : roll > Math.floor(0xffffffff * 0.14)
+          ? "rock_asteroid"
+          : "iron_asteroid";
+    const jitter = canonicalStreamRange(streams, "hazards", -34, 34) * POSITION_UNITS_PER_PIXEL;
+    spawnCanonicalHazard(
+      state,
+      kind,
+      laneXForHazard(index % 3) + jitter,
+      (-42 - index * 52) * POSITION_UNITS_PER_PIXEL,
+      { rareEvent: true },
+      streams
+    );
+  }
+}
+
+function tickCanonicalHazardEvent(state, streams) {
+  if (!state || state.schema !== "SSR_SIM_STATE_V1") throw new TypeError("Canonical hazard director requires simulation state.");
+  if (!streams || typeof streams.nextUint32 !== "function") throw new TypeError("Canonical hazard director requires named random streams.");
+  const directorState = state.director;
+  if (state.phase < 3 || state.boss || directorState.bossRecovery > 0) return;
+  if (state.player.hp <= 1 || state.enemies.length > 10) {
+    directorState.hazardEventTimer = Math.max(directorState.hazardEventTimer, 360);
+    return;
+  }
+  if (directorState.hazardWarningTimer > 0) {
+    directorState.hazardWarningTimer--;
+    if (directorState.hazardWarningTimer === 0) spawnCanonicalDebrisField(state, streams);
+    return;
+  }
+  if (state.hazards.some((hazard) => hazard.rareEvent || hazard.wall)) return;
+  directorState.hazardEventTimer--;
+  if (directorState.hazardEventTimer <= 0) {
+    directorState.hazardWarningTimer = 78;
+    directorState.hazardEventTimer = 1_500
+      + canonicalStreamRange(streams, "hazards", 0, 919)
+      + Math.max(0, 7 - state.phase) * 120;
+  }
 }
 
 function fireCanonicalPlayer(state) {
@@ -577,11 +760,7 @@ function updateCanonicalExpansionEnemy(state, enemy, streams) {
     if (enemy.railWarn > 0) {
       enemy.railWarn--;
       if (enemy.railWarn <= 0 && streams) {
-        state.hazards.push({
-          id: state.nextEntityId++,
-          kind: "enemy_beam",
-          x: enemy.x,
-          y: enemy.y + 13 * POSITION_UNITS_PER_PIXEL,
+        spawnCanonicalHazard(state, "enemy_beam", enemy.x, enemy.y + 13 * POSITION_UNITS_PER_PIXEL, {
           angle: enemy.railAngle,
           active: 14,
           width: 7 * POSITION_UNITS_PER_PIXEL,
@@ -651,43 +830,562 @@ function damageCanonicalPlayer(state, amount) {
   return true;
 }
 
-function updateCanonicalHazards(state) {
+function beamHitsCanonicalPlayer(state, hazard) {
+  if (hazard.realm !== state.playerRealm) return false;
+  const dx = state.player.x - hazard.x;
+  const dy = state.player.y - hazard.y;
+  const directionX = canonicalCosForAngle(hazard.angle);
+  const directionY = sinForAngle(hazard.angle);
+  const projection = roundDivide(dx * directionX + dy * directionY, TRIG_UNITS);
+  const perpendicular = Math.abs(roundDivide(dx * directionY - dy * directionX, TRIG_UNITS));
+  return projection >= -8 * POSITION_UNITS_PER_PIXEL
+    && projection <= hazard.length
+    && perpendicular <= hazard.width + 7 * POSITION_UNITS_PER_PIXEL;
+}
+
+function updateCanonicalHazards(state, streams) {
   const playerBody = collisionBodyFor("player", state.player.x, state.player.y, state.player.heading);
   const survivors = [];
   for (const hazard of state.hazards) {
-    if (hazard.kind === "mine") {
+    if (CANONICAL_ASTEROIDS[hazard.kind]) {
+      hazard.x += hazard.vx;
+      hazard.y += hazard.vy;
+      hazard.angle = (hazard.angle + hazard.angularVelocity + ANGLE_UNITS) % ANGLE_UNITS;
+      hazard.life--;
+      if (hazard.realm === state.playerRealm
+        && bodiesOverlap(playerBody, collisionBodyFor(hazard.kind, hazard.x, hazard.y, hazard.angle))) {
+        if (damageCanonicalPlayer(state, hazard.damage) && !hazard.wall) hazard.hp -= 2;
+      }
+      if (hazard.hp > 0 && hazard.life > 0
+        && hazard.y < GAME_HEIGHT_UNITS + 70 * POSITION_UNITS_PER_PIXEL
+        && hazard.x > -70 * POSITION_UNITS_PER_PIXEL
+        && hazard.x < GAME_WIDTH_UNITS + 70 * POSITION_UNITS_PER_PIXEL) {
+        survivors.push(hazard);
+      }
+      continue;
+    }
+    if (hazard.kind === "mine" || hazard.kind === "energy_mine") {
       hazard.x += hazard.vx;
       hazard.y += hazard.vy;
       hazard.life--;
       if (hazard.armTimer > 0) hazard.armTimer--;
       if (hazard.armTimer <= 0 && hazard.realm === state.playerRealm
-        && bodiesOverlap(playerBody, collisionBodyFor("mine", hazard.x, hazard.y, hazard.angle))) {
-        damageCanonicalPlayer(state, hazard.damage);
+        && bodiesOverlap(playerBody, collisionBodyFor(hazard.kind, hazard.x, hazard.y, hazard.angle))) {
+        if (hazard.kind === "energy_mine") {
+          state.player.energy = Math.max(0, state.player.energy - hazard.drain);
+        } else {
+          damageCanonicalPlayer(state, hazard.damage);
+        }
         continue;
       }
       if (hazard.life > 0) survivors.push(hazard);
       continue;
     }
+    if (hazard.kind === "meteor_warning") {
+      hazard.warn--;
+      hazard.life--;
+      if (hazard.warn <= 0) {
+        spawnCanonicalHazard(state, hazard.targetKind, hazard.x, -38 * POSITION_UNITS_PER_PIXEL, {
+          vx: hazard.spawnVX,
+          vy: hazard.spawnVY,
+          rareEvent: hazard.rareEvent
+        }, streams);
+      } else if (hazard.life > 0) survivors.push(hazard);
+      continue;
+    }
     if (hazard.kind === "enemy_beam") {
-      hazard.active--;
-      if (hazard.realm === state.playerRealm && hazard.active >= 0) {
-        const dx = state.player.x - hazard.x;
-        const dy = state.player.y - hazard.y;
-        const directionX = canonicalCosForAngle(hazard.angle);
-        const directionY = sinForAngle(hazard.angle);
-        const projection = roundDivide(dx * directionX + dy * directionY, TRIG_UNITS);
-        const perpendicular = Math.abs(roundDivide(dx * directionY - dy * directionX, TRIG_UNITS));
-        if (projection >= 0 && projection <= GAME_HEIGHT_UNITS
-          && perpendicular <= hazard.width + 7 * POSITION_UNITS_PER_PIXEL) {
-          damageCanonicalPlayer(state, hazard.damage);
+      hazard.x += hazard.sweepVx;
+      hazard.y += hazard.sweepVy;
+      if (hazard.warn > 0) {
+        hazard.warn--;
+      } else {
+        hazard.active--;
+        if (hazard.active >= 0 && beamHitsCanonicalPlayer(state, hazard)) {
+          if (hazard.drain > 0) state.player.energy = Math.max(0, state.player.energy - hazard.drain);
+          if (hazard.damage > 0) damageCanonicalPlayer(state, hazard.damage);
         }
       }
       if (hazard.active > 0) survivors.push(hazard);
       continue;
     }
+    if (hazard.kind === "gravity_well") {
+      if (hazard.warn > 0) {
+        hazard.warn--;
+      } else {
+        hazard.life--;
+        hazard.pulseAngle = (hazard.pulseAngle + 52) % ANGLE_UNITS;
+        if (hazard.expanding) hazard.radius = Math.min(150 * POSITION_UNITS_PER_PIXEL, hazard.radius + 1_382);
+        if (hazard.shrink) hazard.radius = Math.max(28 * POSITION_UNITS_PER_PIXEL, hazard.radius - 563);
+        if (hazard.realm === state.playerRealm) {
+          const dx = hazard.x - state.player.x;
+          const dy = hazard.y - state.player.y;
+          const distance = Math.max(1, Math.trunc(Math.sqrt(dx * dx + dy * dy)));
+          if (distance < hazard.radius) {
+            const pull = roundDivide(hazard.strength * (hazard.radius - distance), hazard.radius);
+            state.player.vx += roundDivide(dx * pull, distance);
+            state.player.vy += roundDivide(dy * pull, distance);
+            if (hazard.drain > 0 && state.tick % 10 === 0) {
+              state.player.energy = Math.max(0, state.player.energy - hazard.drain);
+            }
+          }
+        }
+      }
+      if (hazard.life > 0) survivors.push(hazard);
+      continue;
+    }
     survivors.push(hazard);
   }
   state.hazards = survivors;
+}
+
+function canonicalAngleToTarget(fromX, fromY, targetX, targetY) {
+  const radians = Math.atan2(targetY - fromY, targetX - fromX);
+  return ((Math.round(radians * ANGLE_UNITS / (Math.PI * 2)) % ANGLE_UNITS) + ANGLE_UNITS) % ANGLE_UNITS;
+}
+
+function fireCanonicalBossProjectile(state, boss, angle, speed, realm = 0, kind = "boss") {
+  const canonicalAngle = ((angle % ANGLE_UNITS) + ANGLE_UNITS) % ANGLE_UNITS;
+  state.enemyProjectiles.push({
+    id: state.nextEntityId++,
+    kind,
+    x: boss.x,
+    y: boss.y + 22 * POSITION_UNITS_PER_PIXEL,
+    vx: roundDivide(canonicalCosForAngle(canonicalAngle) * speed, TRIG_UNITS),
+    vy: roundDivide(sinForAngle(canonicalAngle) * speed, TRIG_UNITS),
+    angle: canonicalAngle,
+    life: kind === "wraithGhost" ? 200 : 220,
+    damage: 1,
+    drain: 0,
+    realm
+  });
+}
+
+function fireCanonicalBossSpread(state, boss, count, spreadAngle, speed, realm = 0, kind = "boss") {
+  const base = canonicalAngleToTarget(boss.x, boss.y + 22 * POSITION_UNITS_PER_PIXEL, state.player.x, state.player.y);
+  const denominator = Math.max(1, count - 1);
+  for (let index = 0; index < count; index++) {
+    const offset = count === 1 ? 0 : roundDivide((index * 2 - (count - 1)) * spreadAngle, denominator);
+    fireCanonicalBossProjectile(state, boss, base + offset, speed, realm, kind);
+  }
+}
+
+function canonicalBossModeForPhase(phase) {
+  const value = Number(phase);
+  if (!Number.isSafeInteger(value) || value < 4 || value % 4 !== 0) return null;
+  if (value < 8) return "standard";
+  if (value < 12) return "wraith";
+  const modes = ["debris_warden", "mothership", "siphon_core", "hive_breaker", "rail_tyrant", "gravity_well"];
+  return modes[Math.floor((value - 12) / 4) % modes.length];
+}
+
+function canonicalBossConfig(mode, phase) {
+  if (mode === "standard") {
+    return { hp: 80 + phase * 18, y: -100, targetY: 92, entrySpeed: 717, attackTimer: 72 };
+  }
+  if (mode === "wraith") {
+    return { hp: Math.floor((88 + phase * 6) * 105 / 100), y: -120, targetY: 94, entrySpeed: 492, attackTimer: 54 };
+  }
+  const expansion = {
+    debris_warden: { baseHp: 112, hpPerPhase: 15, targetY: 90 },
+    mothership: { baseHp: 118, hpPerPhase: 16, targetY: 92 },
+    siphon_core: { baseHp: 120, hpPerPhase: 16, targetY: 90 },
+    hive_breaker: { baseHp: 124, hpPerPhase: 16, targetY: 92 },
+    rail_tyrant: { baseHp: 128, hpPerPhase: 16, targetY: 90 },
+    gravity_well: { baseHp: 132, hpPerPhase: 16, targetY: 90 }
+  }[mode];
+  if (!expansion) throw new RangeError(`Unknown authoritative boss mode: ${mode}`);
+  return {
+    hp: expansion.baseHp + phase * expansion.hpPerPhase,
+    y: -112,
+    targetY: expansion.targetY,
+    entrySpeed: 594,
+    attackTimer: 86
+  };
+}
+
+function spawnCanonicalBoss(state, requestedMode, streams) {
+  if (!state || state.schema !== "SSR_SIM_STATE_V1" || state.terminal || state.boss) {
+    throw new TypeError("Canonical boss creation requires an active boss-free simulation state.");
+  }
+  const mode = String(requestedMode || canonicalBossModeForPhase(state.phase) || "");
+  if (!AUTHORITATIVE_BOSS_ARCHETYPES[mode]) throw new RangeError(`Unknown authoritative boss mode: ${mode}`);
+  if (!streams || typeof streams.nextUint32 !== "function") throw new TypeError("Canonical boss creation requires named random streams.");
+  const config = canonicalBossConfig(mode, state.phase);
+  const boss = {
+    id: state.nextEntityId++,
+    mode,
+    x: Math.round(GAME_WIDTH_UNITS / 2),
+    y: config.y * POSITION_UNITS_PER_PIXEL,
+    targetY: config.targetY * POSITION_UNITS_PER_PIXEL,
+    entrySpeed: config.entrySpeed,
+    angle: 0,
+    hp: config.hp,
+    maxHp: config.hp,
+    score: AUTHORITATIVE_BOSS_ARCHETYPES[mode].score,
+    entered: false,
+    combatActive: false,
+    attackTimer: config.attackTimer,
+    cooldown: config.attackTimer,
+    warn: 0,
+    warnMax: 0,
+    pending: "",
+    step: 0,
+    moveAngle: canonicalStreamRange(streams, "boss_behavior", 0, ANGLE_UNITS - 1),
+    realm: 0,
+    nextRealm: 1,
+    shiftTelegraph: 0,
+    hitsSinceShift: 0,
+    nextShiftHits: mode === "wraith" ? 6 + canonicalStreamRange(streams, "boss_behavior", 0, 2) : 0,
+    passiveTimer: 0,
+    shift60Triggered: false,
+    shift30Triggered: false,
+    chargeTelegraph: 0,
+    chargeStartRealm: 0,
+    chargeDodged: false,
+    chargeRecovery: 0,
+    phantomSpewTimer: mode === "wraith" ? 300 + canonicalStreamRange(streams, "boss_behavior", 0, 119) : 0,
+    bayOpen: 0,
+    threshold70: false,
+    threshold45: false,
+    threshold25: false
+  };
+  state.boss = boss;
+  state.playerRealm = 0;
+  state.director.mood = "boss";
+  state.director.moodTimer = 0;
+  state.director.lastTemplate = "";
+  return boss;
+}
+
+function bossHealthPercentHundredths(boss) {
+  return Math.max(0, Math.min(100, Math.floor(boss.hp * 100 / Math.max(1, boss.maxHp))));
+}
+
+function standardBossAttack(boss) {
+  const hp = bossHealthPercentHundredths(boss);
+  const sequence = hp > 70
+    ? ["spread", "aimed", "spawn", "spread"]
+    : hp > 40
+      ? ["aimed", "fan", "spawn", "aimed"]
+      : ["fan", "spawn", "aimed", "fan"];
+  return sequence[boss.step % sequence.length];
+}
+
+function expansionBossAttack(state, boss) {
+  const hp = bossHealthPercentHundredths(boss);
+  if (boss.mode === "siphon_core" && state.player.energy < 16 * ENERGY_UNITS_PER_POINT && boss.step % 2 === 0) {
+    return "low_energy_pause";
+  }
+  const sequences = {
+    debris_warden: hp > 62
+      ? ["wall", "light", "wall", "meteor", "wall", "double", "rotate"]
+      : hp > 30
+        ? ["wall", "meteor", "wall", "crush", "rotate", "wall", "double", "light"]
+        : ["wall", "crush", "meteor", "wall", "rotate", "wall", "double", "meteor"],
+    mothership: hp > 35 ? ["launch", "escort", "heavy", "launch"] : ["final", "repair", "heavy", "escort"],
+    siphon_core: hp > 45 ? ["drain_beam", "energy_mines", "pulse"] : ["tether", "pulse", "overcharge", "energy_mines"],
+    hive_breaker: hp > 45 ? ["shard_burst", "guards", "light"] : ["panic", "shard_burst", "guards"],
+    rail_tyrant: hp > 45 ? ["center", "crosshair", "triple"] : ["triple", "sweep", "crosshair"],
+    gravity_well: hp > 45 ? ["well", "orbit", "compression"] : ["pull_gap", "compression", "asteroid_orbit"]
+  };
+  const sequence = sequences[boss.mode];
+  return sequence[boss.step % sequence.length];
+}
+
+function canonicalBossCooldown(boss) {
+  const hp = bossHealthPercentHundredths(boss);
+  if (boss.mode === "standard") {
+    const base = hp > 70 ? 60 : hp > 40 ? 48 : hp > 15 ? 38 : 32;
+    return Math.max(30, Math.min(80, base - Math.round((100 - hp) * 4 / 100)));
+  }
+  if (boss.mode === "wraith") return hp > 70 ? 54 : hp > 40 ? 42 : hp > 20 ? 30 : 24;
+  const base = boss.mode === "debris_warden" ? 92 : boss.mode === "mothership" ? 76 : boss.mode === "rail_tyrant" ? 80 : 72;
+  return Math.max(38, Math.min(104, base - Math.round((100 - hp) * 24 / 100)));
+}
+
+function spawnCanonicalBossWall(state, gapSlot, options, streams) {
+  const slots = options.slots || 6;
+  const slotWidth = Math.floor(GAME_WIDTH_UNITS / slots);
+  for (let slot = 0; slot < slots; slot++) {
+    if (slot === gapSlot) continue;
+    spawnCanonicalHazard(state, "boss_wall", slotWidth * slot + Math.floor(slotWidth / 2), options.y ?? -36 * POSITION_UNITS_PER_PIXEL, {
+      vx: 0,
+      vy: options.vy ?? 2_048,
+      angle: 0,
+      angularVelocity: 0,
+      wall: true,
+      noScore: true
+    }, streams);
+  }
+}
+
+function spawnCanonicalBossEnemy(state, boss, type, offsetPixels, streams, options = {}) {
+  return spawnCanonicalEnemy(state, type, boss.x + offsetPixels * POSITION_UNITS_PER_PIXEL, boss.y + 26 * POSITION_UNITS_PER_PIXEL, {
+    vx: options.vx ?? 0,
+    vy: options.vy ?? canonicalEnemyVelocityY(type, state.phase),
+    motion: options.motion || (type === "orange" ? "zigzag" : type === "phantom" ? "phantom" : "drift"),
+    stateMode: options.stateMode || "physical",
+    noPowerup: Boolean(options.noPowerup)
+  }, streams);
+}
+
+function resolveCanonicalBossAttack(state, boss, attack, streams) {
+  const hp = bossHealthPercentHundredths(boss);
+  if (boss.mode === "standard") {
+    if (attack === "spread") fireCanonicalBossSpread(state, boss, hp > 70 ? 5 : hp > 40 ? 7 : 9, hp > 40 ? 148 : 171, 3_379 + Math.round((100 - hp) * 5));
+    else if (attack === "aimed") fireCanonicalBossSpread(state, boss, hp > 70 ? 3 : hp > 40 ? 4 : 5, hp > 40 ? 80 : 102, 3_891 + Math.round((100 - hp) * 5));
+    else if (attack === "fan") fireCanonicalBossSpread(state, boss, hp > 70 ? 7 : hp > 40 ? 9 : 11, hp > 70 ? 149 : hp > 40 ? 199 : 249, 3_584 + Math.round((100 - hp) * 6));
+    else if (attack === "spawn") {
+      const types = state.phase < 3 ? ["red"] : state.phase < 5 ? ["red", "orange"] : ["red", "orange", "purple"];
+      const type = types[canonicalStreamRange(streams, "boss_behavior", 0, types.length - 1)];
+      spawnCanonicalBossEnemy(state, boss, type, 0, streams);
+      if (state.phase >= 4 && canonicalRandomUint32(streams, "boss_behavior") < 2_362_232_012) {
+        const second = types[canonicalStreamRange(streams, "boss_behavior", 0, types.length - 1)];
+        spawnCanonicalBossEnemy(state, boss, second, 24, streams);
+      }
+    }
+  } else if (boss.mode === "debris_warden") {
+    const speed = hp > 62 ? 1_864 : hp > 30 ? 2_253 : 2_642;
+    if (attack === "wall") {
+      spawnCanonicalBossWall(state, canonicalStreamRange(streams, "boss_behavior", 0, 5), { vy: speed }, streams);
+    } else if (attack === "double") {
+      const first = canonicalStreamRange(streams, "boss_behavior", 0, 5);
+      const second = canonicalStreamRange(streams, "boss_behavior", 0, 5);
+      spawnCanonicalBossWall(state, first, { vy: Math.round(speed * 88 / 100) }, streams);
+      spawnCanonicalBossWall(state, second, { y: -132 * POSITION_UNITS_PER_PIXEL, vy: Math.round(speed * 88 / 100) }, streams);
+    } else if (attack === "crush") {
+      spawnCanonicalBossWall(state, canonicalStreamRange(streams, "boss_behavior", 0, 4), { slots: 5, y: -44 * POSITION_UNITS_PER_PIXEL, vy: Math.round(speed * 84 / 100) }, streams);
+    } else if (attack === "meteor") {
+      for (let index = 0; index < 4; index++) {
+        spawnCanonicalHazard(state, "meteor_warning", laneXForHazard(index % 3), Math.round(GAME_HEIGHT_UNITS * 22 / 100), {
+          warn: 44 + index * 8,
+          targetKind: index === 3 && state.phase >= 9 ? "comet_shard" : "rock_asteroid",
+          spawnVY: Math.round(speed * (index === 3 && state.phase >= 9 ? 128 : 112) / 100)
+        }, streams);
+      }
+    } else if (attack === "rotate") {
+      for (let index = 0; index < 5; index++) {
+        spawnCanonicalHazard(state, "rock_asteroid", (44 + index * 72) * POSITION_UNITS_PER_PIXEL, (-38 - index * 30) * POSITION_UNITS_PER_PIXEL, {
+          vx: index % 2 === 0 ? -563 : 563,
+          vy: speed
+        }, streams);
+      }
+    } else {
+      fireCanonicalBossSpread(state, boss, 3, 102, 3_277);
+    }
+  } else if (boss.mode === "mothership") {
+    if (attack === "launch") {
+      spawnCanonicalBossEnemy(state, boss, canonicalRandomUint32(streams, "boss_behavior") < 0x80000000 ? "red" : "orange", -24, streams);
+      spawnCanonicalBossEnemy(state, boss, canonicalRandomUint32(streams, "boss_behavior") < 0x80000000 ? "red" : "orange", 24, streams);
+    } else if (attack === "heavy") {
+      spawnCanonicalBossEnemy(state, boss, state.phase >= 9 && canonicalRandomUint32(streams, "boss_behavior") < 0x80000000 ? "siphon" : "splitter", 0, streams);
+    } else if (attack === "escort") {
+      spawnCanonicalBossEnemy(state, boss, "red", -34, streams);
+      spawnCanonicalBossEnemy(state, boss, "orange", 0, streams);
+      spawnCanonicalBossEnemy(state, boss, "red", 34, streams);
+    } else if (attack === "repair") {
+      spawnCanonicalBossEnemy(state, boss, "repair_drone", canonicalRandomUint32(streams, "boss_behavior") < 0x80000000 ? -26 : 26, streams);
+    } else if (attack === "final") {
+      spawnCanonicalBossEnemy(state, boss, "orange", -36, streams);
+      spawnCanonicalBossEnemy(state, boss, state.phase >= 10 ? "siphon" : "red", 0, streams);
+      spawnCanonicalBossEnemy(state, boss, "orange", 36, streams);
+    }
+    boss.bayOpen = 32;
+  } else if (boss.mode === "siphon_core") {
+    if (attack === "drain_beam" || attack === "tether") {
+      spawnCanonicalHazard(state, "enemy_beam", boss.x, boss.y + 22 * POSITION_UNITS_PER_PIXEL, {
+        angle: canonicalAngleToTarget(boss.x, boss.y + 22 * POSITION_UNITS_PER_PIXEL, state.player.x, state.player.y),
+        warn: 34,
+        active: 34,
+        width: (attack === "tether" ? 12 : 9) * POSITION_UNITS_PER_PIXEL,
+        drain: Math.round((attack === "tether" ? 2.4 : 3.2) * ENERGY_UNITS_PER_POINT)
+      }, streams);
+    } else if (attack === "energy_mines") {
+      spawnCanonicalHazard(state, "energy_mine", boss.x - 44 * POSITION_UNITS_PER_PIXEL, boss.y + 28 * POSITION_UNITS_PER_PIXEL, {}, streams);
+      spawnCanonicalHazard(state, "energy_mine", boss.x + 44 * POSITION_UNITS_PER_PIXEL, boss.y + 28 * POSITION_UNITS_PER_PIXEL, {}, streams);
+    } else if (attack === "pulse") {
+      spawnCanonicalHazard(state, "gravity_well", boss.x, boss.y + 34 * POSITION_UNITS_PER_PIXEL, {
+        radius: 38 * POSITION_UNITS_PER_PIXEL, warn: 34, life: 92, strength: 20, drain: Math.round(2.2 * ENERGY_UNITS_PER_POINT), expanding: true
+      }, streams);
+    } else if (attack === "overcharge") {
+      if (state.player.energy > 65 * ENERGY_UNITS_PER_POINT) {
+        spawnCanonicalHazard(state, "enemy_beam", boss.x, boss.y + 22 * POSITION_UNITS_PER_PIXEL, {
+          angle: canonicalAngleToTarget(boss.x, boss.y + 22 * POSITION_UNITS_PER_PIXEL, state.player.x, state.player.y),
+          warn: 36, active: 28, width: 13 * POSITION_UNITS_PER_PIXEL, drain: 4 * ENERGY_UNITS_PER_POINT
+        }, streams);
+      } else spawnCanonicalHazard(state, "energy_mine", boss.x, boss.y + 28 * POSITION_UNITS_PER_PIXEL, {}, streams);
+    }
+  } else if (boss.mode === "hive_breaker") {
+    if (attack === "shard_burst" || attack === "panic") {
+      const count = attack === "panic" ? 6 : 4;
+      for (let index = 0; index < count; index++) {
+        const numerator = index * 2 - (count - 1);
+        const offset = roundDivide(numerator * 28 * POSITION_UNITS_PER_PIXEL, Math.max(1, count - 1));
+        const vx = roundDivide(numerator * 2_150, Math.max(1, count - 1));
+        spawnCanonicalBossEnemy(state, boss, "splitter_shard", 0, streams, { vx, vy: 2_765 + Math.round(Math.abs(vx) / 6), noPowerup: true });
+        state.enemies[state.enemies.length - 1].x += offset;
+      }
+    } else if (attack === "guards") {
+      spawnCanonicalBossEnemy(state, boss, "splitter", -44, streams);
+      spawnCanonicalBossEnemy(state, boss, "splitter", 44, streams);
+    } else fireCanonicalBossSpread(state, boss, 4, 114, 3_072);
+  } else if (boss.mode === "rail_tyrant") {
+    if (attack === "center") {
+      spawnCanonicalHazard(state, "enemy_beam", Math.floor(GAME_WIDTH_UNITS / 2), -10 * POSITION_UNITS_PER_PIXEL, { angle: 1_024, warn: 42, active: 18, width: 9 * POSITION_UNITS_PER_PIXEL, damage: 1 }, streams);
+    } else if (attack === "crosshair") {
+      spawnCanonicalHazard(state, "enemy_beam", state.player.x, -10 * POSITION_UNITS_PER_PIXEL, { angle: 1_024, warn: 44, active: 16, width: 8 * POSITION_UNITS_PER_PIXEL, damage: 1 }, streams);
+    } else if (attack === "triple") {
+      const safe = canonicalStreamRange(streams, "boss_behavior", 0, 2);
+      for (let lane = 0; lane < 3; lane++) if (lane !== safe) {
+        spawnCanonicalHazard(state, "enemy_beam", laneXForHazard(lane), -10 * POSITION_UNITS_PER_PIXEL, { angle: 1_024, warn: 44, active: 18, width: 13 * POSITION_UNITS_PER_PIXEL, damage: 1 }, streams);
+      }
+    } else if (attack === "sweep") {
+      const left = canonicalRandomUint32(streams, "boss_behavior") < 0x80000000;
+      spawnCanonicalHazard(state, "enemy_beam", (left ? 36 : 339) * POSITION_UNITS_PER_PIXEL, -10 * POSITION_UNITS_PER_PIXEL, {
+        angle: 1_024, warn: 44, active: 72, width: 8 * POSITION_UNITS_PER_PIXEL, damage: 1, sweepVx: left ? 1_178 : -1_178
+      }, streams);
+    }
+  } else if (boss.mode === "gravity_well") {
+    if (attack === "well") {
+      const x = clampInteger(state.player.x + canonicalStreamRange(streams, "boss_behavior", -40, 40) * POSITION_UNITS_PER_PIXEL, 52 * POSITION_UNITS_PER_PIXEL, GAME_WIDTH_UNITS - 52 * POSITION_UNITS_PER_PIXEL);
+      const y = clampInteger(state.player.y - 70 * POSITION_UNITS_PER_PIXEL, 130 * POSITION_UNITS_PER_PIXEL, GAME_HEIGHT_UNITS - 160 * POSITION_UNITS_PER_PIXEL);
+      spawnCanonicalHazard(state, "gravity_well", x, y, { radius: 78 * POSITION_UNITS_PER_PIXEL, warn: 46, life: 160, strength: 123 }, streams);
+    } else if (attack === "compression") {
+      spawnCanonicalHazard(state, "gravity_well", Math.floor(GAME_WIDTH_UNITS / 2), Math.round(GAME_HEIGHT_UNITS * 55 / 100), { radius: 130 * POSITION_UNITS_PER_PIXEL, warn: 42, life: 150, strength: 46, shrink: true }, streams);
+    } else if (attack === "orbit") {
+      fireCanonicalBossSpread(state, boss, 5, 369, 2_714);
+    } else if (attack === "asteroid_orbit") {
+      for (let index = 0; index < 3; index++) spawnCanonicalHazard(state, "small_debris", boss.x + (index - 1) * 36 * POSITION_UNITS_PER_PIXEL, boss.y + 30 * POSITION_UNITS_PER_PIXEL, { vx: (index - 1) * 358, vy: 2_406 }, streams);
+    } else if (attack === "pull_gap") {
+      spawnCanonicalHazard(state, "gravity_well", Math.floor(GAME_WIDTH_UNITS / 2), Math.round(GAME_HEIGHT_UNITS * 48 / 100), { radius: 102 * POSITION_UNITS_PER_PIXEL, warn: 40, life: 120, strength: 77 }, streams);
+      const safe = canonicalStreamRange(streams, "boss_behavior", 0, 2);
+      for (let lane = 0; lane < 3; lane++) if (lane !== safe) spawnCanonicalHazard(state, "enemy_beam", laneXForHazard(lane), -10 * POSITION_UNITS_PER_PIXEL, { angle: 1_024, warn: 46, active: 14, width: 10 * POSITION_UNITS_PER_PIXEL, damage: 1 }, streams);
+    }
+  }
+  boss.step++;
+}
+
+function updateCanonicalWraith(state, boss, streams) {
+  if (boss.shiftTelegraph > 0) {
+    boss.shiftTelegraph--;
+    if (boss.shiftTelegraph === 0) {
+      boss.realm = boss.nextRealm;
+      boss.nextRealm = 1 - boss.realm;
+      boss.hitsSinceShift = 0;
+      boss.nextShiftHits = 6 + canonicalStreamRange(streams, "boss_behavior", 0, 2);
+      boss.passiveTimer = 0;
+      boss.attackTimer = Math.min(boss.attackTimer, 38);
+    }
+    return;
+  }
+  if (boss.chargeTelegraph > 0) {
+    boss.chargeTelegraph--;
+    if (state.playerRealm !== boss.chargeStartRealm) boss.chargeDodged = true;
+    if (boss.chargeTelegraph === 0) {
+      const hp = bossHealthPercentHundredths(boss);
+      const total = hp > 38 ? 12 : 14;
+      fireCanonicalBossSpread(state, boss, total - 3, 91, state.playerRealm === 0 ? 4_813 : 4_096, state.playerRealm, state.playerRealm === 0 ? "wraithPhysical" : "wraithGhost");
+      fireCanonicalBossSpread(state, boss, 3, 46, state.playerRealm === 0 ? 3_277 : 2_867, 1 - state.playerRealm, state.playerRealm === 0 ? "wraithGhost" : "wraithPhysical");
+      if (boss.chargeDodged) state.player.energy = Math.min(state.player.maxEnergy, state.player.energy + 9 * ENERGY_UNITS_PER_POINT);
+      boss.chargeRecovery = 20;
+      boss.attackTimer = canonicalBossCooldown(boss);
+    }
+    return;
+  }
+  if (boss.chargeRecovery > 0) boss.chargeRecovery--;
+  boss.moveAngle = (boss.moveAngle + (boss.realm === 0 ? 13 : 19)) % ANGLE_UNITS;
+  boss.x += roundDivide(sinForAngle(boss.moveAngle) * (boss.realm === 0 ? 922 : 1_331), TRIG_UNITS);
+  boss.x = clampInteger(boss.x, 78 * POSITION_UNITS_PER_PIXEL, GAME_WIDTH_UNITS - 78 * POSITION_UNITS_PER_PIXEL);
+  if (state.playerRealm === boss.realm) boss.passiveTimer = 0;
+  else boss.passiveTimer++;
+  if (!boss.shift60Triggered && boss.hp * 10 <= boss.maxHp * 6) {
+    boss.shift60Triggered = true;
+    boss.shiftTelegraph = 30;
+    boss.nextRealm = 1 - boss.realm;
+    return;
+  }
+  if (!boss.shift30Triggered && boss.hp * 10 <= boss.maxHp * 3) {
+    boss.shift30Triggered = true;
+    boss.shiftTelegraph = 30;
+    boss.nextRealm = 1 - boss.realm;
+    return;
+  }
+  if (boss.passiveTimer >= 540) {
+    boss.shiftTelegraph = 30;
+    boss.nextRealm = 1 - boss.realm;
+    return;
+  }
+  boss.attackTimer--;
+  if (boss.attackTimer <= 0) {
+    boss.combatActive = true;
+    const hp = bossHealthPercentHundredths(boss);
+    const chance = hp < 20 ? 60 : hp < 40 ? 45 : hp < 70 ? 28 : 18;
+    if (canonicalStreamRange(streams, "boss_behavior", 0, 99) < chance && boss.chargeRecovery <= 0) {
+      boss.chargeTelegraph = hp < 40 ? 48 : 42;
+      boss.chargeStartRealm = state.playerRealm;
+      boss.chargeDodged = false;
+      boss.attackTimer = canonicalBossCooldown(boss) + 10;
+    } else {
+      const total = hp > 68 ? 9 : hp > 38 ? 12 : 15;
+      const main = Math.max(2, Math.round(total * 75 / 100));
+      fireCanonicalBossSpread(state, boss, main, boss.realm === 0 ? 137 : 102, boss.realm === 0 ? 4_198 : 3_789, state.playerRealm, state.playerRealm === 0 ? "wraithPhysical" : "wraithGhost");
+      fireCanonicalBossSpread(state, boss, total - main, boss.realm === 0 ? 80 : 68, 3_072, 1 - state.playerRealm, state.playerRealm === 0 ? "wraithGhost" : "wraithPhysical");
+      boss.attackTimer = canonicalBossCooldown(boss);
+    }
+  }
+}
+
+function updateCanonicalBoss(state, streams) {
+  const boss = state.boss;
+  if (!boss) return false;
+  if (!streams || typeof streams.nextUint32 !== "function") throw new TypeError("Canonical boss updates require named random streams.");
+  if (!boss.entered) {
+    boss.y = Math.min(boss.targetY, boss.y + boss.entrySpeed);
+    if (boss.y >= boss.targetY) {
+      boss.y = boss.targetY;
+      boss.entered = true;
+      boss.attackTimer = boss.mode === "wraith" ? 50 : 72;
+      boss.cooldown = boss.attackTimer;
+    }
+    return true;
+  }
+  if (boss.mode === "wraith") {
+    updateCanonicalWraith(state, boss, streams);
+    return true;
+  }
+  boss.moveAngle = (boss.moveAngle + (boss.mode === "rail_tyrant" ? 12 : 16)) % ANGLE_UNITS;
+  boss.x += roundDivide(sinForAngle(boss.moveAngle) * (boss.mode === "mothership" ? 563 : boss.mode === "standard" ? 1_434 : 799), TRIG_UNITS);
+  const edge = boss.mode === "mothership" ? 88 : 78;
+  boss.x = clampInteger(boss.x, edge * POSITION_UNITS_PER_PIXEL, GAME_WIDTH_UNITS - edge * POSITION_UNITS_PER_PIXEL);
+  boss.bayOpen = Math.max(0, boss.bayOpen - 1);
+  const hp = bossHealthPercentHundredths(boss);
+  if (boss.mode === "hive_breaker") {
+    if (!boss.threshold70 && hp < 70) { boss.threshold70 = true; resolveCanonicalBossAttack(state, boss, "guards", streams); }
+    if (!boss.threshold45 && hp < 45) { boss.threshold45 = true; resolveCanonicalBossAttack(state, boss, "shard_burst", streams); }
+    if (!boss.threshold25 && hp < 25) { boss.threshold25 = true; resolveCanonicalBossAttack(state, boss, "panic", streams); }
+  }
+  if (boss.warn > 0) {
+    boss.warn--;
+    if (boss.warn === 0) {
+      resolveCanonicalBossAttack(state, boss, boss.pending, streams);
+      boss.pending = "";
+      boss.attackTimer = canonicalBossCooldown(boss);
+      boss.cooldown = boss.attackTimer;
+    }
+    return true;
+  }
+  boss.attackTimer--;
+  boss.cooldown = boss.attackTimer;
+  if (boss.attackTimer <= 0) {
+    boss.combatActive = true;
+    boss.pending = boss.mode === "standard" ? standardBossAttack(boss) : expansionBossAttack(state, boss);
+    boss.warn = boss.mode === "standard"
+      ? (boss.pending === "spawn" ? (hp < 35 ? 24 : 28) : hp < 35 ? 14 : 18)
+      : boss.pending === "light" ? 18 : boss.pending === "launch" || boss.pending === "escort" ? 32 : boss.mode === "rail_tyrant" && boss.pending === "sweep" ? 50 : boss.mode === "debris_warden" && ["wall", "double", "crush"].includes(boss.pending) ? 54 : 44;
+    boss.warnMax = boss.warn;
+    boss.bayOpen = boss.warn;
+  }
+  return true;
 }
 
 function updateCanonicalEntities(state, streams) {
@@ -737,7 +1435,6 @@ function updateCanonicalEntities(state, streams) {
       && projectile.x < GAME_WIDTH_UNITS + 40 * POSITION_UNITS_PER_PIXEL
       && projectile.y < GAME_HEIGHT_UNITS + 40 * POSITION_UNITS_PER_PIXEL
   ));
-  updateCanonicalHazards(state);
 }
 
 function noteCanonicalKill(state, enemy) {
@@ -834,6 +1531,80 @@ function resolveCanonicalEnemyProjectileHits(state) {
   state.enemyProjectiles = state.enemyProjectiles.filter((projectile) => !consumed.has(projectile.id));
 }
 
+function finishCanonicalBoss(state, boss) {
+  state.score += boss.score;
+  state.stats.bosses++;
+  state.boss = null;
+  state.enemies = [];
+  state.enemyProjectiles = [];
+  state.pendingSpawns = [];
+  state.director.bossRecovery = 120;
+  state.director.mood = "open";
+  state.director.moodTimer = 120;
+  state.director.lastTemplate = "";
+}
+
+function resolveCanonicalBossProjectileHits(state) {
+  const boss = state.boss;
+  if (!boss || !boss.entered || !boss.combatActive) return false;
+  const consumed = new Set();
+  let defeated = false;
+  for (const projectile of state.playerProjectiles) {
+    if (projectile.realm !== boss.realm) continue;
+    const projectileBody = collisionBodyFor("player_bullet", projectile.x, projectile.y, projectile.angle);
+    const bossKey = boss.mode === "standard" ? "boss_standard" : `boss_${boss.mode}`;
+    if (!bodiesOverlap(projectileBody, collisionBodyFor(bossKey, boss.x, boss.y, boss.angle))) continue;
+    consumed.add(projectile.id);
+    boss.hp -= projectile.damage;
+    if (boss.mode === "wraith") {
+      boss.hitsSinceShift++;
+      if (boss.hp > 0 && boss.hitsSinceShift >= boss.nextShiftHits && boss.shiftTelegraph === 0 && boss.chargeTelegraph === 0) {
+        boss.shiftTelegraph = 30;
+        boss.nextRealm = 1 - boss.realm;
+      }
+    }
+    if (boss.hp <= 0) {
+      finishCanonicalBoss(state, boss);
+      defeated = true;
+    }
+    break;
+  }
+  state.playerProjectiles = state.playerProjectiles.filter((projectile) => !consumed.has(projectile.id));
+  return defeated;
+}
+
+function explodeCanonicalMine(state, hazard) {
+  const radius = (hazard.kind === "mine" ? 42 : 36) * POSITION_UNITS_PER_PIXEL;
+  const dx = state.player.x - hazard.x;
+  const dy = state.player.y - hazard.y;
+  if (dx * dx + dy * dy > radius * radius || hazard.realm !== state.playerRealm) return;
+  if (hazard.kind === "energy_mine") state.player.energy = Math.max(0, state.player.energy - hazard.drain);
+  else damageCanonicalPlayer(state, hazard.damage);
+}
+
+function resolveCanonicalHazardProjectileHits(state) {
+  const consumedProjectiles = new Set();
+  const destroyedHazards = new Set();
+  for (const projectile of state.playerProjectiles) {
+    if (consumedProjectiles.has(projectile.id)) continue;
+    const projectileBody = collisionBodyFor("player_bullet", projectile.x, projectile.y, projectile.angle);
+    for (const hazard of state.hazards) {
+      if (destroyedHazards.has(hazard.id) || hazard.realm !== projectile.realm) continue;
+      if (!CANONICAL_ASTEROIDS[hazard.kind] && hazard.kind !== "mine" && hazard.kind !== "energy_mine") continue;
+      if (!bodiesOverlap(projectileBody, collisionBodyFor(hazard.kind, hazard.x, hazard.y, hazard.angle))) continue;
+      consumedProjectiles.add(projectile.id);
+      hazard.hp -= projectile.damage;
+      if (hazard.hp <= 0) {
+        destroyedHazards.add(hazard.id);
+        if (hazard.kind === "mine" || hazard.kind === "energy_mine") explodeCanonicalMine(state, hazard);
+      }
+      break;
+    }
+  }
+  state.playerProjectiles = state.playerProjectiles.filter((projectile) => !consumedProjectiles.has(projectile.id));
+  state.hazards = state.hazards.filter((hazard) => !destroyedHazards.has(hazard.id));
+}
+
 function stepSimulation(state, rawInput, streams) {
   if (!state || state.schema !== "SSR_SIM_STATE_V1") throw new TypeError("Canonical simulation state is invalid.");
   if (state.terminal) throw new Error("Canonical simulation is already terminal.");
@@ -845,10 +1616,26 @@ function stepSimulation(state, rawInput, streams) {
     updateCanonicalPlayer(state, input);
     fireCanonicalPlayer(state);
     updateCanonicalEntities(state, streams);
+    if (state.boss) updateCanonicalBoss(state, streams);
+    updateCanonicalHazards(state, streams);
     resolveCanonicalProjectileHits(state);
+    const bossDefeated = resolveCanonicalBossProjectileHits(state);
+    resolveCanonicalHazardProjectileHits(state);
     resolveCanonicalPlayerContact(state);
     if (!state.terminal) resolveCanonicalEnemyProjectileHits(state);
-    if (!state.terminal && streams) materializeCanonicalSpawns(state, tickCanonicalDirector(state, streams), streams);
+    if (!state.terminal && streams && !state.boss && !bossDefeated) {
+      if (state.director.bossRecovery > 0) {
+        state.director.bossRecovery--;
+      } else {
+        tickCanonicalHazardEvent(state, streams);
+        const previousPhase = state.phase;
+        const due = tickCanonicalDirector(state, streams);
+        materializeCanonicalSpawns(state, due, streams);
+        if (state.phase !== previousPhase && state.phase % 4 === 0) {
+          spawnCanonicalBoss(state, canonicalBossModeForPhase(state.phase), streams);
+        }
+      }
+    }
   }
   if (!state.terminal && state.tick >= state.maxTicks) {
     state.terminal = true;
@@ -858,9 +1645,15 @@ function stepSimulation(state, rawInput, streams) {
 }
 
 return Object.freeze({
+  canonicalBossModeForPhase,
   roundDivide,
+  spawnCanonicalBoss,
   spawnCanonicalEnemy,
+  spawnCanonicalHazard,
   stepSimulation,
+  tickCanonicalHazardEvent,
+  updateCanonicalBoss,
+  updateCanonicalHazards,
   validateCanonicalInput
 });
 });
