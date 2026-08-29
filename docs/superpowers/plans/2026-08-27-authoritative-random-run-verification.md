@@ -123,6 +123,18 @@ cosmetic and outside verification. Boss-specific ability substitution is canonic
 too: Wraith runs resolve the input as an immediate realm hop, while Debris Warden
 runs resolve it as a faster DASH without Ghost Shift's debris phasing.
 
+Foundation hardening now records controls into compact incremental RLE chunks
+instead of retaining one JavaScript object per tick. Completed chunks are also
+persisted in origin-private IndexedDB for later resumable upload, while the
+authoritative tape remains capped at two MiB and has an exact SHA-256 transport
+digest. Canonical state encoding now gives every nested record a stable sorted
+field order, preserves authoritative array order, and deliberately excludes the
+cosmetic feedback journal from replay hashes. The immutable result projection now
+includes every run statistic needed for records, Glory, and achievement decisions,
+plus ticket revisions and a worker-result envelope that binds input, final-state,
+and verifier-build digests. All server, queue, publication, progression, and App
+Check gates remain disabled.
+
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`
 - Create: `shared/verified-run/simulation-step.js`

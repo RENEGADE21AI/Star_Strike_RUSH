@@ -20,7 +20,10 @@ const {
   spawnCanonicalEnemy,
   stepSimulation
 } = require("../shared/verified-run/simulation-step");
-const { deriveVerifiedRunResult } = require("../shared/verified-run/result");
+const {
+  deriveVerifiedRunResult,
+  deriveVerifiedRunWorkerResult
+} = require("../shared/verified-run/result");
 
 function ticket(overrides = {}) {
   return {
@@ -47,6 +50,10 @@ test("canonical simulation state is integer-only, revision-bound, and centered",
   assert.equal(ANGLE_UNITS, 4096);
   assert.equal(POSITION_UNITS_PER_PIXEL, 1024);
   assert.equal(Object.isFrozen(state.ticket), true);
+  assert.throws(
+    () => createSimulationState(ticket({ inputRevision: "SSR_INPUT_V0" })),
+    /Input revision is unsupported/
+  );
 });
 
 test("the exact int8 control sample deterministically drives player motion", () => {
@@ -105,8 +112,27 @@ test("canonical serialization is stable and rejects non-integer authoritative st
   const second = serializeCanonicalState(structuredClone(state));
   assert.deepEqual(first, second);
   assert.match(new TextDecoder().decode(first), /^\{"schema":"SSR_SIM_STATE_V1"/);
+
+  const reordered = structuredClone(state);
+  reordered.player = Object.fromEntries(Object.entries(reordered.player).reverse());
+  reordered.director = Object.fromEntries(Object.entries(reordered.director).reverse());
+  assert.deepEqual(
+    serializeCanonicalState(reordered),
+    first,
+    "nested insertion order must not change the authoritative bytes"
+  );
+
   state.player.x += 0.5;
   assert.throws(() => serializeCanonicalState(state), /integer/);
+});
+
+test("cosmetic feedback journals do not participate in authoritative state bytes or digests", async () => {
+  const plain = createSimulationState(ticket());
+  const cosmetic = createSimulationState(ticket());
+  cosmetic.feedbackEvents.push({ type: "player_fire", x: 10, y: 20, sourceKind: "player" });
+
+  assert.deepEqual(serializeCanonicalState(cosmetic), serializeCanonicalState(plain));
+  assert.equal(await digestCanonicalState(cosmetic), await digestCanonicalState(plain));
 });
 
 test("canonical state digests are stable and change with authoritative state", async () => {
@@ -119,27 +145,93 @@ test("canonical state digests are stable and change with authoritative state", a
 });
 
 test("verified result is derived only from terminal canonical state", () => {
-  const state = createSimulationState(ticket());
+  const state = createSimulationState(ticket({
+    inputRevision: "SSR_INPUT_V1",
+    weekId: "week_2026_08_24"
+  }));
   state.score = 12_345;
   state.phase = 8;
   state.stats.kills = 77;
   state.stats.bosses = 2;
+  state.stats.powerups = 4;
+  state.stats.dashUses = 3;
+  state.stats.realmHops = 5;
+  state.stats.damageTaken = 2;
+  state.stats.highestCombo = 19;
   state.player.hp = 1;
   stepSimulation(state, { x: 0, y: 0, buttons: 2 });
   assert.deepEqual(deriveVerifiedRunResult(state), {
+    schema: "SSR_VERIFIED_RESULT_V1",
     runId: "run_golden_001",
     simRevision: SIMULATION_REVISION,
+    rulesRevision: "rules-v1",
+    contentRevision: "content-v1",
+    inputRevision: "SSR_INPUT_V1",
+    buildSha: "a".repeat(40),
+    weekId: "week_2026_08_24",
     tickCount: 1,
+    durationTicks: 1,
     score: 12_345,
     phase: 8,
     kills: 77,
     bosses: 2,
+    powerups: 4,
     ghostUses: 0,
+    dashUses: 3,
+    realmHops: 5,
     pauseUses: 1,
+    damageTaken: 2,
+    highestCombo: 19,
+    gloryAmount: 1_234,
+    achievementFacts: {
+      score: 12_345,
+      phase: 8,
+      kills: 77,
+      bosses: 2,
+      powerups: 4,
+      ghostUses: 0,
+      dashUses: 3,
+      realmHops: 5,
+      pauseUses: 1,
+      damageTaken: 2,
+      highestCombo: 19,
+      durationTicks: 1
+    },
     terminalReason: "player_destroyed"
   });
   const active = createSimulationState(ticket({ runId: "run_active" }));
   assert.throws(() => deriveVerifiedRunResult(active), /terminal/);
+});
+
+test("worker result binds immutable replay evidence to the complete authoritative projection", () => {
+  assert.equal(typeof deriveVerifiedRunWorkerResult, "function");
+  const state = createSimulationState(ticket({ weekId: "week_2026_08_24" }));
+  state.score = 500;
+  state.player.hp = 1;
+  stepSimulation(state, { x: 0, y: 0, buttons: 2 });
+  const workerResult = deriveVerifiedRunWorkerResult(state, {
+    inputDigest: "11".repeat(32),
+    finalStateDigest: "22".repeat(16),
+    verifierBuildDigest: "33".repeat(32)
+  });
+
+  assert.equal(workerResult.schema, "SSR_VERIFIED_WORKER_RESULT_V1");
+  assert.equal(workerResult.runId, "run_golden_001");
+  assert.equal(workerResult.score, 500);
+  assert.equal(workerResult.weekId, "week_2026_08_24");
+  assert.equal(workerResult.inputDigest, "11".repeat(32));
+  assert.equal(workerResult.finalStateDigest, "22".repeat(16));
+  assert.equal(workerResult.verifierBuildDigest, "33".repeat(32));
+  assert.equal(Object.isFrozen(workerResult), true);
+  assert.equal(Object.isFrozen(workerResult.achievementFacts), true);
+  assert.throws(
+    () => deriveVerifiedRunWorkerResult(state, {
+      inputDigest: "bad",
+      finalStateDigest: "22".repeat(16),
+      verifierBuildDigest: "33".repeat(32)
+    }),
+    /input digest/
+  );
 });
 
 test("500 generated control sequences preserve deterministic integer invariants", () => {

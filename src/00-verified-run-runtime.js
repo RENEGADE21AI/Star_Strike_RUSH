@@ -5,7 +5,9 @@ let activeVerifiedRunTicket = null;
 let activeCanonicalRunRandomStreams = null;
 let activeCanonicalRunState = null;
 let seededRunStarting = false;
-let recordedRunInputs = null;
+let recordedRunInputRecorder = null;
+let recordedRunInputPersistence = null;
+let verifiedInputDatabasePromise = null;
 let pendingRunInputButtons = 0;
 let activeCanonicalRunInput = null;
 let canonicalFeedbackDispatching = false;
@@ -16,6 +18,10 @@ const canonicalEnemyFeedbackUntil = new Map();
 const canonicalHazardFeedbackUntil = new Map();
 const canonicalWingmanFeedbackUntil = new Map();
 let canonicalBossFeedbackUntil = 0;
+
+const VERIFIED_INPUT_DATABASE_NAME = "star-strike-rush-verified-input-v1";
+const VERIFIED_INPUT_DATABASE_VERSION = 1;
+const VERIFIED_INPUT_CHUNK_STORE = "inputChunks";
 
 const CANONICAL_BOSS_PRESENTATION_SIZE = Object.freeze({
   standard: Object.freeze({ w: 130, h: 82 }),
@@ -42,7 +48,8 @@ function clearRunRandomStreams() {
   activeVerifiedRunTicket = null;
   activeCanonicalRunRandomStreams = null;
   activeCanonicalRunState = null;
-  recordedRunInputs = null;
+  recordedRunInputRecorder = null;
+  recordedRunInputPersistence = null;
   pendingRunInputButtons = 0;
   activeCanonicalRunInput = null;
   canonicalFeedbackDispatching = false;
@@ -55,14 +62,87 @@ function clearRunRandomStreams() {
   canonicalBossFeedbackUntil = 0;
 }
 
+function openVerifiedInputDatabase() {
+  if (!globalThis.indexedDB || typeof globalThis.indexedDB.open !== "function") return Promise.resolve(null);
+  if (verifiedInputDatabasePromise) return verifiedInputDatabasePromise;
+  verifiedInputDatabasePromise = new Promise((resolve, reject) => {
+    const request = globalThis.indexedDB.open(VERIFIED_INPUT_DATABASE_NAME, VERIFIED_INPUT_DATABASE_VERSION);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(VERIFIED_INPUT_CHUNK_STORE)) {
+        database.createObjectStore(VERIFIED_INPUT_CHUNK_STORE, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Verified input database could not be opened."));
+    request.onblocked = () => reject(new Error("Verified input database upgrade was blocked."));
+  });
+  return verifiedInputDatabasePromise;
+}
+
+async function persistVerifiedInputChunk(runId, bytes, summary) {
+  const database = await openVerifiedInputDatabase();
+  if (!database) return false;
+  await new Promise((resolve, reject) => {
+    const transaction = database.transaction(VERIFIED_INPUT_CHUNK_STORE, "readwrite");
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error("Verified input chunk write failed."));
+    transaction.onabort = () => reject(transaction.error || new Error("Verified input chunk write was aborted."));
+    transaction.objectStore(VERIFIED_INPUT_CHUNK_STORE).put({
+      id: `${runId}:${String(summary.chunkIndex).padStart(8, "0")}`,
+      runId,
+      chunkIndex: summary.chunkIndex,
+      firstSegmentIndex: summary.firstSegmentIndex,
+      segmentCount: summary.segmentCount,
+      tickCount: summary.tickCount,
+      bytes: bytes.slice(),
+      savedAtMs: Date.now()
+    });
+  });
+  return true;
+}
+
+function createRecordedRunInputPersistence(runId) {
+  if (!globalThis.indexedDB || !/^[A-Za-z0-9_-]{1,128}$/.test(String(runId || ""))) return null;
+  const pending = new Set();
+  let failed = false;
+  let persistedChunks = 0;
+  return Object.freeze({
+    enqueue(bytes, summary) {
+      let operation;
+      operation = persistVerifiedInputChunk(runId, bytes, summary)
+        .then((stored) => {
+          if (stored) persistedChunks++;
+        })
+        .catch(() => {
+          failed = true;
+        })
+        .finally(() => pending.delete(operation));
+      pending.add(operation);
+    },
+    async wait() {
+      while (pending.size > 0) await Promise.all(Array.from(pending));
+      return Object.freeze({ ok: !failed, persistedChunks });
+    }
+  });
+}
+
+async function waitForRecordedRunInputPersistence() {
+  if (!recordedRunInputPersistence) return Object.freeze({ ok: true, persistedChunks: 0 });
+  return recordedRunInputPersistence.wait();
+}
+
 function currentVerifiedRunContext() {
+  const recordingStatus = recordedRunInputRecorder ? recordedRunInputRecorder.status() : null;
   return Object.freeze({
     seeded: activeRunRandomStreams !== null,
     ticket: activeVerifiedRunTicket,
     authoritativeState: activeCanonicalRunState !== null,
     canonicalTick: activeCanonicalRunState ? activeCanonicalRunState.tick : 0,
-    recording: Array.isArray(recordedRunInputs),
-    recordedTicks: Array.isArray(recordedRunInputs) ? recordedRunInputs.length : 0
+    recording: recordingStatus !== null,
+    recordedTicks: recordingStatus ? recordingStatus.tickCount : 0,
+    recordedSegments: recordingStatus ? recordingStatus.segmentCount : 0,
+    recordedBytes: recordingStatus ? recordingStatus.compactByteLength : 0
   });
 }
 
@@ -81,15 +161,22 @@ function runRandomRange(streamName, minimum, maximum) {
   return min + runRandom(streamName) * (max - min);
 }
 
-function beginRunInputRecording() {
-  recordedRunInputs = [];
+function beginRunInputRecording(options = {}) {
+  recordedRunInputPersistence = activeVerifiedRunTicket
+    ? createRecordedRunInputPersistence(activeVerifiedRunTicket.runId)
+    : null;
+  const recorderOptions = { ...options };
+  if (recordedRunInputPersistence && typeof recorderOptions.onChunk !== "function") {
+    recorderOptions.onChunk = (bytes, summary) => recordedRunInputPersistence.enqueue(bytes, summary);
+  }
+  recordedRunInputRecorder = createInputTapeRecorder(recorderOptions);
   pendingRunInputButtons = 0;
   activeCanonicalRunInput = null;
   return currentVerifiedRunContext();
 }
 
 async function beginSeededStandardRun(ticket) {
-  if (seededRunStarting || activeRunRandomStreams || Array.isArray(recordedRunInputs)) {
+  if (seededRunStarting || activeRunRandomStreams || recordedRunInputRecorder) {
     throw new Error("A seeded standard run is already active.");
   }
   const runTicket = ticket && typeof ticket === "object" ? ticket : {};
@@ -550,7 +637,7 @@ function captureCanonicalRunInput(inputState = {}, edgeButtons = 0) {
 }
 
 function queueVerifiedRunInputEdge(action) {
-  if (!Array.isArray(recordedRunInputs)) return false;
+  if (!recordedRunInputRecorder) return false;
   if (action === "ghost") pendingRunInputButtons |= BUTTON_GHOST_SHIFT;
   else if (action === "pause") pendingRunInputButtons |= BUTTON_PAUSE;
   else throw new RangeError(`Unknown verified run input edge: ${action}`);
@@ -562,7 +649,7 @@ function beginCanonicalRunTick(inputState = {}) {
   const canonical = captureCanonicalRunInput(inputState, pendingRunInputButtons);
   pendingRunInputButtons = 0;
   activeCanonicalRunInput = canonical;
-  if (Array.isArray(recordedRunInputs)) {
+  if (recordedRunInputRecorder) {
     recordCanonicalRunInput({
       moveX: canonical.x / 127,
       moveY: canonical.y / 127,
@@ -609,29 +696,19 @@ function endCanonicalRunTick(browserState = null) {
 }
 
 function recordCanonicalRunInput(rawInput = {}) {
-  if (!Array.isArray(recordedRunInputs)) throw new Error("Run input recording is not active.");
-  if (recordedRunInputs.length >= StarStrikeVerifiedRunConstants.MAX_RUN_TICKS) {
-    throw new RangeError("Run input recording exceeds the tick ceiling.");
-  }
-  const input = canonicalRunInput(rawInput);
-  recordedRunInputs.push({
-    moveX: input.x / 127,
-    moveY: input.y / 127,
-    ghostPressed: (input.buttons & BUTTON_GHOST_SHIFT) !== 0,
-    pausePressed: (input.buttons & BUTTON_PAUSE) !== 0
-  });
-  return input;
+  if (!recordedRunInputRecorder) throw new Error("Run input recording is not active.");
+  return recordedRunInputRecorder.append(rawInput);
 }
 
 function finalizeRunInputRecording(metadata = {}) {
-  if (!Array.isArray(recordedRunInputs) || recordedRunInputs.length === 0) {
+  if (!recordedRunInputRecorder || recordedRunInputRecorder.status().tickCount === 0) {
     throw new Error("Run input recording has no ticks.");
   }
-  const frames = recordedRunInputs;
-  recordedRunInputs = null;
+  const recorder = recordedRunInputRecorder;
+  recordedRunInputRecorder = null;
   pendingRunInputButtons = 0;
   activeCanonicalRunInput = null;
-  return encodeInputTape(frames, metadata);
+  return recorder.finalize(metadata);
 }
 
 function finalizeRecordedInputTape(metadata = {}) {
@@ -639,7 +716,7 @@ function finalizeRecordedInputTape(metadata = {}) {
 }
 
 function cancelRunInputRecording() {
-  recordedRunInputs = null;
+  recordedRunInputRecorder = null;
   pendingRunInputButtons = 0;
   activeCanonicalRunInput = null;
 }
@@ -668,3 +745,4 @@ globalThis.recordCanonicalRunInput = recordCanonicalRunInput;
 globalThis.finalizeRunInputRecording = finalizeRunInputRecording;
 globalThis.finalizeRecordedInputTape = finalizeRecordedInputTape;
 globalThis.cancelRunInputRecording = cancelRunInputRecording;
+globalThis.waitForRecordedRunInputPersistence = waitForRecordedRunInputPersistence;

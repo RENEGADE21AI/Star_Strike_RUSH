@@ -15,6 +15,7 @@ const {
   ENERGY_UNITS_PER_POINT,
   GAME_HEIGHT_UNITS,
   GAME_WIDTH_UNITS,
+  INPUT_REVISION,
   MAX_RUN_TICKS,
   POSITION_UNITS_PER_PIXEL,
   SIMULATION_REVISION
@@ -34,6 +35,10 @@ function createSimulationState(ticket) {
   const source = ticket && typeof ticket === "object" ? ticket : {};
   const simRevision = boundedIdentifier(source.simRevision, "Simulation revision", 64);
   if (simRevision !== SIMULATION_REVISION) throw new RangeError("Simulation revision is unsupported.");
+  const inputRevision = source.inputRevision === undefined
+    ? INPUT_REVISION
+    : boundedIdentifier(source.inputRevision, "Input revision", 64);
+  if (inputRevision !== INPUT_REVISION) throw new RangeError("Input revision is unsupported.");
   const maxTicks = Number(source.maxTicks);
   if (!Number.isSafeInteger(maxTicks) || maxTicks < 1 || maxTicks > MAX_RUN_TICKS) {
     throw new RangeError("Simulation ticket tick ceiling is invalid.");
@@ -49,8 +54,10 @@ function createSimulationState(ticket) {
     runId: boundedIdentifier(source.runId, "Run ID"),
     rootSeed: String(source.rootSeed).toLowerCase(),
     simRevision,
+    inputRevision,
     rulesRevision: boundedIdentifier(source.rulesRevision, "Rules revision", 64),
     contentRevision: boundedIdentifier(source.contentRevision, "Content revision", 64),
+    weekId: source.weekId ? boundedIdentifier(source.weekId, "Week ID", 64) : null,
     buildSha: String(source.buildSha).toLowerCase(),
     maxTicks
   });
@@ -178,7 +185,6 @@ function canonicalStateView(state) {
     director: state.director,
     player: state.player,
     stats: state.stats,
-    feedbackEvents: state.feedbackEvents,
     pendingSpawns: state.pendingSpawns,
     enemies: state.enemies,
     playerProjectiles: state.playerProjectiles,
@@ -190,9 +196,19 @@ function canonicalStateView(state) {
   };
 }
 
+function stableNestedValue(value) {
+  if (Array.isArray(value)) return value.map(stableNestedValue);
+  if (!value || typeof value !== "object") return value;
+  const ordered = {};
+  for (const key of Object.keys(value).sort()) ordered[key] = stableNestedValue(value[key]);
+  return ordered;
+}
+
 function serializeCanonicalState(state) {
   if (!state || state.schema !== SIMULATION_STATE_SCHEMA) throw new TypeError("Simulation state schema is invalid.");
-  const view = canonicalStateView(state);
+  const rawView = canonicalStateView(state);
+  const view = {};
+  for (const key of Object.keys(rawView)) view[key] = stableNestedValue(rawView[key]);
   assertCanonicalIntegers(view);
   return new TextEncoder().encode(JSON.stringify(view));
 }

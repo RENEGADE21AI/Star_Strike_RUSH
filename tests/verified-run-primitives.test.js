@@ -21,7 +21,9 @@ const {
   BUTTON_GHOST_SHIFT,
   BUTTON_PAUSE,
   canonicalRunInput,
+  createInputTapeRecorder,
   decodeInputTape,
+  digestInputTape,
   encodeInputTape
 } = require("../shared/verified-run/input-tape");
 const { serializeCanonicalState } = require("../shared/verified-run/simulation-state");
@@ -92,6 +94,95 @@ test("a seeded standard run binds random streams and canonical input to one tick
     { duration: 1, x: 127, y: 0, buttons: BUTTON_GHOST_SHIFT }
   ]);
   clearRunRandomStreams();
+});
+
+test("the ordered runtime retains compact segments rather than per-tick input objects", () => {
+  clearRunRandomStreams();
+  beginRunInputRecording();
+  for (let tick = 0; tick < 10_000; tick++) {
+    recordCanonicalRunInput({ moveX: 1, moveY: 0 });
+  }
+  assert.deepEqual(currentVerifiedRunContext(), {
+    seeded: false,
+    ticket: null,
+    authoritativeState: false,
+    canonicalTick: 0,
+    recording: true,
+    recordedTicks: 10_000,
+    recordedSegments: 1,
+    recordedBytes: 8
+  });
+  const tape = finalizeRecordedInputTape();
+  assert.equal(decodeInputTape(tape).segments.length, 1);
+  clearRunRandomStreams();
+});
+
+test("ticketed runtime persists compact recorder chunks to a private IndexedDB store", async () => {
+  const writes = [];
+  let storeCreated = false;
+  const database = {
+    objectStoreNames: { contains: () => storeCreated },
+    createObjectStore(name, options) {
+      assert.equal(name, "inputChunks");
+      assert.deepEqual(options, { keyPath: "id" });
+      storeCreated = true;
+    },
+    transaction(name, mode) {
+      assert.equal(name, "inputChunks");
+      assert.equal(mode, "readwrite");
+      const transaction = {
+        objectStore() {
+          return {
+            put(record) {
+              writes.push({
+                ...record,
+                bytes: Array.from(record.bytes)
+              });
+            }
+          };
+        }
+      };
+      queueMicrotask(() => transaction.oncomplete?.());
+      return transaction;
+    }
+  };
+  const indexedDB = {
+    open(name, version) {
+      assert.equal(name, "star-strike-rush-verified-input-v1");
+      assert.equal(version, 1);
+      const request = {};
+      queueMicrotask(() => {
+        request.result = database;
+        request.onupgradeneeded?.();
+        request.onsuccess?.();
+      });
+      return request;
+    }
+  };
+  const priorIndexedDb = globalThis.indexedDB;
+  globalThis.indexedDB = indexedDB;
+
+  try {
+    clearRunRandomStreams();
+    await beginSeededStandardRun(seededTicket({ runId: "run_persisted" }));
+    recordCanonicalRunInput({ moveX: 1 });
+    recordCanonicalRunInput({ moveX: -1 });
+    finalizeRecordedInputTape();
+    assert.equal(typeof waitForRecordedRunInputPersistence, "function");
+    await waitForRecordedRunInputPersistence();
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].id, "run_persisted:00000000");
+    assert.equal(writes[0].runId, "run_persisted");
+    assert.equal(writes[0].chunkIndex, 0);
+    assert.equal(writes[0].firstSegmentIndex, 0);
+    assert.equal(writes[0].segmentCount, 2);
+    assert.equal(writes[0].tickCount, 2);
+    assert.equal(writes[0].bytes.length, 16);
+  } finally {
+    clearRunRandomStreams();
+    if (priorIndexedDb === undefined) delete globalThis.indexedDB;
+    else globalThis.indexedDB = priorIndexedDb;
+  }
 });
 
 test("the browser canonical shadow advances independently of legacy random draws", async () => {
@@ -495,6 +586,79 @@ test("input tape round trips run-length segments and checkpoints", () => {
   assert.deepEqual(decoded.checkpoints, [{ tick: 5, digest }]);
   assert.equal(decoded.checkpointIntervalTicks, CHECKPOINT_INTERVAL_TICKS);
   assert.ok(bytes.byteLength <= MAX_INPUT_BYTES);
+});
+
+test("input tape SHA-256 uses the exact finalized transport bytes", async () => {
+  assert.equal(typeof digestInputTape, "function");
+  const bytes = encodeInputTape([
+    { moveX: 0 },
+    { moveX: 0 },
+    { moveX: 1, ghostPressed: true }
+  ]);
+  assert.equal(
+    await digestInputTape(bytes),
+    "db0c445b634f73719d9911f1eed5bd81398988584449f81ecc3f7cb7d9e6177b"
+  );
+});
+
+test("incremental input recording flushes compact RLE chunks instead of retaining one object per tick", () => {
+  assert.equal(typeof createInputTapeRecorder, "function");
+  const flushed = [];
+  const recorder = createInputTapeRecorder({
+    segmentChunkCapacity: 2,
+    onChunk(bytes, summary) {
+      flushed.push({ bytes, summary });
+    }
+  });
+
+  for (let tick = 0; tick < 10_000; tick++) {
+    recorder.append({ moveX: 1, moveY: 0 });
+  }
+  recorder.append({ moveX: 0, moveY: -1, ghostPressed: true });
+  recorder.append({ moveX: 0, moveY: -1 });
+
+  assert.deepEqual(recorder.status(), {
+    tickCount: 10_002,
+    segmentCount: 3,
+    flushedSegmentCount: 2,
+    bufferedSegmentCount: 1,
+    compactByteLength: 24,
+    finalized: false
+  });
+  assert.equal(flushed.length, 1);
+  assert.equal(flushed[0].bytes.byteLength, 16);
+  assert.deepEqual(flushed[0].summary, {
+    chunkIndex: 0,
+    firstSegmentIndex: 0,
+    segmentCount: 2,
+    tickCount: 10_001
+  });
+
+  const decoded = decodeInputTape(recorder.finalize());
+  assert.equal(decoded.tickCount, 10_002);
+  assert.deepEqual(decoded.segments, [
+    { duration: 10_000, x: 127, y: 0, buttons: 0 },
+    { duration: 1, x: 0, y: -127, buttons: BUTTON_GHOST_SHIFT },
+    { duration: 1, x: 0, y: -127, buttons: 0 }
+  ]);
+  assert.equal(flushed.length, 2, "finalization must flush the last partial compact chunk");
+  assert.equal(flushed[1].bytes.byteLength, 8);
+});
+
+test("incremental recorder accepts the exact segment ceiling and rejects overflow without mutation", () => {
+  const recorder = createInputTapeRecorder({ segmentChunkCapacity: 4096 });
+  for (let index = 0; index < MAX_INPUT_SEGMENTS; index++) {
+    recorder.append({ moveX: index % 2 === 0 ? 1 : -1 });
+  }
+  const atCeiling = recorder.status();
+  assert.equal(atCeiling.tickCount, MAX_INPUT_SEGMENTS);
+  assert.equal(atCeiling.segmentCount, MAX_INPUT_SEGMENTS);
+  assert.throws(() => recorder.append({ moveX: 1 }), /segment count/);
+  assert.deepEqual(recorder.status(), atCeiling, "rejected overflow must not consume a tick or alter compact state");
+
+  recorder.append({ moveX: -1 });
+  assert.equal(recorder.status().tickCount, MAX_INPUT_SEGMENTS + 1, "the current segment may still extend");
+  assert.equal(recorder.status().segmentCount, MAX_INPUT_SEGMENTS);
 });
 
 test("input tape rejects corrupt structure, trailing data, and invalid checkpoints", () => {
