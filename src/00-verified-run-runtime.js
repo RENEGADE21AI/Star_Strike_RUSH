@@ -214,6 +214,40 @@ function canonicalBossPresentation(boss) {
   };
 }
 
+function canonicalPresentationSafeGap(slot, options) {
+  if (typeof globalThis.debrisSafeGap === "function") return globalThis.debrisSafeGap(slot, options);
+  const slotWidth = options.width / options.slots;
+  const center = slotWidth * (slot + 0.5);
+  const clearance = options.asteroidRadius + options.playerRadius + options.margin;
+  const minX = slot > 0 ? center - slotWidth + clearance : options.playerRadius + options.margin;
+  const maxX = slot < options.slots - 1 ? center + slotWidth - clearance : options.width - options.playerRadius - options.margin;
+  return { slot, center: Math.max(minX, Math.min(maxX, center)), minX, maxX, width: Math.max(0, maxX - minX) };
+}
+
+function canonicalPresentationSafeLanes(hazards) {
+  const rows = new Map();
+  for (const hazard of hazards) {
+    if (hazard.kind !== "boss_wall" || !(hazard.safeLaneRow > 0)) continue;
+    const key = `${hazard.safeLaneRow}:${hazard.safeGapSlot}:${hazard.safeSlots}`;
+    if (!rows.has(key)) rows.set(key, hazard);
+  }
+  const width = StarStrikeVerifiedRunConstants.GAME_WIDTH_PIXELS;
+  const asteroidRadius = canonicalPresentationRadius("boss_wall", 20.5);
+  const playerRadius = canonicalPresentationRadius("player", 5);
+  return Array.from(rows.values())
+    .sort((left, right) => left.safeLaneRow - right.safeLaneRow)
+    .map((hazard) => ({
+      ...canonicalPresentationSafeGap(hazard.safeGapSlot, {
+        slots: hazard.safeSlots,
+        width,
+        asteroidRadius,
+        playerRadius,
+        margin: 8
+      }),
+      row: hazard.safeLaneRow
+    }));
+}
+
 function currentRunPresentationState(browserState) {
   const canonical = activeCanonicalRunState;
   if (!canonical || !browserState || typeof browserState !== "object") return browserState;
@@ -252,6 +286,7 @@ function currentRunPresentationState(browserState) {
     hitFlash: 0
   }));
   presentation.boss = canonicalBossPresentation(canonical.boss);
+  presentation.safeLanes = canonicalPresentationSafeLanes(canonical.hazards);
 
   canonicalPresentationCache = presentation;
   canonicalPresentationCacheTick = canonical.tick;

@@ -14,6 +14,7 @@ const { canonicalPhaseDuration } = require("../shared/verified-run/director");
 const { createSimulationState, serializeCanonicalState } = require("../shared/verified-run/simulation-state");
 const {
   canonicalBossModeForPhase,
+  roundDivide,
   spawnCanonicalBoss,
   spawnCanonicalHazard,
   stepSimulation,
@@ -45,6 +46,34 @@ function highBossStreams() {
       return name === "boss_behavior" ? 0xffffffff : 0;
     }
   };
+}
+
+function seededBossStreams(seed) {
+  let value = Number(seed) >>> 0;
+  return {
+    nextUint32() {
+      value = (Math.imul(value, 1_664_525) + 1_013_904_223) >>> 0;
+      return value;
+    }
+  };
+}
+
+function missingBossWallSlot(row, slots = 6) {
+  const slotWidth = Math.floor(GAME_WIDTH_UNITS / slots);
+  const occupied = new Set(row.map((hazard) => Math.floor(hazard.x / slotWidth)));
+  for (let slot = 0; slot < slots; slot++) if (!occupied.has(slot)) return slot;
+  return -1;
+}
+
+function reachableCanonicalDistance(frames, maxSpeed) {
+  let velocity = 0;
+  let distance = 0;
+  for (let frame = 0; frame < frames; frame++) {
+    velocity += roundDivide((maxSpeed - velocity) * 22, 100);
+    velocity = Math.min(maxSpeed, velocity);
+    distance += velocity;
+  }
+  return distance;
 }
 
 test("canonical state starts with the live debris-event and boss-recovery clocks", () => {
@@ -209,6 +238,74 @@ test("all eight bosses resolve their signature attacks as authoritative entities
     }
     assert.doesNotThrow(() => serializeCanonicalState(state), mode);
   }
+});
+
+test("1500 seeded canonical Debris Warden double gates remain reachable", () => {
+  const routeMargin = 12 * POSITION_UNITS_PER_PIXEL;
+  for (const healthPercent of [90, 50, 15]) {
+    for (let seed = 1; seed <= 1_500; seed++) {
+      const streams = seededBossStreams(seed);
+      const state = createSimulationState(ticket());
+      state.phase = 12;
+      state.player.fireCooldown = 10_000;
+      const boss = spawnCanonicalBoss(state, "debris_warden", streams);
+      boss.hp = Math.max(1, Math.floor(boss.maxHp * healthPercent / 100));
+      boss.y = boss.targetY;
+      boss.entered = true;
+      boss.combatActive = true;
+      boss.pending = "double";
+      boss.warn = 1;
+      boss.warnMax = 1;
+
+      updateCanonicalBoss(state, streams);
+
+      const rowsByY = new Map();
+      for (const hazard of state.hazards.filter((entry) => entry.kind === "boss_wall")) {
+        if (!rowsByY.has(hazard.y)) rowsByY.set(hazard.y, []);
+        rowsByY.get(hazard.y).push(hazard);
+      }
+      const rows = Array.from(rowsByY.entries()).sort(([leftY], [rightY]) => rightY - leftY);
+      assert.equal(rows.length, 2, `seed ${seed} at ${healthPercent}% health must produce two wall rows`);
+      const firstSlot = missingBossWallSlot(rows[0][1]);
+      const secondSlot = missingBossWallSlot(rows[1][1]);
+      const slotWidth = Math.floor(GAME_WIDTH_UNITS / 6);
+      const travelRequired = Math.abs(secondSlot - firstSlot) * slotWidth;
+      const rowDistance = Math.abs(rows[0][0] - rows[1][0]);
+      const rowSpeed = Math.abs(rows[0][1][0].vy);
+      const reactionFrames = Math.max(1, Math.floor(rowDistance / rowSpeed));
+      const reachable = reachableCanonicalDistance(reactionFrames, state.player.maxSpeed);
+      assert.ok(
+        travelRequired <= reachable - routeMargin,
+        `seed ${seed} at ${healthPercent}% health requires ${travelRequired} units but only ${reachable - routeMargin} are safely reachable`
+      );
+    }
+  }
+});
+
+test("canonical Debris Warden double gates carry authoritative safe-lane metadata", () => {
+  const streams = seededBossStreams(42);
+  const state = createSimulationState(ticket());
+  state.phase = 12;
+  const boss = spawnCanonicalBoss(state, "debris_warden", streams);
+  boss.y = boss.targetY;
+  boss.entered = true;
+  boss.combatActive = true;
+  boss.pending = "double";
+  boss.warn = 1;
+  boss.warnMax = 1;
+
+  updateCanonicalBoss(state, streams);
+
+  const first = state.hazards.filter((hazard) => hazard.safeLaneRow === 1);
+  const second = state.hazards.filter((hazard) => hazard.safeLaneRow === 2);
+  assert.equal(first.length, 5);
+  assert.equal(second.length, 5);
+  for (const row of [first, second]) {
+    assert.equal(new Set(row.map((hazard) => hazard.safeGapSlot)).size, 1);
+    assert.equal(row.every((hazard) => hazard.safeSlots === 6), true);
+    assert.equal(row.some((hazard) => hazard.wallSlot === row[0].safeGapSlot), false);
+  }
+  assert.doesNotThrow(() => serializeCanonicalState(state));
 });
 
 test("boss projectiles are born after projectile motion and do not advance on their creation tick", () => {

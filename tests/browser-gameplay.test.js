@@ -1265,6 +1265,93 @@ test("every ticketed Canvas entity renderer consumes canonical presentation stat
   }
 });
 
+test("ticketed HUD and debug surfaces describe canonical boss and entity state", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1");
+  try {
+    const observed = await page.evaluate(async () => {
+      setupSession("paused");
+      const ticket = {
+        runId: "run_hud_presentation_authority",
+        rootSeed: "00112233445566778899aabbccddeeff",
+        simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+        rulesRevision: "rules-v1",
+        contentRevision: "content-v1",
+        buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        maxTicks: 20_000
+      };
+      await beginSeededStandardRun(ticket);
+      const canonical = currentCanonicalRunState();
+      const streams = await createRunRandomStreams(ticket.rootSeed, ticket.simRevision);
+      const units = StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL;
+      spawnCanonicalEnemy(canonical, "red", 180 * units, 220 * units);
+      canonical.playerProjectiles.push({
+        id: canonical.nextEntityId++, kind: "ghost", x: 190 * units, y: 260 * units,
+        vx: 0, vy: -9 * units, angle: 0, life: 90, damage: 1, pierce: 0, realm: 1
+      });
+      spawnCanonicalHazard(canonical, "rock_asteroid", 210 * units, 300 * units);
+      const safeGapSlot = 2;
+      const safeSlots = 6;
+      const wallSlotWidth = Math.floor(StarStrikeVerifiedRunConstants.GAME_WIDTH_UNITS / safeSlots);
+      for (let slot = 0; slot < safeSlots; slot++) {
+        if (slot === safeGapSlot) continue;
+        spawnCanonicalHazard(
+          canonical,
+          "boss_wall",
+          wallSlotWidth * slot + Math.floor(wallSlotWidth / 2),
+          360 * units,
+          { wallSlot: slot, safeLaneRow: 1, safeGapSlot, safeSlots, vx: 0, vy: 2 * units },
+          streams
+        );
+      }
+      spawnCanonicalPowerup(canonical, "repair", 220 * units, 330 * units);
+      spawnCanonicalBoss(canonical, "wraith", streams);
+      canonical.playerRealm = 1;
+      applyCanonicalRunAuthority(state);
+
+      state.boss = null;
+      state.enemies = [];
+      state.bullets = [];
+      state.enemyBullets = [];
+      state.debris = [];
+      state.enemyBeams = [];
+      state.gravityWells = [];
+      state.powerups = [];
+      state.wingmen = [];
+
+      const snapshot = getDebugSnapshot();
+      return {
+        wraithActive: isWraithActive(),
+        bossHudOffset: bossHudOffset(),
+        playerShotKind: getPlayerShotKind(),
+        action: snapshot.input.action,
+        bossMode: snapshot.encounter.bossMode,
+        counts: {
+          bullets: snapshot.counts.bullets,
+          enemies: snapshot.counts.enemies,
+          debris: snapshot.counts.debris,
+          powerups: snapshot.counts.powerups
+        },
+        enemyTypes: snapshot.encounter.enemyTypes,
+        safeLanes: snapshot.encounter.safeLanes
+      };
+    });
+    assert.deepEqual(observed, {
+      wraithActive: true,
+      bossHudOffset: 32,
+      playerShotKind: "ghost",
+      action: "HOP",
+      bossMode: "wraith",
+      counts: { bullets: 1, enemies: 1, debris: 6, powerups: 1 },
+      enemyTypes: ["red"],
+      safeLanes: [{ row: 1, slot: 2, minX: 127.25, maxX: 185.25, width: 58 }]
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("resume countdown can be cancelled without hidden actions or an additional health charge", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
   const { page, errors } = await openGame(context);

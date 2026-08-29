@@ -232,7 +232,8 @@ function attemptGhost() {
   if (state.gameState !== "playing") return;
   queueVerifiedRunInputEdge("ghost");
   const p = state.player;
-  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST", cost: 35, cooldown: 20, burst: 4.6, phaseThroughDebris: true };
+  const presentedBoss = typeof currentPresentedBoss === "function" ? currentPresentedBoss() : state.boss;
+  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(presentedBoss && presentedBoss.mode) : { label: "GHOST", cost: 35, cooldown: 20, burst: 4.6, phaseThroughDebris: true };
   if (isWraithActive()) {
     const cost = profile.cost;
     if (p.energy < cost) return;

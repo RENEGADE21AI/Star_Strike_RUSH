@@ -882,7 +882,9 @@ function debugScreenRect(rect) {
 }
 
 function getDebugSnapshot() {
-  const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
+  const presentedBoss = presentation.boss;
+  const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(presentedBoss && presentedBoss.mode) : { label: "GHOST" };
   const titleIcons = typeof getTitleIconRects === "function" ? getTitleIconRects() : {};
   const achievementRects = typeof getAchievementsRects === "function" ? getAchievementsRects() : {};
   const codexRects = typeof getCodexRects === "function" ? getCodexRects() : {};
@@ -948,15 +950,15 @@ function getDebugSnapshot() {
       realm: state.playerRealm
     } : null,
     counts: {
-      bullets: state.bullets.length,
-      enemyBullets: state.enemyBullets.length,
-      enemies: state.enemies.length,
-      debris: state.debris.length,
-      beams: state.enemyBeams.length,
-      gravityWells: state.gravityWells.length,
-      powerups: state.powerups.length,
+      bullets: presentation.bullets.length,
+      enemyBullets: presentation.enemyBullets.length,
+      enemies: presentation.enemies.length,
+      debris: presentation.debris.length,
+      beams: presentation.enemyBeams.length,
+      gravityWells: presentation.gravityWells.length,
+      powerups: presentation.powerups.length,
       particles: state.particles.length,
-      wingmen: state.wingmen.length,
+      wingmen: presentation.wingmen.length,
       stars: state.stars.length,
       titleFormations: state.titleFormations.length
     },
@@ -1080,33 +1082,33 @@ function getDebugSnapshot() {
         : state.gameState === "playing"
     },
     encounter: {
-      bossMode: state.boss ? state.boss.mode : null,
-      boss: state.boss ? {
-        x: Number(state.boss.x.toFixed(2)),
-        y: Number(state.boss.y.toFixed(2)),
-        hp: state.boss.hp,
-        maxHp: state.boss.maxHp,
-        entered: state.boss.entered === true,
-        combatActive: state.boss.combatActive === true,
-        damageable: typeof bossCanTakeDamage === "function" ? bossCanTakeDamage(state.boss) : true,
-        realm: state.boss.realm == null ? null : state.boss.realm,
-        tutorialOverride: state.boss.tutorialOverride === true
+      bossMode: presentedBoss ? presentedBoss.mode : null,
+      boss: presentedBoss ? {
+        x: Number(presentedBoss.x.toFixed(2)),
+        y: Number(presentedBoss.y.toFixed(2)),
+        hp: presentedBoss.hp,
+        maxHp: presentedBoss.maxHp,
+        entered: presentedBoss.entered === true,
+        combatActive: presentedBoss.combatActive === true,
+        damageable: typeof bossCanTakeDamage === "function" ? bossCanTakeDamage(presentedBoss) : true,
+        realm: presentedBoss.realm == null ? null : presentedBoss.realm,
+        tutorialOverride: presentedBoss.tutorialOverride === true
       } : null,
-      enemyTypes: Array.from(new Set(state.enemies.map((enemy) => enemy.type))),
-      enemies: state.enemies.slice(0, 16).map((enemy) => ({
+      enemyTypes: Array.from(new Set(presentation.enemies.map((enemy) => enemy.type))),
+      enemies: presentation.enemies.slice(0, 16).map((enemy) => ({
         type: enemy.type,
         x: Number(enemy.x.toFixed(2)),
         y: Number(enemy.y.toFixed(2)),
         hp: Number(enemy.hp || 0),
         tutorialTarget: enemy.tutorialTarget === true
       })),
-      powerups: state.powerups.slice(0, 8).map((powerup) => ({
+      powerups: presentation.powerups.slice(0, 8).map((powerup) => ({
         type: powerup.type,
         x: Number(powerup.x.toFixed(2)),
         y: Number(powerup.y.toFixed(2))
       })),
-      safeLanes: (state.safeLanes || []).map((lane) => ({ row: lane.row, minX: lane.minX, maxX: lane.maxX, width: lane.width })),
-      debrisScales: (state.debris || []).slice(0, 16).map((rock) => ({
+      safeLanes: (presentation.safeLanes || []).map((lane) => ({ row: lane.row, slot: lane.slot, minX: lane.minX, maxX: lane.maxX, width: lane.width })),
+      debrisScales: (presentation.debris || []).slice(0, 16).map((rock) => ({
         spawnScale: Number((rock.spawnScale == null ? 1 : rock.spawnScale).toFixed(3)),
         collisionScale: Number((rock.collisionScale == null ? 1 : rock.collisionScale).toFixed(3)),
         row: rock.row || 0

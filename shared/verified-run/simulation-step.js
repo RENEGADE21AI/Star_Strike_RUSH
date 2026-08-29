@@ -317,6 +317,12 @@ function spawnCanonicalHazard(state, kind, x, y, options = {}, streams) {
       wall: canonicalKind === "boss_wall" || Boolean(options.wall),
       noScore: canonicalKind === "boss_wall" || Boolean(options.noScore)
     };
+    if (canonicalKind === "boss_wall") {
+      hazard.wallSlot = canonicalEntityInteger(options.wallSlot ?? 0, "Boss wall slot");
+      hazard.safeLaneRow = canonicalEntityInteger(options.safeLaneRow ?? 0, "Boss wall safe-lane row");
+      hazard.safeGapSlot = canonicalEntityInteger(options.safeGapSlot ?? 0, "Boss wall safe-gap slot");
+      hazard.safeSlots = canonicalEntityInteger(options.safeSlots ?? 6, "Boss wall slot count");
+    }
   } else if (canonicalKind === "mine" || canonicalKind === "energy_mine") {
     hazard = {
       id: state.nextEntityId++,
@@ -1448,9 +1454,43 @@ function spawnCanonicalBossWall(state, gapSlot, options, streams) {
       angle: 0,
       angularVelocity: 0,
       wall: true,
-      noScore: true
+      noScore: true,
+      wallSlot: slot,
+      safeLaneRow: options.safeLaneRow ?? 0,
+      safeGapSlot: gapSlot,
+      safeSlots: slots
     }, streams);
   }
+}
+
+function canonicalReachableDistance(frames, maxSpeed) {
+  let velocity = 0;
+  let distance = 0;
+  for (let frame = 0; frame < frames; frame++) {
+    velocity += roundDivide((maxSpeed - velocity) * 22, 100);
+    velocity = Math.min(maxSpeed, velocity);
+    distance += velocity;
+  }
+  return distance;
+}
+
+function canonicalDoubleBossWallPlan(state, rowSpeed, streams) {
+  const slots = 6;
+  const slotWidth = Math.floor(GAME_WIDTH_UNITS / slots);
+  const rowDistance = 96 * POSITION_UNITS_PER_PIXEL;
+  const reactionFrames = Math.max(1, Math.floor(rowDistance / Math.max(1, rowSpeed)));
+  const reachable = canonicalReachableDistance(reactionFrames, state.player.maxSpeed);
+  const routeMargin = 12 * POSITION_UNITS_PER_PIXEL;
+  const firstSlot = canonicalStreamRange(streams, "boss_behavior", 0, slots - 1);
+  const candidates = [];
+  for (let slot = 0; slot < slots; slot++) {
+    const travel = Math.abs(slot - firstSlot) * slotWidth;
+    if (travel <= Math.max(0, reachable - routeMargin)) candidates.push(slot);
+  }
+  const useful = candidates.filter((slot) => slot !== firstSlot);
+  const pool = useful.length > 0 ? useful : candidates;
+  const secondSlot = pool[canonicalStreamRange(streams, "boss_behavior", 0, pool.length - 1)] ?? firstSlot;
+  return { firstSlot, secondSlot };
 }
 
 function spawnCanonicalBossEnemy(state, boss, type, offsetPixels, streams, options = {}) {
@@ -1483,10 +1523,10 @@ function resolveCanonicalBossAttack(state, boss, attack, streams) {
     if (attack === "wall") {
       spawnCanonicalBossWall(state, canonicalStreamRange(streams, "boss_behavior", 0, 5), { vy: speed }, streams);
     } else if (attack === "double") {
-      const first = canonicalStreamRange(streams, "boss_behavior", 0, 5);
-      const second = canonicalStreamRange(streams, "boss_behavior", 0, 5);
-      spawnCanonicalBossWall(state, first, { vy: Math.round(speed * 88 / 100) }, streams);
-      spawnCanonicalBossWall(state, second, { y: -132 * POSITION_UNITS_PER_PIXEL, vy: Math.round(speed * 88 / 100) }, streams);
+      const rowSpeed = Math.round(speed * 88 / 100);
+      const plan = canonicalDoubleBossWallPlan(state, rowSpeed, streams);
+      spawnCanonicalBossWall(state, plan.firstSlot, { vy: rowSpeed, safeLaneRow: 1 }, streams);
+      spawnCanonicalBossWall(state, plan.secondSlot, { y: -132 * POSITION_UNITS_PER_PIXEL, vy: rowSpeed, safeLaneRow: 2 }, streams);
     } else if (attack === "crush") {
       spawnCanonicalBossWall(state, canonicalStreamRange(streams, "boss_behavior", 0, 4), { slots: 5, y: -44 * POSITION_UNITS_PER_PIXEL, vy: Math.round(speed * 84 / 100) }, streams);
     } else if (attack === "meteor") {

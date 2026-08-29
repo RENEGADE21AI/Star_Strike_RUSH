@@ -152,7 +152,7 @@ function drawExpansionEnemyOverlay(e) {
 
 function drawExpansionHazards() {
   const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
-  for (const lane of state.safeLanes || []) {
+  for (const lane of presentation.safeLanes || []) {
     const rowColor = lane.row === 1 ? "76,255,196" : "115,188,255";
     const pulse = 0.55 + 0.45 * Math.sin(state.frame * 0.08 + lane.row * 1.7);
     const guide = ctx.createLinearGradient(lane.minX, 0, lane.maxX, 0);

@@ -107,10 +107,14 @@ run statistics back into the ordered runtime before presentation, and canonical
 pause damage and terminal state own the game-over decision. Legacy collision death
 cannot preempt that terminal decision. Canvas entity rendering now consumes a
 read-only presentation view derived from canonical integer enemies, projectiles,
-hazards, powerups, wingmen, and bosses without mutating the legacy arrays. Collision
-feedback, audio, safe-lane visuals, HUD/control boss state, and development debug
-counts still run from legacy state, so browser-state ownership remains intentionally
-unchecked below until those remaining consumers are canonical as well.
+hazards, powerups, wingmen, and bosses without mutating the legacy arrays. Ticketed
+safe-lane guidance, HUD/control boss state, realm presentation, and development debug
+counts now consume that same canonical view. Debris Warden double gates also use an
+integer-only, seeded reachability bound and carry their authoritative safe-gap
+metadata into presentation. The parity diagnostic deliberately retains legacy-array
+comparisons, while collision feedback and audio still run in parallel, so browser-
+state ownership remains intentionally unchecked below until those final consumers
+are canonical as well.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`

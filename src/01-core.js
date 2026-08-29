@@ -608,8 +608,12 @@ function laneIndexFromX(x) { if (x < W / 3) return 0; if (x < (2 * W) / 3) retur
 function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 function wrapAngle(a) { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; }
 function waveItem(type, x, y, delay = 0, extra = {}) { return { type, x, y, delay, extra }; }
-function isWraithActive() { return !!(state.boss && state.boss.mode === "wraith"); }
-function bossHudOffset() { return (state.boss || state.bossDeath) ? 32 : 0; }
+function currentPresentedBoss() {
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
+  return presentation && presentation.boss ? presentation.boss : null;
+}
+function isWraithActive() { return currentPresentedBoss()?.mode === "wraith"; }
+function bossHudOffset() { return (currentPresentedBoss() || state.bossDeath) ? 32 : 0; }
 function getPlayerShotKind() { return isWraithActive() ? (state.playerRealm === 1 ? "ghost" : "physical") : "physical"; }
 function enemyBulletCost(kind) {
   if (kind === "aimed") return 1.25;
