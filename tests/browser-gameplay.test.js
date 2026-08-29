@@ -1149,6 +1149,122 @@ test("debug QA exposes live versus canonical parity for a ticketed browser run",
   }
 });
 
+test("ticketed Canvas entity rendering consumes canonical enemies", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1");
+  try {
+    const renderedPixels = await page.evaluate(async () => {
+      setupSession("paused");
+      await beginSeededStandardRun({
+        runId: "run_canvas_entity_authority",
+        rootSeed: "00112233445566778899aabbccddeeff",
+        simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+        rulesRevision: "rules-v1",
+        contentRevision: "content-v1",
+        buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        maxTicks: 20_000
+      });
+      const canonical = currentCanonicalRunState();
+      const units = StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL;
+      spawnCanonicalEnemy(canonical, "red", 180 * units, 220 * units, {
+        vx: units,
+        vy: 2 * units
+      });
+      state.enemies = [];
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      drawEnemies();
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let occupied = 0;
+      for (let index = 3; index < pixels.length; index += 4) {
+        if (pixels[index] > 0) occupied++;
+      }
+      return occupied;
+    });
+    assert.ok(renderedPixels > 0, "canonical enemy must produce real Canvas pixels when the legacy array is empty");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("every ticketed Canvas entity renderer consumes canonical presentation state", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1");
+  try {
+    const rendered = await page.evaluate(async () => {
+      setupSession("paused");
+      const ticket = {
+        runId: "run_canvas_presentation_authority",
+        rootSeed: "00112233445566778899aabbccddeeff",
+        simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+        rulesRevision: "rules-v1",
+        contentRevision: "content-v1",
+        buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        maxTicks: 20_000
+      };
+      await beginSeededStandardRun(ticket);
+      const canonical = currentCanonicalRunState();
+      const units = StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL;
+      const streams = await createRunRandomStreams(ticket.rootSeed, ticket.simRevision);
+      canonical.playerProjectiles.push({
+        id: canonical.nextEntityId++, kind: "player", x: 120 * units, y: 180 * units,
+        vx: 0, vy: -9 * units, angle: 0, life: 90, damage: 1, pierce: 0, realm: 0
+      });
+      canonical.wingmen.push({
+        id: canonical.nextEntityId++, side: -1, x: 150 * units, y: 250 * units,
+        timer: 100, fireCooldown: 10, phase: "active", arrivalElapsed: 34,
+        arrivalDuration: 34, arrivalFromX: 150 * units, arrivalFromY: 250 * units,
+        departureAngle: 0
+      });
+      spawnCanonicalPowerup(canonical, "repair", 200 * units, 300 * units);
+      spawnCanonicalHazard(canonical, "rock_asteroid", 240 * units, 340 * units);
+      spawnCanonicalBoss(canonical, "standard", streams);
+      state.bullets = [];
+      state.enemyBullets = [];
+      state.wingmen = [];
+      state.powerups = [];
+      state.debris = [];
+      state.enemyBeams = [];
+      state.gravityWells = [];
+      state.boss = null;
+
+      function occupiedAfter(drawer) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        drawer();
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        for (let index = 3; index < pixels.length; index += 4) {
+          if (pixels[index] > 0) return true;
+        }
+        return false;
+      }
+
+      return {
+        wingmen: occupiedAfter(drawWingmen),
+        bullets: occupiedAfter(drawBullets),
+        boss: occupiedAfter(drawBoss),
+        powerups: occupiedAfter(drawPowerups),
+        hazards: occupiedAfter(drawExpansionHazards)
+      };
+    });
+    assert.deepEqual(rendered, {
+      wingmen: true,
+      bullets: true,
+      boss: true,
+      powerups: true,
+      hazards: true
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("resume countdown can be cancelled without hidden actions or an additional health charge", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
   const { page, errors } = await openGame(context);

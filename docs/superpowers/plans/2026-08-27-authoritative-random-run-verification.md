@@ -105,10 +105,12 @@ entity counts so parity gaps can be eliminated before authority is switched over
 Ticketed browser ticks now project canonical score, phase, combo, player state, and
 run statistics back into the ordered runtime before presentation, and canonical
 pause damage and terminal state own the game-over decision. Legacy collision death
-cannot preempt that terminal decision. Entity arrays, collision feedback, and their
-audio/visual presentation still run in parallel, so browser-state ownership remains
-intentionally unchecked below until those consumers render canonical entities
-directly instead of the legacy arrays.
+cannot preempt that terminal decision. Canvas entity rendering now consumes a
+read-only presentation view derived from canonical integer enemies, projectiles,
+hazards, powerups, wingmen, and bosses without mutating the legacy arrays. Collision
+feedback, audio, safe-lane visuals, HUD/control boss state, and development debug
+counts still run from legacy state, so browser-state ownership remains intentionally
+unchecked below until those remaining consumers are canonical as well.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`

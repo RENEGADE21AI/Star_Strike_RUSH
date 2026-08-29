@@ -8,6 +8,20 @@ let seededRunStarting = false;
 let recordedRunInputs = null;
 let pendingRunInputButtons = 0;
 let activeCanonicalRunInput = null;
+let canonicalPresentationCache = null;
+let canonicalPresentationCacheTick = -1;
+let canonicalPresentationCacheSource = null;
+
+const CANONICAL_BOSS_PRESENTATION_SIZE = Object.freeze({
+  standard: Object.freeze({ w: 130, h: 82 }),
+  wraith: Object.freeze({ w: 152, h: 96 }),
+  debris_warden: Object.freeze({ w: 148, h: 88 }),
+  mothership: Object.freeze({ w: 170, h: 92 }),
+  siphon_core: Object.freeze({ w: 142, h: 92 }),
+  hive_breaker: Object.freeze({ w: 146, h: 90 }),
+  rail_tyrant: Object.freeze({ w: 152, h: 88 }),
+  gravity_well: Object.freeze({ w: 150, h: 90 })
+});
 
 function installRunRandomStreams(streams, ticket = null) {
   if (!streams || typeof streams.nextFloat !== "function" || !Array.isArray(streams.names)) {
@@ -26,6 +40,9 @@ function clearRunRandomStreams() {
   recordedRunInputs = null;
   pendingRunInputButtons = 0;
   activeCanonicalRunInput = null;
+  canonicalPresentationCache = null;
+  canonicalPresentationCacheTick = -1;
+  canonicalPresentationCacheSource = null;
 }
 
 function currentVerifiedRunContext() {
@@ -88,6 +105,158 @@ async function beginSeededStandardRun(ticket) {
 
 function currentCanonicalRunState() {
   return activeCanonicalRunState;
+}
+
+function canonicalPresentationPixel(value) {
+  return Number(value) / StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL;
+}
+
+function canonicalPresentationAngle(value) {
+  return Number(value || 0) * Math.PI * 2 / StarStrikeVerifiedRunConstants.ANGLE_UNITS;
+}
+
+function canonicalPresentationRadius(key, fallback = 10) {
+  const circles = globalThis.AUTHORITATIVE_COLLISION_CIRCLES_PIXELS?.[String(key || "")];
+  return Array.isArray(circles) && circles.length > 0 ? Number(circles[0].radius) : fallback;
+}
+
+function canonicalEnemyPresentation(enemy, repairTargets) {
+  const x = canonicalPresentationPixel(enemy.x);
+  const y = canonicalPresentationPixel(enemy.y);
+  const vx = canonicalPresentationPixel(enemy.vx);
+  const vy = canonicalPresentationPixel(enemy.vy);
+  return {
+    ...enemy,
+    x,
+    y,
+    vx,
+    vy,
+    prevX: x - vx,
+    prevY: y - vy,
+    rotation: canonicalPresentationAngle(enemy.angle),
+    loopPhase: canonicalPresentationAngle(enemy.loopAngle),
+    railAngle: canonicalPresentationAngle(enemy.railAngle),
+    r: Number(globalThis.AUTHORITATIVE_ENEMY_ARCHETYPES?.[enemy.type]?.radiusPixels || 12),
+    reward: enemy.score,
+    shoot: enemy.shootTimer,
+    warn: enemy.warnTimer,
+    flickerSeed: enemy.id,
+    isRepairTarget: repairTargets.has(enemy.id),
+    hitFlash: 0,
+    hitPulse: 0
+  };
+}
+
+function canonicalProjectilePresentation(projectile, fallbackRadius) {
+  return {
+    ...projectile,
+    x: canonicalPresentationPixel(projectile.x),
+    y: canonicalPresentationPixel(projectile.y),
+    vx: canonicalPresentationPixel(projectile.vx),
+    vy: canonicalPresentationPixel(projectile.vy),
+    angle: canonicalPresentationAngle(projectile.angle),
+    r: Number(projectile.r || fallbackRadius),
+    trail: []
+  };
+}
+
+function canonicalHazardPresentation(hazard) {
+  const base = {
+    ...hazard,
+    x: canonicalPresentationPixel(hazard.x),
+    y: canonicalPresentationPixel(hazard.y),
+    vx: canonicalPresentationPixel(hazard.vx || 0),
+    vy: canonicalPresentationPixel(hazard.vy || 0),
+    rot: canonicalPresentationAngle(hazard.angle),
+    rotation: canonicalPresentationAngle(hazard.angle),
+    r: canonicalPresentationRadius(hazard.kind, hazard.kind === "meteor_warning" ? 18 : 10),
+    spawnScale: 1,
+    trail: hazard.kind === "comet_shard",
+    armed: Number(hazard.armTimer || 0) <= 0,
+    hitFlash: 0,
+    hitPulse: 0
+  };
+  if (hazard.kind === "enemy_beam") {
+    return {
+      ...base,
+      angle: canonicalPresentationAngle(hazard.angle),
+      length: canonicalPresentationPixel(hazard.length),
+      width: canonicalPresentationPixel(hazard.width),
+      warnMax: hazard.warn,
+      color: hazard.drain > 0 ? "#70ff45" : "#ff3046"
+    };
+  }
+  if (hazard.kind === "gravity_well") {
+    return {
+      ...base,
+      r: canonicalPresentationPixel(hazard.radius),
+      pulse: canonicalPresentationAngle(hazard.pulseAngle),
+      color: hazard.drain > 0 ? "#70ff45" : "#a45cff"
+    };
+  }
+  return base;
+}
+
+function canonicalBossPresentation(boss) {
+  if (!boss) return null;
+  const size = CANONICAL_BOSS_PRESENTATION_SIZE[boss.mode] || CANONICAL_BOSS_PRESENTATION_SIZE.standard;
+  return {
+    ...boss,
+    x: canonicalPresentationPixel(boss.x),
+    y: canonicalPresentationPixel(boss.y),
+    targetY: canonicalPresentationPixel(boss.targetY),
+    angle: canonicalPresentationAngle(boss.angle),
+    movePhase: canonicalPresentationAngle(boss.moveAngle),
+    w: size.w,
+    h: size.h,
+    hitFlash: 0,
+    hitPulse: 0
+  };
+}
+
+function currentRunPresentationState(browserState) {
+  const canonical = activeCanonicalRunState;
+  if (!canonical || !browserState || typeof browserState !== "object") return browserState;
+  if (
+    canonicalPresentationCache &&
+    canonicalPresentationCacheTick === canonical.tick &&
+    canonicalPresentationCacheSource === browserState
+  ) {
+    return canonicalPresentationCache;
+  }
+
+  const repairTargets = new Set(canonical.enemies.map((enemy) => enemy.repairTargetId).filter((id) => id > 0));
+  const hazards = canonical.hazards.map(canonicalHazardPresentation);
+  const presentation = Object.create(browserState);
+  presentation.enemies = canonical.enemies.map((enemy) => canonicalEnemyPresentation(enemy, repairTargets));
+  presentation.bullets = canonical.playerProjectiles.map((projectile) => canonicalProjectilePresentation(projectile, 2.4));
+  presentation.enemyBullets = canonical.enemyProjectiles.map((projectile) => canonicalProjectilePresentation(projectile, 3.4));
+  presentation.debris = hazards.filter((hazard) => hazard.kind !== "enemy_beam" && hazard.kind !== "gravity_well");
+  presentation.enemyBeams = hazards.filter((hazard) => hazard.kind === "enemy_beam");
+  presentation.gravityWells = hazards.filter((hazard) => hazard.kind === "gravity_well");
+  presentation.powerups = canonical.powerups.map((powerup) => ({
+    ...powerup,
+    x: canonicalPresentationPixel(powerup.x),
+    y: canonicalPresentationPixel(powerup.y),
+    vx: canonicalPresentationPixel(powerup.vx),
+    vy: canonicalPresentationPixel(powerup.vy),
+    rotation: canonicalPresentationAngle(powerup.wobbleAngle),
+    spinSpeed: 0.024,
+    size: 11
+  }));
+  presentation.wingmen = canonical.wingmen.map((wingman) => ({
+    ...wingman,
+    x: canonicalPresentationPixel(wingman.x),
+    y: canonicalPresentationPixel(wingman.y),
+    rotation: canonicalPresentationAngle(wingman.departureAngle),
+    hitFlash: 0
+  }));
+  presentation.boss = canonicalBossPresentation(canonical.boss);
+
+  canonicalPresentationCache = presentation;
+  canonicalPresentationCacheTick = canonical.tick;
+  canonicalPresentationCacheSource = browserState;
+  return presentation;
 }
 
 function canonicalRunOwnsGameplayOutcome() {
@@ -252,6 +421,9 @@ function endCanonicalRunTick(browserState = null) {
   activeCanonicalRunInput = null;
   if (activeCanonicalRunState && canonical) {
     stepSimulation(activeCanonicalRunState, canonical, activeCanonicalRunRandomStreams);
+    canonicalPresentationCache = null;
+    canonicalPresentationCacheTick = -1;
+    canonicalPresentationCacheSource = null;
     if (browserState) applyCanonicalRunAuthority(browserState);
     return Object.freeze({
       advanced: true,
@@ -310,6 +482,7 @@ globalThis.runRandomRange = runRandomRange;
 globalThis.beginRunInputRecording = beginRunInputRecording;
 globalThis.beginSeededStandardRun = beginSeededStandardRun;
 globalThis.currentCanonicalRunState = currentCanonicalRunState;
+globalThis.currentRunPresentationState = currentRunPresentationState;
 globalThis.canonicalRunOwnsGameplayOutcome = canonicalRunOwnsGameplayOutcome;
 globalThis.applyCanonicalRunAuthority = applyCanonicalRunAuthority;
 globalThis.currentCanonicalRunParity = currentCanonicalRunParity;

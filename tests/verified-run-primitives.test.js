@@ -265,6 +265,84 @@ test("canonical pause damage returns the terminal outcome that must end a ticket
   clearRunRandomStreams();
 });
 
+test("ticketed presentation converts canonical entities without mutating legacy arrays", async () => {
+  clearRunRandomStreams();
+  const ticket = seededTicket({ runId: "run_entity_presentation" });
+  await beginSeededStandardRun(ticket);
+  const canonical = currentCanonicalRunState();
+  const streams = await createRunRandomStreams(ticket.rootSeed, ticket.simRevision);
+  const units = POSITION_UNITS_PER_PIXEL;
+
+  const enemy = spawnCanonicalEnemy(canonical, "red", 100 * units, 200 * units, {
+    vx: units,
+    vy: 2 * units,
+    angle: 1024,
+    warnTimer: 7
+  });
+  canonical.playerProjectiles.push({
+    id: canonical.nextEntityId++, kind: "player", x: 110 * units, y: 210 * units,
+    vx: 0, vy: -9 * units, angle: 0, life: 90, damage: 1, pierce: 0, realm: 0
+  });
+  canonical.enemyProjectiles.push({
+    id: canonical.nextEntityId++, kind: "aimed", x: 120 * units, y: 220 * units,
+    vx: units, vy: 2 * units, angle: 1024, life: 180, damage: 1, drain: 0, realm: 0
+  });
+  spawnCanonicalHazard(canonical, "rock_asteroid", 130 * units, 230 * units, { angle: 1024 });
+  spawnCanonicalHazard(canonical, "enemy_beam", 140 * units, 240 * units, {
+    angle: 1024,
+    length: 400 * units,
+    width: 8 * units,
+    warn: 12,
+    active: 16
+  });
+  spawnCanonicalHazard(canonical, "gravity_well", 150 * units, 250 * units, {
+    radius: 76 * units,
+    pulseAngle: 2048
+  });
+  spawnCanonicalPowerup(canonical, "repair", 160 * units, 260 * units, { wobbleAngle: 1024 });
+  canonical.wingmen.push({
+    id: canonical.nextEntityId++, side: -1, x: 170 * units, y: 270 * units,
+    timer: 100, fireCooldown: 10, phase: "active", arrivalElapsed: 34,
+    arrivalDuration: 34, arrivalFromX: 170 * units, arrivalFromY: 270 * units,
+    departureAngle: 1024
+  });
+  spawnCanonicalBoss(canonical, "wraith", streams);
+
+  const legacyEnemy = { id: "legacy_enemy" };
+  const browserState = {
+    enemies: [legacyEnemy], bullets: [{ id: "legacy_bullet" }], enemyBullets: [],
+    debris: [], enemyBeams: [], gravityWells: [], powerups: [], wingmen: [],
+    boss: { id: "legacy_boss" }
+  };
+  const view = globalThis.currentRunPresentationState?.(browserState);
+
+  assert.notEqual(view, browserState);
+  assert.deepEqual(browserState.enemies, [legacyEnemy], "presentation cannot replace legacy simulation arrays");
+  assert.equal(view.enemies[0].id, enemy.id);
+  assert.equal(view.enemies[0].x, 100);
+  assert.equal(view.enemies[0].y, 200);
+  assert.equal(view.enemies[0].prevX, 99);
+  assert.equal(view.enemies[0].prevY, 198);
+  assert.equal(view.enemies[0].rotation, Math.PI / 2);
+  assert.equal(view.enemies[0].r, 12);
+  assert.equal(view.enemies[0].warn, 7);
+  assert.equal(view.bullets[0].x, 110);
+  assert.equal(view.enemyBullets[0].angle, Math.PI / 2);
+  assert.equal(view.debris[0].r, 15.5);
+  assert.equal(view.debris[0].rot, Math.PI / 2);
+  assert.equal(view.enemyBeams[0].length, 400);
+  assert.equal(view.enemyBeams[0].width, 8);
+  assert.equal(view.gravityWells[0].r, 76);
+  assert.equal(view.gravityWells[0].pulse, Math.PI);
+  assert.equal(view.powerups[0].size, 11);
+  assert.equal(view.powerups[0].rotation, Math.PI / 2);
+  assert.equal(view.wingmen[0].x, 170);
+  assert.equal(view.boss.mode, "wraith");
+  assert.equal(view.boss.w, 152);
+  assert.equal(view.boss.h, 96);
+  clearRunRandomStreams();
+});
+
 test("canonical input clamps axes and records pressed edges", () => {
   assert.deepEqual(
     canonicalRunInput({ moveX: 2, moveY: -0.5, ghostPressed: true, pausePressed: true }),
