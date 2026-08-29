@@ -353,8 +353,20 @@ function dispatchCanonicalRunFeedback(browserState) {
           globalThis.spawnRapidFireMuzzleParticles(x, y);
         }
       } else if (event.type === "ability") {
-        particles(x, y, 10, "#fff", 1.05);
-        play("ability", 0.84);
+        if (event.abilityKind === "realm_hop") {
+          particles(x, y, 10, event.realm === 0 ? "#bfe8ff" : "#d9b6ff", 0.9);
+          play("ability", 0.86);
+          if (browserState.fx) browserState.fx.flash = Math.max(Number(browserState.fx.flash || 0), 4);
+          browserState.comboPulse = Math.max(Number(browserState.comboPulse || 0), 6);
+        } else if (event.abilityKind === "dash") {
+          particles(x, y, 16, "#ffcc78", 1.35);
+          play("ability", 1.0);
+          if (browserState.fx) browserState.fx.flash = Math.max(Number(browserState.fx.flash || 0), 6);
+        } else {
+          particles(x, y, 10, "#fff", 1.05);
+          play("ability", 0.84);
+          if (browserState.fx) browserState.fx.flash = Math.max(Number(browserState.fx.flash || 0), 6);
+        }
       } else if (event.type === "enemy_hit") {
         canonicalEnemyFeedbackUntil.set(event.entityId, canonical.tick + 11);
         particles(x, y, 6, "#fff", 0.7);

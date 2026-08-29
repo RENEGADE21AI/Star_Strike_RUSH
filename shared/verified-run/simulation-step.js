@@ -34,6 +34,9 @@ const { bodiesOverlap, collisionBodyFor } = geometry;
 const ALLOWED_BUTTONS = BUTTON_GHOST_SHIFT | BUTTON_PAUSE;
 const GHOST_BURST = Math.round(4.6 * POSITION_UNITS_PER_PIXEL);
 const GHOST_COST = 35 * ENERGY_UNITS_PER_POINT;
+const DASH_BURST = Math.round(5.8 * POSITION_UNITS_PER_PIXEL);
+const DASH_COST = 30 * ENERGY_UNITS_PER_POINT;
+const REALM_HOP_COST = 18 * ENERGY_UNITS_PER_POINT;
 
 function emitCanonicalFeedback(state, type, details = {}) {
   if (!Array.isArray(state.feedbackEvents)) state.feedbackEvents = [];
@@ -76,20 +79,45 @@ function ghostDirection(player, input) {
 function applyGhostShift(state, input) {
   const player = state.player;
   if ((input.buttons & BUTTON_GHOST_SHIFT) === 0) return;
-  if (player.energy < GHOST_COST || player.ghostCooldown > 0) return;
+  const bossMode = state.boss && state.boss.mode;
+  if (bossMode === "wraith") {
+    if (player.energy < REALM_HOP_COST) return;
+    player.energy -= REALM_HOP_COST;
+    state.playerRealm = 1 - state.playerRealm;
+    state.stats.realmHops++;
+    emitCanonicalFeedback(state, "ability", {
+      x: player.x,
+      y: player.y,
+      abilityKind: "realm_hop",
+      realm: state.playerRealm
+    });
+    return;
+  }
+  const dash = bossMode === "debris_warden";
+  const cost = dash ? DASH_COST : GHOST_COST;
+  if (player.energy < cost || player.ghostCooldown > 0) return;
   const direction = ghostDirection(player, input);
-  player.vx += roundDivide(direction.x * GHOST_BURST, direction.denominator);
-  player.vy += roundDivide(direction.y * GHOST_BURST, direction.denominator);
-  player.ghostTimer = 18;
-  player.invulnerability = Math.max(player.invulnerability, 24);
-  player.ghostCooldown = 20;
-  player.energy -= GHOST_COST;
-  state.stats.ghostUses++;
-  state.director.ghostGrace = Math.max(state.director.ghostGrace, 60);
+  const burst = dash ? DASH_BURST : GHOST_BURST;
+  player.vx += roundDivide(direction.x * burst, direction.denominator);
+  player.vy += roundDivide(direction.y * burst, direction.denominator);
+  if (dash) {
+    player.dashTimer = 12;
+    player.ghostTimer = 0;
+    player.ghostCooldown = 24;
+    state.stats.dashUses++;
+    state.director.ghostGrace = Math.max(state.director.ghostGrace, 24);
+  } else {
+    player.ghostTimer = 18;
+    player.invulnerability = Math.max(player.invulnerability, 24);
+    player.ghostCooldown = 20;
+    state.stats.ghostUses++;
+    state.director.ghostGrace = Math.max(state.director.ghostGrace, 60);
+  }
+  player.energy -= cost;
   emitCanonicalFeedback(state, "ability", {
     x: player.x,
     y: player.y,
-    abilityKind: "ghost_shift"
+    abilityKind: dash ? "dash" : "ghost_shift"
   });
 }
 
@@ -1480,6 +1508,10 @@ function spawnCanonicalBoss(state, requestedMode, streams) {
   };
   state.boss = boss;
   state.playerRealm = 0;
+  if (mode === "wraith") {
+    state.player.ghostTimer = 0;
+    state.player.ghostCooldown = 0;
+  }
   state.director.mood = "boss";
   state.director.moodTimer = 0;
   state.director.lastTemplate = "";

@@ -119,7 +119,9 @@ the legacy shadow's outcome feedback for the entire ticketed run, then dispatche
 sound, particles, shake, flash, and entity hit pulses only from those canonical
 events. Canvas, HUD, gameplay audio, and collision feedback therefore describe the
 same authoritative state while title traffic, stars, and particle motion remain
-cosmetic and outside verification.
+cosmetic and outside verification. Boss-specific ability substitution is canonical
+too: Wraith runs resolve the input as an immediate realm hop, while Debris Warden
+runs resolve it as a faster DASH without Ghost Shift's debris phasing.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`
@@ -139,7 +141,7 @@ cosmetic and outside verification.
 - Consumes: `createRunRandomStreams()` and canonical input.
 - Produces: `createSimulationState(ticket)`, `stepSimulation(state, input, streams)`, `serializeCanonicalState(state)`, and `deriveVerifiedRunResult(state)`.
 
-- [x] Add golden tests for player motion, pause damage, Ghost Shift, spawns, drops, collisions, phases, every boss, score, and terminal death.
+- [x] Add golden tests for player motion, pause damage, Ghost Shift, Wraith Realm Hop, Debris Warden DASH, spawns, drops, collisions, phases, every boss, score, and terminal death.
 - [x] Confirm the golden tests fail before extraction.
 - [x] Extract gameplay-authoritative state and one-tick transitions behind browser adapters; use 1,024 integer position units, 4,096 angle units, integer timers, and deterministic trigonometry tables.
 - [x] Make Canvas, DOM, audio, visual interpolation, and wall time consumers of canonical state rather than inputs to it.

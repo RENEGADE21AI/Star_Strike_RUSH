@@ -1352,6 +1352,83 @@ test("ticketed HUD and debug surfaces describe canonical boss and entity state",
   }
 });
 
+test("ticketed browser controls resolve Wraith HOP and Debris Warden DASH canonically", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const { page, errors } = await openGame(context, "/?debug=1&input=touch");
+  try {
+    const observed = await page.evaluate(async () => {
+      async function exercise(mode, runId) {
+        clearRunRandomStreams();
+        setupSession("playing");
+        state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
+        const ticket = {
+          runId,
+          rootSeed: "00112233445566778899aabbccddeeff",
+          simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+          rulesRevision: "rules-v1",
+          contentRevision: "content-v1",
+          buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          maxTicks: 20_000
+        };
+        await beginSeededStandardRun(ticket);
+        const canonical = currentCanonicalRunState();
+        const streams = await createRunRandomStreams(ticket.rootSeed, ticket.simRevision);
+        spawnCanonicalBoss(canonical, mode, streams);
+        applyCanonicalRunAuthority(state);
+        attemptGhost();
+        beginCanonicalRunTick({ keyboard: {}, joystick: { active: false } });
+        endCanonicalRunTick(state);
+        updateDebugSnapshot();
+        const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+        return {
+          action: snapshot.input.action,
+          playerRealm: state.playerRealm,
+          canonicalRealm: canonical.playerRealm,
+          ghostTimer: canonical.player.ghostTimer,
+          dashTimer: canonical.player.dashTimer,
+          ghostUses: canonical.stats.ghostUses,
+          dashUses: canonical.stats.dashUses,
+          realmHops: canonical.stats.realmHops,
+          ability: canonical.feedbackEvents.find((event) => event.type === "ability")?.abilityKind || ""
+        };
+      }
+
+      const realmHop = await exercise("wraith", "run_browser_realm_hop");
+      const dash = await exercise("debris_warden", "run_browser_dash");
+      clearRunRandomStreams();
+      return { realmHop, dash };
+    });
+
+    assert.deepEqual(observed, {
+      realmHop: {
+        action: "HOP",
+        playerRealm: 1,
+        canonicalRealm: 1,
+        ghostTimer: 0,
+        dashTimer: 0,
+        ghostUses: 0,
+        dashUses: 0,
+        realmHops: 1,
+        ability: "realm_hop"
+      },
+      dash: {
+        action: "DASH",
+        playerRealm: 0,
+        canonicalRealm: 0,
+        ghostTimer: 0,
+        dashTimer: 11,
+        ghostUses: 0,
+        dashUses: 1,
+        realmHops: 0,
+        ability: "dash"
+      }
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
 test("resume countdown can be cancelled without hidden actions or an additional health charge", { timeout: 120_000 }, async () => {
   const context = await browser.newContext({ viewport: { width: 375, height: 667 }, hasTouch: true, isMobile: true });
   const { page, errors } = await openGame(context);

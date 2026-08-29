@@ -336,6 +336,60 @@ test("ticketed browser feedback is dispatched once from canonical collision outc
   assert.equal(canonicalRunSuppressesLegacyFeedback(), false);
 });
 
+test("ticketed boss abilities preserve their distinct canonical presentation feedback", async () => {
+  async function useBossAbility(mode, runId) {
+    clearRunRandomStreams();
+    const runTicket = seededTicket({ runId });
+    await beginSeededStandardRun(runTicket);
+    const canonical = currentCanonicalRunState();
+    const streams = await createRunRandomStreams(runTicket.rootSeed, runTicket.simRevision);
+    canonical.player.fireCooldown = 10_000;
+    spawnCanonicalBoss(canonical, mode, streams);
+    const origin = {
+      x: canonical.player.x / POSITION_UNITS_PER_PIXEL,
+      y: canonical.player.y / POSITION_UNITS_PER_PIXEL
+    };
+    const sounds = [];
+    const particles = [];
+    globalThis.playGameSound = (name, volume) => sounds.push({ name, volume });
+    globalThis.spawnParticles = (x, y, count, color, speed) => particles.push({ x, y, count, color, speed });
+    const browserState = {
+      player: {},
+      runStats: {},
+      fx: { flash: 0, shake: 0 },
+      comboPulse: 0,
+      particles: []
+    };
+
+    queueVerifiedRunInputEdge("ghost");
+    beginCanonicalRunTick({ keyboard: {}, joystick: { active: false } });
+    endCanonicalRunTick(browserState);
+
+    delete globalThis.playGameSound;
+    delete globalThis.spawnParticles;
+    clearRunRandomStreams();
+    return { origin, sounds, particles, flash: browserState.fx.flash, comboPulse: browserState.comboPulse };
+  }
+
+  const realmHop = await useBossAbility("wraith", "run_feedback_realm_hop");
+  assert.deepEqual(realmHop, {
+    origin: { x: 187.5, y: 533.599609375 },
+    sounds: [{ name: "ability", volume: 0.86 }],
+    particles: [{ x: 187.5, y: 533.599609375, count: 10, color: "#d9b6ff", speed: 0.9 }],
+    flash: 4,
+    comboPulse: 6
+  });
+
+  const dash = await useBossAbility("debris_warden", "run_feedback_dash");
+  assert.deepEqual(dash, {
+    origin: { x: 187.5, y: 533.599609375 },
+    sounds: [{ name: "ability", volume: 1 }],
+    particles: [{ x: 187.5, y: 533.599609375, count: 16, color: "#ffcc78", speed: 1.35 }],
+    flash: 6,
+    comboPulse: 0
+  });
+});
+
 test("ticketed presentation converts canonical entities without mutating legacy arrays", async () => {
   clearRunRandomStreams();
   const ticket = seededTicket({ runId: "run_entity_presentation" });

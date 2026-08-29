@@ -10,6 +10,7 @@ const {
   POSITION_UNITS_PER_PIXEL,
   SIMULATION_REVISION
 } = require("../shared/verified-run/constants");
+const { BUTTON_GHOST_SHIFT } = require("../shared/verified-run/input-tape");
 const { canonicalPhaseDuration } = require("../shared/verified-run/director");
 const { createSimulationState, serializeCanonicalState } = require("../shared/verified-run/simulation-state");
 const {
@@ -326,6 +327,70 @@ test("boss projectiles are born after projectile motion and do not advance on th
   assert.equal(state.enemyProjectiles.length, 9);
   assert.equal(state.enemyProjectiles[0].x, boss.x);
   assert.equal(state.enemyProjectiles[0].y, boss.y + 22 * POSITION_UNITS_PER_PIXEL);
+});
+
+test("Wraith replaces canonical Ghost Shift with an immediate realm hop", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.phase = 8;
+  state.player.fireCooldown = 10_000;
+  state.player.ghostTimer = 8;
+  state.player.ghostCooldown = 7;
+  spawnCanonicalBoss(state, "wraith", zeroStreams());
+  assert.equal(state.player.ghostTimer, 0, "Wraith arrival cancels an in-flight Ghost Shift");
+  assert.equal(state.player.ghostCooldown, 0, "Wraith arrival clears the replaced action's cooldown");
+  const origin = { x: state.player.x, y: state.player.y };
+
+  stepSimulation(state, { x: 0, y: 0, buttons: BUTTON_GHOST_SHIFT }, zeroStreams());
+
+  assert.equal(state.playerRealm, 1);
+  assert.equal(state.player.energy, 82 * ENERGY_UNITS_PER_POINT + 50);
+  assert.equal(state.player.ghostTimer, 0);
+  assert.equal(state.player.dashTimer, 0);
+  assert.equal(state.player.invulnerability, 0);
+  assert.equal(state.player.ghostCooldown, 0);
+  assert.equal(state.stats.realmHops, 1);
+  assert.equal(state.stats.ghostUses, 0);
+  assert.equal(state.stats.dashUses, 0);
+  assert.deepEqual(state.feedbackEvents.find((event) => event.type === "ability"), {
+    type: "ability",
+    x: origin.x,
+    y: origin.y,
+    abilityKind: "realm_hop",
+    realm: 1
+  });
+});
+
+test("Debris Warden replaces canonical Ghost Shift with a non-phasing dash", () => {
+  const state = createSimulationState(ticket({ maxTicks: 20 }));
+  state.phase = 12;
+  state.player.fireCooldown = 10_000;
+  spawnCanonicalBoss(state, "debris_warden", zeroStreams());
+  const origin = { x: state.player.x, y: state.player.y };
+
+  stepSimulation(state, { x: 127, y: 0, buttons: BUTTON_GHOST_SHIFT }, zeroStreams());
+
+  assert.equal(state.player.energy, 70 * ENERGY_UNITS_PER_POINT + 50);
+  assert.equal(state.player.ghostTimer, 0);
+  assert.equal(state.player.dashTimer, 11);
+  assert.equal(state.player.invulnerability, 0);
+  assert.equal(state.player.ghostCooldown, 23);
+  assert.ok(state.player.vx > 5 * POSITION_UNITS_PER_PIXEL);
+  assert.equal(state.stats.dashUses, 1);
+  assert.equal(state.stats.ghostUses, 0);
+  assert.equal(state.stats.realmHops, 0);
+  assert.equal(state.director.ghostGrace, 23);
+  assert.deepEqual(state.feedbackEvents.find((event) => event.type === "ability"), {
+    type: "ability",
+    x: origin.x,
+    y: origin.y,
+    abilityKind: "dash"
+  });
+
+  state.player.vx = 0;
+  state.player.vy = 0;
+  spawnCanonicalHazard(state, "rock_asteroid", state.player.x, state.player.y, { vx: 0, vy: 0, angle: 0 });
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 }, zeroStreams());
+  assert.equal(state.player.hp, 4, "DASH must not grant Ghost Shift debris phasing");
 });
 
 test("phase four starts a boss, freezes the wave clock, and boss death grants only server-derived credit", () => {
