@@ -92,32 +92,14 @@ const FONT_SMALL = "700 12px 'Arial Narrow', Arial, sans-serif";
 const FONT_TINY = "700 10px 'Arial Narrow', Arial, sans-serif";
 const FONT_BUTTON = "900 15px 'Arial Narrow', Arial, sans-serif";
 
-const ENEMY_DATA = {
-  red:     { threat: 1.05, score: 30, radius: 12, hp: 2 },
-  orange:  { threat: 0.80, score: 20, radius: 10, hp: 1 },
-  purple:  { threat: 3.55, score: 150, radius: 17, hp: 5 },
-  phantom: { threat: 2.35, score: 100, radius: 14, hp: 3 },
-  splitter: { threat: 2.20, score: 120, radius: 15, hp: 3 },
-  splitter_shard: { threat: 0.45, score: 10, radius: 8, hp: 1 },
-  carrier: { threat: 4.30, score: 300, radius: 23, hp: 6 },
-  siphon: { threat: 2.70, score: 130, radius: 14, hp: 3 },
-  leech: { threat: 3.80, score: 190, radius: 16, hp: 4 },
-  minecaster: { threat: 2.65, score: 140, radius: 15, hp: 3 },
-  shieldbearer: { threat: 2.45, score: 150, radius: 16, hp: 4 },
-  railgunner: { threat: 3.50, score: 220, radius: 15, hp: 3 },
-  repair_drone: { threat: 1.45, score: 90, radius: 11, hp: 2 }
-};
+const ENEMY_DATA = Object.freeze(Object.fromEntries(Object.entries(AUTHORITATIVE_ENEMY_ARCHETYPES).map(([type, data]) => [type, Object.freeze({
+  threat: data.threatHundredths / 100,
+  score: data.score,
+  radius: data.radiusPixels,
+  hp: data.hp
+})])));
 
-const BOSS_SCORE = {
-  standard: 1000,
-  wraith: 1700,
-  debris_warden: 1800,
-  mothership: 1900,
-  siphon_core: 2000,
-  hive_breaker: 2100,
-  rail_tyrant: 2200,
-  gravity_well: 2300
-};
+const BOSS_SCORE = Object.freeze(Object.fromEntries(Object.entries(AUTHORITATIVE_BOSS_ARCHETYPES).map(([mode, data]) => [mode, data.score])));
 
 function hexToRgb(hex) {
   const s = hex.replace("#", "").trim();
@@ -626,8 +608,12 @@ function laneIndexFromX(x) { if (x < W / 3) return 0; if (x < (2 * W) / 3) retur
 function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 function wrapAngle(a) { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; }
 function waveItem(type, x, y, delay = 0, extra = {}) { return { type, x, y, delay, extra }; }
-function isWraithActive() { return !!(state.boss && state.boss.mode === "wraith"); }
-function bossHudOffset() { return (state.boss || state.bossDeath) ? 32 : 0; }
+function currentPresentedBoss() {
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
+  return presentation && presentation.boss ? presentation.boss : null;
+}
+function isWraithActive() { return currentPresentedBoss()?.mode === "wraith"; }
+function bossHudOffset() { return (currentPresentedBoss() || state.bossDeath) ? 32 : 0; }
 function getPlayerShotKind() { return isWraithActive() ? (state.playerRealm === 1 ? "ghost" : "physical") : "physical"; }
 function enemyBulletCost(kind) {
   if (kind === "aimed") return 1.25;
@@ -734,6 +720,7 @@ const state = {
   verifiedRunLedger: null,
   verifiedRunSession: null,
   verifiedRunPromise: null,
+  verifiedInputTape: null,
   runMode: "standard",
   pausedReason: "",
   pauseNotice: "",

@@ -60,6 +60,15 @@ function accessibleActionSignature(options) {
   });
 }
 
+function scheduleAccessibleActionFocus(action, actions) {
+  requestAnimationFrame(() => {
+    if (!action || !action.isConnected) return;
+    const active = document.activeElement;
+    if (active && actions.contains(active) && active !== action) return;
+    action.focus({ preventScroll: true });
+  });
+}
+
 function setGameAccessibleSurface(options = {}) {
   const dom = createGameAccessibilityDom();
   const mode = String(options.mode || "");
@@ -111,12 +120,12 @@ function setGameAccessibleSurface(options = {}) {
     }
     gameAccessibilitySignature = signature;
     const retained = priorAction && dom.actions.querySelector(`[data-game-action="${CSS.escape(priorAction)}"]`);
-    if (retained) requestAnimationFrame(() => retained.focus({ preventScroll: true }));
+    if (retained) scheduleAccessibleActionFocus(retained, dom.actions);
   }
 
   if (modeChanged && options.modal === true && options.focusFirst !== false) {
     const first = dom.actions.querySelector("button");
-    if (first) requestAnimationFrame(() => first.focus({ preventScroll: true }));
+    if (first) scheduleAccessibleActionFocus(first, dom.actions);
   }
   if (leavingModal) {
     const restoredAction = gameAccessibilityRestoreActionId

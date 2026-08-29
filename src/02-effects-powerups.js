@@ -58,6 +58,7 @@ function powerupFeedbackColor(type) {
 }
 function spawnPowerupCollectBurst(pu) {
   if (!pu) return;
+  if (typeof legacyGameplayFeedbackAllowed === "function" && !legacyGameplayFeedbackAllowed()) return;
   const color = powerupFeedbackColor(pu.type);
   spawnParticles(pu.x, pu.y, 22, color, 1.05);
   for (let index = 0; index < 2; index++) {
@@ -96,7 +97,7 @@ function safePowerupType() {
     const expansionType = pickExpansionPowerupType(lowHp);
     if (expansionType) return expansionType;
   }
-  const r = Math.random();
+  const r = runRandom("loot");
   if (lowHp) {
     if (r < 0.34) return "repair";
     if (r < 0.58) return "wingman";
@@ -114,7 +115,7 @@ function safePowerupType() {
 function registerPowerupDrop(cooldownMin = 240, cooldownMax = 360) {
   state.killsSinceLastDrop = 0;
   state.framesSinceLastDrop = 0;
-  state.powerupDropCooldown = cooldownMin + Math.floor(rand(0, Math.max(1, cooldownMax - cooldownMin)));
+  state.powerupDropCooldown = cooldownMin + Math.floor(runRandomRange("loot", 0, Math.max(1, cooldownMax - cooldownMin)));
 }
 function shouldDropPowerupNow() {
   if (state.powerupDropCooldown > 0) return false;
@@ -127,15 +128,15 @@ function shouldDropPowerupNow() {
   if (state.phase >= 10) chance += 0.01;
   if (state.intensityPhase === "cooldown") chance += 0.05;
   if (state.intensityPhase === "surge") chance -= 0.02;
-  return Math.random() < chance;
+  return runRandom("loot") < chance;
 }
 function dropPowerup(x, y) { spawnPowerupAt(x, y, safePowerupType()); }
 function bossRewardDrops(x, y) {
-  const primary = Math.random() < 0.5 ? "spread" : "rapid";
+  const primary = runRandom("loot") < 0.5 ? "spread" : "rapid";
   spawnPowerupAt(x - 18, y - 2, primary);
-  if (Math.random() < 0.5) {
+  if (runRandom("loot") < 0.5) {
     const pool = ["spread", "rapid", "repair", "wingman", "dual", "energy_cell", "phase_shield", "overcharge", "piercing"];
-    spawnPowerupAt(x + 18, y + 2, pool[Math.floor(Math.random() * pool.length)]);
+    spawnPowerupAt(x + 18, y + 2, pool[Math.floor(runRandom("loot") * pool.length)]);
   }
 }
 function chooseLane(exclude = []) {
@@ -151,7 +152,7 @@ function chooseLane(exclude = []) {
     else if (counts[i] === min) best.push(i);
   }
   if (!best.length) return 1;
-  return best[Math.floor(Math.random() * best.length)];
+  return best[Math.floor(runRandom("loot") * best.length)];
 }
 function laneX(lane) { return laneCenters()[lane]; }
 const WINGMAN_FORMATION_OFFSET_X = 42;
@@ -221,25 +222,21 @@ function spawnWingmen(count) {
 function fireWingman(w) {
   if (w.phase !== "active" || w.fire > 0) return;
   state.bullets.push({ x: w.x, y: w.y - 12, vx: 0, vy: -8.2, life: 80, r: 3, kind: getPlayerShotKind(), realm: state.playerRealm, damage: 0.75 });
-  if (typeof playGameSound === "function") playGameSound("player_fire", 0.18);
+  if ((typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) && typeof playGameSound === "function") {
+    playGameSound("player_fire", 0.18);
+  }
   w.fire = 18;
 }
 function currentInputVector() {
-  let x = 0, y = 0;
-  if (state.keyboard.left) x -= 1;
-  if (state.keyboard.right) x += 1;
-  if (state.keyboard.up) y -= 1;
-  if (state.keyboard.down) y += 1;
-  if (state.joystick.active) { x += state.joystick.ax; y += state.joystick.ay; }
-  const mag = Math.hypot(x, y);
-  if (mag > 1) { x /= mag; y /= mag; }
-  return { x, y };
+  return currentCanonicalRunVector(state);
 }
 
 function attemptGhost() {
   if (state.gameState !== "playing") return;
+  queueVerifiedRunInputEdge("ghost");
   const p = state.player;
-  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST", cost: 35, cooldown: 20, burst: 4.6, phaseThroughDebris: true };
+  const presentedBoss = typeof currentPresentedBoss === "function" ? currentPresentedBoss() : state.boss;
+  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(presentedBoss && presentedBoss.mode) : { label: "GHOST", cost: 35, cooldown: 20, burst: 4.6, phaseThroughDebris: true };
   if (isWraithActive()) {
     const cost = profile.cost;
     if (p.energy < cost) return;
@@ -248,10 +245,12 @@ function attemptGhost() {
     state.runStats.abilityUses++;
     state.runStats.realmHops++;
     recordTrustedRunEvent("ghost");
-    state.fx.flash = Math.max(state.fx.flash, 4);
-    state.comboPulse = Math.max(state.comboPulse, 6);
-    spawnParticles(p.x, p.y, 10, state.playerRealm === 0 ? "#bfe8ff" : "#d9b6ff", 0.9);
-    if (typeof playGameSound === "function") playGameSound("ability", 0.86);
+    if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+      state.fx.flash = Math.max(state.fx.flash, 4);
+      state.comboPulse = Math.max(state.comboPulse, 6);
+      spawnParticles(p.x, p.y, 10, state.playerRealm === 0 ? "#bfe8ff" : "#d9b6ff", 0.9);
+      if (typeof playGameSound === "function") playGameSound("ability", 0.86);
+    }
     return;
   }
   if (p.energy < profile.cost || p.ghostCooldown > 0) return;
@@ -276,9 +275,11 @@ function attemptGhost() {
   else state.runStats.dashUses++;
   recordTrustedRunEvent("ghost");
   state.difficulty.ghostGrace = profile.phaseThroughDebris ? 60 : 24;
-  state.fx.flash = Math.max(state.fx.flash, 6);
-  spawnParticles(p.x, p.y, profile.label === "DASH" ? 16 : 10, profile.label === "DASH" ? "#ffcc78" : "#fff", profile.label === "DASH" ? 1.35 : 1.05);
-  if (typeof playGameSound === "function") playGameSound("ability", profile.label === "DASH" ? 1.0 : 0.84);
+  if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+    state.fx.flash = Math.max(state.fx.flash, 6);
+    spawnParticles(p.x, p.y, profile.label === "DASH" ? 16 : 10, profile.label === "DASH" ? "#ffcc78" : "#fff", profile.label === "DASH" ? 1.35 : 1.05);
+    if (typeof playGameSound === "function") playGameSound("ability", profile.label === "DASH" ? 1.0 : 0.84);
+  }
 }
 
 function updateStars() {

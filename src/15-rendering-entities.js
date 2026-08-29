@@ -1,6 +1,7 @@
 function drawWingmen() {
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
   const alpha = state.player && state.player.ghostTimer > 0 ? 0.42 : 1;
-  for (const w of state.wingmen) {
+  for (const w of presentation.wingmen) {
     if (typeof drawSpriteAsset === "function" && drawSpriteAsset(ctx, "wingman", w.x, w.y, {
       alpha,
       rotation: Number(w.rotation || 0),
@@ -48,7 +49,8 @@ function drawWingmen() {
   }
 }
 function drawBullets() {
-  for (const b of state.bullets) {
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
+  for (const b of presentation.bullets) {
     if (b.kind === "ghost") {
       ctx.save();
       ctx.shadowColor = "rgba(220,190,255,0.9)";
@@ -63,7 +65,7 @@ function drawBullets() {
       else { ctx.fillStyle = "#fff"; ctx.fillRect(b.x - 2, b.y, 4, 10); }
     }
   }
-  for (const b of state.enemyBullets) {
+  for (const b of presentation.enemyBullets) {
     if (b.kind === "boss") {
       if (typeof drawLaserBolt === "function") drawLaserBolt(b.x, b.y + 4, { width: 6, length: 15, color: "255,220,76", glow: 9 });
     } else if (b.kind === "aimed") {
@@ -100,7 +102,7 @@ function drawBullets() {
         }
       }
       if (b.kind === "wraithPhysical") {
-        const wrongRealm = state.boss && state.boss.mode === "wraith" && b.realm !== state.playerRealm;
+        const wrongRealm = presentation.boss && presentation.boss.mode === "wraith" && b.realm !== state.playerRealm;
         ctx.globalAlpha = wrongRealm ? 0.35 : 0.98;
         ctx.fillStyle = wrongRealm ? "rgba(220,230,255,0.70)" : "rgba(255,255,255,0.98)";
         ctx.fillRect(b.x - 4, b.y - 2, 8, 10);
@@ -113,7 +115,7 @@ function drawBullets() {
         ctx.beginPath(); ctx.arc(b.x, b.y, 4.5, 0, TAU); ctx.fill();
       }
       ctx.restore();
-      if (state.boss && state.boss.mode === "wraith" && b.kind === "wraithGhost" && state.boss.hp / state.boss.maxHp <= 0.4 && b.realm !== state.playerRealm) {
+      if (presentation.boss && presentation.boss.mode === "wraith" && b.kind === "wraithGhost" && presentation.boss.hp / presentation.boss.maxHp <= 0.4 && b.realm !== state.playerRealm) {
         ctx.save();
         ctx.globalAlpha = 0.18;
         ctx.strokeStyle = "rgba(255,255,255,0.9)";
@@ -136,7 +138,8 @@ function enemyHeadingRotation(dx, dy, fallbackY = 1) {
   return Math.atan2(headingY, headingX) - Math.PI / 2;
 }
 function drawEnemies() {
-  for (const e of state.enemies) {
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
+  for (const e of presentation.enemies) {
     const transform = enemyVisualTransform(e);
     const scale = transform.scale;
     const hitMix = clamp((e.hitFlash || 0) / 12, 0, 1);
@@ -191,7 +194,8 @@ function drawBossImpactFeedback(boss, yOffset = 0) {
   ctx.restore();
 }
 function drawBoss() {
-  const b = state.boss;
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
+  const b = presentation.boss;
   if (!b) return;
   if (typeof drawExpansionBoss === "function" && drawExpansionBoss(b)) return;
   if (b.mode === "wraith") {
@@ -305,7 +309,8 @@ function drawBossDeath() {
   }
 }
 function drawPowerups() {
-  for (const p of state.powerups) {
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
+  for (const p of presentation.powerups) {
     const bob = Math.sin(state.frame * 0.12 + p.x * 0.03) * 1.4;
     const spin = Number.isFinite(p.rotation) ? p.rotation : state.frame * 0.024;
     const visual = typeof expansionPowerupVisual === "function" ? expansionPowerupVisual(p.type) : null;

@@ -21,6 +21,9 @@ after the files they depend on, because the current code intentionally shares gl
   tutorial no-progression gates.
 - `00-runtime.js`: deterministic fixed-step simulation clock, render-rate
   independence, long-background-gap clamping, and bounded backing-canvas DPR.
+- `00-verified-run-runtime.js`: browser boundary for versioned run random
+  streams and compact RLE/IndexedDB canonical input recording; competition remains gated
+  until the headless replay worker is authoritative.
 - `01-core.js`: canvas handles, constants, persistent settings, global state, scoring.
 - `02-audio.js`: throttled procedural Web Audio effects, gesture-safe looping
   title/gameplay music with state crossfades, and the persisted audio preference.

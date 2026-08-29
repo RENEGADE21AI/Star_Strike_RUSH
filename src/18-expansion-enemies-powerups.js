@@ -3,7 +3,7 @@ function spawnCarrierLaunchedEnemy(e) {
   const earlyPool = ["red", "orange"];
   const latePool = state.phase >= 9 ? ["red", "orange", "splitter", "siphon"] : ["red", "orange", "red"];
   const pool = e.launchCount < 2 ? earlyPool : latePool;
-  const type = pool[Math.floor(Math.random() * pool.length)];
+  const type = pool[Math.floor(expansionLootRandom() * pool.length)];
   const side = e.launchCount % 2 === 0 ? -1 : 1;
   const targetLane = chooseLane([]);
   spawnEnemy(type, e.x + side * 11, e.y + 16, {
@@ -15,7 +15,7 @@ function spawnCarrierLaunchedEnemy(e) {
     launchTimer: 13,
     spawnOriginX: e.x + side * 11,
     spawnOriginY: e.y + 16,
-    spawnTargetX: laneX(targetLane) + rand(-16, 16),
+    spawnTargetX: laneX(targetLane) + expansionEnemyRand(-16, 16),
     spawnTargetY: e.y + 92,
     recover: 24
   });
@@ -44,7 +44,7 @@ function updateExpansionEnemy(e, p, threat, moveScale, margin) {
     if (e.launchTimer <= 0) {
       spawnCarrierLaunchedEnemy(e);
       const minDelay = hpPct < 0.45 ? 86 : 108;
-      e.launchTimer = Math.floor(minDelay + rand(0, 44) - state.phase * 1.2);
+      e.launchTimer = Math.floor(minDelay + expansionEnemyRand(0, 44) - state.phase * 1.2);
     }
   } else if (e.type === "siphon") {
     e.x += Math.sign(p.x - e.x) * 0.22 + Math.sin(e.t * 0.035 + e.loopPhase) * 0.18;
@@ -65,7 +65,7 @@ function updateExpansionEnemy(e, p, threat, moveScale, margin) {
         intendedRange: shot.range,
         maxSpeed: 4.8
       });
-      e.fireTimer = Math.floor(112 + rand(-20, 28) - state.phase * 1.5);
+      e.fireTimer = Math.floor(112 + expansionEnemyRand(-20, 28) - state.phase * 1.5);
       e.fireWarn = 0;
     }
   } else if (e.type === "leech") {
@@ -97,9 +97,9 @@ function updateExpansionEnemy(e, p, threat, moveScale, margin) {
     if (!state.boss && state.debris.filter((d) => d.kind === "mine").length < 4) {
       e.mineTimer--;
       if (e.mineTimer <= 0 && e.minesDropped < 2) {
-        spawnMine(e.x + rand(-10, 10), e.y + 16);
+        spawnMine(e.x + expansionEnemyRand(-10, 10), e.y + 16);
         e.minesDropped++;
-        e.mineTimer = Math.floor(rand(86, 128));
+        e.mineTimer = Math.floor(expansionEnemyRand(86, 128));
       }
     }
   } else if (e.type === "shieldbearer") {
@@ -119,14 +119,14 @@ function updateExpansionEnemy(e, p, threat, moveScale, margin) {
           color: "#ff3046",
           source: "railgunner"
         });
-        e.railCooldown = Math.floor(132 + rand(-18, 34));
+        e.railCooldown = Math.floor(132 + expansionEnemyRand(-18, 34));
         kickShake(5);
       }
     } else {
       e.railCooldown--;
       if (e.railCooldown <= 0) {
         e.railAngle = Math.atan2(p.y - (e.y + 13), p.x - e.x);
-        e.railWarn = Math.floor(38 + rand(0, 8));
+        e.railWarn = Math.floor(38 + expansionEnemyRand(0, 8));
       }
     }
   } else if (e.type === "repair_drone") {
@@ -233,8 +233,10 @@ function onEnemyDestroyed(e) {
 function finishEnemyDestroyed(e, index, allowDrop = true) {
   if (!e || index < 0) return;
   noteKill(e.reward || enemyScoreForType(e.type), e.type, e.id);
-  spawnDeathBurst(e.x, e.y, e.type === "purple" ? 22 : e.type === "phantom" ? 18 : e.type === "carrier" ? 24 : 14);
-  if (typeof playGameSound === "function") playGameSound("destroy", e.type === "carrier" ? 1.1 : 0.72);
+  if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+    spawnDeathBurst(e.x, e.y, e.type === "purple" ? 22 : e.type === "phantom" ? 18 : e.type === "carrier" ? 24 : 14);
+    if (typeof playGameSound === "function") playGameSound("destroy", e.type === "carrier" ? 1.1 : 0.72);
+  }
   onEnemyDestroyed(e);
   if (allowDrop && !enemyDropsBlocked(e)) {
     if (shouldDropPowerupNow()) { dropPowerup(e.x, e.y); registerPowerupDrop(240, 360); }
@@ -251,7 +253,13 @@ function drainPlayerEnergy(amount, source = "drain") {
   p.energy = clamp(p.energy - mitigated, 0, p.maxEnergy);
   if (before > p.energy) {
     state.difficulty.ghostGrace = Math.max(state.difficulty.ghostGrace, 18);
-    if (source !== "passive" && state.frame % 6 === 0) spawnParticles(p.x, p.y, 3, "#70ff45", 0.45);
+    if (
+      (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) &&
+      source !== "passive" &&
+      state.frame % 6 === 0
+    ) {
+      spawnParticles(p.x, p.y, 3, "#70ff45", 0.45);
+    }
   }
   return before - p.energy;
 }
@@ -261,9 +269,11 @@ function consumePhaseShieldOnDamage(amount = 1) {
   if (!p || p.phaseShield <= 0) return false;
   p.phaseShield = 0;
   p.inv = Math.max(p.inv, 42);
-  state.fx.flash = Math.max(state.fx.flash, 8);
-  kickShake(amount >= 2 ? 8 : 5);
-  spawnParticles(p.x, p.y, 18, "#d8f7ff", 0.9);
+  if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+    state.fx.flash = Math.max(state.fx.flash, 8);
+    kickShake(amount >= 2 ? 8 : 5);
+    spawnParticles(p.x, p.y, 18, "#d8f7ff", 0.9);
+  }
   showMessage("PHASE SHIELD BROKEN", 55);
   return true;
 }
@@ -284,7 +294,7 @@ function pickExpansionPowerupType(lowHp = false) {
   if (state.enemies.some((e) => e.type === "siphon" || e.type === "leech")) chance += 0.18;
   if (state.player.energy < 45) chance += 0.12;
   if (lowHp) chance -= 0.06;
-  if (Math.random() > clamp(chance, 0.08, 0.52)) return null;
+  if (expansionLootRandom() > clamp(chance, 0.08, 0.52)) return null;
   const pool = [];
   const add = (type, weight) => { for (let i = 0; i < weight; i++) pool.push(type); };
   if (state.player.energy < 85 || state.phase >= 5) add("energy_cell", 5);
@@ -296,7 +306,7 @@ function pickExpansionPowerupType(lowHp = false) {
   if (state.phase >= 6) add("stabilizer", 3);
   if (state.phase >= 6 && !lowHp && !state.boss) add("score_surge", 2);
   if (!pool.length) return null;
-  return pool[Math.floor(Math.random() * pool.length)];
+  return pool[Math.floor(expansionLootRandom() * pool.length)];
 }
 
 function expansionPowerupVisual(type) {
@@ -368,3 +378,6 @@ function activateIonBurst() {
   state.fx.flash = Math.max(state.fx.flash, 9);
   kickShake(7);
 }
+const expansionEnemyRandom = () => runRandom("enemy_behavior");
+const expansionEnemyRand = (minimum, maximum) => runRandomRange("enemy_behavior", minimum, maximum);
+const expansionLootRandom = () => runRandom("loot");

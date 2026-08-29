@@ -66,11 +66,65 @@ async function dismissCurrentTutorialDialogue(page) {
   });
 }
 
+async function pressAccessibleGameActionUntil(page, label, completion) {
+  const action = page.getByRole("button", { name: label, exact: true });
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const pressed = await action.press("Enter", { timeout: 3_000 }).then(() => true, () => false);
+    if (!pressed) continue;
+    const completed = await page.waitForFunction((expected) => {
+      if (expected === "checkpoint-dialogue") {
+        return tutorialDirector?.dialogueVisible === true && state.gameState === "playing";
+      }
+      if (expected === "training-offer") {
+        return onboardingUiMode === "resume_training" && state.gameState === "start";
+      }
+      return false;
+    }, completion, { timeout: 3_000 }).then(() => true, () => false);
+    if (completed) return;
+  }
+  const diagnostic = await page.evaluate(() => ({
+    gameState: state.gameState,
+    runMode: state.runMode,
+    onboardingUiMode,
+    onboardingStatus: onboardingState?.status || "",
+    surface: gameAccessibilitySnapshot()
+  }));
+  throw new Error(`Accessible action did not reach ${completion}: ${label}; ${JSON.stringify(diagnostic)}`);
+}
+
 before(async () => {
   server = http.createServer(staticResponse);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
   browser = await chromium.launch({ headless: true });
+});
+
+test("modal autofocus never steals an explicitly selected accessible action", async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.setContent("<!doctype html><html><body><main id=game tabindex=0></main></body></html>");
+    await page.addScriptTag({ url: `${baseUrl}/src/00-accessible-surface.js` });
+    await page.evaluate(() => {
+      const rect = { x: 0, y: 0, w: 40, h: 20 };
+      setGameAccessibleSurface({
+        mode: "focus-race-regression",
+        modal: true,
+        actions: [
+          { id: "safe-first", label: "Safe first action", rect, handler() {} },
+          { id: "explicit-choice", label: "Explicit choice", rect, handler() {} }
+        ]
+      });
+      document.querySelector('[data-game-action="explicit-choice"]').focus();
+    });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.dataset?.gameAction || ""),
+      "explicit-choice"
+    );
+  } finally {
+    await context.close();
+  }
 });
 
 test("a fresh player explicitly chooses First Flight before the separate call-sign briefing", { timeout: 120_000 }, async () => {
@@ -300,11 +354,11 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
     });
 
     await page.keyboard.press("Escape");
-    await page.waitForFunction(() => onboardingUiMode === "none" && gameAccessibilitySnapshot().mode === "pause");
-    const restartCheckpoint = page.getByRole("button", { name: "Restart tutorial checkpoint", exact: true });
-    await restartCheckpoint.focus();
-    await page.keyboard.press("Enter");
-    await page.waitForFunction(() => tutorialDirector?.dialogueVisible === true && state.gameState === "playing");
+    await page.waitForFunction(() => {
+      const surface = gameAccessibilitySnapshot();
+      return onboardingUiMode === "none" && surface.mode === "pause" && surface.hidden === false;
+    });
+    await pressAccessibleGameActionUntil(page, "Restart tutorial checkpoint", "checkpoint-dialogue");
     let transferred = await page.evaluate(() => ({
       modalCount: document.querySelectorAll('[aria-modal="true"]').length,
       game: gameAccessibilitySnapshot(),
@@ -316,10 +370,11 @@ test("tutorial pause has one modal owner and skip confirmation cannot leak Escap
 
     await dismissCurrentTutorialDialogue(page);
     await page.keyboard.press("Escape");
-    await page.waitForFunction(() => gameAccessibilitySnapshot().mode === "pause");
-    const returnTitle = page.getByRole("button", { name: "Return to title", exact: true });
-    await returnTitle.press("Enter");
-    await page.waitForFunction(() => onboardingUiMode === "resume_training" && state.gameState === "start");
+    await page.waitForFunction(() => {
+      const surface = gameAccessibilitySnapshot();
+      return onboardingUiMode === "none" && surface.mode === "pause" && surface.hidden === false;
+    });
+    await pressAccessibleGameActionUntil(page, "Return to title", "training-offer");
     transferred = await page.evaluate(() => ({
       modalCount: document.querySelectorAll('[aria-modal="true"]').length,
       game: gameAccessibilitySnapshot(),
@@ -995,6 +1050,379 @@ test("a clean browser can start, move, pause, resume, and keep time frozen while
     });
     assert.equal(lethalAutomatic.hp, 0, "automatic pause uses the same one-Health cost at one remaining Health");
     assert.equal(lethalAutomatic.gameState, "gameover", "a lethal automatic pause ends the standard run deterministically");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("debug QA exposes live versus canonical parity for a ticketed browser run", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1");
+  try {
+    await page.evaluate(async () => {
+      setupSession("playing");
+      state.sceneTransition = { mode: "idle", frame: 0, duration: 1 };
+      await beginSeededStandardRun({
+        runId: "run_browser_parity",
+        rootSeed: "00112233445566778899aabbccddeeff",
+        simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+        rulesRevision: "rules-v1",
+        contentRevision: "content-v1",
+        buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        maxTicks: 20_000
+      });
+    });
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(document.querySelector("#debugSnapshot")?.textContent || "null");
+      return snapshot?.canonicalParity?.canonicalTick >= 2;
+    });
+    const parity = (await debugSnapshot(page)).canonicalParity;
+    assert.equal(parity.active, true);
+    assert.equal(typeof parity.matched, "boolean");
+    assert.ok(Array.isArray(parity.differences));
+    const outcomeFields = new Set([
+      "activeTicks",
+      "score",
+      "phase",
+      "multiplier",
+      "comboKills",
+      "playerRealm",
+      "player.x",
+      "player.y",
+      "player.hp",
+      "player.energy"
+    ]);
+    assert.deepEqual(
+      parity.differences.filter((difference) => outcomeFields.has(difference.field)),
+      [],
+      "ticketed browser outcome fields must be projected from canonical state"
+    );
+    const pause = await page.evaluate(() => {
+      const accepted = pauseGame("focus");
+      const canonical = currentCanonicalRunState();
+      return {
+        accepted,
+        gameState: state.gameState,
+        browserHp: state.player.hp,
+        canonicalHp: canonical.player.hp,
+        pauseUses: canonical.stats.pauseUses
+      };
+    });
+    assert.deepEqual(pause, {
+      accepted: true,
+      gameState: "paused",
+      browserHp: 4,
+      canonicalHp: 4,
+      pauseUses: 1
+    });
+    const terminal = await page.evaluate(() => {
+      state.gameState = "playing";
+      state.player.hp = 1;
+      currentCanonicalRunState().player.hp = 1;
+      const accepted = pauseGame("manual");
+      const canonical = currentCanonicalRunState();
+      return {
+        accepted,
+        gameState: state.gameState,
+        browserHp: state.player.hp,
+        canonicalHp: canonical.player.hp,
+        terminal: canonical.terminal,
+        pauseUses: canonical.stats.pauseUses,
+        recording: currentVerifiedRunContext().recording,
+        tapeBytes: state.verifiedInputTape?.byteLength || 0
+      };
+    });
+    assert.deepEqual({ ...terminal, tapeBytes: terminal.tapeBytes > 0 }, {
+      accepted: true,
+      gameState: "gameover",
+      browserHp: 0,
+      canonicalHp: 0,
+      terminal: true,
+      pauseUses: 2,
+      recording: false,
+      tapeBytes: true
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("ticketed Canvas entity rendering consumes canonical enemies", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1");
+  try {
+    const renderedPixels = await page.evaluate(async () => {
+      setupSession("paused");
+      await beginSeededStandardRun({
+        runId: "run_canvas_entity_authority",
+        rootSeed: "00112233445566778899aabbccddeeff",
+        simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+        rulesRevision: "rules-v1",
+        contentRevision: "content-v1",
+        buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        maxTicks: 20_000
+      });
+      const canonical = currentCanonicalRunState();
+      const units = StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL;
+      spawnCanonicalEnemy(canonical, "red", 180 * units, 220 * units, {
+        vx: units,
+        vy: 2 * units
+      });
+      state.enemies = [];
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      drawEnemies();
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let occupied = 0;
+      for (let index = 3; index < pixels.length; index += 4) {
+        if (pixels[index] > 0) occupied++;
+      }
+      return occupied;
+    });
+    assert.ok(renderedPixels > 0, "canonical enemy must produce real Canvas pixels when the legacy array is empty");
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("every ticketed Canvas entity renderer consumes canonical presentation state", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1");
+  try {
+    const rendered = await page.evaluate(async () => {
+      setupSession("paused");
+      const ticket = {
+        runId: "run_canvas_presentation_authority",
+        rootSeed: "00112233445566778899aabbccddeeff",
+        simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+        rulesRevision: "rules-v1",
+        contentRevision: "content-v1",
+        buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        maxTicks: 20_000
+      };
+      await beginSeededStandardRun(ticket);
+      const canonical = currentCanonicalRunState();
+      const units = StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL;
+      const streams = await createRunRandomStreams(ticket.rootSeed, ticket.simRevision);
+      canonical.playerProjectiles.push({
+        id: canonical.nextEntityId++, kind: "player", x: 120 * units, y: 180 * units,
+        vx: 0, vy: -9 * units, angle: 0, life: 90, damage: 1, pierce: 0, realm: 0
+      });
+      canonical.wingmen.push({
+        id: canonical.nextEntityId++, side: -1, x: 150 * units, y: 250 * units,
+        timer: 100, fireCooldown: 10, phase: "active", arrivalElapsed: 34,
+        arrivalDuration: 34, arrivalFromX: 150 * units, arrivalFromY: 250 * units,
+        departureAngle: 0
+      });
+      spawnCanonicalPowerup(canonical, "repair", 200 * units, 300 * units);
+      spawnCanonicalHazard(canonical, "rock_asteroid", 240 * units, 340 * units);
+      spawnCanonicalBoss(canonical, "standard", streams);
+      state.bullets = [];
+      state.enemyBullets = [];
+      state.wingmen = [];
+      state.powerups = [];
+      state.debris = [];
+      state.enemyBeams = [];
+      state.gravityWells = [];
+      state.boss = null;
+
+      function occupiedAfter(drawer) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        drawer();
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        for (let index = 3; index < pixels.length; index += 4) {
+          if (pixels[index] > 0) return true;
+        }
+        return false;
+      }
+
+      return {
+        wingmen: occupiedAfter(drawWingmen),
+        bullets: occupiedAfter(drawBullets),
+        boss: occupiedAfter(drawBoss),
+        powerups: occupiedAfter(drawPowerups),
+        hazards: occupiedAfter(drawExpansionHazards)
+      };
+    });
+    assert.deepEqual(rendered, {
+      wingmen: true,
+      bullets: true,
+      boss: true,
+      powerups: true,
+      hazards: true
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("ticketed HUD and debug surfaces describe canonical boss and entity state", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const { page, errors } = await openGame(context, "/?debug=1");
+  try {
+    const observed = await page.evaluate(async () => {
+      setupSession("paused");
+      const ticket = {
+        runId: "run_hud_presentation_authority",
+        rootSeed: "00112233445566778899aabbccddeeff",
+        simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+        rulesRevision: "rules-v1",
+        contentRevision: "content-v1",
+        buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        maxTicks: 20_000
+      };
+      await beginSeededStandardRun(ticket);
+      const canonical = currentCanonicalRunState();
+      const streams = await createRunRandomStreams(ticket.rootSeed, ticket.simRevision);
+      const units = StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL;
+      spawnCanonicalEnemy(canonical, "red", 180 * units, 220 * units);
+      canonical.playerProjectiles.push({
+        id: canonical.nextEntityId++, kind: "ghost", x: 190 * units, y: 260 * units,
+        vx: 0, vy: -9 * units, angle: 0, life: 90, damage: 1, pierce: 0, realm: 1
+      });
+      spawnCanonicalHazard(canonical, "rock_asteroid", 210 * units, 300 * units);
+      const safeGapSlot = 2;
+      const safeSlots = 6;
+      const wallSlotWidth = Math.floor(StarStrikeVerifiedRunConstants.GAME_WIDTH_UNITS / safeSlots);
+      for (let slot = 0; slot < safeSlots; slot++) {
+        if (slot === safeGapSlot) continue;
+        spawnCanonicalHazard(
+          canonical,
+          "boss_wall",
+          wallSlotWidth * slot + Math.floor(wallSlotWidth / 2),
+          360 * units,
+          { wallSlot: slot, safeLaneRow: 1, safeGapSlot, safeSlots, vx: 0, vy: 2 * units },
+          streams
+        );
+      }
+      spawnCanonicalPowerup(canonical, "repair", 220 * units, 330 * units);
+      spawnCanonicalBoss(canonical, "wraith", streams);
+      canonical.playerRealm = 1;
+      applyCanonicalRunAuthority(state);
+
+      state.boss = null;
+      state.enemies = [];
+      state.bullets = [];
+      state.enemyBullets = [];
+      state.debris = [];
+      state.enemyBeams = [];
+      state.gravityWells = [];
+      state.powerups = [];
+      state.wingmen = [];
+
+      const snapshot = getDebugSnapshot();
+      return {
+        wraithActive: isWraithActive(),
+        bossHudOffset: bossHudOffset(),
+        playerShotKind: getPlayerShotKind(),
+        action: snapshot.input.action,
+        bossMode: snapshot.encounter.bossMode,
+        counts: {
+          bullets: snapshot.counts.bullets,
+          enemies: snapshot.counts.enemies,
+          debris: snapshot.counts.debris,
+          powerups: snapshot.counts.powerups
+        },
+        enemyTypes: snapshot.encounter.enemyTypes,
+        safeLanes: snapshot.encounter.safeLanes
+      };
+    });
+    assert.deepEqual(observed, {
+      wraithActive: true,
+      bossHudOffset: 32,
+      playerShotKind: "ghost",
+      action: "HOP",
+      bossMode: "wraith",
+      counts: { bullets: 1, enemies: 1, debris: 6, powerups: 1 },
+      enemyTypes: ["red"],
+      safeLanes: [{ row: 1, slot: 2, minX: 127.25, maxX: 185.25, width: 58 }]
+    });
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
+});
+
+test("ticketed browser controls resolve Wraith HOP and Debris Warden DASH canonically", { timeout: 120_000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const { page, errors } = await openGame(context, "/?debug=1&input=touch");
+  try {
+    const observed = await page.evaluate(async () => {
+      async function exercise(mode, runId) {
+        clearRunRandomStreams();
+        setupSession("playing");
+        state.sceneTransition = { mode: "idle", frame: 0, duration: 1, elapsedSeconds: 0, durationSeconds: 0 };
+        const ticket = {
+          runId,
+          rootSeed: "00112233445566778899aabbccddeeff",
+          simRevision: StarStrikeVerifiedRunConstants.SIMULATION_REVISION,
+          rulesRevision: "rules-v1",
+          contentRevision: "content-v1",
+          buildSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          maxTicks: 20_000
+        };
+        await beginSeededStandardRun(ticket);
+        const canonical = currentCanonicalRunState();
+        const streams = await createRunRandomStreams(ticket.rootSeed, ticket.simRevision);
+        spawnCanonicalBoss(canonical, mode, streams);
+        applyCanonicalRunAuthority(state);
+        attemptGhost();
+        beginCanonicalRunTick({ keyboard: {}, joystick: { active: false } });
+        endCanonicalRunTick(state);
+        updateDebugSnapshot();
+        const snapshot = JSON.parse(document.querySelector("#debugSnapshot").textContent);
+        return {
+          action: snapshot.input.action,
+          playerRealm: state.playerRealm,
+          canonicalRealm: canonical.playerRealm,
+          ghostTimer: canonical.player.ghostTimer,
+          dashTimer: canonical.player.dashTimer,
+          ghostUses: canonical.stats.ghostUses,
+          dashUses: canonical.stats.dashUses,
+          realmHops: canonical.stats.realmHops,
+          ability: canonical.feedbackEvents.find((event) => event.type === "ability")?.abilityKind || ""
+        };
+      }
+
+      const realmHop = await exercise("wraith", "run_browser_realm_hop");
+      const dash = await exercise("debris_warden", "run_browser_dash");
+      clearRunRandomStreams();
+      return { realmHop, dash };
+    });
+
+    assert.deepEqual(observed, {
+      realmHop: {
+        action: "HOP",
+        playerRealm: 1,
+        canonicalRealm: 1,
+        ghostTimer: 0,
+        dashTimer: 0,
+        ghostUses: 0,
+        dashUses: 0,
+        realmHops: 1,
+        ability: "realm_hop"
+      },
+      dash: {
+        action: "DASH",
+        playerRealm: 0,
+        canonicalRealm: 0,
+        ghostTimer: 0,
+        dashTimer: 11,
+        ghostUses: 0,
+        dashUses: 1,
+        realmHops: 0,
+        ability: "dash"
+      }
+    });
     assert.deepEqual(errors, []);
   } finally {
     await context.close();

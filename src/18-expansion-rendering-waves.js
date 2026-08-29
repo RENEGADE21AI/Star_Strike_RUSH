@@ -151,7 +151,8 @@ function drawExpansionEnemyOverlay(e) {
 }
 
 function drawExpansionHazards() {
-  for (const lane of state.safeLanes || []) {
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
+  for (const lane of presentation.safeLanes || []) {
     const rowColor = lane.row === 1 ? "76,255,196" : "115,188,255";
     const pulse = 0.55 + 0.45 * Math.sin(state.frame * 0.08 + lane.row * 1.7);
     const guide = ctx.createLinearGradient(lane.minX, 0, lane.maxX, 0);
@@ -172,7 +173,7 @@ function drawExpansionHazards() {
     ctx.stroke();
     ctx.restore();
   }
-  for (const g of state.gravityWells) {
+  for (const g of presentation.gravityWells) {
     ctx.save();
     const alpha = g.warn > 0 ? 0.26 + Math.sin(state.frame * 0.24) * 0.10 : 0.34;
     ctx.strokeStyle = (g.color || "#a45cff").replace(")", `,${alpha})`);
@@ -184,7 +185,7 @@ function drawExpansionHazards() {
     ctx.beginPath(); ctx.arc(g.x, g.y, g.r * (0.55 + Math.sin(g.pulse || 0) * 0.08), 0, TAU); ctx.stroke();
     ctx.restore();
   }
-  for (const d of state.debris) {
+  for (const d of presentation.debris) {
     ctx.save();
     if (d.kind === "meteor_warning") {
       ctx.globalAlpha = 0.55 + Math.sin(state.frame * 0.28) * 0.18;
@@ -240,7 +241,7 @@ function drawExpansionHazards() {
     }
     ctx.restore();
   }
-  for (const beam of state.enemyBeams) {
+  for (const beam of presentation.enemyBeams) {
     ctx.save();
     const active = beam.warn <= 0;
     const alpha = active ? 0.82 : 0.22 + (1 - beam.warn / Math.max(1, beam.warnMax || beam.warn || 1)) * 0.36;
@@ -309,7 +310,7 @@ function registerExpansionWaveTemplates() {
   };
   waveTemplates.leechPressure = function waveTemplateLeechPressure() {
     const [a, b, c] = laneCenters();
-    return [waveItem("leech", b + rand(-22, 22), -58, 0), waveItem("red", a, -32, 20), waveItem("orange", c, -38, 34, { motion: "zigzag" })];
+    return [waveItem("leech", b + expansionWaveRand(-22, 22), -58, 0), waveItem("red", a, -32, 20), waveItem("orange", c, -38, 34, { motion: "zigzag" })];
   };
   waveTemplates.railWarning = function waveTemplateRailWarning() {
     const [a, b, c] = laneCenters();
@@ -322,3 +323,4 @@ function registerExpansionWaveTemplates() {
 }
 
 registerExpansionWaveTemplates();
+const expansionWaveRand = (minimum, maximum) => runRandomRange("waves", minimum, maximum);

@@ -37,7 +37,8 @@ function drawControls() {
   ctx.strokeStyle = "rgba(225,248,255,0.32)";
   ctx.beginPath(); ctx.arc(knobX, knobY, 18, 0, TAU); ctx.stroke();
   const wraith = isWraithActive();
-  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: wraith ? "HOP" : "GHOST", cost: wraith ? 18 : 35 };
+  const presentedBoss = typeof currentPresentedBoss === "function" ? currentPresentedBoss() : state.boss;
+  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(presentedBoss && presentedBoss.mode) : { label: wraith ? "HOP" : "GHOST", cost: wraith ? 18 : 35 };
   const ready = controlEnabled && state.player && state.player.energy >= profile.cost && (wraith ? true : state.player.ghostCooldown <= 0);
   const visuallyReady = controlEnabled && (ready || wraith);
   const buttonFill = !controlEnabled
@@ -81,7 +82,8 @@ function drawDesktopControlHint() {
     state.inputHintTimer < 180 ||
     (typeof currentGameplayControlEnabled === "function" && !currentGameplayControlEnabled())
   ) return;
-  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
+  const presentedBoss = typeof currentPresentedBoss === "function" ? currentPresentedBoss() : state.boss;
+  const profile = typeof ghostActionProfile === "function" ? ghostActionProfile(presentedBoss && presentedBoss.mode) : { label: "GHOST" };
   const text = `MOVE  WASD / ARROWS    ${profile.label}  SPACE / SHIFT`;
   const fade = clamp((state.inputHintTimer - 180) / 42, 0, 1);
   ctx.save();
@@ -122,7 +124,8 @@ function drawLeftStatusHUD() {
   const layout = getGameplayHudLayout();
   const energy = layout.energy;
   const health = layout.health;
-  const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: isWraithActive() ? "HOP" : "GHOST", cost: isWraithActive() ? 18 : 35 };
+  const presentedBoss = typeof currentPresentedBoss === "function" ? currentPresentedBoss() : state.boss;
+  const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(presentedBoss && presentedBoss.mode) : { label: isWraithActive() ? "HOP" : "GHOST", cost: isWraithActive() ? 18 : 35 };
   const enough = p.energy >= actionProfile.cost && p.ghostCooldown <= 0;
   ctx.save();
   ctx.globalAlpha = gameplayHudOpacity(p, layout);

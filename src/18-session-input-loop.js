@@ -89,6 +89,17 @@ function pauseGame(reason = "manual") {
   clearGameplayInput();
   state.pausedReason = reason;
   state.pauseNotice = decision.message;
+  let canonicalPauseOutcome = null;
+  if (state.runMode === "standard" && currentVerifiedRunContext().recording) {
+    queueVerifiedRunInputEdge("pause");
+    beginCanonicalRunTick(state);
+    canonicalPauseOutcome = endCanonicalRunTick(state);
+  }
+  if (canonicalPauseOutcome && canonicalPauseOutcome.terminal) {
+    enterGameOver();
+    state.pauseNotice = decision.message;
+    return true;
+  }
   if (decision.cost > 0 && state.player.hp <= 0) {
     if (state.runMode === "tutorial" && typeof recoverTutorialCheckpoint === "function") {
       recoverTutorialCheckpoint();
@@ -138,6 +149,7 @@ function handlePauseEscape() {
   return false;
 }
 function setupSession(mode = "start", options = {}) {
+  clearRunRandomStreams();
   const preserveStars = options.preserveStars === true && Array.isArray(state.stars) && state.stars.length > 0;
   if (typeof resetGloryCelebrations === "function") resetGloryCelebrations();
   state.player = makePlayer();
@@ -158,6 +170,7 @@ function setupSession(mode = "start", options = {}) {
   state.verifiedRunLedger = typeof createTrustedRunLedger === "function" ? createTrustedRunLedger() : null;
   state.verifiedRunSession = null;
   state.verifiedRunPromise = null;
+  state.verifiedInputTape = null;
   state.runStartingHighScore = highScore;
   state.newHighScore = false;
   state.multiplier = 1;
@@ -319,6 +332,14 @@ function enterGameOver() {
   state.difficultyDeaths = Math.max(0, Math.floor(state.difficultyDeaths || 0)) + 1;
   if (typeof recordDifficultySample === "function") recordDifficultySample(true);
   if (progressionAllowed) finalizeLocalRunAchievements();
+  if (progressionAllowed && currentVerifiedRunContext().recording) {
+    try {
+      state.verifiedInputTape = finalizeRecordedInputTape();
+    } catch {
+      cancelRunInputRecording();
+      state.verifiedInputTape = null;
+    }
+  }
   if (progressionAllowed && typeof publishVerifiedRunIfEligible === "function") publishVerifiedRunIfEligible();
   if (typeof startGloryCelebrations === "function") {
     startGloryCelebrations(progressionResult && progressionResult.presentationEvents);
@@ -794,6 +815,7 @@ function update() {
     return;
   }
 
+  beginCanonicalRunTick(state);
   state.runStats.activeFrames = Math.max(0, Math.floor(state.runStats.activeFrames || 0)) + 1;
   state.framesSinceLastDrop++;
   if (!state.inputHintAcknowledged) state.inputHintTimer = Math.min(600, Math.max(0, state.inputHintTimer || 0) + 1);
@@ -829,6 +851,9 @@ function update() {
     showNextMessage();
   }
 
+  const canonicalOutcome = endCanonicalRunTick(state);
+  if (canonicalOutcome.terminal && state.gameState !== "gameover") enterGameOver();
+
 }
 
 /* DEVELOPMENT_QA_START */
@@ -857,7 +882,9 @@ function debugScreenRect(rect) {
 }
 
 function getDebugSnapshot() {
-  const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(state.boss && state.boss.mode) : { label: "GHOST" };
+  const presentation = typeof currentRunPresentationState === "function" ? currentRunPresentationState(state) : state;
+  const presentedBoss = presentation.boss;
+  const actionProfile = typeof ghostActionProfile === "function" ? ghostActionProfile(presentedBoss && presentedBoss.mode) : { label: "GHOST" };
   const titleIcons = typeof getTitleIconRects === "function" ? getTitleIconRects() : {};
   const achievementRects = typeof getAchievementsRects === "function" ? getAchievementsRects() : {};
   const codexRects = typeof getCodexRects === "function" ? getCodexRects() : {};
@@ -897,6 +924,9 @@ function getDebugSnapshot() {
     score: state.score,
     highScore,
     phase: state.phase,
+    canonicalParity: typeof currentCanonicalRunParity === "function"
+      ? currentCanonicalRunParity(state)
+      : null,
     deviceProgress: typeof currentMetaSnapshot === "function" ? currentMetaSnapshot() : null,
     gloryCelebration: typeof gloryCelebrationActive === "function" && gloryCelebrationActive() ? {
       active: true,
@@ -920,15 +950,15 @@ function getDebugSnapshot() {
       realm: state.playerRealm
     } : null,
     counts: {
-      bullets: state.bullets.length,
-      enemyBullets: state.enemyBullets.length,
-      enemies: state.enemies.length,
-      debris: state.debris.length,
-      beams: state.enemyBeams.length,
-      gravityWells: state.gravityWells.length,
-      powerups: state.powerups.length,
+      bullets: presentation.bullets.length,
+      enemyBullets: presentation.enemyBullets.length,
+      enemies: presentation.enemies.length,
+      debris: presentation.debris.length,
+      beams: presentation.enemyBeams.length,
+      gravityWells: presentation.gravityWells.length,
+      powerups: presentation.powerups.length,
       particles: state.particles.length,
-      wingmen: state.wingmen.length,
+      wingmen: presentation.wingmen.length,
       stars: state.stars.length,
       titleFormations: state.titleFormations.length
     },
@@ -1052,33 +1082,33 @@ function getDebugSnapshot() {
         : state.gameState === "playing"
     },
     encounter: {
-      bossMode: state.boss ? state.boss.mode : null,
-      boss: state.boss ? {
-        x: Number(state.boss.x.toFixed(2)),
-        y: Number(state.boss.y.toFixed(2)),
-        hp: state.boss.hp,
-        maxHp: state.boss.maxHp,
-        entered: state.boss.entered === true,
-        combatActive: state.boss.combatActive === true,
-        damageable: typeof bossCanTakeDamage === "function" ? bossCanTakeDamage(state.boss) : true,
-        realm: state.boss.realm == null ? null : state.boss.realm,
-        tutorialOverride: state.boss.tutorialOverride === true
+      bossMode: presentedBoss ? presentedBoss.mode : null,
+      boss: presentedBoss ? {
+        x: Number(presentedBoss.x.toFixed(2)),
+        y: Number(presentedBoss.y.toFixed(2)),
+        hp: presentedBoss.hp,
+        maxHp: presentedBoss.maxHp,
+        entered: presentedBoss.entered === true,
+        combatActive: presentedBoss.combatActive === true,
+        damageable: typeof bossCanTakeDamage === "function" ? bossCanTakeDamage(presentedBoss) : true,
+        realm: presentedBoss.realm == null ? null : presentedBoss.realm,
+        tutorialOverride: presentedBoss.tutorialOverride === true
       } : null,
-      enemyTypes: Array.from(new Set(state.enemies.map((enemy) => enemy.type))),
-      enemies: state.enemies.slice(0, 16).map((enemy) => ({
+      enemyTypes: Array.from(new Set(presentation.enemies.map((enemy) => enemy.type))),
+      enemies: presentation.enemies.slice(0, 16).map((enemy) => ({
         type: enemy.type,
         x: Number(enemy.x.toFixed(2)),
         y: Number(enemy.y.toFixed(2)),
         hp: Number(enemy.hp || 0),
         tutorialTarget: enemy.tutorialTarget === true
       })),
-      powerups: state.powerups.slice(0, 8).map((powerup) => ({
+      powerups: presentation.powerups.slice(0, 8).map((powerup) => ({
         type: powerup.type,
         x: Number(powerup.x.toFixed(2)),
         y: Number(powerup.y.toFixed(2))
       })),
-      safeLanes: (state.safeLanes || []).map((lane) => ({ row: lane.row, minX: lane.minX, maxX: lane.maxX, width: lane.width })),
-      debrisScales: (state.debris || []).slice(0, 16).map((rock) => ({
+      safeLanes: (presentation.safeLanes || []).map((lane) => ({ row: lane.row, slot: lane.slot, minX: lane.minX, maxX: lane.maxX, width: lane.width })),
+      debrisScales: (presentation.debris || []).slice(0, 16).map((rock) => ({
         spawnScale: Number((rock.spawnScale == null ? 1 : rock.spawnScale).toFixed(3)),
         collisionScale: Number((rock.collisionScale == null ? 1 : rock.collisionScale).toFixed(3)),
         row: rock.row || 0

@@ -143,9 +143,9 @@ function configureExpansionEnemy(e, type, extra = {}, phaseBoost = 0) {
     e.vy = 1.15 + phaseBoost * 0.16;
     e.r = 15;
     e.hp = e.maxHp = 3;
-    e.crackSeed = rand(0, TAU);
+    e.crackSeed = expansionDataRand(0, TAU);
   } else if (type === "splitter_shard") {
-    e.vx = extra.vx != null ? extra.vx : (Math.random() < 0.5 ? -1.7 : 1.7);
+    e.vx = extra.vx != null ? extra.vx : (expansionDataRandom() < 0.5 ? -1.7 : 1.7);
     e.vy = extra.vy != null ? extra.vy : 2.75 + state.phase * 0.035;
     e.r = 8;
     e.hp = e.maxHp = 1;
@@ -158,14 +158,14 @@ function configureExpansionEnemy(e, type, extra = {}, phaseBoost = 0) {
     e.vy = 0.55 + phaseBoost * 0.05;
     e.r = 23;
     e.hp = e.maxHp = 6;
-    e.launchTimer = extra.launchTimer || Math.floor(rand(86, 124));
+    e.launchTimer = extra.launchTimer || Math.floor(expansionDataRand(86, 124));
     e.launchCount = 0;
     e.bayOpen = 0;
   } else if (type === "siphon") {
     e.vy = 1.05 + phaseBoost * 0.12;
     e.r = 14;
     e.hp = e.maxHp = 3;
-    e.fireTimer = extra.fireTimer || Math.floor(rand(58, 98));
+    e.fireTimer = extra.fireTimer || Math.floor(expansionDataRand(58, 98));
     e.fireWarn = 0;
   } else if (type === "leech") {
     e.vy = 0.70 + phaseBoost * 0.05;
@@ -178,18 +178,18 @@ function configureExpansionEnemy(e, type, extra = {}, phaseBoost = 0) {
     e.vy = 0.82 + phaseBoost * 0.05;
     e.r = 15;
     e.hp = e.maxHp = 3;
-    e.mineTimer = extra.mineTimer || Math.floor(rand(70, 110));
+    e.mineTimer = extra.mineTimer || Math.floor(expansionDataRand(70, 110));
     e.minesDropped = 0;
   } else if (type === "shieldbearer") {
     e.vy = 0.75 + phaseBoost * 0.04;
     e.r = 16;
     e.hp = e.maxHp = 4;
-    e.shieldPulse = rand(0, TAU);
+    e.shieldPulse = expansionDataRand(0, TAU);
   } else if (type === "railgunner") {
     e.vy = 0.72 + phaseBoost * 0.04;
     e.r = 15;
     e.hp = e.maxHp = 3;
-    e.railCooldown = extra.railCooldown || Math.floor(rand(85, 130));
+    e.railCooldown = extra.railCooldown || Math.floor(expansionDataRand(85, 130));
     e.railWarn = 0;
     e.railAngle = Math.PI / 2;
   } else if (type === "repair_drone") {
@@ -201,3 +201,5 @@ function configureExpansionEnemy(e, type, extra = {}, phaseBoost = 0) {
   }
   return e;
 }
+const expansionDataRandom = () => runRandom("enemy_behavior");
+const expansionDataRand = (minimum, maximum) => runRandomRange("enemy_behavior", minimum, maximum);

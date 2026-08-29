@@ -108,6 +108,10 @@ const SHIP_SPRITES = new Set([...FRIENDLY_SPRITES, ...HOSTILE_SPRITES]);
 
 function normalizeSpriteEntry(key, entry) {
   const render = { ...entry.render };
+  const authoritativeCollision = typeof AUTHORITATIVE_COLLISION_CIRCLES_PIXELS === "object"
+    ? AUTHORITATIVE_COLLISION_CIRCLES_PIXELS[key]
+    : null;
+  const collision = Object.freeze((authoritativeCollision || entry.collision || []).map((circle) => Object.freeze({ ...circle })));
   const friendly = FRIENDLY_SPRITES.has(key);
   const hostile = HOSTILE_SPRITES.has(key);
   const ship = SHIP_SPRITES.has(key);
@@ -142,7 +146,7 @@ function normalizeSpriteEntry(key, entry) {
     offsetX: 0,
     offsetY: -direction * Math.round(render.height * 0.34)
   };
-  return Object.freeze({ ...entry, render: Object.freeze(render), orientation, projectileOrigin: Object.freeze(projectileOrigin), exhaustOrigin: Object.freeze(exhaustOrigin) });
+  return Object.freeze({ ...entry, render: Object.freeze(render), collision, orientation, projectileOrigin: Object.freeze(projectileOrigin), exhaustOrigin: Object.freeze(exhaustOrigin) });
 }
 
 const SPRITE_MANIFEST = Object.freeze(Object.fromEntries(
