@@ -196,6 +196,53 @@ test("auto-fire, projectile motion, collision, kills, and score are authoritativ
   assert.equal(state.playerProjectiles.length, 0, "the hitting projectile must be consumed");
 });
 
+test("each canonical tick publishes an integer-only feedback journal for its authoritative outcomes", () => {
+  const state = createSimulationState(ticket({ maxTicks: 120 }));
+  const enemy = spawnCanonicalEnemy(
+    state,
+    "orange",
+    state.player.x,
+    state.player.y - 45 * POSITION_UNITS_PER_PIXEL,
+    { vx: 0, vy: 0 }
+  );
+
+  let killingTick = 0;
+  for (let tick = 0; tick < 8 && state.stats.kills === 0; tick++) {
+    stepSimulation(state, { x: 0, y: 0, buttons: tick === 0 ? 1 : 0 });
+    killingTick = state.tick;
+  }
+
+  assert.deepEqual(
+    state.feedbackEvents.filter((event) => event.type !== "player_fire"),
+    [
+      {
+        type: "enemy_hit",
+        entityId: enemy.id,
+        entityKind: "orange",
+        x: enemy.x,
+        y: enemy.y,
+        amount: 1
+      },
+      {
+        type: "enemy_destroyed",
+        entityId: enemy.id,
+        entityKind: "orange",
+        x: enemy.x,
+        y: enemy.y
+      }
+    ]
+  );
+  assert.equal(killingTick > 0, true);
+  assert.doesNotThrow(() => serializeCanonicalState(state));
+
+  stepSimulation(state, { x: 0, y: 0, buttons: 0 });
+  assert.equal(
+    state.feedbackEvents.some((event) => event.type === "enemy_hit" || event.type === "enemy_destroyed"),
+    false,
+    "feedback must describe only the current canonical tick"
+  );
+});
+
 test("enemy contact uses artwork-aligned bodies and terminal health authority", () => {
   const state = createSimulationState(ticket());
   state.player.hp = 1;
@@ -205,6 +252,14 @@ test("enemy contact uses artwork-aligned bodies and terminal health authority", 
   assert.equal(state.terminal, true);
   assert.equal(state.terminalReason, "player_destroyed");
   assert.equal(state.stats.damageTaken, 1);
+  assert.deepEqual(state.feedbackEvents.filter((event) => event.type === "player_hit"), [
+    {
+      type: "player_hit",
+      x: state.player.x,
+      y: state.player.y,
+      amount: 1
+    }
+  ]);
 });
 
 test("red drift consumes only deterministic enemy behavior randomness and stays integer exact", () => {

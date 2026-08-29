@@ -146,8 +146,10 @@ function firePlayer() {
     state.bullets.push({ x: tipX, y: tipY, vx: 0, vy: -9.0, life: 90, r: 3, kind, realm: state.playerRealm, damage: 1, pierce });
     state.difficulty.shotsFired += 1;
   }
-  if (p.rapid > 0) spawnRapidFireMuzzleParticles(tipX, tipY);
-  if (typeof playGameSound === "function") playGameSound("player_fire", p.rapid > 0 ? 0.20 : 0.27);
+  if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+    if (p.rapid > 0) spawnRapidFireMuzzleParticles(tipX, tipY);
+    if (typeof playGameSound === "function") playGameSound("player_fire", p.rapid > 0 ? 0.20 : 0.27);
+  }
   p.fire = cooldown;
 }
 function updateWingmen() {

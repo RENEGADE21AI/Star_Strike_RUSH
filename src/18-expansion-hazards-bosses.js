@@ -184,8 +184,11 @@ function pointToBeamDistance(px, py, beam) {
 
 function explodeHazard(d) {
   const radius = d.kind === "mine" ? 42 : 36;
-  spawnParticles(d.x, d.y, 24, d.kind === "energy_mine" ? "#70ff45" : "#ff8a32", 0.9);
-  kickShake(4);
+  const legacyFeedback = typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed();
+  if (legacyFeedback) {
+    spawnParticles(d.x, d.y, 24, d.kind === "energy_mine" ? "#70ff45" : "#ff8a32", 0.9);
+    kickShake(4);
+  }
   if (Math.hypot(state.player.x - d.x, state.player.y - d.y) <= radius && state.player.inv <= 0) {
     if (d.kind === "energy_mine") drainPlayerEnergy(d.drain || 24, "energy_mine");
     else damagePlayer(d.damage || 1);
@@ -201,6 +204,7 @@ function explodeHazard(d) {
 }
 
 function spawnAsteroidDestruction(d) {
+  if (typeof legacyGameplayFeedbackAllowed === "function" && !legacyGameplayFeedbackAllowed()) return;
   const scale = clamp(Number(d && d.r || 16) / 24, 0.45, 1);
   const color = d.color || "#cbd3d8";
   spawnParticles(d.x, d.y, Math.round(18 + 18 * scale), color, 0.72 + scale * 0.42);
@@ -225,6 +229,7 @@ function spawnAsteroidDestruction(d) {
 
 function updateExpansionHazards() {
   const p = state.player;
+  const legacyFeedback = typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed();
   for (let i = state.debris.length - 1; i >= 0; i--) {
     const d = state.debris[i];
     if (d.kind === "meteor_warning") {
@@ -264,8 +269,10 @@ function updateExpansionHazards() {
         b.life = 0;
         d.hitFlash = 8;
         d.hitPulse = 1;
-        spawnParticles(b.x, b.y, 6, "#fff", 0.52);
-        if (typeof playGameSound === "function") playGameSound("enemy_hit", 0.38);
+        if (legacyFeedback) {
+          spawnParticles(b.x, b.y, 6, "#fff", 0.52);
+          if (typeof playGameSound === "function") playGameSound("enemy_hit", 0.38);
+        }
         if (d.hp <= 0) {
           if (d.kind === "mine" || d.kind === "energy_mine") explodeHazard(d);
           else spawnAsteroidDestruction(d);
@@ -303,7 +310,7 @@ function updateExpansionHazards() {
           e.hp -= d.wall ? 2 : 1.5;
           if (!d.wall) d.hp -= 1;
           applyEnemyHitFeedback(e);
-          spawnParticles(e.x, e.y, 5, d.color || "#999", 0.45);
+          if (legacyFeedback) spawnParticles(e.x, e.y, 5, d.color || "#999", 0.45);
           if (e.hp <= 0) finishEnemyDestroyed(e, j, false);
           if (d.hp <= 0) break;
         }
@@ -327,7 +334,7 @@ function updateExpansionHazards() {
         if (beam.drain) drainPlayerEnergy(beam.drain, beam.source || "beam");
         if (beam.damage) damagePlayer(beam.damage);
       }
-      if (beam.drain && state.frame % 7 === 0) spawnParticles(p.x, p.y, 2, "#70ff45", 0.35);
+      if (legacyFeedback && beam.drain && state.frame % 7 === 0) spawnParticles(p.x, p.y, 2, "#70ff45", 0.35);
     }
     if (beam.active <= 0) state.enemyBeams.splice(i, 1);
   }

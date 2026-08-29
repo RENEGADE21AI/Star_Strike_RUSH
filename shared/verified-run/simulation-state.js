@@ -134,6 +134,7 @@ function createSimulationState(ticket) {
       damageTaken: 0,
       highestCombo: 0
     },
+    feedbackEvents: [],
     pendingSpawns: [],
     enemies: [],
     playerProjectiles: [],
@@ -177,6 +178,7 @@ function canonicalStateView(state) {
     director: state.director,
     player: state.player,
     stats: state.stats,
+    feedbackEvents: state.feedbackEvents,
     pendingSpawns: state.pendingSpawns,
     enemies: state.enemies,
     playerProjectiles: state.playerProjectiles,

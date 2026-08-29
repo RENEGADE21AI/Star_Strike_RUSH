@@ -58,6 +58,7 @@ function powerupFeedbackColor(type) {
 }
 function spawnPowerupCollectBurst(pu) {
   if (!pu) return;
+  if (typeof legacyGameplayFeedbackAllowed === "function" && !legacyGameplayFeedbackAllowed()) return;
   const color = powerupFeedbackColor(pu.type);
   spawnParticles(pu.x, pu.y, 22, color, 1.05);
   for (let index = 0; index < 2; index++) {
@@ -221,7 +222,9 @@ function spawnWingmen(count) {
 function fireWingman(w) {
   if (w.phase !== "active" || w.fire > 0) return;
   state.bullets.push({ x: w.x, y: w.y - 12, vx: 0, vy: -8.2, life: 80, r: 3, kind: getPlayerShotKind(), realm: state.playerRealm, damage: 0.75 });
-  if (typeof playGameSound === "function") playGameSound("player_fire", 0.18);
+  if ((typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) && typeof playGameSound === "function") {
+    playGameSound("player_fire", 0.18);
+  }
   w.fire = 18;
 }
 function currentInputVector() {
@@ -242,10 +245,12 @@ function attemptGhost() {
     state.runStats.abilityUses++;
     state.runStats.realmHops++;
     recordTrustedRunEvent("ghost");
-    state.fx.flash = Math.max(state.fx.flash, 4);
-    state.comboPulse = Math.max(state.comboPulse, 6);
-    spawnParticles(p.x, p.y, 10, state.playerRealm === 0 ? "#bfe8ff" : "#d9b6ff", 0.9);
-    if (typeof playGameSound === "function") playGameSound("ability", 0.86);
+    if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+      state.fx.flash = Math.max(state.fx.flash, 4);
+      state.comboPulse = Math.max(state.comboPulse, 6);
+      spawnParticles(p.x, p.y, 10, state.playerRealm === 0 ? "#bfe8ff" : "#d9b6ff", 0.9);
+      if (typeof playGameSound === "function") playGameSound("ability", 0.86);
+    }
     return;
   }
   if (p.energy < profile.cost || p.ghostCooldown > 0) return;
@@ -270,9 +275,11 @@ function attemptGhost() {
   else state.runStats.dashUses++;
   recordTrustedRunEvent("ghost");
   state.difficulty.ghostGrace = profile.phaseThroughDebris ? 60 : 24;
-  state.fx.flash = Math.max(state.fx.flash, 6);
-  spawnParticles(p.x, p.y, profile.label === "DASH" ? 16 : 10, profile.label === "DASH" ? "#ffcc78" : "#fff", profile.label === "DASH" ? 1.35 : 1.05);
-  if (typeof playGameSound === "function") playGameSound("ability", profile.label === "DASH" ? 1.0 : 0.84);
+  if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+    state.fx.flash = Math.max(state.fx.flash, 6);
+    spawnParticles(p.x, p.y, profile.label === "DASH" ? 16 : 10, profile.label === "DASH" ? "#ffcc78" : "#fff", profile.label === "DASH" ? 1.35 : 1.05);
+    if (typeof playGameSound === "function") playGameSound("ability", profile.label === "DASH" ? 1.0 : 0.84);
+  }
 }
 
 function updateStars() {

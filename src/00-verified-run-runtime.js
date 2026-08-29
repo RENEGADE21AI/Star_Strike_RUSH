@@ -8,9 +8,14 @@ let seededRunStarting = false;
 let recordedRunInputs = null;
 let pendingRunInputButtons = 0;
 let activeCanonicalRunInput = null;
+let canonicalFeedbackDispatching = false;
 let canonicalPresentationCache = null;
 let canonicalPresentationCacheTick = -1;
 let canonicalPresentationCacheSource = null;
+const canonicalEnemyFeedbackUntil = new Map();
+const canonicalHazardFeedbackUntil = new Map();
+const canonicalWingmanFeedbackUntil = new Map();
+let canonicalBossFeedbackUntil = 0;
 
 const CANONICAL_BOSS_PRESENTATION_SIZE = Object.freeze({
   standard: Object.freeze({ w: 130, h: 82 }),
@@ -40,9 +45,14 @@ function clearRunRandomStreams() {
   recordedRunInputs = null;
   pendingRunInputButtons = 0;
   activeCanonicalRunInput = null;
+  canonicalFeedbackDispatching = false;
   canonicalPresentationCache = null;
   canonicalPresentationCacheTick = -1;
   canonicalPresentationCacheSource = null;
+  canonicalEnemyFeedbackUntil.clear();
+  canonicalHazardFeedbackUntil.clear();
+  canonicalWingmanFeedbackUntil.clear();
+  canonicalBossFeedbackUntil = 0;
 }
 
 function currentVerifiedRunContext() {
@@ -125,6 +135,7 @@ function canonicalEnemyPresentation(enemy, repairTargets) {
   const y = canonicalPresentationPixel(enemy.y);
   const vx = canonicalPresentationPixel(enemy.vx);
   const vy = canonicalPresentationPixel(enemy.vy);
+  const feedbackActive = Number(canonicalEnemyFeedbackUntil.get(enemy.id) || 0) >= Number(activeCanonicalRunState?.tick || 0);
   return {
     ...enemy,
     x,
@@ -142,8 +153,8 @@ function canonicalEnemyPresentation(enemy, repairTargets) {
     warn: enemy.warnTimer,
     flickerSeed: enemy.id,
     isRepairTarget: repairTargets.has(enemy.id),
-    hitFlash: 0,
-    hitPulse: 0
+    hitFlash: feedbackActive ? 12 : 0,
+    hitPulse: feedbackActive ? 1 : 0
   };
 }
 
@@ -161,6 +172,7 @@ function canonicalProjectilePresentation(projectile, fallbackRadius) {
 }
 
 function canonicalHazardPresentation(hazard) {
+  const feedbackActive = Number(canonicalHazardFeedbackUntil.get(hazard.id) || 0) >= Number(activeCanonicalRunState?.tick || 0);
   const base = {
     ...hazard,
     x: canonicalPresentationPixel(hazard.x),
@@ -173,8 +185,8 @@ function canonicalHazardPresentation(hazard) {
     spawnScale: 1,
     trail: hazard.kind === "comet_shard",
     armed: Number(hazard.armTimer || 0) <= 0,
-    hitFlash: 0,
-    hitPulse: 0
+    hitFlash: feedbackActive ? 8 : 0,
+    hitPulse: feedbackActive ? 1 : 0
   };
   if (hazard.kind === "enemy_beam") {
     return {
@@ -209,8 +221,8 @@ function canonicalBossPresentation(boss) {
     movePhase: canonicalPresentationAngle(boss.moveAngle),
     w: size.w,
     h: size.h,
-    hitFlash: 0,
-    hitPulse: 0
+    hitFlash: canonicalBossFeedbackUntil >= Number(activeCanonicalRunState?.tick || 0) ? 10 : 0,
+    hitPulse: canonicalBossFeedbackUntil >= Number(activeCanonicalRunState?.tick || 0) ? 1 : 0
   };
 }
 
@@ -283,7 +295,7 @@ function currentRunPresentationState(browserState) {
     x: canonicalPresentationPixel(wingman.x),
     y: canonicalPresentationPixel(wingman.y),
     rotation: canonicalPresentationAngle(wingman.departureAngle),
-    hitFlash: 0
+    hitFlash: Number(canonicalWingmanFeedbackUntil.get(wingman.id) || 0) >= canonical.tick ? 8 : 0
   }));
   presentation.boss = canonicalBossPresentation(canonical.boss);
   presentation.safeLanes = canonicalPresentationSafeLanes(canonical.hazards);
@@ -296,6 +308,114 @@ function currentRunPresentationState(browserState) {
 
 function canonicalRunOwnsGameplayOutcome() {
   return activeCanonicalRunState !== null;
+}
+
+function canonicalRunSuppressesLegacyFeedback() {
+  return activeCanonicalRunState !== null && !canonicalFeedbackDispatching;
+}
+
+function legacyGameplayFeedbackAllowed() {
+  return !canonicalRunSuppressesLegacyFeedback();
+}
+
+function canonicalFeedbackPixel(value) {
+  return Number(value) / StarStrikeVerifiedRunConstants.POSITION_UNITS_PER_PIXEL;
+}
+
+function dispatchCanonicalRunFeedback(browserState) {
+  const canonical = activeCanonicalRunState;
+  if (!canonical || !browserState || typeof browserState !== "object") return false;
+  const events = Array.isArray(canonical.feedbackEvents) ? canonical.feedbackEvents : [];
+  for (const feedbackMap of [canonicalEnemyFeedbackUntil, canonicalHazardFeedbackUntil, canonicalWingmanFeedbackUntil]) {
+    for (const [entityId, expiresAt] of feedbackMap) {
+      if (expiresAt < canonical.tick) feedbackMap.delete(entityId);
+    }
+  }
+  browserState.lastCanonicalFeedback = { tick: canonical.tick, events };
+  const play = (name, volume) => {
+    if (typeof globalThis.playGameSound === "function") globalThis.playGameSound(name, volume);
+  };
+  const particles = (x, y, count, color, speed) => {
+    if (typeof globalThis.spawnParticles === "function") globalThis.spawnParticles(x, y, count, color, speed);
+  };
+  const burst = (x, y, count) => {
+    if (typeof globalThis.spawnDeathBurst === "function") globalThis.spawnDeathBurst(x, y, count);
+  };
+
+  canonicalFeedbackDispatching = true;
+  try {
+    for (const event of events) {
+      const x = canonicalFeedbackPixel(event.x);
+      const y = canonicalFeedbackPixel(event.y);
+      if (event.type === "player_fire") {
+        play("player_fire", event.sourceKind === "wingman" ? 0.18 : canonical.player.rapid > 0 ? 0.20 : 0.27);
+        if (event.sourceKind === "player" && canonical.player.rapid > 0 && typeof globalThis.spawnRapidFireMuzzleParticles === "function") {
+          globalThis.spawnRapidFireMuzzleParticles(x, y);
+        }
+      } else if (event.type === "ability") {
+        particles(x, y, 10, "#fff", 1.05);
+        play("ability", 0.84);
+      } else if (event.type === "enemy_hit") {
+        canonicalEnemyFeedbackUntil.set(event.entityId, canonical.tick + 11);
+        particles(x, y, 6, "#fff", 0.7);
+        play("enemy_hit", 0.62);
+      } else if (event.type === "enemy_shield_hit") {
+        canonicalEnemyFeedbackUntil.set(event.entityId, canonical.tick + 7);
+        particles(x, y, 5, "#bff6ff", 0.52);
+        play("enemy_hit", 0.32);
+      } else if (event.type === "enemy_destroyed") {
+        const count = event.entityKind === "purple" ? 22 : event.entityKind === "phantom" ? 18 : event.entityKind === "carrier" ? 24 : 14;
+        burst(x, y, count);
+        play("destroy", event.entityKind === "carrier" ? 1.1 : 0.72);
+      } else if (event.type === "boss_hit") {
+        canonicalBossFeedbackUntil = canonical.tick + 9;
+        particles(x, y, 7, "#fff", 0.82);
+        play("boss_hit", 0.78);
+      } else if (event.type === "boss_destroyed") {
+        particles(x, y, 50, "#fff", 1.1);
+        particles(x, y, 24, "#9ff", 1.0);
+        play("boss_destroy", 1.2);
+        if (typeof globalThis.kickShake === "function") globalThis.kickShake(14);
+        if (browserState.fx) browserState.fx.flash = Math.max(Number(browserState.fx.flash || 0), 14);
+      } else if (event.type === "hazard_hit") {
+        canonicalHazardFeedbackUntil.set(event.entityId, canonical.tick + 7);
+        particles(x, y, 6, "#fff", 0.52);
+        play("enemy_hit", 0.38);
+      } else if (event.type === "hazard_destroyed") {
+        particles(x, y, 24, event.entityKind === "energy_mine" ? "#70ff45" : "#cbd3d8", 0.9);
+        play("enemy_destroy", 0.62);
+      } else if (event.type === "wingman_hit") {
+        canonicalWingmanFeedbackUntil.set(event.entityId, canonical.tick + 7);
+        particles(x, y, event.destroyed ? 10 : 5, event.destroyed ? "#f6f" : "#bff6ff", event.destroyed ? 0.8 : 0.42);
+        play("wingman_hit", event.destroyed ? 0.85 : 0.34);
+      } else if (event.type === "wingman_collision") {
+        canonicalWingmanFeedbackUntil.set(event.entityId, canonical.tick + 7);
+        particles(x, y, 12, "#f6f", 0.9);
+        burst(canonicalFeedbackPixel(event.enemyX), canonicalFeedbackPixel(event.enemyY), 10);
+        play("wingman_hit", 0.92);
+      } else if (event.type === "player_hit") {
+        particles(x, y, event.amount >= 2 ? 18 : 12, "#ff8a8a", 1.05);
+        play("player_hit", event.amount >= 2 ? 1.15 : 0.9);
+        if (typeof globalThis.kickShake === "function") globalThis.kickShake(event.amount >= 2 ? 12 : 8);
+        if (browserState.fx) browserState.fx.flash = Math.max(Number(browserState.fx.flash || 0), event.amount >= 2 ? 10 : 8);
+      } else if (event.type === "shield_absorbed") {
+        particles(x, y, 12, "#8ff5ff", 0.8);
+        play("enemy_hit", 0.32);
+      } else if (event.type === "energy_drained") {
+        particles(x, y, 3, "#70ff45", 0.45);
+      } else if (event.type === "powerup_collected") {
+        if (typeof globalThis.spawnPowerupCollectBurst === "function") {
+          globalThis.spawnPowerupCollectBurst({ x, y, type: event.entityKind });
+        } else {
+          particles(x, y, 22, "#8ff5ff", 1.05);
+          play("powerup", 0.9);
+        }
+      }
+    }
+  } finally {
+    canonicalFeedbackDispatching = false;
+  }
+  return true;
 }
 
 function applyCanonicalRunAuthority(browserState) {
@@ -459,7 +579,10 @@ function endCanonicalRunTick(browserState = null) {
     canonicalPresentationCache = null;
     canonicalPresentationCacheTick = -1;
     canonicalPresentationCacheSource = null;
-    if (browserState) applyCanonicalRunAuthority(browserState);
+    if (browserState) {
+      applyCanonicalRunAuthority(browserState);
+      dispatchCanonicalRunFeedback(browserState);
+    }
     return Object.freeze({
       advanced: true,
       terminal: activeCanonicalRunState.terminal === true,
@@ -519,6 +642,9 @@ globalThis.beginSeededStandardRun = beginSeededStandardRun;
 globalThis.currentCanonicalRunState = currentCanonicalRunState;
 globalThis.currentRunPresentationState = currentRunPresentationState;
 globalThis.canonicalRunOwnsGameplayOutcome = canonicalRunOwnsGameplayOutcome;
+globalThis.canonicalRunSuppressesLegacyFeedback = canonicalRunSuppressesLegacyFeedback;
+globalThis.legacyGameplayFeedbackAllowed = legacyGameplayFeedbackAllowed;
+globalThis.dispatchCanonicalRunFeedback = dispatchCanonicalRunFeedback;
 globalThis.applyCanonicalRunAuthority = applyCanonicalRunAuthority;
 globalThis.currentCanonicalRunParity = currentCanonicalRunParity;
 globalThis.captureCanonicalRunInput = captureCanonicalRunInput;

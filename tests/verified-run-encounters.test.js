@@ -131,6 +131,9 @@ test("asteroids damage on artwork-aligned contact while energy mines drain only 
   assert.equal(mineState.player.hp, 5);
   assert.equal(mineState.player.energy, 76 * ENERGY_UNITS_PER_POINT);
   assert.equal(mineState.hazards.length, 0);
+  assert.equal(mineState.feedbackEvents.some((event) => (
+    event.type === "hazard_destroyed" && event.entityKind === "energy_mine"
+  )), true);
 });
 
 test("gravity-well warning expiry applies deterministic integer pull and energy drain", () => {

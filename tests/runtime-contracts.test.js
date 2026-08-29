@@ -179,6 +179,34 @@ test("the fixed-step loop records canonical controls before authoritative update
   assert.match(ghost, /queueVerifiedRunInputEdge\("ghost"\)/);
 });
 
+test("ticketed legacy shadow updates cannot duplicate authoritative collision feedback", () => {
+  const functionSource = (file, start, end) => {
+    const source = fs.readFileSync(path.join(repoRoot, "src", file), "utf8");
+    return source.slice(source.indexOf(start), end ? source.indexOf(end, source.indexOf(start)) : source.length);
+  };
+  const guardedFeedbackFunctions = [
+    ["02-effects-powerups.js", "function spawnPowerupCollectBurst", "function spawnPowerupAt"],
+    ["02-effects-powerups.js", "function fireWingman", "function currentInputVector"],
+    ["02-effects-powerups.js", "function attemptGhost", "function updateStars"],
+    ["05-entities.js", "function firePlayer", "function updateWingmen"],
+    ["06-bosses.js", "function spawnBossDeath", "function updateBossStandard"],
+    ["07-gameplay-systems.js", "function damagePlayer", "function collectPowerup"],
+    ["07-gameplay-systems.js", "function applyEnemyHitFeedback", "function bossSpriteKey"],
+    ["18-expansion-enemies-powerups.js", "function finishEnemyDestroyed", "function drainPlayerEnergy"],
+    ["18-expansion-enemies-powerups.js", "function drainPlayerEnergy", "function consumePhaseShieldOnDamage"],
+    ["18-expansion-enemies-powerups.js", "function consumePhaseShieldOnDamage", "function tickExpansionPlayerTimers"],
+    ["18-expansion-hazards-bosses.js", "function explodeHazard", "function updateExpansionHazards"],
+    ["18-expansion-hazards-bosses.js", "function updateExpansionHazards", "function updateBossWraithExpansion"]
+  ];
+  for (const [file, start, end] of guardedFeedbackFunctions) {
+    assert.match(
+      functionSource(file, start, end),
+      /legacyGameplayFeedbackAllowed\(\)/,
+      `${file}:${start} must suppress legacy feedback during a canonical tick`
+    );
+  }
+});
+
 test("gameplay randomness uses named run streams while cosmetics remain local", () => {
   const streamByFile = new Map([
     ["00-gameplay-rules.js", "hazards"],

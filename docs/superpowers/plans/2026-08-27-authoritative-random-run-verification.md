@@ -112,9 +112,14 @@ safe-lane guidance, HUD/control boss state, realm presentation, and development 
 counts now consume that same canonical view. Debris Warden double gates also use an
 integer-only, seeded reachability bound and carry their authoritative safe-gap
 metadata into presentation. The parity diagnostic deliberately retains legacy-array
-comparisons, while collision feedback and audio still run in parallel, so browser-
-state ownership remains intentionally unchecked below until those final consumers
-are canonical as well.
+comparisons for development diagnosis. Each canonical tick now also publishes an
+integer-only feedback journal for firing, abilities, hits, shields, drains, pickups,
+wingmen, hazards, enemy destruction, and boss destruction. The browser suppresses
+the legacy shadow's outcome feedback for the entire ticketed run, then dispatches
+sound, particles, shake, flash, and entity hit pulses only from those canonical
+events. Canvas, HUD, gameplay audio, and collision feedback therefore describe the
+same authoritative state while title traffic, stars, and particle motion remain
+cosmetic and outside verification.
 
 **Files:**
 - Create: `shared/verified-run/simulation-state.js`
@@ -134,12 +139,12 @@ are canonical as well.
 - Consumes: `createRunRandomStreams()` and canonical input.
 - Produces: `createSimulationState(ticket)`, `stepSimulation(state, input, streams)`, `serializeCanonicalState(state)`, and `deriveVerifiedRunResult(state)`.
 
-- [ ] Add golden tests for player motion, pause damage, Ghost Shift, spawns, drops, collisions, phases, every boss, score, and terminal death.
-- [ ] Confirm the golden tests fail before extraction.
-- [ ] Extract gameplay-authoritative state and one-tick transitions behind browser adapters; use 1,024 integer position units, 4,096 angle units, integer timers, and deterministic trigonometry tables.
-- [ ] Make Canvas, DOM, audio, visual interpolation, and wall time consumers of canonical state rather than inputs to it.
-- [ ] Run 500 generated-seed invariants plus Node, Chromium, and WebKit golden replay parity.
-- [ ] Commit with `git commit -m "feat: extract authoritative headless simulation"`.
+- [x] Add golden tests for player motion, pause damage, Ghost Shift, spawns, drops, collisions, phases, every boss, score, and terminal death.
+- [x] Confirm the golden tests fail before extraction.
+- [x] Extract gameplay-authoritative state and one-tick transitions behind browser adapters; use 1,024 integer position units, 4,096 angle units, integer timers, and deterministic trigonometry tables.
+- [x] Make Canvas, DOM, audio, visual interpolation, and wall time consumers of canonical state rather than inputs to it.
+- [x] Run 500 generated-seed invariants plus Node, Chromium, and WebKit golden replay parity.
+- [x] Deliver the authoritative headless simulation in reviewed incremental commits.
 
 ### Task 4: Version-bound ticket lifecycle
 

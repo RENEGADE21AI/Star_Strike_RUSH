@@ -204,6 +204,7 @@ function spawnBoss() {
   discoverCodex("boss_standard");
 }
 function spawnBossDeath(boss) {
+  const legacyFeedback = typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed();
   state.bossDeath = { x: boss.x, y: boss.y, w: boss.w, h: boss.h, timer: 0, life: 150, pieces: [] };
   const cols = 5, rows = 3, pw = boss.w / cols, ph = boss.h / rows;
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
@@ -223,11 +224,13 @@ function spawnBossDeath(boss) {
   state.waveMood = "open";
   state.waveMoodTimer = 120;
   state.lastWaveTemplateName = null;
-  spawnParticles(boss.x, boss.y, 50, "#fff", 1.1);
-  spawnParticles(boss.x, boss.y, 24, "#9ff", 1.0);
-  if (typeof playGameSound === "function") playGameSound("boss_destroy", 1.2);
-  kickShake(14);
-  state.fx.flash = 14;
+  if (legacyFeedback) {
+    spawnParticles(boss.x, boss.y, 50, "#fff", 1.1);
+    spawnParticles(boss.x, boss.y, 24, "#9ff", 1.0);
+    if (typeof playGameSound === "function") playGameSound("boss_destroy", 1.2);
+    kickShake(14);
+    state.fx.flash = 14;
+  }
 }
 function updateBossStandard() {
   const b = state.boss; if (!b) return;

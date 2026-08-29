@@ -35,6 +35,11 @@ const ALLOWED_BUTTONS = BUTTON_GHOST_SHIFT | BUTTON_PAUSE;
 const GHOST_BURST = Math.round(4.6 * POSITION_UNITS_PER_PIXEL);
 const GHOST_COST = 35 * ENERGY_UNITS_PER_POINT;
 
+function emitCanonicalFeedback(state, type, details = {}) {
+  if (!Array.isArray(state.feedbackEvents)) state.feedbackEvents = [];
+  state.feedbackEvents.push({ type, ...details });
+}
+
 function roundDivide(numerator, denominator) {
   if (!Number.isSafeInteger(numerator) || !Number.isSafeInteger(denominator) || denominator <= 0) {
     throw new TypeError("Canonical division requires safe integers and a positive denominator.");
@@ -81,12 +86,22 @@ function applyGhostShift(state, input) {
   player.energy -= GHOST_COST;
   state.stats.ghostUses++;
   state.director.ghostGrace = Math.max(state.director.ghostGrace, 60);
+  emitCanonicalFeedback(state, "ability", {
+    x: player.x,
+    y: player.y,
+    abilityKind: "ghost_shift"
+  });
 }
 
 function applyPauseEdge(state, input) {
   if ((input.buttons & BUTTON_PAUSE) === 0) return;
   state.player.hp = Math.max(0, state.player.hp - 1);
   state.stats.pauseUses++;
+  emitCanonicalFeedback(state, "pause_cost", {
+    x: state.player.x,
+    y: state.player.y,
+    amount: 1
+  });
   if (state.player.hp === 0) {
     state.terminal = true;
     state.terminalReason = "player_destroyed";
@@ -599,9 +614,25 @@ function applyCanonicalIonBurst(state, streams) {
     const dx = enemy.x - state.player.x;
     const dy = enemy.y - state.player.y;
     if (dx * dx + dy * dy <= radiusSquared) {
-      enemy.hp -= enemy.type === "purple" || enemy.type === "carrier" ? 1 : 2;
+      const amount = enemy.type === "purple" || enemy.type === "carrier" ? 1 : 2;
+      enemy.hp -= amount;
+      emitCanonicalFeedback(state, "enemy_hit", {
+        entityId: enemy.id,
+        entityKind: enemy.type,
+        x: enemy.x,
+        y: enemy.y,
+        amount
+      });
     }
-    if (enemy.hp <= 0) noteCanonicalKill(state, enemy, streams, false);
+    if (enemy.hp <= 0) {
+      noteCanonicalKill(state, enemy, streams, false);
+      emitCanonicalFeedback(state, "enemy_destroyed", {
+        entityId: enemy.id,
+        entityKind: enemy.type,
+        x: enemy.x,
+        y: enemy.y
+      });
+    }
     else survivors.push(enemy);
   }
   state.enemies = survivors;
@@ -613,6 +644,12 @@ function collectCanonicalPowerup(state, powerup, streams) {
   }
   const player = state.player;
   state.stats.powerups++;
+  emitCanonicalFeedback(state, "powerup_collected", {
+    entityId: powerup.id,
+    entityKind: powerup.type,
+    x: powerup.x,
+    y: powerup.y
+  });
   if (powerup.type === "spread") player.spread = Math.max(player.spread, 900);
   else if (powerup.type === "rapid") player.rapid = Math.max(player.rapid, 900);
   else if (powerup.type === "repair") player.hp = Math.min(player.maxHp, player.hp + 1);
@@ -709,6 +746,12 @@ function updateCanonicalWingmen(state) {
         id: state.nextEntityId++, kind: "wingman", x: wingman.x, y: wingman.y - 12 * POSITION_UNITS_PER_PIXEL,
         vx: 0, vy: -8_397, angle: 0, life: 80, damage: 1, pierce: 0, realm: state.playerRealm
       });
+      emitCanonicalFeedback(state, "player_fire", {
+        x: wingman.x,
+        y: wingman.y - 12 * POSITION_UNITS_PER_PIXEL,
+        sourceKind: "wingman",
+        amount: 1
+      });
       wingman.fireCooldown = 18;
     }
   }
@@ -736,6 +779,12 @@ function fireCanonicalPlayer(state) {
       });
     }
     state.director.shotsFired += 3;
+    emitCanonicalFeedback(state, "player_fire", {
+      x: player.x,
+      y: player.y - 20 * POSITION_UNITS_PER_PIXEL,
+      sourceKind: "player",
+      amount: 3
+    });
   } else {
     state.playerProjectiles.push({
       id: state.nextEntityId++,
@@ -751,6 +800,12 @@ function fireCanonicalPlayer(state) {
       realm: state.playerRealm
     });
     state.director.shotsFired++;
+    emitCanonicalFeedback(state, "player_fire", {
+      x: player.x,
+      y: player.y - 20 * POSITION_UNITS_PER_PIXEL,
+      sourceKind: "player",
+      amount: 1
+    });
   }
   player.fireCooldown = player.rapid > 0 ? 10 : 14;
 }
@@ -1127,7 +1182,15 @@ function drainCanonicalPlayerEnergy(state, amount) {
   const drain = state.player.stabilizer > 0 ? roundDivide(amount, 2) : amount;
   const before = state.player.energy;
   state.player.energy = Math.max(0, state.player.energy - drain);
-  return before - state.player.energy;
+  const applied = before - state.player.energy;
+  if (applied > 0) {
+    emitCanonicalFeedback(state, "energy_drained", {
+      x: state.player.x,
+      y: state.player.y,
+      amount: applied
+    });
+  }
+  return applied;
 }
 
 function damageCanonicalPlayer(state, amount) {
@@ -1135,6 +1198,11 @@ function damageCanonicalPlayer(state, amount) {
   if (state.player.phaseShield > 0) {
     state.player.phaseShield = 0;
     state.player.invulnerability = 42;
+    emitCanonicalFeedback(state, "shield_absorbed", {
+      x: state.player.x,
+      y: state.player.y,
+      amount
+    });
     return false;
   }
   const pacing = state.director;
@@ -1144,6 +1212,11 @@ function damageCanonicalPlayer(state, amount) {
   state.stats.damageTaken += amount;
   state.player.invulnerability = 90;
   state.player.energy = Math.min(state.player.maxEnergy, state.player.energy + 12 * ENERGY_UNITS_PER_POINT);
+  emitCanonicalFeedback(state, "player_hit", {
+    x: state.player.x,
+    y: state.player.y,
+    amount
+  });
   pacing.grace = 120;
   pacing.ghostGrace = 0;
   pacing.killStreak = 0;
@@ -1193,7 +1266,17 @@ function updateCanonicalHazards(state, streams) {
       hazard.life--;
       if (hazard.realm === state.playerRealm
         && bodiesOverlap(playerBody, collisionBodyFor(hazard.kind, hazard.x, hazard.y, hazard.angle))) {
-        if (damageCanonicalPlayer(state, hazard.damage) && !hazard.wall) hazard.hp -= 2;
+        if (damageCanonicalPlayer(state, hazard.damage) && !hazard.wall) {
+          hazard.hp -= 2;
+          if (hazard.hp <= 0) {
+            emitCanonicalFeedback(state, "hazard_destroyed", {
+              entityId: hazard.id,
+              entityKind: hazard.kind,
+              x: hazard.x,
+              y: hazard.y
+            });
+          }
+        }
       }
       if (hazard.hp > 0 && hazard.life > 0
         && hazard.y < GAME_HEIGHT_UNITS + 70 * POSITION_UNITS_PER_PIXEL
@@ -1215,6 +1298,12 @@ function updateCanonicalHazards(state, streams) {
         } else {
           damageCanonicalPlayer(state, hazard.damage);
         }
+        emitCanonicalFeedback(state, "hazard_destroyed", {
+          entityId: hazard.id,
+          entityKind: hazard.kind,
+          x: hazard.x,
+          y: hazard.y
+        });
         continue;
       }
       if (hazard.life > 0) survivors.push(hazard);
@@ -1844,13 +1933,32 @@ function resolveCanonicalProjectileHits(state, streams) {
       if (enemy.shieldedBy && enemy.type !== "shieldbearer" && enemy.shieldCooldown <= 0) {
         enemy.shieldCooldown = 62;
         deadProjectiles.add(projectile.id);
+        emitCanonicalFeedback(state, "enemy_shield_hit", {
+          entityId: enemy.id,
+          entityKind: enemy.type,
+          x: enemy.x,
+          y: enemy.y
+        });
         break;
       }
       enemy.hp -= projectile.damage;
+      emitCanonicalFeedback(state, "enemy_hit", {
+        entityId: enemy.id,
+        entityKind: enemy.type,
+        x: enemy.x,
+        y: enemy.y,
+        amount: projectile.damage
+      });
       if (enemy.hp <= 0) {
         deadEnemies.add(enemy.id);
         destroyedEnemies.push(enemy);
         noteCanonicalKill(state, enemy, streams);
+        emitCanonicalFeedback(state, "enemy_destroyed", {
+          entityId: enemy.id,
+          entityKind: enemy.type,
+          x: enemy.x,
+          y: enemy.y
+        });
       }
       if ((projectile.pierce || 0) > 0) {
         projectile.pierce--;
@@ -1906,7 +2014,14 @@ function resolveCanonicalEnemyProjectileHits(state) {
       const wingman = state.wingmen[index];
       if (!bodiesOverlap(collisionBodyFor(collisionKey, projectile.x, projectile.y, projectile.angle), collisionBodyFor("wingman", wingman.x, wingman.y, 0))) continue;
       consumed.add(projectile.id);
-      if (wingman.phase === "active") state.wingmen.splice(index, 1);
+      const destroyed = wingman.phase === "active";
+      if (destroyed) state.wingmen.splice(index, 1);
+      emitCanonicalFeedback(state, "wingman_hit", {
+        entityId: wingman.id,
+        x: wingman.x,
+        y: wingman.y,
+        destroyed
+      });
       intercepted = true;
       break;
     }
@@ -1933,6 +2048,15 @@ function resolveCanonicalWingmanContact(state) {
       if (!bodiesOverlap(collisionBodyFor(enemy.type, enemy.x, enemy.y, enemy.angle), collisionBodyFor("wingman", wingman.x, wingman.y, 0))) continue;
       if (wingman.phase === "active" && state.player.ghostTimer <= 0) state.wingmen.splice(wingmanIndex, 1);
       state.enemies.splice(enemyIndex, 1);
+      emitCanonicalFeedback(state, "wingman_collision", {
+        entityId: wingman.id,
+        enemyId: enemy.id,
+        enemyKind: enemy.type,
+        x: wingman.x,
+        y: wingman.y,
+        enemyX: enemy.x,
+        enemyY: enemy.y
+      });
       break;
     }
   }
@@ -1952,6 +2076,12 @@ function spawnCanonicalBossRewards(state, boss, streams) {
 function finishCanonicalBoss(state, boss, streams) {
   state.score += boss.score;
   state.stats.bosses++;
+  emitCanonicalFeedback(state, "boss_destroyed", {
+    entityId: boss.id,
+    entityKind: boss.mode,
+    x: boss.x,
+    y: boss.y
+  });
   spawnCanonicalBossRewards(state, boss, streams);
   if (streams) registerCanonicalPowerupDrop(state, streams, 300, 480);
   state.boss = null;
@@ -1977,6 +2107,13 @@ function resolveCanonicalBossProjectileHits(state, streams) {
     consumed.add(projectile.id);
     state.director.shotsHit++;
     boss.hp -= projectile.damage;
+    emitCanonicalFeedback(state, "boss_hit", {
+      entityId: boss.id,
+      entityKind: boss.mode,
+      x: projectile.x,
+      y: projectile.y,
+      amount: projectile.damage
+    });
     if (boss.mode === "wraith") {
       boss.hitsSinceShift++;
       if (boss.hp > 0 && boss.hitsSinceShift >= boss.nextShiftHits && boss.shiftTelegraph === 0 && boss.chargeTelegraph === 0) {
@@ -2015,8 +2152,21 @@ function resolveCanonicalHazardProjectileHits(state) {
       if (!bodiesOverlap(projectileBody, collisionBodyFor(hazard.kind, hazard.x, hazard.y, hazard.angle))) continue;
       consumedProjectiles.add(projectile.id);
       hazard.hp -= projectile.damage;
+      emitCanonicalFeedback(state, "hazard_hit", {
+        entityId: hazard.id,
+        entityKind: hazard.kind,
+        x: projectile.x,
+        y: projectile.y,
+        amount: projectile.damage
+      });
       if (hazard.hp <= 0) {
         destroyedHazards.add(hazard.id);
+        emitCanonicalFeedback(state, "hazard_destroyed", {
+          entityId: hazard.id,
+          entityKind: hazard.kind,
+          x: hazard.x,
+          y: hazard.y
+        });
         if (hazard.kind === "mine" || hazard.kind === "energy_mine") explodeCanonicalMine(state, hazard);
       }
       break;
@@ -2030,6 +2180,7 @@ function stepSimulation(state, rawInput, streams) {
   if (!state || state.schema !== "SSR_SIM_STATE_V1") throw new TypeError("Canonical simulation state is invalid.");
   if (state.terminal) throw new Error("Canonical simulation is already terminal.");
   const input = validateCanonicalInput(rawInput);
+  state.feedbackEvents = [];
   state.tick++;
   state.director.ticksSinceDrop++;
   if (state.director.dropCooldown > 0) state.director.dropCooldown--;

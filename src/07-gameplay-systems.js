@@ -423,11 +423,13 @@ function damagePlayer(amount = 1) {
   state.difficulty.grace = 120;
   state.difficulty.ghostGrace = 0;
   if (typeof applyLowHpReliefAfterHit === "function") applyLowHpReliefAfterHit();
-  kickShake(amount >= 2 ? 12 : 8);
-  state.fx.flash = Math.max(state.fx.flash, amount >= 2 ? 10 : 8);
   resetCombo();
-  spawnParticles(p.x, p.y, amount >= 2 ? 18 : 12, "#ff8a8a", 1.05);
-  if (typeof playGameSound === "function") playGameSound("player_hit", amount >= 2 ? 1.15 : 0.9);
+  if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+    kickShake(amount >= 2 ? 12 : 8);
+    state.fx.flash = Math.max(state.fx.flash, amount >= 2 ? 10 : 8);
+    spawnParticles(p.x, p.y, amount >= 2 ? 18 : 12, "#ff8a8a", 1.05);
+    if (typeof playGameSound === "function") playGameSound("player_hit", amount >= 2 ? 1.15 : 0.9);
+  }
   if (p.hp <= 0) {
     if (typeof canonicalRunOwnsGameplayOutcome === "function" && canonicalRunOwnsGameplayOutcome()) return;
     if (state.runMode === "tutorial" && typeof recoverTutorialCheckpoint === "function") recoverTutorialCheckpoint();
@@ -456,12 +458,14 @@ function collectPowerup(pu) {
 }
 function enemyScoreForType(type) { return (ENEMY_DATA[type] && ENEMY_DATA[type].score) ? ENEMY_DATA[type].score : 20; }
 function applyEnemyHitFeedback(e) {
+  if (typeof legacyGameplayFeedbackAllowed === "function" && !legacyGameplayFeedbackAllowed()) return;
   e.hitFlash = 12;
   e.hitPulse = 1;
   if (typeof playGameSound === "function") playGameSound("enemy_hit", 0.62);
 }
 function applyBossHitFeedback(boss, x, y) {
   if (!boss) return;
+  if (typeof legacyGameplayFeedbackAllowed === "function" && !legacyGameplayFeedbackAllowed()) return;
   boss.hitFlash = 10;
   boss.hitPulse = 1;
   spawnParticles(x, y, 7, "#fff", 0.82);
@@ -469,6 +473,7 @@ function applyBossHitFeedback(boss, x, y) {
 }
 function applyBossStagingPingFeedback(boss, x, y) {
   if (!boss) return;
+  if (typeof legacyGameplayFeedbackAllowed === "function" && !legacyGameplayFeedbackAllowed()) return;
   boss.hitFlash = Math.max(boss.hitFlash || 0, 5);
   boss.hitPulse = Math.max(boss.hitPulse || 0, 0.45);
   spawnParticles(x, y, 4, "#bff6ff", 0.48);
@@ -485,6 +490,7 @@ function bossCollisionHits(bullet, boss) {
 }
 function updateCollisions() {
   const p = state.player;
+  const legacyFeedback = typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed();
   for (let i = state.bullets.length - 1; i >= 0; i--) {
     const b = state.bullets[i], dmg = b.damage ?? 1;
     if (b.life <= 0) continue;
@@ -625,12 +631,12 @@ function updateCollisions() {
           e.hp -= actualDamage;
           applyEnemyHitFeedback(e);
         }
-        spawnParticles(b.x, b.y, 6, "#fff", 0.7);
+        if (legacyFeedback) spawnParticles(b.x, b.y, 6, "#fff", 0.7);
         if (e.hp <= 0) {
           if (typeof finishEnemyDestroyed === "function") finishEnemyDestroyed(e, j, true);
           else {
             noteKill(e.reward || enemyScoreForType(e.type), e.type, e.id);
-            spawnDeathBurst(e.x, e.y, e.type === "purple" ? 22 : e.type === "phantom" ? 18 : 14);
+            if (legacyFeedback) spawnDeathBurst(e.x, e.y, e.type === "purple" ? 22 : e.type === "phantom" ? 18 : 14);
             if (shouldDropPowerupNow()) { dropPowerup(e.x, e.y); registerPowerupDrop(240, 360); }
             else state.killsSinceLastDrop++;
             state.enemies.splice(j, 1);
@@ -656,9 +662,9 @@ function updateCollisions() {
           state.enemyBullets.splice(i, 1);
           const immune = wingmanProtected || wm.phase === "arriving" || wm.phase === "departing";
           wm.hitFlash = 8;
-          spawnParticles(wm.x, wm.y, immune ? 5 : 10, immune ? "#bff6ff" : "#f6f", immune ? 0.42 : 0.8);
+          if (legacyFeedback) spawnParticles(wm.x, wm.y, immune ? 5 : 10, immune ? "#bff6ff" : "#f6f", immune ? 0.42 : 0.8);
           if (!immune) state.wingmen.splice(w, 1);
-          if (typeof playGameSound === "function") playGameSound("wingman_hit", immune ? 0.34 : 0.85);
+          if (legacyFeedback && typeof playGameSound === "function") playGameSound("wingman_hit", immune ? 0.34 : 0.85);
           wingmanBlocked = true;
           break;
         }
@@ -672,7 +678,7 @@ function updateCollisions() {
       )) {
         state.enemyBullets.splice(i, 1);
         if (typeof drainPlayerEnergy === "function") drainPlayerEnergy(b.drain || 22, "drainShot");
-        spawnParticles(p.x, p.y, 10, "#70ff45", 0.65);
+        if (legacyFeedback) spawnParticles(p.x, p.y, 10, "#70ff45", 0.65);
       }
       continue;
     }
@@ -712,9 +718,11 @@ function updateCollisions() {
           if (typeof onEnemyDestroyed === "function") onEnemyDestroyed(e);
           state.enemies.splice(i, 1);
           wm.hitFlash = 8;
-          spawnParticles(wm.x, wm.y, immune ? 7 : 12, immune ? "#bff6ff" : "#f6f", immune ? 0.55 : 0.9);
-          spawnDeathBurst(e.x, e.y, 10);
-          if (typeof playGameSound === "function") playGameSound("wingman_hit", immune ? 0.42 : 0.92);
+          if (legacyFeedback) {
+            spawnParticles(wm.x, wm.y, immune ? 7 : 12, immune ? "#bff6ff" : "#f6f", immune ? 0.55 : 0.9);
+            spawnDeathBurst(e.x, e.y, 10);
+            if (typeof playGameSound === "function") playGameSound("wingman_hit", immune ? 0.42 : 0.92);
+          }
           wingmanHit = true;
           break;
         }

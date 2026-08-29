@@ -265,6 +265,77 @@ test("canonical pause damage returns the terminal outcome that must end a ticket
   clearRunRandomStreams();
 });
 
+test("ticketed browser feedback is dispatched once from canonical collision outcomes", async () => {
+  clearRunRandomStreams();
+  await beginSeededStandardRun(seededTicket({ runId: "run_feedback_dispatch" }));
+  const canonical = currentCanonicalRunState();
+  const units = POSITION_UNITS_PER_PIXEL;
+  canonical.player.fireCooldown = 10_000;
+  const enemy = spawnCanonicalEnemy(canonical, "orange", 120 * units, 180 * units, { vx: 0, vy: 0 });
+  enemy.hp = 1;
+  canonical.playerProjectiles.push({
+    id: canonical.nextEntityId++,
+    kind: "player",
+    x: enemy.x,
+    y: enemy.y,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    life: 20,
+    damage: 1,
+    pierce: 0,
+    realm: 0
+  });
+  const sounds = [];
+  const bursts = [];
+  const particles = [];
+  globalThis.playGameSound = (name, volume) => sounds.push({ name, volume });
+  globalThis.spawnDeathBurst = (x, y, count) => bursts.push({ x, y, count });
+  globalThis.spawnParticles = (x, y, count, color, speed) => particles.push({ x, y, count, color, speed });
+  const browserState = {
+    player: {},
+    runStats: {},
+    fx: { flash: 0, shake: 0 },
+    particles: []
+  };
+
+  beginCanonicalRunTick({ keyboard: {}, joystick: { active: false } });
+  assert.equal(canonicalRunSuppressesLegacyFeedback(), true);
+  const outcome = endCanonicalRunTick(browserState);
+
+  assert.equal(
+    canonicalRunSuppressesLegacyFeedback(),
+    true,
+    "legacy feedback stays suppressed between ticks while the authoritative run remains active"
+  );
+  assert.deepEqual(outcome, { advanced: true, terminal: false, canonicalTick: 1 });
+  assert.deepEqual(sounds, [
+    { name: "enemy_hit", volume: 0.62 },
+    { name: "destroy", volume: 0.72 }
+  ]);
+  const hitEvent = canonical.feedbackEvents.find((event) => event.type === "enemy_hit");
+  assert.deepEqual(particles, [
+    {
+      x: hitEvent.x / units,
+      y: hitEvent.y / units,
+      count: 6,
+      color: "#fff",
+      speed: 0.7
+    }
+  ]);
+  assert.deepEqual(bursts, [{ x: hitEvent.x / units, y: hitEvent.y / units, count: 14 }]);
+  assert.deepEqual(browserState.lastCanonicalFeedback, {
+    tick: 1,
+    events: canonical.feedbackEvents
+  });
+
+  delete globalThis.playGameSound;
+  delete globalThis.spawnDeathBurst;
+  delete globalThis.spawnParticles;
+  clearRunRandomStreams();
+  assert.equal(canonicalRunSuppressesLegacyFeedback(), false);
+});
+
 test("ticketed presentation converts canonical entities without mutating legacy arrays", async () => {
   clearRunRandomStreams();
   const ticket = seededTicket({ runId: "run_entity_presentation" });

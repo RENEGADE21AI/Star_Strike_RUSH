@@ -233,8 +233,10 @@ function onEnemyDestroyed(e) {
 function finishEnemyDestroyed(e, index, allowDrop = true) {
   if (!e || index < 0) return;
   noteKill(e.reward || enemyScoreForType(e.type), e.type, e.id);
-  spawnDeathBurst(e.x, e.y, e.type === "purple" ? 22 : e.type === "phantom" ? 18 : e.type === "carrier" ? 24 : 14);
-  if (typeof playGameSound === "function") playGameSound("destroy", e.type === "carrier" ? 1.1 : 0.72);
+  if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+    spawnDeathBurst(e.x, e.y, e.type === "purple" ? 22 : e.type === "phantom" ? 18 : e.type === "carrier" ? 24 : 14);
+    if (typeof playGameSound === "function") playGameSound("destroy", e.type === "carrier" ? 1.1 : 0.72);
+  }
   onEnemyDestroyed(e);
   if (allowDrop && !enemyDropsBlocked(e)) {
     if (shouldDropPowerupNow()) { dropPowerup(e.x, e.y); registerPowerupDrop(240, 360); }
@@ -251,7 +253,13 @@ function drainPlayerEnergy(amount, source = "drain") {
   p.energy = clamp(p.energy - mitigated, 0, p.maxEnergy);
   if (before > p.energy) {
     state.difficulty.ghostGrace = Math.max(state.difficulty.ghostGrace, 18);
-    if (source !== "passive" && state.frame % 6 === 0) spawnParticles(p.x, p.y, 3, "#70ff45", 0.45);
+    if (
+      (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) &&
+      source !== "passive" &&
+      state.frame % 6 === 0
+    ) {
+      spawnParticles(p.x, p.y, 3, "#70ff45", 0.45);
+    }
   }
   return before - p.energy;
 }
@@ -261,9 +269,11 @@ function consumePhaseShieldOnDamage(amount = 1) {
   if (!p || p.phaseShield <= 0) return false;
   p.phaseShield = 0;
   p.inv = Math.max(p.inv, 42);
-  state.fx.flash = Math.max(state.fx.flash, 8);
-  kickShake(amount >= 2 ? 8 : 5);
-  spawnParticles(p.x, p.y, 18, "#d8f7ff", 0.9);
+  if (typeof legacyGameplayFeedbackAllowed !== "function" || legacyGameplayFeedbackAllowed()) {
+    state.fx.flash = Math.max(state.fx.flash, 8);
+    kickShake(amount >= 2 ? 8 : 5);
+    spawnParticles(p.x, p.y, 18, "#d8f7ff", 0.9);
+  }
   showMessage("PHASE SHIELD BROKEN", 55);
   return true;
 }
